@@ -1,0 +1,50 @@
+# DigitalOcean App Platform Specification
+# هذا الملف يخبر DigitalOcean بكيفية نشر المشروع
+
+name: attendance-system
+
+services:
+  # Backend Service (NestJS)
+  - name: backend
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: mahmoudalimohamedali1-cpu/attendance-system
+    source_dir: backend
+    build_command: npm install && npm run build && npx prisma generate
+    run_command: npm run start:prod
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 3000
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${db.DATABASE_URL}
+
+# Static Site (React Dashboard)
+static_sites:
+  - name: dashboard
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: mahmoudalimohamedali1-cpu/attendance-system
+    source_dir: web-admin
+    build_command: npm install && npm run build
+    output_dir: dist
+    envs:
+      - key: VITE_API_BASE_URL
+        scope: BUILD_TIME
+        value: ${backend.PUBLIC_URL}/api/v1
+
+# Database (PostgreSQL)
+databases:
+  - name: db
+    engine: PG
+    production: false
+    cluster_name: attendance-db
+    db_name: attendance_db
+    db_user: attendance_user
+
