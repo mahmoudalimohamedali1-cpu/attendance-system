@@ -75,3 +75,4 @@ https://dashboard.yourcompany.com
 3. GitHub يتحقق تلقائياً من الـ domain
 4. HTTPS مفعل تلقائياً بعد التحقق
 
+
