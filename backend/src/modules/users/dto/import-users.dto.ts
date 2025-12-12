@@ -1,0 +1,13 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsArray, ValidateNested } from 'class-validator';
+import { CreateUserDto } from './create-user.dto';
+
+export class ImportUsersDto {
+  @ApiProperty({ description: 'قائمة المستخدمين', type: [CreateUserDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateUserDto)
+  users: CreateUserDto[];
+}
+

@@ -1,0 +1,601 @@
+// Prisma Schema للنظام الحضور والانصراف
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== المستخدمين والأدوار ====================
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  phone           String?    @unique
+  password        String
+  firstName       String     @map("first_name")
+  lastName        String     @map("last_name")
+  avatar          String?
+  employeeCode    String?    @unique @map("employee_code")
+  jobTitle        String?    @map("job_title")
+  role            Role       @default(EMPLOYEE)
+  status          UserStatus @default(ACTIVE)
+  salary          Decimal?   @db.Decimal(10, 2)
+  hireDate        DateTime?  @map("hire_date")
+  fcmToken        String?    @map("fcm_token")
+  
+  // بيانات التعرف على الوجه
+  faceRegistered    Boolean    @default(false) @map("face_registered")
+  faceData          FaceData?
+  
+  // العلاقات
+  branchId        String?    @map("branch_id")
+  branch          Branch?    @relation(fields: [branchId], references: [id])
+  departmentId    String?    @map("department_id")
+  department      Department? @relation(fields: [departmentId], references: [id])
+  managerId       String?    @map("manager_id")
+  manager         User?      @relation("ManagerEmployees", fields: [managerId], references: [id])
+  employees       User[]     @relation("ManagerEmployees")
+  
+  // السجلات
+  attendances     Attendance[]
+  leaveRequests   LeaveRequest[]  @relation("EmployeeLeaveRequests")
+  approvedLeaves  LeaveRequest[]  @relation("ApproverLeaveRequests")
+  notifications   Notification[]
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]
+  
+  // إعدادات العمل من المنزل
+  workFromHome    WorkFromHome[]
+  
+  // الأجهزة المسجلة
+  registeredDevices RegisteredDevice[]
+  
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  
+  @@map("users")
+}
+
+// ==================== الأجهزة المسجلة للموظفين ====================
+
+enum DeviceStatus {
+  ACTIVE      // نشط ومعتمد
+  PENDING     // في انتظار الموافقة
+  BLOCKED     // محظور
+  INACTIVE    // غير نشط
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+  UNKNOWN
+}
+
+model RegisteredDevice {
+  id              String       @id @default(uuid())
+  userId          String       @map("user_id")
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // معرف الجهاز الفريد
+  deviceId        String       @map("device_id")           // Unique device identifier
+  deviceFingerprint String?    @map("device_fingerprint")  // Hash of device info
+  
+  // معلومات الجهاز
+  deviceName      String?      @map("device_name")         // e.g., "iPhone 14 Pro"
+  deviceModel     String?      @map("device_model")        // e.g., "iPhone14,3"
+  deviceBrand     String?      @map("device_brand")        // e.g., "Apple"
+  platform        DevicePlatform @default(UNKNOWN)
+  osVersion       String?      @map("os_version")          // e.g., "iOS 17.2"
+  appVersion      String?      @map("app_version")         // e.g., "1.0.0"
+  
+  // حالة الجهاز
+  status          DeviceStatus @default(PENDING)
+  isMainDevice    Boolean      @default(false) @map("is_main_device") // الجهاز الرئيسي
+  
+  // الموافقة
+  approvedBy      String?      @map("approved_by")
+  approvedAt      DateTime?    @map("approved_at")
+  blockedReason   String?      @map("blocked_reason")
+  
+  // إحصائيات الاستخدام
+  lastUsedAt      DateTime?    @map("last_used_at")
+  usageCount      Int          @default(0) @map("usage_count")
+  
+  // سجل المحاولات
+  deviceLogs      DeviceAccessLog[]
+  
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  
+  @@unique([userId, deviceId])
+  @@index([deviceId])
+  @@index([userId, status])
+  @@map("registered_devices")
+}
+
+// سجل محاولات الوصول من الأجهزة
+model DeviceAccessLog {
+  id              String   @id @default(uuid())
+  deviceId        String?  @map("device_id")
+  device          RegisteredDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  
+  userId          String   @map("user_id")
+  attemptedDeviceId String @map("attempted_device_id") // معرف الجهاز المستخدم
+  
+  // نوع المحاولة
+  actionType      String   @map("action_type") // CHECK_IN, CHECK_OUT, LOGIN
+  isSuccess       Boolean  @map("is_success")
+  isKnownDevice   Boolean  @map("is_known_device")
+  
+  // معلومات إضافية
+  deviceInfo      String?  @map("device_info") @db.Text // JSON with full device info
+  ipAddress       String?  @map("ip_address")
+  location        String?  // lat,lng
+  
+  // سبب الفشل
+  failureReason   String?  @map("failure_reason")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@index([userId, createdAt])
+  @@index([attemptedDeviceId])
+  @@map("device_access_logs")
+}
+
+// ==================== طلبات تحديث بيانات الحضور ====================
+
+enum UpdateRequestStatus {
+  PENDING     // في انتظار المراجعة
+  APPROVED    // تمت الموافقة
+  REJECTED    // مرفوض
+  CANCELLED   // ملغي من الموظف
+}
+
+enum UpdateRequestType {
+  FACE_UPDATE       // تحديث بيانات الوجه فقط
+  DEVICE_UPDATE     // تحديث بيانات الجهاز فقط
+  BOTH              // تحديث كليهما
+  DEVICE_CHANGE     // تغيير جهاز (موبايل جديد)
+}
+
+model DataUpdateRequest {
+  id              String              @id @default(uuid())
+  userId          String              @map("user_id")
+  
+  // نوع التحديث
+  requestType     UpdateRequestType   @map("request_type")
+  status          UpdateRequestStatus @default(PENDING)
+  
+  // سبب الطلب من الموظف
+  reason          String?             @db.Text
+  
+  // ============ بيانات الوجه الجديدة ============
+  newFaceEmbedding  String?           @map("new_face_embedding") @db.Text
+  newFaceImage      String?           @map("new_face_image") @db.Text     // صورة Base64
+  faceImageQuality  Float?            @map("face_image_quality")
+  
+  // ============ بيانات الجهاز الجديد ============
+  newDeviceId         String?         @map("new_device_id")
+  newDeviceFingerprint String?        @map("new_device_fingerprint")
+  newDeviceName       String?         @map("new_device_name")
+  newDeviceModel      String?         @map("new_device_model")
+  newDeviceBrand      String?         @map("new_device_brand")
+  newDevicePlatform   DevicePlatform? @map("new_device_platform")
+  newDeviceOsVersion  String?         @map("new_device_os_version")
+  newDeviceAppVersion String?         @map("new_device_app_version")
+  
+  // ============ بيانات المراجعة ============
+  reviewedBy      String?             @map("reviewed_by")
+  reviewedAt      DateTime?           @map("reviewed_at")
+  reviewNote      String?             @map("review_note")      // ملاحظة المسؤول
+  rejectionReason String?             @map("rejection_reason")
+  
+  // ============ معلومات إضافية ============
+  oldDeviceId     String?             @map("old_device_id")    // الجهاز القديم للمقارنة
+  
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("data_update_requests")
+}
+
+// ==================== بيانات التعرف على الوجه ====================
+
+model FaceData {
+  id              String   @id @default(uuid())
+  userId          String   @unique @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Face Embeddings - مصفوفة الأرقام التي تمثل ملامح الوجه
+  faceEmbedding   String   @map("face_embedding") @db.Text // JSON array of floats
+  
+  // صورة الوجه المرجعية (Base64 مشفرة)
+  faceImage       String?  @map("face_image") @db.Text
+  
+  // معلومات إضافية
+  registeredAt    DateTime @default(now()) @map("registered_at")
+  lastVerifiedAt  DateTime? @map("last_verified_at")
+  verificationCount Int    @default(0) @map("verification_count")
+  
+  // جودة الصورة والتحقق
+  imageQuality    Float?   @map("image_quality") // 0-1
+  confidence      Float?   // ثقة التسجيل
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@map("face_data")
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceInfo  String?  @map("device_info")
+  ipAddress   String?  @map("ip_address")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("refresh_tokens")
+}
+
+// ==================== الفروع والأقسام ====================
+
+model Branch {
+  id              String   @id @default(uuid())
+  name            String
+  nameEn          String?  @map("name_en")
+  address         String?
+  latitude        Decimal  @db.Decimal(10, 8)
+  longitude       Decimal  @db.Decimal(11, 8)
+  geofenceRadius  Int      @default(100) @map("geofence_radius") // بالمتر
+  timezone        String   @default("Asia/Riyadh")
+  isActive        Boolean  @default(true) @map("is_active")
+  
+  // مواعيد العمل الافتراضية
+  workStartTime   String   @default("09:00") @map("work_start_time")
+  workEndTime     String   @default("17:00") @map("work_end_time")
+  
+  // فترات السماح
+  lateGracePeriod     Int  @default(10) @map("late_grace_period") // دقائق
+  earlyCheckInPeriod  Int  @default(15) @map("early_check_in_period") // دقائق قبل بداية الدوام
+  earlyCheckOutPeriod Int  @default(0) @map("early_check_out_period") // دقائق
+  
+  // أيام العمل
+  workingDays     String   @default("1,2,3,4,5") @map("working_days") // 0=الأحد, 6=السبت
+  
+  users           User[]
+  departments     Department[]
+  attendances     Attendance[]
+  schedules       WorkSchedule[]
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@map("branches")
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String
+  nameEn      String?  @map("name_en")
+  branchId    String   @map("branch_id")
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  
+  // جدول عمل خاص بالقسم (اختياري)
+  workStartTime   String?  @map("work_start_time")
+  workEndTime     String?  @map("work_end_time")
+  
+  users       User[]
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@map("departments")
+}
+
+// ==================== جدول العمل ====================
+
+model WorkSchedule {
+  id              String   @id @default(uuid())
+  branchId        String   @map("branch_id")
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  
+  dayOfWeek       Int      @map("day_of_week") // 0-6 (الأحد - السبت)
+  workStartTime   String   @map("work_start_time")
+  workEndTime     String   @map("work_end_time")
+  isWorkingDay    Boolean  @default(true) @map("is_working_day")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@unique([branchId, dayOfWeek])
+  @@map("work_schedules")
+}
+
+// ==================== سجلات الحضور ====================
+
+enum AttendanceStatus {
+  PRESENT       // حضر في الوقت
+  LATE          // متأخر
+  EARLY_LEAVE   // انصراف مبكر
+  ABSENT        // غائب
+  ON_LEAVE      // إجازة
+  WORK_FROM_HOME // عمل من المنزل
+}
+
+enum CheckType {
+  CHECK_IN
+  CHECK_OUT
+}
+
+model Attendance {
+  id              String           @id @default(uuid())
+  userId          String           @map("user_id")
+  user            User             @relation(fields: [userId], references: [id])
+  branchId        String           @map("branch_id")
+  branch          Branch           @relation(fields: [branchId], references: [id])
+  
+  date            DateTime         @db.Date
+  checkInTime     DateTime?        @map("check_in_time")
+  checkOutTime    DateTime?        @map("check_out_time")
+  
+  // معلومات الموقع عند الحضور
+  checkInLatitude     Decimal?     @db.Decimal(10, 8) @map("check_in_latitude")
+  checkInLongitude    Decimal?     @db.Decimal(11, 8) @map("check_in_longitude")
+  checkInDistance     Int?         @map("check_in_distance") // المسافة بالمتر من الفرع
+  
+  // معلومات الموقع عند الانصراف
+  checkOutLatitude    Decimal?     @db.Decimal(10, 8) @map("check_out_latitude")
+  checkOutLongitude   Decimal?     @db.Decimal(11, 8) @map("check_out_longitude")
+  checkOutDistance    Int?         @map("check_out_distance")
+  
+  // حالة الحضور
+  status          AttendanceStatus @default(PRESENT)
+  lateMinutes     Int              @default(0) @map("late_minutes")
+  earlyLeaveMinutes Int            @default(0) @map("early_leave_minutes")
+  workingMinutes  Int              @default(0) @map("working_minutes")
+  overtimeMinutes Int              @default(0) @map("overtime_minutes")
+  
+  // ملاحظات
+  notes           String?
+  isWorkFromHome  Boolean          @default(false) @map("is_work_from_home")
+  
+  // محاولات مشبوهة
+  isMockLocation  Boolean          @default(false) @map("is_mock_location")
+  deviceInfo      String?          @map("device_info")
+  
+  // التحقق بالوجه
+  checkInFaceVerified   Boolean    @default(false) @map("check_in_face_verified")
+  checkInFaceConfidence Float?     @map("check_in_face_confidence")
+  checkOutFaceVerified  Boolean    @default(false) @map("check_out_face_verified")
+  checkOutFaceConfidence Float?    @map("check_out_face_confidence")
+  
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@index([branchId, date])
+  @@map("attendances")
+}
+
+// سجل محاولات التحقق بالوجه
+model FaceVerificationLog {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  
+  verificationType String  @map("verification_type") // CHECK_IN, CHECK_OUT, REGISTRATION
+  isSuccess       Boolean  @map("is_success")
+  confidence      Float?   // نسبة التطابق
+  threshold       Float?   // الحد الأدنى المطلوب
+  
+  // معلومات الجهاز
+  deviceInfo      String?  @map("device_info")
+  ipAddress       String?  @map("ip_address")
+  
+  // صورة المحاولة (اختياري للتدقيق)
+  attemptImage    String?  @map("attempt_image") @db.Text
+  
+  errorMessage    String?  @map("error_message")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@index([userId, createdAt])
+  @@map("face_verification_logs")
+}
+
+// سجل محاولات الحضور المشبوهة
+model SuspiciousAttempt {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  attemptType     String   @map("attempt_type") // MOCK_LOCATION, OUT_OF_RANGE, etc.
+  latitude        Decimal? @db.Decimal(10, 8)
+  longitude       Decimal? @db.Decimal(11, 8)
+  distance        Int?     // المسافة من الفرع
+  deviceInfo      String?  @map("device_info")
+  ipAddress       String?  @map("ip_address")
+  notes           String?
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("suspicious_attempts")
+}
+
+// ==================== طلبات الإجازات ====================
+
+enum LeaveType {
+  ANNUAL        // إجازة سنوية
+  SICK          // إجازة مرضية
+  PERSONAL      // إجازة شخصية
+  EMERGENCY     // إجازة طارئة
+  WORK_FROM_HOME // عمل من المنزل
+  EARLY_LEAVE   // خروج مبكر
+  OTHER         // أخرى
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveRequest {
+  id              String      @id @default(uuid())
+  userId          String      @map("user_id")
+  user            User        @relation("EmployeeLeaveRequests", fields: [userId], references: [id])
+  
+  type            LeaveType
+  startDate       DateTime    @map("start_date") @db.Date
+  endDate         DateTime    @map("end_date") @db.Date
+  startTime       String?     @map("start_time") // للخروج المبكر
+  endTime         String?     @map("end_time")
+  
+  reason          String
+  status          LeaveStatus @default(PENDING)
+  
+  // الموافقة
+  approverId      String?     @map("approver_id")
+  approver        User?       @relation("ApproverLeaveRequests", fields: [approverId], references: [id])
+  approverNotes   String?     @map("approver_notes")
+  approvedAt      DateTime?   @map("approved_at")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  
+  @@map("leave_requests")
+}
+
+// ==================== العمل من المنزل ====================
+
+model WorkFromHome {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  date        DateTime @db.Date
+  reason      String?
+  approvedBy  String?  @map("approved_by")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@unique([userId, date])
+  @@map("work_from_home")
+}
+
+// ==================== الإشعارات ====================
+
+enum NotificationType {
+  LATE_CHECK_IN
+  EARLY_CHECK_OUT
+  EARLY_CHECK_IN
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  SUSPICIOUS_ACTIVITY
+  GENERAL
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  user        User             @relation(fields: [userId], references: [id])
+  
+  type        NotificationType
+  title       String
+  titleEn     String?          @map("title_en")
+  body        String
+  bodyEn      String?          @map("body_en")
+  data        Json?            // بيانات إضافية
+  
+  isRead      Boolean          @default(false) @map("is_read")
+  readAt      DateTime?        @map("read_at")
+  
+  createdAt   DateTime         @default(now()) @map("created_at")
+  
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ==================== سجل التدقيق ====================
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  SETTINGS_CHANGE
+  EXPORT
+  IMPORT
+}
+
+model AuditLog {
+  id          String      @id @default(uuid())
+  userId      String?     @map("user_id")
+  user        User?       @relation(fields: [userId], references: [id])
+  
+  action      AuditAction
+  entity      String      // اسم الكيان (User, Branch, etc.)
+  entityId    String?     @map("entity_id")
+  oldValue    Json?       @map("old_value")
+  newValue    Json?       @map("new_value")
+  description String?
+  ipAddress   String?     @map("ip_address")
+  userAgent   String?     @map("user_agent")
+  
+  createdAt   DateTime    @default(now()) @map("created_at")
+  
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== العطلات الرسمية ====================
+
+model Holiday {
+  id          String   @id @default(uuid())
+  name        String
+  nameEn      String?  @map("name_en")
+  date        DateTime @db.Date
+  isRecurring Boolean  @default(false) @map("is_recurring") // تتكرر كل سنة
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@map("holidays")
+}
+
+// ==================== إعدادات النظام ====================
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@map("system_settings")
+}
+
