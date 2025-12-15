@@ -8,11 +8,13 @@ import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/l10n/app_localizations.dart';
+import 'core/services/notification_service.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/leaves/presentation/bloc/leaves_bloc.dart';
+import 'features/letters/presentation/bloc/letters_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,10 @@ void main() async {
   
   // Initialize dependency injection
   await configureDependencies();
+  
+  // Initialize Notification Service
+  final notificationService = getIt<NotificationService>();
+  await notificationService.initialize();
   
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -52,6 +58,7 @@ class AttendanceApp extends StatelessWidget {
         BlocProvider(create: (_) => getIt<NotificationsBloc>()),
         BlocProvider(create: (_) => getIt<SettingsBloc>()..add(LoadSettingsEvent())),
         BlocProvider(create: (_) => getIt<LeavesBloc>()),
+        BlocProvider(create: (_) => getIt<LettersBloc>()),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, settingsState) {

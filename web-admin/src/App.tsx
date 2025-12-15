@@ -7,6 +7,7 @@ import { UsersPage } from '@/pages/users/UsersPage';
 import { AttendancePage } from '@/pages/attendance/AttendancePage';
 import { BranchesPage } from '@/pages/branches/BranchesPage';
 import { LeavesPage } from '@/pages/leaves/LeavesPage';
+import { LettersPage } from '@/pages/letters/LettersPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { SettingsPage } from '@/pages/settings/SettingsPage';
 import DataUpdatesPage from '@/pages/data-updates/DataUpdatesPage';
@@ -51,6 +52,7 @@ function App() {
         <Route path="attendance" element={<AttendancePage />} />
         <Route path="branches" element={<BranchesPage />} />
         <Route path="leaves" element={<LeavesPage />} />
+        <Route path="letters" element={<LettersPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="data-updates" element={<DataUpdatesPage />} />
         <Route path="settings" element={<SettingsPage />} />

@@ -11,6 +11,12 @@ import '../../features/attendance/presentation/pages/attendance_history_page.dar
 import '../../features/attendance/presentation/pages/monthly_stats_page.dart';
 import '../../features/leaves/presentation/pages/leaves_page.dart';
 import '../../features/leaves/presentation/pages/create_leave_request_page.dart';
+import '../../features/leaves/presentation/pages/pending_leaves_page.dart';
+import '../../features/leaves/presentation/pages/leave_details_page.dart';
+import '../../features/letters/presentation/pages/create_letter_request_page.dart';
+import '../../features/letters/presentation/pages/pending_letters_page.dart';
+import '../../features/letters/presentation/pages/letter_details_page.dart';
+import '../../features/letters/presentation/pages/letters_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/change_password_page.dart';
@@ -88,6 +94,49 @@ class AppRouter {
                 name: 'new-leave',
                 parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) => const CreateLeaveRequestPage(),
+              ),
+              GoRoute(
+                path: 'pending',
+                name: 'pending-leaves',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const PendingLeavesPage(),
+              ),
+              GoRoute(
+                path: 'details/:id',
+                name: 'leave-details',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return LeaveDetailsPage(leaveId: id);
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/letters',
+            name: 'letters',
+            builder: (context, state) => const LettersPage(),
+            routes: [
+              GoRoute(
+                path: 'new',
+                name: 'new-letter',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const CreateLetterRequestPage(),
+              ),
+              GoRoute(
+                path: 'pending',
+                name: 'pending-letters',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const PendingLettersPage(),
+              ),
+              GoRoute(
+                path: 'details/:id',
+                name: 'letter-details',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return LetterDetailsPage(letterId: id);
+                },
               ),
             ],
           ),

@@ -32,6 +32,11 @@ import '../../features/leaves/data/repositories/leaves_repository_impl.dart';
 import '../../features/leaves/domain/repositories/leaves_repository.dart';
 import '../../features/leaves/presentation/bloc/leaves_bloc.dart';
 
+import '../../features/letters/data/datasources/letters_remote_datasource.dart';
+import '../../features/letters/data/repositories/letters_repository_impl.dart';
+import '../../features/letters/domain/repositories/letters_repository.dart';
+import '../../features/letters/presentation/bloc/letters_bloc.dart';
+
 import '../../features/notifications/data/datasources/notifications_remote_datasource.dart';
 import '../../features/notifications/data/repositories/notifications_repository_impl.dart';
 import '../../features/notifications/domain/repositories/notifications_repository.dart';
@@ -102,6 +107,10 @@ Future<void> configureDependencies() async {
     () => LeavesRemoteDataSourceImpl(getIt()),
   );
   
+  getIt.registerLazySingleton<LettersRemoteDataSource>(
+    () => LettersRemoteDataSourceImpl(getIt()),
+  );
+  
   getIt.registerLazySingleton<NotificationsRemoteDataSource>(
     () => NotificationsRemoteDataSourceImpl(getIt()),
   );
@@ -117,6 +126,10 @@ Future<void> configureDependencies() async {
   
   getIt.registerLazySingleton<LeavesRepository>(
     () => LeavesRepositoryImpl(getIt()),
+  );
+  
+  getIt.registerLazySingleton<LettersRepository>(
+    () => LettersRepositoryImpl(getIt()),
   );
   
   getIt.registerLazySingleton<NotificationsRepository>(
@@ -139,6 +152,8 @@ Future<void> configureDependencies() async {
       logoutUseCase: getIt(),
       refreshTokenUseCase: getIt(),
       storageService: getIt(),
+      notificationService: getIt(),
+      authRepository: getIt(),
     ),
   );
   
@@ -154,6 +169,10 @@ Future<void> configureDependencies() async {
   
   getIt.registerFactory<LeavesBloc>(
     () => LeavesBloc(getIt()),
+  );
+  
+  getIt.registerFactory<LettersBloc>(
+    () => LettersBloc(getIt()),
   );
   
   getIt.registerFactory<NotificationsBloc>(

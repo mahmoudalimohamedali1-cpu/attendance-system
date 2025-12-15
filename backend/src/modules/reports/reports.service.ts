@@ -19,6 +19,7 @@ export class ReportsService {
       activeEmployees,
       todayAttendance,
       pendingLeaves,
+      pendingLetters,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: 'EMPLOYEE' } }),
       this.prisma.user.count({ where: { role: 'EMPLOYEE', status: 'ACTIVE' } }),
@@ -26,6 +27,7 @@ export class ReportsService {
         where: { date: today },
       }),
       this.prisma.leaveRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.letterRequest.count({ where: { status: 'PENDING' } }),
     ]);
 
     const presentToday = todayAttendance.filter((a) => a.checkInTime).length;
@@ -46,6 +48,7 @@ export class ReportsService {
         workFromHome: workFromHomeToday,
       },
       pendingLeaves,
+      pendingLetters,
     };
   }
 

@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 // Core Modules
 import { PrismaModule } from './common/prisma/prisma.module';
+import { UploadModule } from './common/upload/upload.module';
 import { AppController } from './app.controller';
 
 // Feature Modules
@@ -12,6 +13,7 @@ import { UsersModule } from './modules/users/users.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { LeavesModule } from './modules/leaves/leaves.module';
+import { LettersModule } from './modules/letters/letters.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AuditModule } from './modules/audit/audit.module';
@@ -33,6 +35,7 @@ import { DataUpdateModule } from './modules/data-update/data-update.module';
 
     // Core
     PrismaModule,
+    UploadModule,
 
     // Features
     AuthModule,
@@ -40,6 +43,7 @@ import { DataUpdateModule } from './modules/data-update/data-update.module';
     BranchesModule,
     AttendanceModule,
     LeavesModule,
+    LettersModule,
     NotificationsModule,
     ReportsModule,
     AuditModule,
@@ -50,5 +54,5 @@ import { DataUpdateModule } from './modules/data-update/data-update.module';
   ],
   controllers: [AppController],
 })
-export class AppModule {}
+export class AppModule { }
 

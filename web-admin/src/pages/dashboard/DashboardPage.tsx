@@ -23,6 +23,7 @@ import {
   Schedule,
   PersonOff,
   HomeWork,
+  Description,
 } from '@mui/icons-material';
 import {
   PieChart,
@@ -49,6 +50,7 @@ interface DashboardStats {
     workFromHome: number;
   };
   pendingLeaves: number;
+  pendingLetters?: number;
 }
 
 export const DashboardPage = () => {
@@ -88,6 +90,7 @@ export const DashboardPage = () => {
     employees: { total: 0, active: 0 },
     today: { present: 0, late: 0, earlyLeave: 0, absent: 0, workFromHome: 0 },
     pendingLeaves: 0,
+    pendingLetters: 0,
   };
 
   const pieData = [
@@ -160,6 +163,14 @@ export const DashboardPage = () => {
       icon: <Warning />,
       color: '#0288d1',
       bgColor: '#e1f5fe',
+    },
+    {
+      title: 'خطابات معلقة',
+      value: dashboardStats.pendingLetters || 0,
+      subtitle: 'خطاب قيد المراجعة',
+      icon: <Description />,
+      color: '#7b1fa2',
+      bgColor: '#f3e5f5',
     },
   ];
 

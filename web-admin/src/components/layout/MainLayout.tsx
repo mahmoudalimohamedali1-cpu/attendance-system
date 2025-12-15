@@ -33,6 +33,7 @@ import {
   Notifications,
   Person,
   Sync as SyncIcon,
+  Description,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -44,6 +45,7 @@ const menuItems = [
   { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance' },
   { text: 'الفروع والأقسام', icon: <Business />, path: '/branches' },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves' },
+  { text: 'الخطابات', icon: <Description />, path: '/letters' },
   { text: 'طلبات التحديث', icon: <SyncIcon />, path: '/data-updates', badge: true },
   { text: 'التقارير', icon: <Assessment />, path: '/reports' },
   { text: 'الإعدادات', icon: <Settings />, path: '/settings' },

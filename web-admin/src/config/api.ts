@@ -81,6 +81,18 @@ export const API_ENDPOINTS = {
     DISABLE_WFH: (userId: string, date: string) => `/leaves/work-from-home/${userId}/${date}`,
   },
   
+  // Letters
+  LETTERS: {
+    CREATE: '/letters',
+    MY: '/letters/my',
+    GET: (id: string) => `/letters/${id}`,
+    CANCEL: (id: string) => `/letters/${id}`,
+    PENDING: '/letters/pending/all',
+    APPROVE: (id: string) => `/letters/${id}/approve`,
+    REJECT: (id: string) => `/letters/${id}/reject`,
+    ALL: '/letters/admin/all',
+  },
+  
   // Notifications
   NOTIFICATIONS: {
     LIST: '/notifications',
