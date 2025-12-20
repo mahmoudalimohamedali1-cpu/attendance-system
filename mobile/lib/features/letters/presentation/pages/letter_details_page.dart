@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/letters_bloc.dart';
 
@@ -40,18 +41,26 @@ class _LetterDetailsPageState extends State<LetterDetailsPage> {
   String _getStatusLabel(String status) {
     final labels = {
       'PENDING': 'قيد المراجعة',
+      'MGR_APPROVED': 'موافقة المدير',
+      'MGR_REJECTED': 'رفض المدير',
       'APPROVED': 'موافق عليها',
       'REJECTED': 'مرفوضة',
+      'DELAYED': 'مؤجل',
     };
     return labels[status] ?? status;
   }
 
   Color _getStatusColor(String status) {
     switch (status) {
+      case 'MGR_APPROVED':
+        return Colors.blue;
       case 'APPROVED':
         return AppTheme.successColor;
+      case 'MGR_REJECTED':
       case 'REJECTED':
         return AppTheme.errorColor;
+      case 'DELAYED':
+        return Colors.purple;
       default:
         return AppTheme.warningColor;
     }
@@ -325,6 +334,27 @@ class _LetterDetailsPageState extends State<LetterDetailsPage> {
                               final url = attachment['url'] ?? attachment['path'] ?? '';
                               final filename = attachment['originalName'] ?? attachment['filename'] ?? '';
                               return ListTile(
+                                onTap: () async {
+                                  if (url.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('رابط الملف غير متوفر')),
+                                    );
+                                    return;
+                                  }
+                                  final fullUrl = url.startsWith('http') 
+                                      ? url 
+                                      : 'http://72.61.239.170:3000$url';
+                                  final uri = Uri.parse(fullUrl);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  } else {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('لا يمكن فتح الملف')),
+                                      );
+                                    }
+                                  }
+                                },
                                 leading: Icon(
                                   url.toLowerCase().contains('.pdf')
                                       ? Icons.picture_as_pdf
@@ -332,12 +362,8 @@ class _LetterDetailsPageState extends State<LetterDetailsPage> {
                                   color: AppTheme.primaryColor,
                                 ),
                                 title: Text(filename),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.open_in_new),
-                                  onPressed: () {
-                                    // يمكن فتح الملف في متصفح أو تطبيق خارجي
-                                  },
-                                ),
+                                subtitle: const Text('اضغط لفتح المرفق'),
+                                trailing: const Icon(Icons.open_in_new, color: AppTheme.primaryColor),
                               );
                             }),
                           ],
@@ -375,8 +401,73 @@ class _LetterDetailsPageState extends State<LetterDetailsPage> {
                     ),
                   ],
 
-                  // Action Buttons (only for pending requests)
-                  if (status == 'PENDING') ...[
+                  // HR Attachments (signed letter from HR)
+                  if ((letter['hrAttachments'] as List?)?.isNotEmpty ?? false) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      elevation: 2,
+                      color: Colors.green[50],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.file_download, color: Colors.green[700]),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'الخطاب الموقع من HR',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ...(letter['hrAttachments'] as List).map((attachment) {
+                              final url = attachment['url'] ?? attachment['path'] ?? '';
+                              final filename = attachment['originalName'] ?? attachment['filename'] ?? 'ملف';
+                              return ListTile(
+                                onTap: () async {
+                                  final fullUrl = url.startsWith('http') 
+                                      ? url 
+                                      : 'http://72.61.239.170:3000$url';
+                                  final uri = Uri.parse(fullUrl);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  } else {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('لا يمكن فتح الملف')),
+                                      );
+                                    }
+                                  }
+                                },
+                                leading: Icon(
+                                  url.toLowerCase().contains('.pdf')
+                                      ? Icons.picture_as_pdf
+                                      : Icons.image,
+                                  color: Colors.green[700],
+                                ),
+                                title: Text(filename),
+                                subtitle: const Text('اضغط لتحميل الخطاب'),
+                                trailing: Icon(Icons.download, color: Colors.green[700]),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Action Buttons (for pending or MGR_APPROVED requests)
+                  if (status == 'PENDING' || status == 'MGR_APPROVED') ...[
                     const SizedBox(height: 24),
                     Row(
                       children: [

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
@@ -15,25 +16,54 @@ import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/leaves/presentation/bloc/leaves_bloc.dart';
 import 'features/letters/presentation/bloc/letters_bloc.dart';
+import 'features/raises/presentation/bloc/raises_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Hive
-  await Hive.initFlutter();
+  // Initialize Firebase first
+  try {
+    await Firebase.initializeApp();
+    print('✅ Firebase initialized');
+  } catch (e) {
+    print('⚠️ Firebase initialization failed: $e');
+    // Continue without Firebase - app should still work
+  }
   
-  // Initialize dependency injection
-  await configureDependencies();
+  try {
+    // Initialize Hive
+    await Hive.initFlutter();
+  } catch (e) {
+    print('⚠️ Error initializing Hive: $e');
+  }
   
-  // Initialize Notification Service
-  final notificationService = getIt<NotificationService>();
-  await notificationService.initialize();
+  try {
+    // Initialize dependency injection
+    await configureDependencies();
+  } catch (e) {
+    print('❌ Error configuring dependencies: $e');
+    // Continue anyway - some dependencies might still work
+  }
+  
+  try {
+    // Initialize Notification Service (non-blocking)
+    final notificationService = getIt<NotificationService>();
+    notificationService.initialize().catchError((error) {
+      print('⚠️ Error initializing NotificationService: $error');
+    });
+  } catch (e) {
+    print('⚠️ Error getting NotificationService: $e');
+  }
   
   // Set preferred orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } catch (e) {
+    print('⚠️ Error setting orientations: $e');
+  }
   
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
@@ -51,14 +81,99 @@ class AttendanceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('🚀 Building AttendanceApp...');
+    
+    // Create blocs with error handling
+    AuthBloc? authBloc;
+    AttendanceBloc? attendanceBloc;
+    NotificationsBloc? notificationsBloc;
+    SettingsBloc? settingsBloc;
+    LeavesBloc? leavesBloc;
+    LettersBloc? lettersBloc;
+    RaisesBloc? raisesBloc;
+    
+    try {
+      authBloc = getIt<AuthBloc>();
+      print('✅ AuthBloc created');
+    } catch (e) {
+      print('❌ Error creating AuthBloc: $e');
+    }
+    
+    try {
+      attendanceBloc = getIt<AttendanceBloc>();
+    } catch (e) {
+      print('❌ Error creating AttendanceBloc: $e');
+    }
+    
+    try {
+      notificationsBloc = getIt<NotificationsBloc>();
+    } catch (e) {
+      print('❌ Error creating NotificationsBloc: $e');
+    }
+    
+    try {
+      settingsBloc = getIt<SettingsBloc>();
+    } catch (e) {
+      print('❌ Error creating SettingsBloc: $e');
+    }
+    
+    try {
+      leavesBloc = getIt<LeavesBloc>();
+    } catch (e) {
+      print('❌ Error creating LeavesBloc: $e');
+    }
+    
+    try {
+      lettersBloc = getIt<LettersBloc>();
+    } catch (e) {
+      print('❌ Error creating LettersBloc: $e');
+    }
+    
+    try {
+      raisesBloc = getIt<RaisesBloc>();
+    } catch (e) {
+      print('❌ Error creating RaisesBloc: $e');
+    }
+    
+    // If critical blocs failed, show error screen
+    if (authBloc == null || settingsBloc == null) {
+      return MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 64),
+                const SizedBox(height: 20),
+                const Text(
+                  'فشل تشغيل التطبيق',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  authBloc == null ? 'خطأ في AuthBloc' : 'خطأ في SettingsBloc',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Trigger initial events
+    authBloc.add(CheckAuthStatusEvent());
+    settingsBloc.add(LoadSettingsEvent());
+    
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (_) => getIt<AuthBloc>()..add(CheckAuthStatusEvent())),
-        BlocProvider(create: (_) => getIt<AttendanceBloc>()),
-        BlocProvider(create: (_) => getIt<NotificationsBloc>()),
-        BlocProvider(create: (_) => getIt<SettingsBloc>()..add(LoadSettingsEvent())),
-        BlocProvider(create: (_) => getIt<LeavesBloc>()),
-        BlocProvider(create: (_) => getIt<LettersBloc>()),
+        BlocProvider.value(value: authBloc),
+        if (attendanceBloc != null) BlocProvider.value(value: attendanceBloc),
+        if (notificationsBloc != null) BlocProvider.value(value: notificationsBloc),
+        BlocProvider.value(value: settingsBloc),
+        if (leavesBloc != null) BlocProvider.value(value: leavesBloc),
+        if (lettersBloc != null) BlocProvider.value(value: lettersBloc),
+        if (raisesBloc != null) BlocProvider.value(value: raisesBloc),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, settingsState) {

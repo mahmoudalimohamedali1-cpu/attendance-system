@@ -4,6 +4,13 @@ abstract class LeavesRemoteDataSource {
   Future<dynamic> createLeaveRequest(Map<String, dynamic> data);
   Future<dynamic> getMyLeaveRequests(Map<String, dynamic> params);
   Future<dynamic> cancelLeaveRequest(String id);
+  Future<dynamic> uploadAttachments(List<String> filePaths);
+  
+  // Manager/Admin methods
+  Future<dynamic> getPendingLeaveRequests(Map<String, dynamic> params);
+  Future<dynamic> approveLeaveRequest(String id, {String? notes});
+  Future<dynamic> rejectLeaveRequest(String id, {String? notes});
+  Future<dynamic> getLeaveRequestById(String id);
 }
 
 class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
@@ -28,5 +35,34 @@ class LeavesRemoteDataSourceImpl implements LeavesRemoteDataSource {
     final response = await _apiClient.cancelLeaveRequest(id);
     return response.data;
   }
-}
 
+  @override
+  Future<dynamic> uploadAttachments(List<String> filePaths) async {
+    final response = await _apiClient.uploadLeaveAttachments(filePaths);
+    return response.data;
+  }
+
+  @override
+  Future<dynamic> getPendingLeaveRequests(Map<String, dynamic> params) async {
+    final response = await _apiClient.getPendingLeaveRequests(params);
+    return response.data;
+  }
+
+  @override
+  Future<dynamic> approveLeaveRequest(String id, {String? notes}) async {
+    final response = await _apiClient.approveLeaveRequest(id, notes: notes);
+    return response.data;
+  }
+
+  @override
+  Future<dynamic> rejectLeaveRequest(String id, {String? notes}) async {
+    final response = await _apiClient.rejectLeaveRequest(id, notes: notes);
+    return response.data;
+  }
+
+  @override
+  Future<dynamic> getLeaveRequestById(String id) async {
+    final response = await _apiClient.getLeaveRequestById(id);
+    return response.data;
+  }
+}

@@ -2,6 +2,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsBoolean, IsString, Min, Max, IsNotEmpty } from 'class-validator';
 
 export class CheckInDto {
+  @ApiProperty({ description: 'معرف الشركة' })
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
   @ApiProperty({
     description: 'خط العرض',
     example: 24.7136,
@@ -98,5 +103,29 @@ export class CheckInDto {
   @IsOptional()
   @IsString()
   deviceFingerprint?: string;
+
+  // ============ Play Integrity API ============
+
+  @ApiPropertyOptional({
+    description: 'Play Integrity Token من Google',
+  })
+  @IsOptional()
+  @IsString()
+  integrityToken?: string;
+
+  @ApiPropertyOptional({
+    description: 'هل فشل فحص Integrity على الجهاز',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  integrityCheckFailed?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'رسالة خطأ Integrity إن وجدت',
+  })
+  @IsOptional()
+  @IsString()
+  integrityError?: string;
 }
 

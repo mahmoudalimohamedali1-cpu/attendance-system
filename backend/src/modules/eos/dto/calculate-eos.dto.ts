@@ -1,0 +1,57 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, IsEnum, IsDateString, IsNumber } from 'class-validator';
+
+export enum EosReason {
+    RESIGNATION = 'RESIGNATION',           // استقالة
+    TERMINATION = 'TERMINATION',            // إنهاء خدمات من الشركة
+    END_OF_CONTRACT = 'END_OF_CONTRACT',    // انتهاء العقد
+    RETIREMENT = 'RETIREMENT',              // تقاعد
+    DEATH = 'DEATH',                        // وفاة
+}
+
+export class CalculateEosDto {
+    @ApiProperty({ description: 'سبب إنهاء الخدمة', enum: EosReason })
+    @IsEnum(EosReason)
+    reason: EosReason;
+
+    @ApiProperty({ description: 'تاريخ آخر يوم عمل' })
+    @IsDateString()
+    lastWorkingDay: string;
+
+    @ApiPropertyOptional({ description: 'تجاوز الراتب الأساسي (اختياري)', example: 10000 })
+    @IsNumber()
+    @IsOptional()
+    overrideBaseSalary?: number;
+}
+
+export interface EosBreakdown {
+    employeeId: string;
+    employeeName: string;
+    hireDate: Date;
+    lastWorkingDay: Date;
+    yearsOfService: number;
+    monthsOfService: number;
+    totalDaysOfService: number;
+
+    baseSalary: number;
+    reason: EosReason;
+
+    // حساب المكافأة
+    eosForFirst5Years: number;    // 1/2 شهر عن كل سنة
+    eosForRemaining: number;      // شهر عن كل سنة بعد الخامسة
+    totalEos: number;
+
+    // تعديلات حسب السبب (استقالة قبل 5 سنوات)
+    eosAdjustmentFactor: number;  // 1.0 = كامل، 0.5 = نصف، 0.333 = ثلث
+    adjustedEos: number;
+
+    // رصيد الإجازات
+    remainingLeaveDays: number;
+    leavePayout: number;
+
+    // خصم السلف
+    outstandingLoans: number;
+
+    // المبلغ النهائي
+    netSettlement: number;
+}

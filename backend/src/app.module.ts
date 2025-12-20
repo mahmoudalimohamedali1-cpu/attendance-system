@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 
-// Core Modules
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { UploadModule } from './common/upload/upload.module';
+import { RedisModule } from './common/redis/redis.module';
+import { QueueModule } from './common/queue/queue.module';
 import { AppController } from './app.controller';
 
 // Feature Modules
@@ -21,6 +23,27 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { FaceRecognitionModule } from './modules/face-recognition/face-recognition.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { DataUpdateModule } from './modules/data-update/data-update.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
+import { JobTitlesModule } from './modules/job-titles/job-titles.module';
+import { RaisesModule } from './modules/raises/raises.module';
+import { AdvancesModule } from './modules/advances/advances.module';
+import { SalaryComponentsModule } from './modules/salary-components/salary-components.module';
+import { SalaryStructuresModule } from './modules/salary-structures/salary-structures.module';
+import { SalaryAssignmentsModule } from './modules/salary-assignments/salary-assignments.module';
+import { PayrollPeriodsModule } from './modules/payroll-periods/payroll-periods.module';
+import { PayrollRunsModule } from './modules/payroll-runs/payroll-runs.module';
+import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module';
+import { GosiModule } from './modules/gosi/gosi.module';
+import { EosModule } from './modules/eos/eos.module';
+import { PdfModule } from './common/pdf/pdf.module';
+import { ExcelModule } from './common/excel/excel.module';
+import { EmailModule } from './common/email/email.module';
+import { RetroPayModule } from './modules/retro-pay/retro-pay.module';
+import { PoliciesModule } from './modules/policies/policies.module';
+import { LoanPaymentsModule } from './modules/loan-payments/loan-payments.module';
+import { PayrollCalculationModule } from './modules/payroll-calculation/payroll-calculation.module';
+import { CompaniesModule } from './modules/companies/companies.module';
+import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
   imports: [
@@ -36,6 +59,8 @@ import { DataUpdateModule } from './modules/data-update/data-update.module';
     // Core
     PrismaModule,
     UploadModule,
+    RedisModule,
+    QueueModule,
 
     // Features
     AuthModule,
@@ -44,6 +69,8 @@ import { DataUpdateModule } from './modules/data-update/data-update.module';
     AttendanceModule,
     LeavesModule,
     LettersModule,
+    RaisesModule,         // طلبات الزيادة
+    AdvancesModule,       // طلبات السلف
     NotificationsModule,
     ReportsModule,
     AuditModule,
@@ -51,8 +78,31 @@ import { DataUpdateModule } from './modules/data-update/data-update.module';
     FaceRecognitionModule, // التعرف على الوجه
     DevicesModule,        // إدارة الأجهزة المسجلة
     DataUpdateModule,     // طلبات تحديث البيانات
+    PermissionsModule,    // نظام الصلاحيات
+    JobTitlesModule,      // الدرجات الوظيفية
+    SalaryComponentsModule, // مكونات الراتب
+    SalaryStructuresModule, // هياكل الرواتب
+    SalaryAssignmentsModule, // تعيينات الرواتب
+    PayrollPeriodsModule,   // فترات الرواتب
+    PayrollRunsModule,      // مسيرات الرواتب
+    BankAccountsModule,     // الحسابات البنكية للموظفين
+    GosiModule,             // التأمينات الاجتماعية
+    EosModule,              // مكافأة نهاية الخدمة
+    PdfModule,              // توليد PDF
+    ExcelModule,            // تصدير Excel
+    EmailModule,            // إرسال البريد الإلكتروني
+    RetroPayModule,         // الفروقات
+    PoliciesModule,         // محرك السياسات
+    LoanPaymentsModule,     // تتبع سداد السلف
+    PayrollCalculationModule, // محرك الحساب
+    CompaniesModule,        // إدارة الشركات
   ],
   controllers: [AppController],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TenantInterceptor,
+    },
+  ],
 })
 export class AppModule { }
-

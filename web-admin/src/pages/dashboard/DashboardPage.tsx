@@ -1,4 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -14,6 +16,21 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Snackbar,
+  IconButton,
+
+  Paper,
+  Divider,
 } from '@mui/material';
 import {
   People,
@@ -24,6 +41,21 @@ import {
   PersonOff,
   HomeWork,
   Description,
+  Login,
+  EventBusy,
+  Add,
+  BeachAccess,
+  Mail,
+  PhoneAndroid,
+  Face,
+  MonetizationOn,
+  Send,
+  Close,
+
+  History,
+  CloudUpload,
+  Delete,
+  AttachFile,
 } from '@mui/icons-material';
 import {
   PieChart,
@@ -35,10 +67,13 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
 } from 'recharts';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { api } from '@/services/api.service';
+import { useAuthStore } from '@/store/auth.store';
 
 interface DashboardStats {
   employees: { total: number; active: number };
@@ -53,8 +88,62 @@ interface DashboardStats {
   pendingLetters?: number;
 }
 
+interface EmployeeDashboard {
+  isEmployeeDashboard: true;
+  myAttendance: {
+    checkedIn: boolean;
+    checkInTime: string | null;
+    checkOutTime: string | null;
+    status: string;
+    workingMinutes: number;
+  } | null;
+  myPendingLeaves: number;
+  myPendingLetters: number;
+  myApprovedLeaves: number;
+  remainingLeaveDays?: number;
+  annualLeaveDays?: number;
+}
+
+type DashboardResponse = DashboardStats | EmployeeDashboard;
+
 export const DashboardPage = () => {
-  const { data: stats, isLoading, error } = useQuery<DashboardStats>({
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
+  const [openLetterDialog, setOpenLetterDialog] = useState(false);
+  const [openRaiseDialog, setOpenRaiseDialog] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
+
+  // Manager leave request form state
+  const [leaveForm, setLeaveForm] = useState({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
+  const [letterForm, setLetterForm] = useState({ type: 'CERTIFICATION', subject: '', content: '', priority: 'NORMAL' });
+  const [leaveAttachments, setLeaveAttachments] = useState<any[]>([]);
+  const [letterAttachments, setLetterAttachments] = useState<any[]>([]);
+  const [raiseAttachments, setRaiseAttachments] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const leaveFileInputRef = useRef<HTMLInputElement>(null);
+  const letterFileInputRef = useRef<HTMLInputElement>(null);
+  const raiseFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Raise form state
+  const [raiseForm, setRaiseForm] = useState({ type: 'SALARY_INCREASE', amount: '', effectiveMonth: '', notes: '' });
+
+  // Advance form state
+  const [openAdvanceDialog, setOpenAdvanceDialog] = useState(false);
+  const [advanceForm, setAdvanceForm] = useState({
+    type: 'BANK_TRANSFER',
+    amount: '',
+    startDate: '',
+    endDate: '',
+    periodMonths: '',
+    monthlyDeduction: '',
+    notes: ''
+  });
+  const [advanceAttachments, setAdvanceAttachments] = useState<any[]>([]);
+  const advanceFileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: stats, isLoading, error } = useQuery<DashboardResponse>({
     queryKey: ['dashboard'],
     queryFn: () => api.get('/reports/dashboard'),
     refetchInterval: 60000,
@@ -63,12 +152,123 @@ export const DashboardPage = () => {
   const { data: recentAttendance } = useQuery<{ data: Array<{ id: string; user: { firstName: string; lastName: string }; checkInTime: string | null; checkOutTime: string | null; status: string }> }>({
     queryKey: ['recent-attendance'],
     queryFn: () => api.get('/attendance/admin/all?limit=5'),
+    enabled: !stats || !('isEmployeeDashboard' in stats),
   });
 
   const { data: weeklyStatsData } = useQuery<{ data: Array<{ date: string; present: number; late: number; absent: number }> }>({
     queryKey: ['weekly-stats'],
     queryFn: () => api.get('/reports/weekly-summary'),
+    enabled: !stats || !('isEmployeeDashboard' in stats),
   });
+
+  // Mutations for manager requests
+  const leaveRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/leaves', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setOpenLeaveDialog(false);
+      setLeaveForm({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
+      setLeaveAttachments([]);
+      setSnackbar({ open: true, message: 'تم إرسال طلب الإجازة بنجاح', severity: 'success' });
+    },
+    onError: () => {
+      setSnackbar({ open: true, message: 'فشل إرسال الطلب', severity: 'error' });
+    },
+  });
+
+  const letterRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/letters', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setOpenLetterDialog(false);
+      setLetterForm({ type: 'CERTIFICATION', subject: '', content: '', priority: 'NORMAL' });
+      setLetterAttachments([]);
+      setSnackbar({ open: true, message: 'تم إرسال طلب الخطاب بنجاح', severity: 'success' });
+    },
+    onError: () => {
+      setSnackbar({ open: true, message: 'فشل إرسال الطلب', severity: 'error' });
+    },
+  });
+
+  const raiseRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/raises', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setOpenRaiseDialog(false);
+      setRaiseForm({ type: 'SALARY_INCREASE', amount: '', effectiveMonth: '', notes: '' });
+      setRaiseAttachments([]);
+      setSnackbar({ open: true, message: 'تم إرسال طلب الزيادة بنجاح', severity: 'success' });
+    },
+    onError: () => {
+      setSnackbar({ open: true, message: 'فشل إرسال الطلب', severity: 'error' });
+    },
+  });
+
+  const advanceRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/advances', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setOpenAdvanceDialog(false);
+      setAdvanceForm({
+        type: 'BANK_TRANSFER',
+        amount: '',
+        startDate: '',
+        endDate: '',
+        periodMonths: '',
+        monthlyDeduction: '',
+        notes: ''
+      });
+      setAdvanceAttachments([]);
+      setSnackbar({ open: true, message: 'تم إرسال طلب السلفة بنجاح', severity: 'success' });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'فشل إرسال الطلب';
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    },
+  });
+
+  // File upload handlers
+  const handleLeaveFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    Array.from(files).forEach(file => formData.append('files', file));
+    try {
+      const response = await api.postFormData<any>('/leaves/upload-attachments', formData);
+      console.log('=== UPLOAD RESPONSE ===', JSON.stringify(response, null, 2));
+      if (response?.files && Array.isArray(response.files) && response.files.length > 0) {
+        console.log('FILES FOUND:', response.files);
+        setLeaveAttachments(prev => [...prev, ...response.files]);
+        setSnackbar({ open: true, message: 'تم رفع الملفات بنجاح!', severity: 'success' });
+      } else {
+        console.error('NO FILES - response:', response);
+        setSnackbar({ open: true, message: 'لم يتم استلام الملفات - تحقق من console', severity: 'error' });
+      }
+    } catch (err) {
+      console.error('UPLOAD ERROR:', err);
+      setSnackbar({ open: true, message: 'فشل رفع الملفات', severity: 'error' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleLetterFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    Array.from(files).forEach(file => formData.append('files', file));
+    try {
+      const response = await api.postFormData<{ files: any[] }>('/letters/upload-attachments', formData);
+      if (response?.files) {
+        setLetterAttachments(prev => [...prev, ...response.files]);
+        setSnackbar({ open: true, message: 'تم رفع الملفات بنجاح', severity: 'success' });
+      }
+    } catch {
+      setSnackbar({ open: true, message: 'فشل رفع الملفات', severity: 'error' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -86,7 +286,14 @@ export const DashboardPage = () => {
     );
   }
 
-  const dashboardStats = stats || {
+  // Employee Dashboard
+  if (stats && 'isEmployeeDashboard' in stats) {
+    return <EmployeeDashboardView data={stats} />;
+  }
+
+  // Admin/Manager Dashboard
+  const adminStats = stats as DashboardStats;
+  const dashboardStats = adminStats || {
     employees: { total: 0, active: 0 },
     today: { present: 0, late: 0, earlyLeave: 0, absent: 0, workFromHome: 0 },
     pendingLeaves: 0,
@@ -100,20 +307,19 @@ export const DashboardPage = () => {
     { name: 'من المنزل', value: dashboardStats.today.workFromHome, color: '#9c27b0' },
   ].filter(item => item.value > 0);
 
-  // استخدام البيانات الأسبوعية الفعلية أو الافتراضية
   const weeklyData = weeklyStatsData?.data?.map(item => ({
     day: new Date(item.date).toLocaleDateString('ar-EG', { weekday: 'long' }),
     present: item.present || 0,
     late: item.late || 0,
     absent: item.absent || 0,
   })) || [
-    { day: 'السبت', present: 0, late: 0, absent: 0 },
-    { day: 'الأحد', present: 0, late: 0, absent: 0 },
-    { day: 'الإثنين', present: 0, late: 0, absent: 0 },
-    { day: 'الثلاثاء', present: 0, late: 0, absent: 0 },
-    { day: 'الأربعاء', present: 0, late: 0, absent: 0 },
-    { day: 'الخميس', present: 0, late: 0, absent: 0 },
-  ];
+      { day: 'السبت', present: 0, late: 0, absent: 0 },
+      { day: 'الأحد', present: 0, late: 0, absent: 0 },
+      { day: 'الإثنين', present: 0, late: 0, absent: 0 },
+      { day: 'الثلاثاء', present: 0, late: 0, absent: 0 },
+      { day: 'الأربعاء', present: 0, late: 0, absent: 0 },
+      { day: 'الخميس', present: 0, late: 0, absent: 0 },
+    ];
 
   const statCards = [
     {
@@ -186,6 +392,97 @@ export const DashboardPage = () => {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         مرحباً بك! هذه نظرة عامة على النظام اليوم
       </Typography>
+
+      {/* Quick Actions for MANAGER role */}
+      {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
+        <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Add color="primary" />
+            الخدمات المتاحة
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          <Grid container spacing={2}>
+            <Grid item xs={6} sm={4} md={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                color="primary"
+                size="large"
+                startIcon={<BeachAccess />}
+                onClick={() => setOpenLeaveDialog(true)}
+                sx={{ py: 2, borderRadius: 2 }}
+              >
+                طلب إجازة
+              </Button>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                color="secondary"
+                size="large"
+                startIcon={<Mail />}
+                onClick={() => setOpenLetterDialog(true)}
+                sx={{ py: 2, borderRadius: 2 }}
+              >
+                طلب خطاب
+              </Button>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                color="success"
+                size="large"
+                startIcon={<MonetizationOn />}
+                onClick={() => setOpenRaiseDialog(true)}
+                sx={{ py: 2, borderRadius: 2 }}
+              >
+                طلب زيادة
+              </Button>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                color="warning"
+                size="large"
+                startIcon={<MonetizationOn />}
+                onClick={() => setOpenAdvanceDialog(true)}
+                sx={{ py: 2, borderRadius: 2, bgcolor: '#ff9800' }}
+              >
+                طلب سلفة
+              </Button>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="info"
+                size="large"
+                startIcon={<PhoneAndroid />}
+                onClick={() => navigate('/data-updates')}
+                sx={{ py: 2, borderRadius: 2 }}
+              >
+                تحديث جهاز
+              </Button>
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="warning"
+                size="large"
+                startIcon={<Face />}
+                onClick={() => navigate('/data-updates')}
+                sx={{ py: 2, borderRadius: 2 }}
+              >
+                تحديث الوجه
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -311,7 +608,7 @@ export const DashboardPage = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <RechartsTooltip />
                 </PieChart>
               </ResponsiveContainer>
               <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -349,19 +646,19 @@ export const DashboardPage = () => {
                         record.checkOutTime
                           ? `تسجيل انصراف - ${new Date(record.checkOutTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
                           : record.checkInTime
-                          ? `تسجيل حضور - ${new Date(record.checkInTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
-                          : 'لم يسجل بعد'
+                            ? `تسجيل حضور - ${new Date(record.checkInTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
+                            : 'لم يسجل بعد'
                       }
                     />
                   </ListItem>
                 )) || (
-                  <ListItem sx={{ px: 0 }}>
-                    <ListItemText
-                      primary="لا توجد نشاطات حديثة"
-                      secondary="سيتم عرض النشاطات هنا"
-                    />
-                  </ListItem>
-                )}
+                    <ListItem sx={{ px: 0 }}>
+                      <ListItemText
+                        primary="لا توجد نشاطات حديثة"
+                        secondary="سيتم عرض النشاطات هنا"
+                      />
+                    </ListItem>
+                  )}
               </List>
             </CardContent>
           </Card>
@@ -379,7 +676,7 @@ export const DashboardPage = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
                   <YAxis />
-                  <Tooltip />
+                  <RechartsTooltip />
                   <Legend />
                   <Bar dataKey="present" name="حاضر" fill="#4caf50" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="late" name="متأخر" fill="#ff9800" radius={[4, 4, 0, 0]} />
@@ -390,6 +687,1465 @@ export const DashboardPage = () => {
           </Card>
         </Grid>
       </Grid>
-    </Box>
+
+      {/* Manager Leave Request Dialog */}
+      {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
+        <>
+          <Dialog open={openLeaveDialog} onClose={() => setOpenLeaveDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">طلب إجازة جديد</Typography>
+                <IconButton onClick={() => setOpenLeaveDialog(false)}>
+                  <Close />
+                </IconButton>
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>نوع الإجازة</InputLabel>
+                    <Select
+                      value={leaveForm.type}
+                      label="نوع الإجازة"
+                      onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })}
+                    >
+                      <MenuItem value="ANNUAL">سنوية</MenuItem>
+                      <MenuItem value="SICK">مرضية</MenuItem>
+                      <MenuItem value="EMERGENCY">طارئة</MenuItem>
+                      <MenuItem value="UNPAID">بدون راتب</MenuItem>
+                      <MenuItem value="PERMISSION">إذن</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="من تاريخ"
+                    type="date"
+                    value={leaveForm.startDate}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="إلى تاريخ"
+                    type="date"
+                    value={leaveForm.endDate}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="السبب"
+                    multiline
+                    rows={3}
+                    value={leaveForm.reason}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                  />
+                </Grid>
+                {/* File Upload Section */}
+                <Grid item xs={12}>
+                  <input
+                    type="file"
+                    ref={leaveFileInputRef}
+                    style={{ display: 'none' }}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    multiple
+                    onChange={(e) => handleLeaveFileUpload(e.target.files)}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                    onClick={() => leaveFileInputRef.current?.click()}
+                    disabled={isUploading}
+                    sx={{ mb: 1 }}
+                  >
+                    {isUploading ? 'جاري الرفع...' : 'إرفاق ملفات (اختياري)'}
+                  </Button>
+                  {leaveAttachments.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {leaveAttachments.map((file, index) => (
+                        <Chip
+                          key={index}
+                          icon={<AttachFile />}
+                          label={file.originalName}
+                          variant="outlined"
+                          color="info"
+                          onDelete={() => setLeaveAttachments(prev => prev.filter((_, i) => i !== index))}
+                          deleteIcon={<Delete />}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenLeaveDialog(false)}>إلغاء</Button>
+              <Button
+                variant="contained"
+                startIcon={<Send />}
+                onClick={() => leaveRequestMutation.mutate({ ...leaveForm, attachments: leaveAttachments })}
+                disabled={leaveRequestMutation.isPending || !leaveForm.startDate || !leaveForm.endDate || !leaveForm.reason}
+              >
+                إرسال الطلب
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Manager Letter Request Dialog */}
+          <Dialog open={openLetterDialog} onClose={() => setOpenLetterDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">طلب خطاب جديد</Typography>
+                <IconButton onClick={() => setOpenLetterDialog(false)}>
+                  <Close />
+                </IconButton>
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>نوع الخطاب</InputLabel>
+                    <Select
+                      value={letterForm.type}
+                      label="نوع الخطاب"
+                      onChange={(e) => setLetterForm({ ...letterForm, type: e.target.value })}
+                    >
+                      <MenuItem value="CERTIFICATION">شهادة</MenuItem>
+                      <MenuItem value="SALARY_CERTIFICATE">شهادة راتب</MenuItem>
+                      <MenuItem value="EXPERIENCE_CERTIFICATE">شهادة خبرة</MenuItem>
+                      <MenuItem value="REQUEST">طلب</MenuItem>
+                      <MenuItem value="COMPLAINT">شكوى</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="الموضوع"
+                    value={letterForm.subject}
+                    onChange={(e) => setLetterForm({ ...letterForm, subject: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="المحتوى"
+                    multiline
+                    rows={4}
+                    value={letterForm.content}
+                    onChange={(e) => setLetterForm({ ...letterForm, content: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>الأولوية</InputLabel>
+                    <Select
+                      value={letterForm.priority}
+                      label="الأولوية"
+                      onChange={(e) => setLetterForm({ ...letterForm, priority: e.target.value })}
+                    >
+                      <MenuItem value="LOW">منخفضة</MenuItem>
+                      <MenuItem value="NORMAL">عادية</MenuItem>
+                      <MenuItem value="HIGH">عالية</MenuItem>
+                      <MenuItem value="URGENT">عاجلة</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                {/* File Upload Section */}
+                <Grid item xs={12}>
+                  <input
+                    type="file"
+                    ref={letterFileInputRef}
+                    style={{ display: 'none' }}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    multiple
+                    onChange={(e) => handleLetterFileUpload(e.target.files)}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                    onClick={() => letterFileInputRef.current?.click()}
+                    disabled={isUploading}
+                    sx={{ mb: 1 }}
+                  >
+                    {isUploading ? 'جاري الرفع...' : 'إرفاق ملفات (اختياري)'}
+                  </Button>
+                  {letterAttachments.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {letterAttachments.map((file, index) => (
+                        <Chip
+                          key={index}
+                          icon={<AttachFile />}
+                          label={file.originalName}
+                          variant="outlined"
+                          color="secondary"
+                          onDelete={() => setLetterAttachments(prev => prev.filter((_, i) => i !== index))}
+                          deleteIcon={<Delete />}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenLetterDialog(false)}>إلغاء</Button>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<Send />}
+                onClick={() => letterRequestMutation.mutate({ ...letterForm, attachments: letterAttachments })}
+                disabled={letterRequestMutation.isPending || !letterForm.subject || !letterForm.content}
+              >
+                إرسال الطلب
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Manager Raise Request Dialog */}
+          <Dialog open={openRaiseDialog} onClose={() => setOpenRaiseDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">طلب زيادة جديد</Typography>
+                <IconButton onClick={() => setOpenRaiseDialog(false)}>
+                  <Close />
+                </IconButton>
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>نوع الطلب</InputLabel>
+                    <Select
+                      value={raiseForm.type}
+                      label="نوع الطلب"
+                      onChange={(e) => setRaiseForm({ ...raiseForm, type: e.target.value })}
+                    >
+                      <MenuItem value="SALARY_INCREASE">زيادة راتب</MenuItem>
+                      <MenuItem value="ANNUAL_LEAVE_BONUS">بدل إجازة سنوية</MenuItem>
+                      <MenuItem value="BUSINESS_TRIP">رحلة عمل</MenuItem>
+                      <MenuItem value="BONUS">مكافأة</MenuItem>
+                      <MenuItem value="ALLOWANCE">بدل</MenuItem>
+                      <MenuItem value="OTHER">أخرى</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="المبلغ (ر.س)"
+                    type="number"
+                    value={raiseForm.amount}
+                    onChange={(e) => setRaiseForm({ ...raiseForm, amount: e.target.value })}
+                    InputProps={{ inputProps: { min: 0 } }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="الزيادة لشهر"
+                    type="month"
+                    value={raiseForm.effectiveMonth}
+                    onChange={(e) => setRaiseForm({ ...raiseForm, effectiveMonth: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="الملاحظات"
+                    multiline
+                    rows={3}
+                    value={raiseForm.notes}
+                    onChange={(e) => setRaiseForm({ ...raiseForm, notes: e.target.value })}
+                    inputProps={{ maxLength: 200 }}
+                    helperText={`${raiseForm.notes.length}/200`}
+                  />
+                </Grid>
+                {/* File Upload Section */}
+                <Grid item xs={12}>
+                  <input
+                    type="file"
+                    ref={raiseFileInputRef}
+                    style={{ display: 'none' }}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    multiple
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (!files || files.length === 0) return;
+                      setIsUploading(true);
+                      const formData = new FormData();
+                      Array.from(files).forEach(file => formData.append('files', file));
+                      try {
+                        const response = await api.postFormData<any>('/raises/upload-attachments', formData);
+                        if (response?.files && Array.isArray(response.files)) {
+                          setRaiseAttachments(prev => [...prev, ...response.files]);
+                          setSnackbar({ open: true, message: 'تم رفع الملفات بنجاح', severity: 'success' });
+                        }
+                      } catch {
+                        setSnackbar({ open: true, message: 'فشل رفع الملفات', severity: 'error' });
+                      } finally {
+                        setIsUploading(false);
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                    onClick={() => raiseFileInputRef.current?.click()}
+                    disabled={isUploading}
+                    sx={{ mb: 1 }}
+                  >
+                    {isUploading ? 'جاري الرفع...' : 'إرفاق ملفات (اختياري)'}
+                  </Button>
+                  {raiseAttachments.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {raiseAttachments.map((file, index) => (
+                        <Chip
+                          key={index}
+                          icon={<AttachFile />}
+                          label={file.originalName}
+                          variant="outlined"
+                          color="success"
+                          onDelete={() => setRaiseAttachments(prev => prev.filter((_, i) => i !== index))}
+                          deleteIcon={<Delete />}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenRaiseDialog(false)}>إلغاء</Button>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<Send />}
+                onClick={() => raiseRequestMutation.mutate({
+                  type: raiseForm.type,
+                  amount: parseFloat(raiseForm.amount),
+                  effectiveMonth: raiseForm.effectiveMonth + '-01',
+                  notes: raiseForm.notes || null,
+                  attachments: raiseAttachments.length > 0 ? raiseAttachments : null,
+                })}
+                disabled={raiseRequestMutation.isPending || !raiseForm.amount || !raiseForm.effectiveMonth}
+              >
+                إرسال الطلب
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Manager Advance Request Dialog */}
+          <Dialog open={openAdvanceDialog} onClose={() => setOpenAdvanceDialog(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">طلب سلفة جديد</Typography>
+                <IconButton onClick={() => setOpenAdvanceDialog(false)}>
+                  <Close />
+                </IconButton>
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>نوع السلفة</InputLabel>
+                    <Select
+                      value={advanceForm.type}
+                      label="نوع السلفة"
+                      onChange={(e) => setAdvanceForm({ ...advanceForm, type: e.target.value })}
+                    >
+                      <MenuItem value="BANK_TRANSFER">سلفة تحويل بنكي</MenuItem>
+                      <MenuItem value="CASH">سلفه نقداً</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="المبلغ المطلوب"
+                    type="number"
+                    value={advanceForm.amount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const deduction = val && advanceForm.periodMonths ? (Number(val) / Number(advanceForm.periodMonths)).toFixed(2) : '';
+                      setAdvanceForm({ ...advanceForm, amount: val, monthlyDeduction: deduction });
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="مدة السداد (شهور)"
+                    type="number"
+                    value={advanceForm.periodMonths}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const deduction = val && advanceForm.amount ? (Number(advanceForm.amount) / Number(val)).toFixed(2) : '';
+                      setAdvanceForm({ ...advanceForm, periodMonths: val, monthlyDeduction: deduction });
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="من تاريخ"
+                    type="date"
+                    value={advanceForm.startDate}
+                    onChange={(e) => setAdvanceForm({ ...advanceForm, startDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="الاستقطاع الشهري"
+                    type="number"
+                    disabled
+                    value={advanceForm.monthlyDeduction}
+                    helperText="يتم حسابه تلقائياً"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="ملاحظات"
+                    multiline
+                    rows={2}
+                    value={advanceForm.notes}
+                    onChange={(e) => setAdvanceForm({ ...advanceForm, notes: e.target.value })}
+                  />
+                </Grid>
+                {/* File Upload Section */}
+                <Grid item xs={12}>
+                  <input
+                    type="file"
+                    ref={advanceFileInputRef}
+                    style={{ display: 'none' }}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    multiple
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (!files || files.length === 0) return;
+                      setIsUploading(true);
+                      const formData = new FormData();
+                      Array.from(files).forEach(file => formData.append('files', file));
+                      try {
+                        const response = await api.postFormData<any>('/advances/upload-attachments', formData);
+                        if (response?.files && Array.isArray(response.files)) {
+                          setAdvanceAttachments(prev => [...prev, ...response.files]);
+                          setSnackbar({ open: true, message: 'تم رفع الملفات بنجاح', severity: 'success' });
+                        }
+                      } catch {
+                        setSnackbar({ open: true, message: 'فشل رفع الملفات', severity: 'error' });
+                      } finally {
+                        setIsUploading(false);
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                    onClick={() => advanceFileInputRef.current?.click()}
+                    disabled={isUploading}
+                    sx={{ mb: 1 }}
+                  >
+                    {isUploading ? 'جاري الرفع...' : 'إرفاق ملفات (اختياري)'}
+                  </Button>
+                  {advanceAttachments.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {advanceAttachments.map((file, index) => (
+                        <Chip
+                          key={index}
+                          icon={<AttachFile />}
+                          label={file.originalName}
+                          variant="outlined"
+                          color="warning"
+                          onDelete={() => setAdvanceAttachments(prev => prev.filter((_, i) => i !== index))}
+                          deleteIcon={<Delete />}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenAdvanceDialog(false)}>إلغاء</Button>
+              <Button
+                variant="contained"
+                color="warning"
+                startIcon={<Send />}
+                onClick={() => {
+                  const start = new Date(advanceForm.startDate);
+                  const end = new Date(start.setMonth(start.getMonth() + Number(advanceForm.periodMonths)));
+                  advanceRequestMutation.mutate({
+                    ...advanceForm,
+                    endDate: end.toISOString().split('T')[0],
+                    attachments: advanceAttachments
+                  });
+                }}
+                disabled={advanceRequestMutation.isPending || !advanceForm.amount || !advanceForm.startDate || !advanceForm.periodMonths}
+                sx={{ bgcolor: '#ff9800' }}
+              >
+                إرسال الطلب
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      )
+      }
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box >
   );
 };
+
+// Enhanced Employee Dashboard Component with Quick Actions
+function EmployeeDashboardView({ data }: { data: EmployeeDashboard }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
+  const [openLetterDialog, setOpenLetterDialog] = useState(false);
+  const [openRaiseDialog, setOpenRaiseDialog] = useState(false);
+  const [openAdvanceDialog, setOpenAdvanceDialog] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
+
+  // Upload refs
+  const leaveFileInputRef = useRef<HTMLInputElement>(null);
+  const letterFileInputRef = useRef<HTMLInputElement>(null);
+  const raiseFileInputRef = useRef<HTMLInputElement>(null);
+  const advanceFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Leave request form state
+  const [leaveForm, setLeaveForm] = useState({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
+  const [leaveAttachments, setLeaveAttachments] = useState<any[]>([]);
+
+  // Letter request form state
+  const [letterForm, setLetterForm] = useState({ type: 'CERTIFICATION', subject: '', content: '', priority: 'NORMAL' });
+  const [letterAttachments, setLetterAttachments] = useState<any[]>([]);
+
+  // Raise form state
+  const [raiseForm, setRaiseForm] = useState({ type: 'SALARY_INCREASE', amount: '', effectiveMonth: '', notes: '' });
+  const [raiseAttachments, setRaiseAttachments] = useState<any[]>([]);
+
+  // Advance form state
+  const [advanceForm, setAdvanceForm] = useState({
+    type: 'BANK_TRANSFER',
+    amount: '',
+    startDate: '',
+    endDate: '',
+    periodMonths: '',
+    monthlyDeduction: '',
+    notes: ''
+  });
+  const [advanceAttachments, setAdvanceAttachments] = useState<any[]>([]);
+
+  // Fetch my recent requests
+  const { data: myLeaves } = useQuery<{ data: Array<any> }>({
+    queryKey: ['my-leaves'],
+    queryFn: () => api.get('/leaves/my?limit=5'),
+  });
+
+  const { data: myLetters } = useQuery<{ data: Array<any> }>({
+    queryKey: ['my-letters'],
+    queryFn: () => api.get('/letters/my?limit=5'),
+  });
+
+  // Submit leave request
+  const leaveRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/leaves', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['my-leaves'] });
+      setOpenLeaveDialog(false);
+      setLeaveForm({ type: 'ANNUAL', startDate: '', endDate: '', reason: '' });
+      setSnackbar({ open: true, message: 'تم إرسال طلب الإجازة بنجاح', severity: 'success' });
+    },
+    onError: () => {
+      setSnackbar({ open: true, message: 'فشل إرسال الطلب', severity: 'error' });
+    },
+  });
+
+  // Submit letter request
+  const letterRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/letters', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['my-letters'] });
+      setOpenLetterDialog(false);
+      setLetterForm({ type: 'CERTIFICATION', subject: '', content: '', priority: 'NORMAL' });
+      setSnackbar({ open: true, message: 'تم إرسال طلب الخطاب بنجاح', severity: 'success' });
+    },
+    onError: () => {
+      setSnackbar({ open: true, message: 'فشل إرسال الطلب', severity: 'error' });
+    },
+  });
+
+  // Submit advance request
+  const advanceRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/advances', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setOpenAdvanceDialog(false);
+      setAdvanceForm({
+        type: 'BANK_TRANSFER',
+        amount: '',
+        startDate: '',
+        endDate: '',
+        periodMonths: '',
+        monthlyDeduction: '',
+        notes: ''
+      });
+      setAdvanceAttachments([]);
+      setSnackbar({ open: true, message: 'تم إرسال طلب السلفة بنجاح', severity: 'success' });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'فشل إرسال الطلب';
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    },
+  });
+
+  // Submit raise request
+  const raiseRequestMutation = useMutation({
+    mutationFn: (formData: any) => api.post('/raises', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setOpenRaiseDialog(false);
+      setRaiseForm({ type: 'SALARY_INCREASE', amount: '', effectiveMonth: '', notes: '' });
+      setRaiseAttachments([]);
+      setSnackbar({ open: true, message: 'تم إرسال طلب الزيادة بنجاح', severity: 'success' });
+    },
+    onError: () => {
+      setSnackbar({ open: true, message: 'فشل إرسال الطلب', severity: 'error' });
+    },
+  });
+
+  // Attachment Handler for Employee View
+  const handleFileUpload = async (files: FileList | null, type: 'leave' | 'letter' | 'raise' | 'advance') => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    Array.from(files).forEach(file => formData.append('files', file));
+
+    let endpoint = '';
+    switch (type) {
+      case 'leave': endpoint = '/leaves/upload-attachments'; break;
+      case 'letter': endpoint = '/letters/upload-attachments'; break;
+      case 'raise': endpoint = '/raises/upload-attachments'; break;
+      case 'advance': endpoint = '/advances/upload-attachments'; break;
+    }
+
+    try {
+      const response = await api.postFormData<any>(endpoint, formData);
+      if (response?.files && Array.isArray(response.files)) {
+        if (type === 'leave') setLeaveAttachments(prev => [...prev, ...response.files]);
+        if (type === 'letter') setLetterAttachments(prev => [...prev, ...response.files]);
+        if (type === 'raise') setRaiseAttachments(prev => [...prev, ...response.files]);
+        if (type === 'advance') setAdvanceAttachments(prev => [...prev, ...response.files]);
+        setSnackbar({ open: true, message: 'تم رفع الملفات بنجاح', severity: 'success' });
+      }
+    } catch {
+      setSnackbar({ open: true, message: 'فشل رفع الملفات', severity: 'error' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const getLeaveTypeLabel = (type: string) => {
+    const types: Record<string, string> = {
+      ANNUAL: 'سنوية',
+      SICK: 'مرضية',
+      EMERGENCY: 'طارئة',
+      UNPAID: 'بدون راتب',
+      PERMISSION: 'إذن',
+    };
+    return types[type] || type;
+  };
+
+  const getLetterTypeLabel = (type: string) => {
+    const types: Record<string, string> = {
+      CERTIFICATION: 'شهادة',
+      SALARY_CERTIFICATE: 'شهادة راتب',
+      EXPERIENCE_CERTIFICATE: 'شهادة خبرة',
+      REQUEST: 'طلب',
+      COMPLAINT: 'شكوى',
+    };
+    return types[type] || type;
+  };
+
+  const getStatusLabel = (status: string) => {
+    const statuses: Record<string, string> = {
+      PENDING: 'قيد المراجعة',
+      MGR_APPROVED: 'موافقة المدير',
+      APPROVED: 'موافق عليه',
+      REJECTED: 'مرفوض',
+      DELAYED: 'مؤجل',
+      CANCELLED: 'ملغي',
+    };
+    return statuses[status] || status;
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, 'warning' | 'info' | 'success' | 'error' | 'default'> = {
+      PENDING: 'warning',
+      MGR_APPROVED: 'info',
+      APPROVED: 'success',
+      REJECTED: 'error',
+      DELAYED: 'default',
+      CANCELLED: 'default',
+    };
+    return colors[status] || 'default';
+  };
+
+  return (
+    <Box>
+      <Typography variant="h4" fontWeight="bold" gutterBottom>
+        لوحة التحكم الشخصية
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+        مرحباً بك! يمكنك من هنا متابعة حضورك وإرسال الطلبات
+      </Typography>
+
+      <Grid container spacing={3}>
+        {/* Today's Attendance */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                حضورك اليوم
+              </Typography>
+              {data.myAttendance ? (
+                <Box>
+                  <Box display="flex" alignItems="center" gap={2} mb={2}>
+                    <Avatar sx={{ bgcolor: data.myAttendance.checkedIn ? 'success.main' : 'grey.400', width: 60, height: 60 }}>
+                      {data.myAttendance.checkedIn ? <CheckCircle sx={{ fontSize: 32 }} /> : <Login sx={{ fontSize: 32 }} />}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h5" fontWeight="bold">
+                        {data.myAttendance.checkedIn ? 'أنت حاضر ✓' : 'لم تسجل بعد'}
+                      </Typography>
+                      <Typography color="text.secondary">
+                        الحالة: {data.myAttendance.status || 'نشط'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  {data.myAttendance.checkInTime && (
+                    <Box display="flex" gap={4}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">وقت الحضور</Typography>
+                        <Typography variant="h6">{new Date(data.myAttendance.checkInTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</Typography>
+                      </Box>
+                      {data.myAttendance.checkOutTime && (
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">وقت الانصراف</Typography>
+                          <Typography variant="h6">{new Date(data.myAttendance.checkOutTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</Typography>
+                        </Box>
+                      )}
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">ساعات العمل</Typography>
+                        <Typography variant="h6">{Math.round((data.myAttendance.workingMinutes || 0) / 60 * 10) / 10} ساعة</Typography>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                <Box display="flex" alignItems="center" justifyContent="center" height={150}>
+                  <Typography color="text.secondary">لم تسجل حضورك اليوم</Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Leave Balance */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                رصيد الإجازات
+              </Typography>
+              <Box display="flex" alignItems="center" justifyContent="center" py={2}>
+                <Box textAlign="center">
+                  <Typography variant="h2" fontWeight="bold" color="primary.main">
+                    {data.remainingLeaveDays ?? '--'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    يوم متبقي من {data.annualLeaveDays ?? '--'} يوم
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={data.annualLeaveDays ? ((data.remainingLeaveDays || 0) / data.annualLeaveDays) * 100 : 0}
+                    sx={{ mt: 2, height: 10, borderRadius: 5, width: 200 }}
+                    color={
+                      (data.remainingLeaveDays || 0) / (data.annualLeaveDays || 1) > 0.5
+                        ? 'success'
+                        : (data.remainingLeaveDays || 0) / (data.annualLeaveDays || 1) > 0.2
+                          ? 'warning'
+                          : 'error'
+                    }
+                  />
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Quick Actions */}
+        <Grid item xs={12}>
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Add color="primary" />
+              الخدمات المتاحة
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Grid container spacing={2}>
+              <Grid item xs={6} sm={4} md={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  startIcon={<BeachAccess />}
+                  onClick={() => setOpenLeaveDialog(true)}
+                  sx={{ py: 2, borderRadius: 2 }}
+                >
+                  طلب إجازة
+                </Button>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  color="secondary"
+                  size="large"
+                  startIcon={<Mail />}
+                  onClick={() => setOpenLetterDialog(true)}
+                  sx={{ py: 2, borderRadius: 2 }}
+                >
+                  طلب خطاب
+                </Button>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  color="success"
+                  size="large"
+                  startIcon={<MonetizationOn />}
+                  onClick={() => setOpenRaiseDialog(true)}
+                  sx={{ py: 2, borderRadius: 2 }}
+                >
+                  طلب زيادة
+                </Button>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  color="warning"
+                  size="large"
+                  startIcon={<MonetizationOn />}
+                  onClick={() => setOpenAdvanceDialog(true)}
+                  sx={{ py: 2, borderRadius: 2, bgcolor: '#ff9800' }}
+                >
+                  طلب سلفة
+                </Button>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="info"
+                  size="large"
+                  startIcon={<PhoneAndroid />}
+                  onClick={() => navigate('/data-updates')}
+                  sx={{ py: 2, borderRadius: 2 }}
+                >
+                  تحديث جهاز
+                </Button>
+              </Grid>
+              <Grid item xs={6} sm={4} md={2}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="warning"
+                  size="large"
+                  startIcon={<Face />}
+                  onClick={() => navigate('/data-updates')}
+                  sx={{ py: 2, borderRadius: 2 }}
+                >
+                  تحديث الوجه
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+
+        {/* My Requests Summary */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <EventBusy color="primary" />
+                ملخص طلباتي
+              </Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={4}>
+                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50' }}>
+                    <Typography variant="h4" fontWeight="bold" color="warning.main">{data.myPendingLeaves}</Typography>
+                    <Typography variant="caption" color="text.secondary">إجازات معلقة</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={4}>
+                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'info.50' }}>
+                    <Typography variant="h4" fontWeight="bold" color="info.main">{data.myPendingLetters}</Typography>
+                    <Typography variant="caption" color="text.secondary">خطابات معلقة</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={4}>
+                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}>
+                    <Typography variant="h4" fontWeight="bold" color="success.main">{data.myApprovedLeaves}</Typography>
+                    <Typography variant="caption" color="text.secondary">موافق عليها</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Recent Leaves */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <History color="primary" />
+                  آخر طلبات الإجازات
+                </Typography>
+                <Button size="small" onClick={() => navigate('/leaves')}>عرض الكل</Button>
+              </Box>
+              <List dense sx={{ py: 0 }}>
+                {myLeaves?.data?.slice(0, 4).map((leave: any, i: number) => (
+                  <ListItem key={leave.id || i} sx={{ px: 0 }}>
+                    <ListItemAvatar>
+                      <Avatar sx={{ bgcolor: getStatusColor(leave.status) + '.light', width: 36, height: 36 }}>
+                        <BeachAccess sx={{ fontSize: 18 }} />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={getLeaveTypeLabel(leave.type)}
+                      secondary={format(new Date(leave.startDate), 'dd/MM/yyyy', { locale: ar })}
+                    />
+                    <Chip label={getStatusLabel(leave.status)} size="small" color={getStatusColor(leave.status)} />
+                  </ListItem>
+                )) || (
+                    <ListItem sx={{ px: 0 }}>
+                      <ListItemText primary="لا توجد طلبات سابقة" />
+                    </ListItem>
+                  )}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Recent Letters */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Description color="secondary" />
+                  آخر طلبات الخطابات
+                </Typography>
+                <Button size="small" onClick={() => navigate('/letters')}>عرض الكل</Button>
+              </Box>
+              <List dense sx={{ py: 0 }}>
+                {myLetters?.data?.slice(0, 3).map((letter: any, i: number) => (
+                  <ListItem key={letter.id || i} sx={{ px: 0 }}>
+                    <ListItemAvatar>
+                      <Avatar sx={{ bgcolor: getStatusColor(letter.status) + '.light', width: 36, height: 36 }}>
+                        <Mail sx={{ fontSize: 18 }} />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={letter.subject || getLetterTypeLabel(letter.type)}
+                      secondary={format(new Date(letter.createdAt), 'dd/MM/yyyy', { locale: ar })}
+                    />
+                    <Chip label={getStatusLabel(letter.status)} size="small" color={getStatusColor(letter.status)} />
+                  </ListItem>
+                )) || (
+                    <ListItem sx={{ px: 0 }}>
+                      <ListItemText primary="لا توجد طلبات سابقة" />
+                    </ListItem>
+                  )}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Leave Request Dialog */}
+      <Dialog open={openLeaveDialog} onClose={() => setOpenLeaveDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">طلب إجازة جديد</Typography>
+            <IconButton onClick={() => setOpenLeaveDialog(false)}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>نوع الإجازة</InputLabel>
+                <Select
+                  value={leaveForm.type}
+                  label="نوع الإجازة"
+                  onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })}
+                >
+                  <MenuItem value="ANNUAL">سنوية</MenuItem>
+                  <MenuItem value="SICK">مرضية</MenuItem>
+                  <MenuItem value="EMERGENCY">طارئة</MenuItem>
+                  <MenuItem value="UNPAID">بدون راتب</MenuItem>
+                  <MenuItem value="PERMISSION">إذن</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="من تاريخ"
+                type="date"
+                value={leaveForm.startDate}
+                onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="إلى تاريخ"
+                type="date"
+                value={leaveForm.endDate}
+                onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="السبب"
+                multiline
+                rows={3}
+                value={leaveForm.reason}
+                onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <input
+                type="file"
+                ref={leaveFileInputRef}
+                style={{ display: 'none' }}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                multiple
+                onChange={(e) => handleFileUpload(e.target.files, 'leave')}
+              />
+              <Button
+                variant="outlined"
+                startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                onClick={() => leaveFileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                إرفاق ملفات (اختياري)
+              </Button>
+              {leaveAttachments.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                  {leaveAttachments.map((file, index) => (
+                    <Chip key={index} label={file.originalName} size="small" onDelete={() => setLeaveAttachments(prev => prev.filter((_, i) => i !== index))} />
+                  ))}
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenLeaveDialog(false)}>إلغاء</Button>
+          <Button
+            variant="contained"
+            startIcon={<Send />}
+            onClick={() => leaveRequestMutation.mutate(leaveForm)}
+            disabled={leaveRequestMutation.isPending || !leaveForm.startDate || !leaveForm.endDate || !leaveForm.reason}
+          >
+            إرسال الطلب
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Letter Request Dialog */}
+      <Dialog open={openLetterDialog} onClose={() => setOpenLetterDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">طلب خطاب جديد</Typography>
+            <IconButton onClick={() => setOpenLetterDialog(false)}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>نوع الخطاب</InputLabel>
+                <Select
+                  value={letterForm.type}
+                  label="نوع الخطاب"
+                  onChange={(e) => setLetterForm({ ...letterForm, type: e.target.value })}
+                >
+                  <MenuItem value="CERTIFICATION">شهادة</MenuItem>
+                  <MenuItem value="SALARY_CERTIFICATE">شهادة راتب</MenuItem>
+                  <MenuItem value="EXPERIENCE_CERTIFICATE">شهادة خبرة</MenuItem>
+                  <MenuItem value="REQUEST">طلب</MenuItem>
+                  <MenuItem value="COMPLAINT">شكوى</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="الموضوع"
+                value={letterForm.subject}
+                onChange={(e) => setLetterForm({ ...letterForm, subject: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="المحتوى"
+                multiline
+                rows={4}
+                value={letterForm.content}
+                onChange={(e) => setLetterForm({ ...letterForm, content: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>الأولوية</InputLabel>
+                <Select
+                  value={letterForm.priority}
+                  label="الأولوية"
+                  onChange={(e) => setLetterForm({ ...letterForm, priority: e.target.value })}
+                >
+                  <MenuItem value="LOW">منخفضة</MenuItem>
+                  <MenuItem value="NORMAL">عادية</MenuItem>
+                  <MenuItem value="HIGH">عالية</MenuItem>
+                  <MenuItem value="URGENT">عاجلة</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <input
+                type="file"
+                ref={letterFileInputRef}
+                style={{ display: 'none' }}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                multiple
+                onChange={(e) => handleFileUpload(e.target.files, 'letter')}
+              />
+              <Button
+                variant="outlined"
+                startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                onClick={() => letterFileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                إرفاق ملفات (اختياري)
+              </Button>
+              {letterAttachments.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                  {letterAttachments.map((file, index) => (
+                    <Chip key={index} label={file.originalName} size="small" onDelete={() => setLetterAttachments(prev => prev.filter((_, i) => i !== index))} />
+                  ))}
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenLetterDialog(false)}>إلغاء</Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<Send />}
+            onClick={() => letterRequestMutation.mutate(letterForm)}
+            disabled={letterRequestMutation.isPending || !letterForm.subject || !letterForm.content}
+          >
+            إرسال الطلب
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Raise Request Dialog */}
+      <Dialog open={openRaiseDialog} onClose={() => setOpenRaiseDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">طلب زيادة جديد</Typography>
+            <IconButton onClick={() => setOpenRaiseDialog(false)}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>نوع الطلب</InputLabel>
+                <Select
+                  value={raiseForm.type}
+                  label="نوع الطلب"
+                  onChange={(e) => setRaiseForm({ ...raiseForm, type: e.target.value })}
+                >
+                  <MenuItem value="SALARY_INCREASE">زيادة راتب</MenuItem>
+                  <MenuItem value="ANNUAL_LEAVE_BONUS">بدل إجازة سنوية</MenuItem>
+                  <MenuItem value="BUSINESS_TRIP">رحلة عمل</MenuItem>
+                  <MenuItem value="BONUS">مكافأة</MenuItem>
+                  <MenuItem value="ALLOWANCE">بدل</MenuItem>
+                  <MenuItem value="OTHER">أخرى</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="المبلغ (ر.س)"
+                type="number"
+                value={raiseForm.amount}
+                onChange={(e) => setRaiseForm({ ...raiseForm, amount: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="الزيادة لشهر"
+                type="month"
+                value={raiseForm.effectiveMonth}
+                onChange={(e) => setRaiseForm({ ...raiseForm, effectiveMonth: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="الملاحظات"
+                multiline
+                rows={3}
+                value={raiseForm.notes}
+                onChange={(e) => setRaiseForm({ ...raiseForm, notes: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <input
+                type="file"
+                ref={raiseFileInputRef}
+                style={{ display: 'none' }}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                multiple
+                onChange={(e) => handleFileUpload(e.target.files, 'raise')}
+              />
+              <Button
+                variant="outlined"
+                startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                onClick={() => raiseFileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                إرفاق ملفات (اختياري)
+              </Button>
+              {raiseAttachments.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                  {raiseAttachments.map((file, index) => (
+                    <Chip key={index} label={file.originalName} size="small" onDelete={() => setRaiseAttachments(prev => prev.filter((_, i) => i !== index))} />
+                  ))}
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenRaiseDialog(false)}>إلغاء</Button>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<Send />}
+            onClick={() => raiseRequestMutation.mutate({ ...raiseForm, attachments: raiseAttachments })}
+            disabled={raiseRequestMutation.isPending || !raiseForm.amount}
+          >
+            إرسال الطلب
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Advance Request Dialog */}
+      <Dialog open={openAdvanceDialog} onClose={() => setOpenAdvanceDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">طلب سلفة جديد</Typography>
+            <IconButton onClick={() => setOpenAdvanceDialog(false)}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>نوع السلفة</InputLabel>
+                <Select
+                  value={advanceForm.type}
+                  label="نوع السلفة"
+                  onChange={(e) => setAdvanceForm({ ...advanceForm, type: e.target.value })}
+                >
+                  <MenuItem value="BANK_TRANSFER">سلفة تحويل بنكي</MenuItem>
+                  <MenuItem value="CASH">سلفه نقداً</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="المبلغ المطلوب"
+                type="number"
+                value={advanceForm.amount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const deduction = val && advanceForm.periodMonths ? (Number(val) / Number(advanceForm.periodMonths)).toFixed(2) : '';
+                  setAdvanceForm({ ...advanceForm, amount: val, monthlyDeduction: deduction });
+                }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="مدة السداد (شهور)"
+                type="number"
+                value={advanceForm.periodMonths}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const deduction = val && advanceForm.amount ? (Number(advanceForm.amount) / Number(val)).toFixed(2) : '';
+                  setAdvanceForm({ ...advanceForm, periodMonths: val, monthlyDeduction: deduction });
+                }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="من تاريخ"
+                type="date"
+                value={advanceForm.startDate}
+                onChange={(e) => setAdvanceForm({ ...advanceForm, startDate: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="الاستقطاع الشهري"
+                type="number"
+                disabled
+                value={advanceForm.monthlyDeduction}
+                helperText="يتم حسابه تلقائياً"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="ملاحظات"
+                multiline
+                rows={2}
+                value={advanceForm.notes}
+                onChange={(e) => setAdvanceForm({ ...advanceForm, notes: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <input
+                type="file"
+                ref={advanceFileInputRef}
+                style={{ display: 'none' }}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                multiple
+                onChange={(e) => handleFileUpload(e.target.files, 'advance')}
+              />
+              <Button
+                variant="outlined"
+                startIcon={isUploading ? <CircularProgress size={16} /> : <CloudUpload />}
+                onClick={() => advanceFileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                إرفاق ملفات (اختياري)
+              </Button>
+              {advanceAttachments.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                  {advanceAttachments.map((file, index) => (
+                    <Chip key={index} label={file.originalName} size="small" onDelete={() => setAdvanceAttachments(prev => prev.filter((_, i) => i !== index))} />
+                  ))}
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAdvanceDialog(false)}>إلغاء</Button>
+          <Button
+            variant="contained"
+            color="warning"
+            startIcon={<Send />}
+            onClick={() => {
+              const start = new Date(advanceForm.startDate);
+              const end = new Date(start.setMonth(start.getMonth() + Number(advanceForm.periodMonths)));
+              advanceRequestMutation.mutate({
+                ...advanceForm,
+                endDate: end.toISOString().split('T')[0],
+                attachments: advanceAttachments.length > 0 ? advanceAttachments.flat() : undefined
+              });
+            }}
+            disabled={advanceRequestMutation.isPending || !advanceForm.amount || !advanceForm.startDate || !advanceForm.periodMonths}
+            sx={{ bgcolor: '#ff9800' }}
+          >
+            إرسال الطلب
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+}

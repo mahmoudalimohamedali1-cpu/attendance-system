@@ -10,23 +10,24 @@ import { CreateDepartmentDto } from './dto/create-department.dto';
 
 @Injectable()
 export class BranchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   // ============ Branch Methods ============
 
-  async createBranch(createBranchDto: CreateBranchDto) {
+  async createBranch(createBranchDto: CreateBranchDto, companyId: string) {
     const branch = await this.prisma.branch.create({
-      data: createBranchDto,
+      data: { ...createBranchDto, companyId },
     });
 
     // Create default work schedules for the branch
-    await this.createDefaultSchedules(branch.id, createBranchDto.workingDays);
+    await this.createDefaultSchedules(branch.id, companyId, createBranchDto.workingDays);
 
     return branch;
   }
 
-  async findAllBranches() {
+  async findAllBranches(companyId: string) {
     return this.prisma.branch.findMany({
+      where: { companyId },
       include: {
         departments: true,
         _count: {
@@ -56,8 +57,10 @@ export class BranchesService {
     return branch;
   }
 
-  async updateBranch(id: string, updateBranchDto: UpdateBranchDto) {
-    const branch = await this.prisma.branch.findUnique({ where: { id } });
+  async updateBranch(id: string, updateBranchDto: UpdateBranchDto, companyId: string) {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id, companyId }
+    });
 
     if (!branch) {
       throw new NotFoundException('الفرع غير موجود');
@@ -91,8 +94,10 @@ export class BranchesService {
     return { message: 'تم حذف الفرع بنجاح' };
   }
 
-  async toggleBranchStatus(id: string) {
-    const branch = await this.prisma.branch.findUnique({ where: { id } });
+  async toggleBranchStatus(id: string, companyId: string) {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id, companyId }
+    });
 
     if (!branch) {
       throw new NotFoundException('الفرع غير موجود');
@@ -106,9 +111,9 @@ export class BranchesService {
 
   // ============ Department Methods ============
 
-  async createDepartment(createDepartmentDto: CreateDepartmentDto) {
-    const branch = await this.prisma.branch.findUnique({
-      where: { id: createDepartmentDto.branchId },
+  async createDepartment(createDepartmentDto: CreateDepartmentDto, companyId: string) {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: createDepartmentDto.branchId, companyId },
     });
 
     if (!branch) {
@@ -116,12 +121,13 @@ export class BranchesService {
     }
 
     return this.prisma.department.create({
-      data: createDepartmentDto,
+      data: { ...createDepartmentDto, companyId },
     });
   }
 
-  async findAllDepartments(branchId?: string) {
-    const where = branchId ? { branchId } : {};
+  async findAllDepartments(companyId: string, branchId?: string) {
+    const where: any = { companyId };
+    if (branchId) where.branchId = branchId;
 
     return this.prisma.department.findMany({
       where,
@@ -186,7 +192,11 @@ export class BranchesService {
     return this.prisma.workSchedule.findMany({ where: { branchId } });
   }
 
-  async getBranchSchedule(branchId: string) {
+  async getBranchSchedule(branchId: string, companyId: string) {
+    // Verify branch belongs to company
+    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, companyId } });
+    if (!branch) throw new NotFoundException('الفرع غير موجود');
+
     return this.prisma.workSchedule.findMany({
       where: { branchId },
       orderBy: { dayOfWeek: 'asc' },
@@ -195,15 +205,16 @@ export class BranchesService {
 
   // ============ Helper Methods ============
 
-  private async createDefaultSchedules(branchId: string, workingDaysStr?: string) {
-    const workingDays = workingDaysStr 
-      ? workingDaysStr.split(',').map(Number) 
+  private async createDefaultSchedules(branchId: string, companyId: string, workingDaysStr?: string) {
+    const workingDays = workingDaysStr
+      ? workingDaysStr.split(',').map(Number)
       : [0, 1, 2, 3, 4]; // Sunday to Thursday (default for middle east)
 
     const schedules = [];
     for (let day = 0; day <= 6; day++) {
       schedules.push({
         branchId,
+        companyId,
         dayOfWeek: day,
         workStartTime: '09:00',
         workEndTime: '17:00',

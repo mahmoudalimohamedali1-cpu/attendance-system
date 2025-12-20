@@ -38,13 +38,15 @@ class _LettersPageState extends State<LettersPage> with SingleTickerProviderStat
           _currentStatus = 'NEW';
           break;
         case 1:
-          _currentStatus = 'PENDING';
+          // Include both PENDING (waiting for manager) and MGR_APPROVED (waiting for HR)
+          _currentStatus = 'PENDING,MGR_APPROVED';
           break;
         case 2:
           _currentStatus = 'APPROVED';
           break;
         case 3:
-          _currentStatus = 'REJECTED';
+          // Include both MGR_REJECTED and REJECTED
+          _currentStatus = 'REJECTED,MGR_REJECTED';
           break;
       }
     });
@@ -69,8 +71,11 @@ class _LettersPageState extends State<LettersPage> with SingleTickerProviderStat
   String _getStatusLabel(String status) {
     final labels = {
       'PENDING': 'قيد المراجعة',
+      'MGR_APPROVED': 'موافقة المدير',
+      'MGR_REJECTED': 'رفض المدير',
       'APPROVED': 'موافق عليها',
       'REJECTED': 'مرفوضة',
+      'DELAYED': 'مؤجل',
       'CANCELLED': 'ملغاة',
     };
     return labels[status] ?? status;
@@ -78,10 +83,15 @@ class _LettersPageState extends State<LettersPage> with SingleTickerProviderStat
 
   Color _getStatusColor(String status) {
     switch (status) {
+      case 'MGR_APPROVED':
+        return Colors.blue;
       case 'APPROVED':
         return AppTheme.successColor;
+      case 'MGR_REJECTED':
       case 'REJECTED':
         return AppTheme.errorColor;
+      case 'DELAYED':
+        return Colors.purple;
       case 'CANCELLED':
         return Colors.grey;
       default:
@@ -190,17 +200,22 @@ class _LettersPageState extends State<LettersPage> with SingleTickerProviderStat
                           ? DateTime.parse(letter['createdAt'].toString())
                           : null;
 
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                      return InkWell(
+                        onTap: () {
+                          context.push('/letters/details/${letter['id']}');
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -301,6 +316,7 @@ class _LettersPageState extends State<LettersPage> with SingleTickerProviderStat
                             ],
                           ),
                         ),
+                      ),
                       );
                     },
                   );

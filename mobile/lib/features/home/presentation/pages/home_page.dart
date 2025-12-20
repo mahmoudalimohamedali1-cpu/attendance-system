@@ -11,6 +11,7 @@ import '../../../notifications/presentation/bloc/notifications_bloc.dart';
 import '../widgets/check_in_out_card.dart';
 import '../widgets/quick_stats_card.dart';
 import '../widgets/today_status_card.dart';
+import '../widgets/letter_request_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -93,6 +94,8 @@ class _HomePageState extends State<HomePage> {
                 const CheckInOutCard(),
                 const SizedBox(height: 20),
                 const QuickStatsCard(),
+                const SizedBox(height: 20),
+                const LetterRequestCard(),
                 const SizedBox(height: 20),
                 _QuickActionsCard(),
               ],
@@ -312,6 +315,28 @@ class _QuickActionsCard extends StatelessWidget {
                     label: 'طلب خطاب',
                     color: Colors.green,
                     onTap: () => context.push('/letters/new'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.account_balance_wallet,
+                    label: 'طلب سلفة',
+                    color: Colors.orange,
+                    onTap: () => context.push('/advances/new'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.trending_up,
+                    label: 'طلب زيادة',
+                    color: Colors.purple,
+                    onTap: () => context.push('/raises/new'),
                   ),
                 ),
               ],

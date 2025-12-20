@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { LeaveQueryDto } from './dto/leave-query.dto';
 import { NotificationType } from '@prisma/client';
@@ -15,10 +16,17 @@ export class LeavesService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-  ) {}
+    private permissionsService: PermissionsService,
+  ) { }
 
-  async createLeaveRequest(userId: string, createLeaveDto: CreateLeaveRequestDto) {
-    const { type, startDate, endDate, reason, startTime, endTime } = createLeaveDto;
+  async createLeaveRequest(userId: string, companyId: string, createLeaveDto: CreateLeaveRequestDto) {
+    const { type, startDate, endDate, reason, notes, attachments } = createLeaveDto;
+    const leaveNotes = reason || notes || '';
+
+    // Debug: log attachments
+    console.log('📎 Received attachments:', JSON.stringify(attachments));
+    console.log('📎 Attachments type:', typeof attachments);
+    console.log('📎 Is Array:', Array.isArray(attachments));
 
     // Validate dates
     const start = new Date(startDate);
@@ -28,10 +36,21 @@ export class LeavesService {
       throw new BadRequestException('تاريخ النهاية يجب أن يكون بعد تاريخ البداية');
     }
 
+    // Calculate requested days
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const requestedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    // Check user's remaining leave balance
+    const user = await this.prisma.user.findFirst({ where: { id: userId, companyId } });
+    if (user && user.remainingLeaveDays < requestedDays) {
+      throw new BadRequestException(`رصيد الإجازات غير كافي. المتبقي: ${user.remainingLeaveDays} يوم`);
+    }
+
     // Check for overlapping leaves
     const existingLeave = await this.prisma.leaveRequest.findFirst({
       where: {
         userId,
+        companyId,
         status: { in: ['PENDING', 'APPROVED'] },
         OR: [
           { startDate: { lte: end }, endDate: { gte: start } },
@@ -43,15 +62,30 @@ export class LeavesService {
       throw new BadRequestException('يوجد طلب إجازة متداخل مع هذه الفترة');
     }
 
+    // Get user's manager to save as approver at submission time
+    const userWithManager = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { managerId: true },
+    });
+
     const leaveRequest = await this.prisma.leaveRequest.create({
       data: {
         userId,
+        companyId,
         type,
         startDate: start,
         endDate: end,
-        startTime,
-        endTime,
-        reason,
+        requestedDays,
+        notes: leaveNotes,
+        reason: leaveNotes,
+        attachments: attachments && attachments.length > 0
+          ? attachments as unknown as any
+          : undefined,
+        // Workflow fields
+        currentStep: 'MANAGER',
+        managerApproverId: userWithManager?.managerId || null,
+        managerDecision: 'PENDING',
+        hrDecision: 'PENDING',
       },
       include: {
         user: {
@@ -61,12 +95,13 @@ export class LeavesService {
     });
 
     // Notify manager
-    if (leaveRequest.user.managerId) {
+    const leaveWithUser = leaveRequest as typeof leaveRequest & { user: { firstName: string; lastName: string; managerId: string | null } };
+    if (leaveWithUser.user?.managerId) {
       await this.notificationsService.sendNotification(
-        leaveRequest.user.managerId,
+        leaveWithUser.user.managerId,
         NotificationType.GENERAL,
         'طلب إجازة جديد',
-        `${leaveRequest.user.firstName} ${leaveRequest.user.lastName} طلب ${this.getLeaveTypeName(type)}`,
+        `${leaveWithUser.user.firstName} ${leaveWithUser.user.lastName} طلب ${this.getLeaveTypeName(type)}`,
         { leaveRequestId: leaveRequest.id },
       );
     }
@@ -74,10 +109,10 @@ export class LeavesService {
     return leaveRequest;
   }
 
-  async getMyLeaveRequests(userId: string, query: LeaveQueryDto) {
+  async getMyLeaveRequests(userId: string, companyId: string, query: LeaveQueryDto) {
     const { status, type, page = 1, limit = 20 } = query;
 
-    const where: any = { userId };
+    const where: any = { userId, companyId };
     if (status) where.status = status;
     if (type) where.type = type;
 
@@ -105,9 +140,9 @@ export class LeavesService {
     };
   }
 
-  async getLeaveRequestById(id: string, userId?: string) {
-    const leaveRequest = await this.prisma.leaveRequest.findUnique({
-      where: { id },
+  async getLeaveRequestById(id: string, companyId: string, userId?: string) {
+    const leaveRequest = await this.prisma.leaveRequest.findFirst({
+      where: { id, companyId },
       include: {
         user: {
           select: { id: true, firstName: true, lastName: true, employeeCode: true },
@@ -131,9 +166,109 @@ export class LeavesService {
     return leaveRequest;
   }
 
-  async cancelLeaveRequest(id: string, userId: string) {
-    const leaveRequest = await this.prisma.leaveRequest.findUnique({
-      where: { id },
+  /**
+   * جلب تفاصيل طلب الإجازة مع معلومات الموظف الكاملة (للمدير/HR)
+   * تشمل: أيام الإجازة المتبقية، تاريخ التوظيف، الفرع، القسم، طلبات السنة الحالية
+   */
+  async getLeaveRequestWithEmployeeContext(id: string, companyId: string, requesterId: string) {
+    const leaveRequest = await this.prisma.leaveRequest.findFirst({
+      where: { id, companyId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+            jobTitle: true,
+            hireDate: true,
+            annualLeaveDays: true,
+            usedLeaveDays: true,
+            remainingLeaveDays: true,
+            branch: { select: { id: true, name: true } },
+            department: { select: { id: true, name: true } },
+          },
+        },
+        approver: { select: { firstName: true, lastName: true } },
+        managerApprover: { select: { firstName: true, lastName: true } },
+        hrApprover: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    if (!leaveRequest) {
+      throw new NotFoundException('طلب الإجازة غير موجود');
+    }
+
+    // Check requester permissions
+    const requester = await this.prisma.user.findUnique({ where: { id: requesterId } });
+    if (!requester) {
+      throw new ForbiddenException('مستخدم غير موجود');
+    }
+
+    // Only managers, HR, and admins can access this
+    if (requester.role === 'EMPLOYEE' && leaveRequest.userId !== requesterId) {
+      throw new ForbiddenException('غير مصرح بالوصول لهذا الطلب');
+    }
+
+    // Get current year leave requests for this employee
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
+
+    const currentYearLeaveRequests = await this.prisma.leaveRequest.findMany({
+      where: {
+        userId: leaveRequest.userId,
+        createdAt: {
+          gte: startOfYear,
+          lte: endOfYear,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        startDate: true,
+        endDate: true,
+        requestedDays: true,
+        approvedDays: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    // Calculate leave summary
+    const leaveSummary = {
+      totalRequests: currentYearLeaveRequests.length,
+      approvedDays: currentYearLeaveRequests
+        .filter(r => r.status === 'APPROVED')
+        .reduce((sum, r) => sum + (r.approvedDays || r.requestedDays), 0),
+      pendingDays: currentYearLeaveRequests
+        .filter(r => r.status === 'PENDING')
+        .reduce((sum, r) => sum + r.requestedDays, 0),
+      rejectedRequests: currentYearLeaveRequests.filter(r => r.status === 'REJECTED').length,
+    };
+
+    // Cast for type safety with included relations
+    const leaveData = leaveRequest as any;
+
+    return {
+      ...leaveData,
+      employeeContext: {
+        hireDate: leaveData.user?.hireDate,
+        annualLeaveDays: leaveData.user?.annualLeaveDays,
+        usedLeaveDays: leaveData.user?.usedLeaveDays,
+        remainingLeaveDays: leaveData.user?.remainingLeaveDays,
+        branch: leaveData.user?.branch,
+        department: leaveData.user?.department,
+      },
+      currentYearLeaveRequests,
+      leaveSummary,
+    };
+  }
+
+  async cancelLeaveRequest(id: string, companyId: string, userId: string) {
+    const leaveRequest = await this.prisma.leaveRequest.findFirst({
+      where: { id, companyId },
     });
 
     if (!leaveRequest) {
@@ -156,21 +291,32 @@ export class LeavesService {
 
   // ============ Manager/Admin Methods ============
 
-  async getPendingRequests(managerId?: string, query?: LeaveQueryDto) {
-    const { page = 1, limit = 20 } = query || {};
+  async getPendingRequests(userId: string, companyId: string, query?: LeaveQueryDto) {
+    const { page = 1, limit = 20, status = 'PENDING' } = query || {};
 
-    let where: any = { status: 'PENDING' };
+    // Get accessible employee IDs based on LEAVES_VIEW OR LEAVES_APPROVE_MANAGER permission
+    // Combine both permissions to get all employees the user can access
+    const [viewAccessible, approveAccessible] = await Promise.all([
+      this.permissionsService.getAccessibleEmployeeIds(userId, companyId, 'LEAVES_VIEW'),
+      this.permissionsService.getAccessibleEmployeeIds(userId, companyId, 'LEAVES_APPROVE_MANAGER'),
+    ]);
 
-    // If manager, only get their team's requests
-    if (managerId) {
-      const manager = await this.prisma.user.findUnique({
-        where: { id: managerId },
-      });
+    // Combine unique employee IDs from both permissions
+    const accessibleEmployeeIds = [...new Set([...viewAccessible, ...approveAccessible])];
 
-      if (manager?.role === 'MANAGER') {
-        where.user = { managerId };
-      }
+    // If no accessible employees, return empty
+    if (accessibleEmployeeIds.length === 0) {
+      return {
+        data: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      };
     }
+
+    const where: any = {
+      status,
+      companyId,
+      userId: { in: accessibleEmployeeIds },
+    };
 
     const [requests, total] = await Promise.all([
       this.prisma.leaveRequest.findMany({
@@ -205,9 +351,9 @@ export class LeavesService {
     };
   }
 
-  async approveLeaveRequest(id: string, approverId: string, notes?: string) {
-    const leaveRequest = await this.prisma.leaveRequest.findUnique({
-      where: { id },
+  async approveLeaveRequest(id: string, companyId: string, approverId: string, notes?: string) {
+    const leaveRequest = await this.prisma.leaveRequest.findFirst({
+      where: { id, companyId },
       include: { user: true },
     });
 
@@ -215,74 +361,77 @@ export class LeavesService {
       throw new NotFoundException('طلب الإجازة غير موجود');
     }
 
-    if (leaveRequest.status !== 'PENDING') {
+    // Route through workflow based on currentStep
+    const currentStep = leaveRequest.currentStep || 'MANAGER';
+
+    if (currentStep === 'MANAGER') {
+      // Check if this user is the assigned manager approver
+      if (leaveRequest.managerApproverId === approverId) {
+        return this.managerDecision(id, companyId, approverId, 'APPROVED', notes);
+      }
+
+      // Or check if they have general LEAVES_APPROVE_MANAGER permission
+      const canApprove = await this.permissionsService.canAccessEmployee(
+        approverId,
+        companyId,
+        'LEAVES_APPROVE_MANAGER',
+        leaveRequest.userId
+      );
+      if (canApprove.hasAccess) {
+        return this.managerDecision(id, companyId, approverId, 'APPROVED', notes);
+      }
+
+      throw new ForbiddenException('ليس لديك صلاحية الموافقة على طلبات هذا الموظف');
+    } else if (currentStep === 'HR') {
+      // Route to HR decision
+      return this.hrDecision(id, companyId, approverId, 'APPROVED', notes);
+    } else {
       throw new BadRequestException('هذا الطلب تم البت فيه مسبقاً');
     }
-
-    const updated = await this.prisma.leaveRequest.update({
-      where: { id },
-      data: {
-        status: 'APPROVED',
-        approverId,
-        approverNotes: notes,
-        approvedAt: new Date(),
-      },
-    });
-
-    // Create attendance records for leave days
-    await this.createLeaveAttendanceRecords(leaveRequest);
-
-    // Notify employee
-    await this.notificationsService.sendNotification(
-      leaveRequest.userId,
-      NotificationType.LEAVE_APPROVED,
-      'تمت الموافقة على طلب الإجازة',
-      `تمت الموافقة على طلبك ${this.getLeaveTypeName(leaveRequest.type)}`,
-      { leaveRequestId: id },
-    );
-
-    return updated;
   }
 
-  async rejectLeaveRequest(id: string, approverId: string, notes?: string) {
-    const leaveRequest = await this.prisma.leaveRequest.findUnique({
-      where: { id },
+  async rejectLeaveRequest(id: string, companyId: string, approverId: string, notes?: string) {
+    const leaveRequest = await this.prisma.leaveRequest.findFirst({
+      where: { id, companyId },
     });
 
     if (!leaveRequest) {
       throw new NotFoundException('طلب الإجازة غير موجود');
     }
 
-    if (leaveRequest.status !== 'PENDING') {
+    // Route through workflow based on currentStep
+    const currentStep = leaveRequest.currentStep || 'MANAGER';
+
+    if (currentStep === 'MANAGER') {
+      // Check if this user is the assigned manager approver
+      if (leaveRequest.managerApproverId === approverId) {
+        return this.managerDecision(id, companyId, approverId, 'REJECTED', notes);
+      }
+
+      // Or check if they have general LEAVES_APPROVE_MANAGER permission
+      const canApprove = await this.permissionsService.canAccessEmployee(
+        approverId,
+        companyId,
+        'LEAVES_APPROVE_MANAGER',
+        leaveRequest.userId
+      );
+      if (canApprove.hasAccess) {
+        return this.managerDecision(id, companyId, approverId, 'REJECTED', notes);
+      }
+
+      throw new ForbiddenException('ليس لديك صلاحية رفض طلبات هذا الموظف');
+    } else if (currentStep === 'HR') {
+      // Route to HR decision
+      return this.hrDecision(id, companyId, approverId, 'REJECTED', notes);
+    } else {
       throw new BadRequestException('هذا الطلب تم البت فيه مسبقاً');
     }
-
-    const updated = await this.prisma.leaveRequest.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        approverId,
-        approverNotes: notes,
-        approvedAt: new Date(),
-      },
-    });
-
-    // Notify employee
-    await this.notificationsService.sendNotification(
-      leaveRequest.userId,
-      NotificationType.LEAVE_REJECTED,
-      'تم رفض طلب الإجازة',
-      `تم رفض طلبك ${this.getLeaveTypeName(leaveRequest.type)}${notes ? ': ' + notes : ''}`,
-      { leaveRequestId: id },
-    );
-
-    return updated;
   }
 
-  async getAllLeaveRequests(query: LeaveQueryDto) {
+  async getAllLeaveRequests(companyId: string, query: LeaveQueryDto) {
     const { status, type, userId, page = 1, limit = 20 } = query;
 
-    const where: any = {};
+    const where: any = { companyId };
     if (status) where.status = status;
     if (type) where.type = type;
     if (userId) where.userId = userId;
@@ -322,7 +471,7 @@ export class LeavesService {
 
   // ============ Work From Home ============
 
-  async enableWorkFromHome(userId: string, date: Date, reason?: string, approverId?: string) {
+  async enableWorkFromHome(userId: string, companyId: string, date: Date, reason?: string, approverId?: string) {
     const targetDate = new Date(date);
     targetDate.setHours(0, 0, 0, 0);
 
@@ -342,6 +491,7 @@ export class LeavesService {
     return this.prisma.workFromHome.create({
       data: {
         userId,
+        companyId,
         date: targetDate,
         reason,
         approvedBy: approverId,
@@ -349,7 +499,7 @@ export class LeavesService {
     });
   }
 
-  async disableWorkFromHome(userId: string, date: Date) {
+  async disableWorkFromHome(userId: string, companyId: string, date: Date) {
     const targetDate = new Date(date);
     targetDate.setHours(0, 0, 0, 0);
 
@@ -371,18 +521,20 @@ export class LeavesService {
     const types: Record<string, string> = {
       ANNUAL: 'إجازة سنوية',
       SICK: 'إجازة مرضية',
-      PERSONAL: 'إجازة شخصية',
-      EMERGENCY: 'إجازة طارئة',
-      WORK_FROM_HOME: 'عمل من المنزل',
-      EARLY_LEAVE: 'خروج مبكر',
-      OTHER: 'أخرى',
+      NEW_BABY: 'مولود جديد',
+      MARRIAGE: 'إجازة زواج',
+      BEREAVEMENT: 'إجازة وفاة',
+      HAJJ: 'إجازة حج',
+      EXAM: 'إجازة اختبارات',
+      WORK_MISSION: 'مهمة عمل',
+      UNPAID: 'إجازة بدون راتب',
     };
     return types[type] || type;
   }
 
   private async createLeaveAttendanceRecords(leaveRequest: any) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: leaveRequest.userId },
+    const user = await this.prisma.user.findFirst({
+      where: { id: leaveRequest.userId, companyId: leaveRequest.companyId },
     });
 
     if (!user?.branchId) return;
@@ -403,17 +555,313 @@ export class LeavesService {
         },
         create: {
           userId: leaveRequest.userId,
+          companyId: leaveRequest.companyId,
           branchId: user.branchId,
           date: targetDate,
           status: 'ON_LEAVE',
-          notes: `${this.getLeaveTypeName(leaveRequest.type)}: ${leaveRequest.reason}`,
+          notes: `${this.getLeaveTypeName(leaveRequest.type)}${leaveRequest.notes ? ': ' + leaveRequest.notes : ''}`,
         },
         update: {
           status: 'ON_LEAVE',
-          notes: `${this.getLeaveTypeName(leaveRequest.type)}: ${leaveRequest.reason}`,
+          notes: `${this.getLeaveTypeName(leaveRequest.type)}${leaveRequest.notes ? ': ' + leaveRequest.notes : ''}`,
         },
       });
     }
   }
-}
 
+  // Helper method to deduct leave balance
+  private async deductLeaveBalance(userId: string, companyId: string, days: number) {
+    await this.prisma.user.updateMany({
+      where: { id: userId, companyId },
+      data: {
+        usedLeaveDays: { increment: days },
+        remainingLeaveDays: { decrement: days },
+      },
+    });
+  }
+
+  // ==================== Workflow: Manager Inbox ====================
+
+  async getManagerInbox(managerId: string, companyId: string) {
+    // استخدام نظام الصلاحيات للحصول على الموظفين المتاحين
+    // يشمل: المرؤوسين المباشرين + أي موظفين ضمن نطاق صلاحية LEAVES_APPROVE_MANAGER
+    const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+      managerId,
+      companyId,
+      'LEAVES_APPROVE_MANAGER',
+    );
+
+    if (accessibleEmployeeIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.leaveRequest.findMany({
+      where: {
+        companyId,
+        userId: { in: accessibleEmployeeIds },
+        currentStep: 'MANAGER',
+        status: 'PENDING',
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+            jobTitle: true,
+            department: { select: { name: true } },
+          },
+        },
+      },
+    });
+  }
+
+  // ==================== Workflow: HR Inbox ====================
+
+  async getHRInbox(hrUserId: string, companyId: string) {
+    // HR sees requests that have manager approval and are in HR step
+    // Filter by scope using permissions service
+    const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+      hrUserId,
+      companyId,
+      'LEAVES_APPROVE_HR',
+    );
+
+    if (accessibleEmployeeIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.leaveRequest.findMany({
+      where: {
+        companyId,
+        userId: { in: accessibleEmployeeIds },
+        currentStep: 'HR',
+        status: 'MGR_APPROVED',
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+            jobTitle: true,
+            department: { select: { name: true } },
+            branch: { select: { name: true } },
+          },
+        },
+        managerApprover: {
+          select: { firstName: true, lastName: true },
+        },
+      },
+    });
+  }
+
+  // ==================== Workflow: Manager Decision ====================
+
+  async managerDecision(
+    requestId: string,
+    companyId: string,
+    managerId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    notes?: string,
+  ) {
+    const request = await this.prisma.leaveRequest.findFirst({
+      where: { id: requestId, companyId },
+      include: { user: true },
+    });
+
+    if (!request) {
+      throw new NotFoundException('طلب الإجازة غير موجود');
+    }
+
+    // Verify this manager is the assigned approver
+    if (request.managerApproverId !== managerId) {
+      throw new ForbiddenException('ليس لديك صلاحية للموافقة على هذا الطلب');
+    }
+
+    // Verify request is in correct step
+    if (request.currentStep !== 'MANAGER') {
+      throw new BadRequestException('هذا الطلب ليس في مرحلة موافقة المدير');
+    }
+
+    if (decision === 'APPROVED') {
+      // Move to HR step
+      await this.prisma.leaveRequest.update({
+        where: { id: requestId },
+        data: {
+          managerDecision: 'APPROVED',
+          managerDecisionAt: new Date(),
+          managerNotes: notes,
+          currentStep: 'HR',
+          status: 'MGR_APPROVED',
+        },
+      });
+
+      // TODO: Notify HR users
+    } else {
+      // Rejected - request is done
+      await this.prisma.leaveRequest.update({
+        where: { id: requestId },
+        data: {
+          managerDecision: 'REJECTED',
+          managerDecisionAt: new Date(),
+          managerNotes: notes,
+          currentStep: 'COMPLETED',
+          status: 'MGR_REJECTED',
+        },
+      });
+
+      // Notify employee
+      await this.notificationsService.sendNotification(
+        request.userId,
+        'LEAVE_REJECTED',
+        'تم رفض طلب الإجازة',
+        `تم رفض طلب إجازتك من قبل المدير${notes ? ': ' + notes : ''}`,
+        { leaveRequestId: requestId },
+      );
+    }
+
+    // Log the decision
+    await this.prisma.approvalLog.create({
+      data: {
+        companyId,
+        requestType: 'LEAVE',
+        requestId,
+        step: 'MANAGER',
+        decision,
+        notes,
+        byUserId: managerId,
+      },
+    });
+
+    return this.prisma.leaveRequest.findUnique({
+      where: { id: requestId },
+      include: { user: true, managerApprover: true },
+    });
+  }
+
+  // ==================== Workflow: HR Decision ====================
+
+  async hrDecision(
+    requestId: string,
+    companyId: string,
+    hrUserId: string,
+    decision: 'APPROVED' | 'REJECTED' | 'DELAYED',
+    notes?: string,
+  ) {
+    const request = await this.prisma.leaveRequest.findFirst({
+      where: { id: requestId, companyId },
+      include: { user: true },
+    });
+
+    if (!request) {
+      throw new NotFoundException('طلب الإجازة غير موجود');
+    }
+
+    // Verify request is in HR step
+    if (request.currentStep !== 'HR') {
+      throw new BadRequestException('هذا الطلب ليس في مرحلة موافقة HR');
+    }
+
+    // Verify HR has permission for this employee
+    const accessibleIds = await this.permissionsService.getAccessibleEmployeeIds(
+      hrUserId,
+      companyId,
+      'LEAVES_APPROVE_HR',
+    );
+    if (!accessibleIds.includes(request.userId)) {
+      throw new ForbiddenException('ليس لديك صلاحية للموافقة على طلب هذا الموظف');
+    }
+
+    if (decision === 'APPROVED') {
+      await this.prisma.leaveRequest.update({
+        where: { id: requestId },
+        data: {
+          hrDecision: 'APPROVED',
+          hrDecisionAt: new Date(),
+          hrDecisionNotes: notes,
+          hrApproverId: hrUserId,
+          currentStep: 'COMPLETED',
+          status: 'APPROVED',
+          approvedDays: request.requestedDays,
+          approvedAt: new Date(),
+        },
+      });
+
+      // Deduct leave balance
+      await this.deductLeaveBalance(request.userId, companyId, request.requestedDays);
+
+      // Create attendance records for leave days
+      await this.createLeaveAttendanceRecords(request);
+
+      // Notify employee
+      await this.notificationsService.sendNotification(
+        request.userId,
+        'LEAVE_APPROVED',
+        'تمت الموافقة على طلب الإجازة',
+        `تمت الموافقة النهائية على طلب إجازتك`,
+        { leaveRequestId: requestId },
+      );
+    } else if (decision === 'REJECTED') {
+      await this.prisma.leaveRequest.update({
+        where: { id: requestId },
+        data: {
+          hrDecision: 'REJECTED',
+          hrDecisionAt: new Date(),
+          hrDecisionNotes: notes,
+          hrApproverId: hrUserId,
+          currentStep: 'COMPLETED',
+          status: 'REJECTED',
+        },
+      });
+
+      await this.notificationsService.sendNotification(
+        request.userId,
+        'LEAVE_REJECTED',
+        'تم رفض طلب الإجازة',
+        `تم رفض طلب إجازتك من قبل HR${notes ? ': ' + notes : ''}`,
+        { leaveRequestId: requestId },
+      );
+    } else if (decision === 'DELAYED') {
+      await this.prisma.leaveRequest.update({
+        where: { id: requestId },
+        data: {
+          hrDecision: 'DELAYED',
+          hrDecisionAt: new Date(),
+          hrDecisionNotes: notes,
+          hrApproverId: hrUserId,
+          status: 'DELAYED',
+        },
+      });
+
+      await this.notificationsService.sendNotification(
+        request.userId,
+        'GENERAL',
+        'تم تأجيل طلب الإجازة',
+        `تم تأجيل طلب إجازتك${notes ? ': ' + notes : ''}`,
+        { leaveRequestId: requestId },
+      );
+    }
+
+    // Log the decision
+    await this.prisma.approvalLog.create({
+      data: {
+        requestType: 'LEAVE',
+        requestId,
+        step: 'HR',
+        decision,
+        notes,
+        byUserId: hrUserId,
+      },
+    });
+
+    return this.prisma.leaveRequest.findUnique({
+      where: { id: requestId },
+      include: { user: true, managerApprover: true, hrApprover: true },
+    });
+  }
+}

@@ -3,45 +3,51 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
 export class SettingsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  async getAllSettings() {
-    return this.prisma.systemSetting.findMany();
-  }
-
-  async getSetting(key: string) {
-    return this.prisma.systemSetting.findUnique({
-      where: { key },
+  async getAllSettings(companyId: string) {
+    return this.prisma.systemSetting.findMany({
+      where: { companyId },
     });
   }
 
-  async setSetting(key: string, value: string, description?: string) {
+  async getSetting(key: string, companyId: string) {
+    return this.prisma.systemSetting.findFirst({
+      where: { key, companyId },
+    });
+  }
+
+  async setSetting(key: string, value: string, companyId: string, description?: string) {
     return this.prisma.systemSetting.upsert({
-      where: { key },
-      create: { key, value, description },
+      where: {
+        key_companyId: { key, companyId }
+      },
+      create: { key, value, companyId, description },
       update: { value, description },
     });
   }
 
-  async deleteSetting(key: string) {
+  async deleteSetting(key: string, companyId: string) {
     return this.prisma.systemSetting.delete({
-      where: { key },
+      where: {
+        key_companyId: { key, companyId }
+      },
     });
   }
 
-  async setMultipleSettings(settings: Array<{ key: string; value: string; description?: string }>) {
+  async setMultipleSettings(settings: Array<{ key: string; value: string; description?: string }>, companyId: string) {
     const results = [];
     for (const setting of settings) {
-      const result = await this.setSetting(setting.key, setting.value, setting.description);
+      const result = await this.setSetting(setting.key, setting.value, companyId, setting.description);
       results.push(result);
     }
     return results;
   }
 
   // Holiday management
-  async getHolidays(year?: number) {
-    const where: any = {};
-    
+  async getHolidays(companyId: string, year?: number) {
+    const where: any = { companyId };
+
     if (year) {
       const startOfYear = new Date(year, 0, 1);
       const endOfYear = new Date(year, 11, 31);
@@ -57,22 +63,22 @@ export class SettingsService {
     });
   }
 
-  async createHoliday(data: { name: string; nameEn?: string; date: Date; isRecurring?: boolean }) {
+  async createHoliday(data: { name: string; nameEn?: string; date: Date; isRecurring?: boolean }, companyId: string) {
     return this.prisma.holiday.create({
-      data,
+      data: { ...data, companyId },
     });
   }
 
-  async updateHoliday(id: string, data: Partial<{ name: string; nameEn?: string; date: Date; isRecurring?: boolean }>) {
+  async updateHoliday(id: string, companyId: string, data: Partial<{ name: string; nameEn?: string; date: Date; isRecurring?: boolean }>) {
     return this.prisma.holiday.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
   }
 
-  async deleteHoliday(id: string) {
+  async deleteHoliday(id: string, companyId: string) {
     return this.prisma.holiday.delete({
-      where: { id },
+      where: { id, companyId },
     });
   }
 
@@ -97,6 +103,15 @@ export class SettingsService {
     });
 
     return !!holiday;
+  }
+
+  /**
+   * التحقق مما إذا كانت الشركة لا ترحل الإجازات
+   * @returns true إذا كانت الشركة لا ترحل الإجازات (السنة تبدأ من الصفر)
+   */
+  async isLeaveCarryoverDisabled(companyId: string): Promise<boolean> {
+    const setting = await this.getSetting('disableLeaveCarryover', companyId);
+    return setting?.value === 'true';
   }
 }
 

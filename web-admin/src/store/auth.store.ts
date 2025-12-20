@@ -21,6 +21,9 @@ export interface User {
   manager?: { id: string; firstName: string; lastName: string };
   salary?: number;
   hireDate?: string;
+  annualLeaveDays?: number;
+  usedLeaveDays?: number;
+  remainingLeaveDays?: number;
 }
 
 interface AuthState {

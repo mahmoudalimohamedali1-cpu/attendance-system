@@ -4,7 +4,7 @@ import { AuditAction } from '@prisma/client';
 
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async log(
     action: AuditAction,
@@ -143,6 +143,67 @@ export class AuditService {
       console.error('Values:', { page, limit, skipValue, takeValue });
       throw error;
     }
+  }
+
+  // ==================== Helper Methods ====================
+
+  /**
+   * تسجيل عملية تسجيل دخول
+   */
+  async logLogin(userId: string, ipAddress?: string, userAgent?: string) {
+    return this.log('LOGIN', 'AUTH', undefined, userId, null, null, 'تسجيل دخول ناجح', ipAddress, userAgent);
+  }
+
+  /**
+   * تسجيل تغيير في الرواتب
+   */
+  async logPayrollChange(
+    userId: string,
+    payrollId: string,
+    action: AuditAction,
+    oldValue?: any,
+    newValue?: any,
+    description?: string,
+  ) {
+    return this.log(action, 'PAYROLL', payrollId, userId, oldValue, newValue, description);
+  }
+
+  /**
+   * تسجيل تغيير في الحساب البنكي (مع إخفاء البيانات الحساسة)
+   */
+  async logBankAccountChange(
+    userId: string,
+    accountId: string,
+    action: AuditAction,
+    oldValue?: any,
+    newValue?: any,
+  ) {
+    // إخفاء IBAN للأمان
+    const sanitizeBank = (data: any) => {
+      if (!data) return null;
+      return {
+        ...data,
+        iban: data.iban ? '****' + data.iban.slice(-4) : undefined,
+        accountNumber: data.accountNumber ? '****' + data.accountNumber.slice(-4) : undefined,
+      };
+    };
+
+    return this.log(
+      action,
+      'BANK_ACCOUNT',
+      accountId,
+      userId,
+      sanitizeBank(oldValue),
+      sanitizeBank(newValue),
+      'تغيير في بيانات الحساب البنكي',
+    );
+  }
+
+  /**
+   * تسجيل تصدير بيانات حساسة
+   */
+  async logExport(userId: string, entity: string, description: string) {
+    return this.log('EXPORT', entity, undefined, userId, null, null, description);
   }
 }
 

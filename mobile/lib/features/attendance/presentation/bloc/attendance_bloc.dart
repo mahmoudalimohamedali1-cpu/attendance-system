@@ -1,6 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/services/location_service.dart';
+import '../../../../core/services/security_service.dart';
+import '../../../../core/utils/error_handler.dart';
 import '../../domain/entities/attendance_entity.dart';
 import '../../domain/usecases/check_in_usecase.dart';
 import '../../domain/usecases/check_out_usecase.dart';
@@ -196,6 +198,13 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(AttendanceLoading());
 
     try {
+      // 🔒 فحص أمني شامل قبل الحضور (Android Native)
+      final securityCheck = await SecurityService.performSecurityCheck();
+      if (securityCheck.shouldBlockAttendance) {
+        emit(AttendanceError(securityCheck.blockReason ?? 'فشل الفحص الأمني. لا يمكن تسجيل الحضور.'));
+        return;
+      }
+      
       // Get current location
       final location = await locationService.getCurrentLocation();
 
@@ -235,7 +244,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     } on LocationException catch (e) {
       emit(AttendanceError(e.message));
     } catch (e) {
-      emit(AttendanceError('فشل تسجيل الحضور: ${e.toString()}'));
+      emit(AttendanceError(ErrorHandler.handleError(e, defaultMessage: 'فشل تسجيل الحضور')));
     }
   }
 
@@ -246,6 +255,13 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     emit(AttendanceLoading());
 
     try {
+      // 🔒 فحص أمني شامل قبل الانصراف (Android Native)
+      final securityCheck = await SecurityService.performSecurityCheck();
+      if (securityCheck.shouldBlockAttendance) {
+        emit(AttendanceError(securityCheck.blockReason ?? 'فشل الفحص الأمني. لا يمكن تسجيل الانصراف.'));
+        return;
+      }
+      
       final location = await locationService.getCurrentLocation();
 
       // فحص الموقع الوهمي - مفعل
@@ -283,7 +299,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     } on LocationException catch (e) {
       emit(AttendanceError(e.message));
     } catch (e) {
-      emit(AttendanceError('فشل تسجيل الانصراف: ${e.toString()}'));
+      emit(AttendanceError(ErrorHandler.handleError(e, defaultMessage: 'فشل تسجيل الانصراف')));
     }
   }
 

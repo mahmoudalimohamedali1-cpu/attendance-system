@@ -37,6 +37,11 @@ import '../../features/letters/data/repositories/letters_repository_impl.dart';
 import '../../features/letters/domain/repositories/letters_repository.dart';
 import '../../features/letters/presentation/bloc/letters_bloc.dart';
 
+import '../../features/raises/data/datasources/raises_remote_datasource.dart';
+import '../../features/raises/data/repositories/raises_repository_impl.dart';
+import '../../features/raises/domain/repositories/raises_repository.dart';
+import '../../features/raises/presentation/bloc/raises_bloc.dart';
+
 import '../../features/notifications/data/datasources/notifications_remote_datasource.dart';
 import '../../features/notifications/data/repositories/notifications_repository_impl.dart';
 import '../../features/notifications/domain/repositories/notifications_repository.dart';
@@ -47,20 +52,40 @@ import '../../features/settings/presentation/bloc/settings_bloc.dart';
 final getIt = GetIt.instance;
 
 Future<void> configureDependencies() async {
-  // External dependencies
-  final sharedPreferences = await SharedPreferences.getInstance();
-  getIt.registerSingleton<SharedPreferences>(sharedPreferences);
+  print('🔧 Starting dependency injection...');
   
-  const secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-  );
-  getIt.registerSingleton<FlutterSecureStorage>(secureStorage);
+  // External dependencies
+  SharedPreferences? sharedPreferences;
+  try {
+    sharedPreferences = await SharedPreferences.getInstance();
+    getIt.registerSingleton<SharedPreferences>(sharedPreferences);
+    print('✅ SharedPreferences registered');
+  } catch (e) {
+    print('❌ Error initializing SharedPreferences: $e');
+    rethrow;
+  }
+  
+  try {
+    const secureStorage = FlutterSecureStorage(
+      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+    );
+    getIt.registerSingleton<FlutterSecureStorage>(secureStorage);
+    print('✅ FlutterSecureStorage registered');
+  } catch (e) {
+    print('❌ Error initializing FlutterSecureStorage: $e');
+    rethrow;
+  }
   
   // Services
-  getIt.registerLazySingleton<StorageService>(
-    () => StorageService(getIt(), getIt()),
-  );
+  try {
+    getIt.registerLazySingleton<StorageService>(
+      () => StorageService(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()),
+    );
+    print('✅ StorageService registered');
+  } catch (e) {
+    print('❌ Error registering StorageService: $e');
+  }
   
   getIt.registerLazySingleton<LocationService>(
     () => LocationService(),
@@ -69,26 +94,42 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<NotificationService>(
     () => NotificationService(),
   );
+  print('✅ Services registered');
   
   // Network - استخدام الإعدادات من AppConfig
-  final dio = Dio(BaseOptions(
-    baseUrl: AppConfig.apiBaseUrl,
-    connectTimeout: Duration(milliseconds: AppConfig.connectionTimeout),
-    receiveTimeout: Duration(milliseconds: AppConfig.receiveTimeout),
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-  ));
-  
-  dio.interceptors.add(AuthInterceptor(getIt()));
-  dio.interceptors.add(LogInterceptor(
-    requestBody: true,
-    responseBody: true,
-    logPrint: (obj) => print('🌐 API: $obj'),
-  ));
-  
-  getIt.registerSingleton<Dio>(dio);
+  print('🔧 Setting up Network...');
+  try {
+    final dio = Dio(BaseOptions(
+      baseUrl: AppConfig.apiBaseUrl,
+      connectTimeout: Duration(milliseconds: AppConfig.connectionTimeout),
+      receiveTimeout: Duration(milliseconds: AppConfig.receiveTimeout),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ));
+    
+    // Add AuthInterceptor - make sure StorageService is registered first
+    try {
+      dio.interceptors.add(AuthInterceptor(getIt<StorageService>()));
+      print('✅ AuthInterceptor added');
+    } catch (e) {
+      print('⚠️ Warning: Could not add AuthInterceptor: $e');
+      // Continue without auth interceptor - app should still work
+    }
+    
+    dio.interceptors.add(LogInterceptor(
+      requestBody: true,
+      responseBody: true,
+      logPrint: (obj) => print('🌐 API: $obj'),
+    ));
+    
+    getIt.registerSingleton<Dio>(dio);
+    print('✅ Dio registered');
+  } catch (e) {
+    print('❌ Error setting up Network: $e');
+    rethrow;
+  }
   
   getIt.registerLazySingleton<ApiClient>(
     () => ApiClient(getIt()),
@@ -115,6 +156,10 @@ Future<void> configureDependencies() async {
     () => NotificationsRemoteDataSourceImpl(getIt()),
   );
   
+  getIt.registerLazySingleton<RaisesRemoteDatasource>(
+    () => RaisesRemoteDatasourceImpl(apiClient: getIt()),
+  );
+  
   // Repositories
   getIt.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(getIt(), getIt()),
@@ -136,50 +181,112 @@ Future<void> configureDependencies() async {
     () => NotificationsRepositoryImpl(getIt()),
   );
   
+  getIt.registerLazySingleton<RaisesRepository>(
+    () => RaisesRepositoryImpl(remoteDatasource: getIt()),
+  );
+  
   // Use cases
-  getIt.registerLazySingleton(() => LoginUseCase(getIt()));
-  getIt.registerLazySingleton(() => LogoutUseCase(getIt()));
-  getIt.registerLazySingleton(() => RefreshTokenUseCase(getIt()));
-  getIt.registerLazySingleton(() => CheckInUseCase(getIt()));
-  getIt.registerLazySingleton(() => CheckOutUseCase(getIt()));
-  getIt.registerLazySingleton(() => GetAttendanceHistoryUseCase(getIt()));
-  getIt.registerLazySingleton(() => GetTodayAttendanceUseCase(getIt()));
+  print('🔧 Registering Use Cases...');
+  try {
+    getIt.registerLazySingleton<LoginUseCase>(
+      () => LoginUseCase(getIt<AuthRepository>()),
+    );
+    print('✅ LoginUseCase registered');
+  } catch (e) {
+    print('❌ Error registering LoginUseCase: $e');
+    rethrow;
+  }
+  
+  try {
+    getIt.registerLazySingleton<LogoutUseCase>(
+      () => LogoutUseCase(getIt<AuthRepository>()),
+    );
+    print('✅ LogoutUseCase registered');
+  } catch (e) {
+    print('❌ Error registering LogoutUseCase: $e');
+    rethrow;
+  }
+  
+  try {
+    getIt.registerLazySingleton<RefreshTokenUseCase>(
+      () => RefreshTokenUseCase(getIt<AuthRepository>()),
+    );
+    print('✅ RefreshTokenUseCase registered');
+  } catch (e) {
+    print('❌ Error registering RefreshTokenUseCase: $e');
+    rethrow;
+  }
+  
+  getIt.registerLazySingleton<CheckInUseCase>(
+    () => CheckInUseCase(getIt<AttendanceRepository>()),
+  );
+  
+  getIt.registerLazySingleton<CheckOutUseCase>(
+    () => CheckOutUseCase(getIt<AttendanceRepository>()),
+  );
+  
+  getIt.registerLazySingleton<GetAttendanceHistoryUseCase>(
+    () => GetAttendanceHistoryUseCase(getIt<AttendanceRepository>()),
+  );
+  
+  getIt.registerLazySingleton<GetTodayAttendanceUseCase>(
+    () => GetTodayAttendanceUseCase(getIt<AttendanceRepository>()),
+  );
+  
+  print('✅ All Use Cases registered');
   
   // Blocs
-  getIt.registerFactory<AuthBloc>(
-    () => AuthBloc(
-      loginUseCase: getIt(),
-      logoutUseCase: getIt(),
-      refreshTokenUseCase: getIt(),
-      storageService: getIt(),
-      notificationService: getIt(),
-      authRepository: getIt(),
-    ),
-  );
+  print('🔧 Registering Blocs...');
+  
+  try {
+    getIt.registerFactory<AuthBloc>(
+      () {
+        print('🔧 Creating AuthBloc instance...');
+        return AuthBloc(
+          loginUseCase: getIt<LoginUseCase>(),
+          logoutUseCase: getIt<LogoutUseCase>(),
+          refreshTokenUseCase: getIt<RefreshTokenUseCase>(),
+          storageService: getIt<StorageService>(),
+          notificationService: getIt<NotificationService>(),
+          authRepository: getIt<AuthRepository>(),
+        );
+      },
+    );
+    print('✅ AuthBloc registered');
+  } catch (e) {
+    print('❌ Error registering AuthBloc: $e');
+    rethrow;
+  }
   
   getIt.registerFactory<AttendanceBloc>(
     () => AttendanceBloc(
-      checkInUseCase: getIt(),
-      checkOutUseCase: getIt(),
-      getHistoryUseCase: getIt(),
-      getTodayAttendanceUseCase: getIt(),
-      locationService: getIt(),
+      checkInUseCase: getIt<CheckInUseCase>(),
+      checkOutUseCase: getIt<CheckOutUseCase>(),
+      getHistoryUseCase: getIt<GetAttendanceHistoryUseCase>(),
+      getTodayAttendanceUseCase: getIt<GetTodayAttendanceUseCase>(),
+      locationService: getIt<LocationService>(),
     ),
   );
   
   getIt.registerFactory<LeavesBloc>(
-    () => LeavesBloc(getIt()),
+    () => LeavesBloc(getIt<LeavesRepository>()),
   );
   
   getIt.registerFactory<LettersBloc>(
-    () => LettersBloc(getIt()),
+    () => LettersBloc(getIt<LettersRepository>()),
+  );
+  
+  getIt.registerFactory<RaisesBloc>(
+    () => RaisesBloc(repository: getIt<RaisesRepository>()),
   );
   
   getIt.registerFactory<NotificationsBloc>(
-    () => NotificationsBloc(getIt()),
+    () => NotificationsBloc(getIt<NotificationsRepository>()),
   );
   
   getIt.registerFactory<SettingsBloc>(
-    () => SettingsBloc(getIt()),
+    () => SettingsBloc(getIt<StorageService>()),
   );
+  
+  print('✅ All Blocs registered');
 }

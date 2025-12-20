@@ -3,37 +3,70 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:logger/logger.dart';
 
 class NotificationService {
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _firebaseMessaging;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   final Logger _logger = Logger();
+  
+  FirebaseMessaging? get firebaseMessaging {
+    try {
+      _firebaseMessaging ??= FirebaseMessaging.instance;
+      return _firebaseMessaging;
+    } catch (e) {
+      _logger.e('Firebase not initialized: $e');
+      return null;
+    }
+  }
 
   bool _isInitialized = false;
 
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // Request permission
-    await _requestPermission();
+    try {
+      // Request permission
+      await _requestPermission();
+    } catch (e) {
+      _logger.e('Error requesting notification permission: $e');
+    }
 
-    // Initialize local notifications
-    await _initializeLocalNotifications();
+    try {
+      // Initialize local notifications
+      await _initializeLocalNotifications();
+    } catch (e) {
+      _logger.e('Error initializing local notifications: $e');
+    }
 
-    // Configure Firebase messaging
-    await _configureFirebaseMessaging();
+    try {
+      // Configure Firebase messaging
+      await _configureFirebaseMessaging();
+    } catch (e) {
+      _logger.e('Error configuring Firebase messaging: $e');
+      // Continue without Firebase - app should still work
+    }
 
     _isInitialized = true;
   }
 
   Future<void> _requestPermission() async {
-    final settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    try {
+      final messaging = firebaseMessaging;
+      if (messaging == null) {
+        _logger.w('Firebase not available, skipping permission request');
+        return;
+      }
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
 
-    _logger.i('Notification permission status: ${settings.authorizationStatus}');
+      _logger.i('Notification permission status: ${settings.authorizationStatus}');
+    } catch (e) {
+      _logger.e('Error requesting Firebase permission: $e');
+      // Continue without Firebase permissions
+    }
   }
 
   Future<void> _initializeLocalNotifications() async {
@@ -74,16 +107,26 @@ class NotificationService {
   }
 
   Future<void> _configureFirebaseMessaging() async {
-    // Foreground messages
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    try {
+      final messaging = firebaseMessaging;
+      if (messaging == null) {
+        _logger.w('Firebase not initialized, skipping Firebase Messaging configuration');
+        return;
+      }
+      // Foreground messages
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-    // Background messages (when app is in background)
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
+      // Background messages (when app is in background)
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
 
-    // Handle initial message (when app is terminated)
-    final initialMessage = await _firebaseMessaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleBackgroundMessage(initialMessage);
+      // Handle initial message (when app is terminated)
+      final initialMessage = await messaging.getInitialMessage();
+      if (initialMessage != null) {
+        _handleBackgroundMessage(initialMessage);
+      }
+    } catch (e) {
+      _logger.e('Firebase Messaging not available: $e');
+      // Continue without Firebase - app should still work
     }
   }
 
@@ -111,7 +154,12 @@ class NotificationService {
 
   Future<String?> getFCMToken() async {
     try {
-      final token = await _firebaseMessaging.getToken();
+      final messaging = firebaseMessaging;
+      if (messaging == null) {
+        _logger.w('Firebase not available, cannot get FCM token');
+        return null;
+      }
+      final token = await messaging.getToken();
       _logger.i('FCM Token: $token');
       return token;
     } catch (e) {
@@ -121,12 +169,22 @@ class NotificationService {
   }
 
   Future<void> subscribeToTopic(String topic) async {
-    await _firebaseMessaging.subscribeToTopic(topic);
+    final messaging = firebaseMessaging;
+    if (messaging == null) {
+      _logger.w('Firebase not available, cannot subscribe to topic');
+      return;
+    }
+    await messaging.subscribeToTopic(topic);
     _logger.i('Subscribed to topic: $topic');
   }
 
   Future<void> unsubscribeFromTopic(String topic) async {
-    await _firebaseMessaging.unsubscribeFromTopic(topic);
+    final messaging = firebaseMessaging;
+    if (messaging == null) {
+      _logger.w('Firebase not available, cannot unsubscribe from topic');
+      return;
+    }
+    await messaging.unsubscribeFromTopic(topic);
     _logger.i('Unsubscribed from topic: $topic');
   }
 

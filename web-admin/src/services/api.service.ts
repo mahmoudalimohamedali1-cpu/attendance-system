@@ -6,6 +6,7 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 
 // استخدام متغير البيئة - ويرجع للقيمة الافتراضية إذا لم يكن موجود
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+export const API_URL = API_BASE_URL;
 
 class ApiService {
   private client: AxiosInstance;
@@ -139,6 +140,17 @@ class ApiService {
 
   async delete<T = unknown>(url: string, config?: object): Promise<T> {
     const response = await this.client.delete<T>(url, config);
+    return response.data;
+  }
+
+  async postFormData<T = unknown>(url: string, formData: FormData): Promise<T> {
+    // Delete Content-Type header so axios sets it with correct boundary
+    const response = await this.client.post<T>(url, formData, {
+      headers: {
+        'Content-Type': undefined,
+      },
+      transformRequest: [(data) => data],
+    });
     return response.data;
   }
 }

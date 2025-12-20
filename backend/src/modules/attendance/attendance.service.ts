@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeofenceService } from './services/geofence.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
@@ -18,14 +19,15 @@ export class AttendanceService {
     private prisma: PrismaService,
     private geofenceService: GeofenceService,
     private notificationsService: NotificationsService,
-  ) {}
+    private permissionsService: PermissionsService,
+  ) { }
 
   async checkIn(userId: string, checkInDto: CheckInDto) {
     const { latitude, longitude, isMockLocation, deviceInfo, faceEmbedding, faceImage } = checkInDto;
 
-    // Get user with branch info
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    // Get user with branch info and company check
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, companyId: checkInDto.companyId },
       include: { branch: true, department: true, faceData: true },
     });
 
@@ -116,7 +118,7 @@ export class AttendanceService {
 
     if (currentMinutes < earliestCheckIn) {
       const waitMinutes = earliestCheckIn - currentMinutes;
-      
+
       // Notify about early check-in attempt
       await this.notificationsService.sendNotification(
         userId,
@@ -154,41 +156,41 @@ export class AttendanceService {
     // التحقق من الوجه أو تسجيله
     if (faceEmbedding) {
       try {
-        const currentEmb = Array.isArray(faceEmbedding) 
-          ? faceEmbedding 
+        const currentEmb = Array.isArray(faceEmbedding)
+          ? faceEmbedding
           : JSON.parse(faceEmbedding as string);
-        
+
         // إذا كان الوجه مسجلاً، يجب التحقق منه أولاً
         if (user.faceRegistered && user.faceData) {
           const storedEmb = JSON.parse(user.faceData.faceEmbedding);
-          
+
           // حساب التشابه (Cosine Similarity)
           const similarity = this.cosineSimilarity(currentEmb, storedEmb);
           const similarityPercent = Math.round(similarity * 100);
           console.log(`🔍 Face verification for check-in: similarity = ${similarityPercent}%`);
-          
+
           // threshold = 0.5 (50%)
           const FACE_THRESHOLD = 0.5;
-          
+
           if (similarity < FACE_THRESHOLD) {
             console.log(`❌ Face verification FAILED: ${similarityPercent}% < ${FACE_THRESHOLD * 100}%`);
-            
+
             // تسجيل محاولة مشبوهة
             await this.logSuspiciousAttempt(
-              userId, 
-              'FACE_MISMATCH', 
-              latitude, 
-              longitude, 
+              userId,
+              'FACE_MISMATCH',
+              latitude,
+              longitude,
               deviceInfo
             );
-            
+
             throw new ForbiddenException(
               `الوجه غير مطابق (${similarityPercent}%) - يجب أن يكون التطابق أكثر من ${FACE_THRESHOLD * 100}%`
             );
           }
-          
+
           console.log(`✅ Face verification PASSED: ${similarityPercent}%`);
-          
+
           // تحديث الصورة فقط إذا كانت موجودة (بدون تغيير الـ embedding)
           if (faceImage) {
             await this.prisma.faceData.update({
@@ -205,11 +207,11 @@ export class AttendanceService {
             faceEmbedding: JSON.stringify(currentEmb),
             updatedAt: new Date(),
           };
-          
+
           if (faceImage) {
             updateData.faceImage = faceImage;
           }
-          
+
           await this.prisma.faceData.upsert({
             where: { userId },
             create: {
@@ -221,14 +223,14 @@ export class AttendanceService {
             },
             update: updateData,
           });
-          
+
           if (!user.faceRegistered) {
             await this.prisma.user.update({
               where: { id: userId },
               data: { faceRegistered: true },
             });
           }
-          
+
           console.log(`✅ تم تسجيل وجه المستخدم ${userId} لأول مرة`);
         }
       } catch (e) {
@@ -251,6 +253,7 @@ export class AttendanceService {
       },
       create: {
         userId,
+        companyId: user.companyId,
         branchId: user.branch.id,
         date: today,
         checkInTime: now,
@@ -289,8 +292,8 @@ export class AttendanceService {
     console.log('userId:', userId);
     console.log('faceEmbedding received:', faceEmbedding ? `YES (${Array.isArray(faceEmbedding) ? faceEmbedding.length : 'string'})` : 'NO');
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, companyId: checkOutDto.companyId },
       include: { branch: true, department: true, faceData: true },
     });
 
@@ -313,44 +316,44 @@ export class AttendanceService {
       if (!faceEmbedding) {
         throw new BadRequestException('يجب التقاط صورة الوجه للتحقق من الهوية');
       }
-      
+
       try {
-        const currentEmb = Array.isArray(faceEmbedding) 
-          ? faceEmbedding 
+        const currentEmb = Array.isArray(faceEmbedding)
+          ? faceEmbedding
           : JSON.parse(faceEmbedding as string);
         const storedEmb = JSON.parse(user.faceData.faceEmbedding);
-        
+
         // التحقق من أن الـ embeddings لهما نفس الحجم
         if (currentEmb.length !== storedEmb.length) {
           console.error(`❌ Embedding size mismatch: current=${currentEmb.length}, stored=${storedEmb.length}`);
           throw new BadRequestException('خطأ في بيانات الوجه - حجم غير متطابق');
         }
-        
+
         // حساب التشابه (Cosine Similarity)
         const similarity = this.cosineSimilarity(currentEmb, storedEmb);
         const similarityPercent = Math.round(similarity * 100);
         console.log(`🔍 Face verification for user ${userId}: similarity = ${similarityPercent}%`);
-        
+
         // threshold = 0.5 (50%) - يمكن تعديله حسب الحاجة
         const FACE_THRESHOLD = 0.5;
-        
+
         if (similarity < FACE_THRESHOLD) {
           console.log(`❌ Face verification FAILED: ${similarityPercent}% < ${FACE_THRESHOLD * 100}%`);
-          
+
           // تسجيل محاولة مشبوهة
           await this.logSuspiciousAttempt(
-            userId, 
-            'FACE_MISMATCH', 
-            latitude, 
-            longitude, 
+            userId,
+            'FACE_MISMATCH',
+            latitude,
+            longitude,
             deviceInfo
           );
-          
+
           throw new ForbiddenException(
             `الوجه غير مطابق (${similarityPercent}%) - يجب أن يكون التطابق أكثر من ${FACE_THRESHOLD * 100}%`
           );
         }
-        
+
         console.log(`✅ Face verification PASSED for user ${userId}: ${similarityPercent}%`);
       } catch (e) {
         if (e instanceof ForbiddenException) throw e;
@@ -423,7 +426,7 @@ export class AttendanceService {
 
     if (currentMinutes < endMinutes) {
       earlyLeaveMinutes = endMinutes - currentMinutes;
-      
+
       // Update status if it was PRESENT
       if (status === 'PRESENT') {
         status = 'EARLY_LEAVE';
@@ -477,23 +480,22 @@ export class AttendanceService {
     };
   }
 
-  async getTodayAttendance(userId: string) {
+  async getTodayAttendance(userId: string, companyId: string) {
     // استخدام التوقيت المحلي
     const nowToday = new Date();
     const localDateToday = new Date(nowToday.getTime() + (2 * 60 * 60 * 1000)); // UTC+2
     const today = new Date(Date.UTC(localDateToday.getUTCFullYear(), localDateToday.getUTCMonth(), localDateToday.getUTCDate()));
 
-    const attendance = await this.prisma.attendance.findUnique({
+    const attendance = await this.prisma.attendance.findFirst({
       where: {
-        userId_date: {
-          userId,
-          date: today,
-        },
+        userId,
+        companyId,
+        date: today,
       },
     });
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, companyId },
       include: { branch: true, faceData: true },
     });
 
@@ -509,10 +511,10 @@ export class AttendanceService {
     };
   }
 
-  async getAttendanceHistory(userId: string, query: AttendanceQueryDto) {
+  async getAttendanceHistory(userId: string, companyId: string, query: AttendanceQueryDto) {
     const { startDate, endDate, status, page = 1, limit = 30 } = query;
 
-    const where: any = { userId };
+    const where: any = { userId, companyId };
 
     if (startDate) {
       where.date = { gte: new Date(startDate) };
@@ -547,13 +549,14 @@ export class AttendanceService {
     };
   }
 
-  async getMonthlyStats(userId: string, year: number, month: number) {
+  async getMonthlyStats(userId: string, companyId: string, year: number, month: number) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
 
     const attendances = await this.prisma.attendance.findMany({
       where: {
         userId,
+        companyId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -584,10 +587,28 @@ export class AttendanceService {
   }
 
   // Admin methods
-  async getAllAttendance(query: AttendanceQueryDto) {
+  async getAllAttendance(userId: string, companyId: string, query: AttendanceQueryDto) {
     const { startDate, endDate, date, status, branchId, departmentId, search, page = 1, limit = 50 } = query;
 
-    const where: any = {};
+    // Get accessible employee IDs based on ATTENDANCE_VIEW permission
+    const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+      userId,
+      companyId,
+      'ATTENDANCE_VIEW'
+    );
+
+    // If no accessible employees, return empty
+    if (accessibleEmployeeIds.length === 0) {
+      return {
+        data: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      };
+    }
+
+    const where: any = {
+      companyId,
+      userId: { in: accessibleEmployeeIds },
+    };
 
     // Handle single date - استخدام UTC لتجنب مشاكل timezone
     if (date) {
@@ -615,7 +636,7 @@ export class AttendanceService {
     }
 
     if (departmentId) {
-      where.user = { departmentId };
+      where.user = { ...where.user, departmentId };
     }
 
     // Handle search by employee name
@@ -664,14 +685,14 @@ export class AttendanceService {
     };
   }
 
-  async getDailyStats(date?: Date) {
+  async getDailyStats(companyId: string, date?: Date) {
     const targetDate = date || new Date();
     targetDate.setHours(0, 0, 0, 0);
 
     const [totalEmployees, attendances] = await Promise.all([
-      this.prisma.user.count({ where: { status: 'ACTIVE', role: 'EMPLOYEE' } }),
+      this.prisma.user.count({ where: { companyId, status: 'ACTIVE', role: 'EMPLOYEE' } }),
       this.prisma.attendance.findMany({
-        where: { date: targetDate },
+        where: { companyId, date: targetDate },
       }),
     ]);
 
@@ -703,6 +724,7 @@ export class AttendanceService {
     await this.prisma.suspiciousAttempt.create({
       data: {
         userId,
+        companyId: (await this.prisma.user.findFirst({ where: { id: userId }, select: { companyId: true } }))?.companyId,
         attemptType,
         latitude,
         longitude,
@@ -769,20 +791,20 @@ export class AttendanceService {
     if (a.length !== b.length || a.length === 0) {
       return 0;
     }
-    
+
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
-    
+
     for (let i = 0; i < a.length; i++) {
       dotProduct += a[i] * b[i];
       normA += a[i] * a[i];
       normB += b[i] * b[i];
     }
-    
+
     const denominator = Math.sqrt(normA) * Math.sqrt(normB);
     if (denominator === 0) return 0;
-    
+
     return dotProduct / denominator;
   }
 }

@@ -130,18 +130,57 @@ class LocationService {
     );
   }
 
-  /// فحص الموقع الوهمي - معطل مؤقتاً
-  /// تم تعطيل جميع الفحوصات لأنها تسبب مشاكل false positive
+  /// فحص الموقع الوهمي - مُفعّل مع فحوصات متعددة
   Future<MockCheckResult> _comprehensiveMockCheck(Position position, List<Position> samples) async {
-    // تسجيل معلومات الموقع للتشخيص فقط
     final speedKmh = position.speed * 3.6;
     _logger.i('📍 Location: ${position.latitude}, ${position.longitude}');
     _logger.i('📊 Accuracy: ${position.accuracy}m, Speed: ${speedKmh.toStringAsFixed(1)}km/h');
     _logger.i('🔍 Android isMocked flag: ${position.isMocked}');
     
-    // دائماً نرجع أن الموقع حقيقي - الفحوصات معطلة
-    _logger.i('✅ Location check DISABLED - always returning real location');
+    // 1. فحص isMocked flag من Android (الأهم)
+    if (position.isMocked) {
+      _logger.w('⚠️ MOCK DETECTED: Android isMocked flag is TRUE');
+      return MockCheckResult(isMock: true, reason: 'ANDROID_MOCKED_FLAG');
+    }
     
+    // 2. فحص دقة الموقع (accuracy)
+    // GPS حقيقي: 5-100 متر
+    // موقع وهمي: غالباً 0 أو دقيق جداً بشكل مثالي
+    if (position.accuracy < _minAcceptableAccuracy || position.accuracy > _maxAcceptableAccuracy) {
+      _logger.w('⚠️ SUSPICIOUS: Accuracy ${position.accuracy}m is outside normal range');
+      // لا نرفض بناءً على الدقة فقط، لكن نسجل
+    }
+    
+    // 3. فحص السرعة (speed)
+    // سرعة غير منطقية تشير لتزوير
+    if (speedKmh > _maxReasonableSpeed) {
+      _logger.w('⚠️ MOCK DETECTED: Speed ${speedKmh.toStringAsFixed(1)}km/h is unreasonable');
+      return MockCheckResult(isMock: true, reason: 'UNREASONABLE_SPEED');
+    }
+    
+    // 4. فحص عمر الموقع (location age)
+    final locationAge = DateTime.now().difference(position.timestamp ?? DateTime.now());
+    if (locationAge.inSeconds > 30) {
+      _logger.w('⚠️ SUSPICIOUS: Location is ${locationAge.inSeconds}s old');
+      // لا نرفض بناءً على العمر فقط، لكن نسجل
+    }
+    
+    // 5. فحص التناسق بين العينات (Teleportation check)
+    if (samples.length >= 2) {
+      for (int i = 1; i < samples.length; i++) {
+        final distance = Geolocator.distanceBetween(
+          samples[i-1].latitude, samples[i-1].longitude,
+          samples[i].latitude, samples[i].longitude,
+        );
+        // إذا تحرك أكثر من 100 متر في نصف ثانية = مشبوه جداً
+        if (distance > 100) {
+          _logger.w('⚠️ MOCK DETECTED: Teleportation detected - moved ${distance.toStringAsFixed(0)}m between samples');
+          return MockCheckResult(isMock: true, reason: 'TELEPORTATION_DETECTED');
+        }
+      }
+    }
+    
+    _logger.i('✅ Location check PASSED - appears genuine');
     return MockCheckResult(isMock: false, reason: null);
   }
 
@@ -264,8 +303,14 @@ class LocationService {
       timeLimit: const Duration(seconds: 10),
     );
 
-    // فحص الموقع الوهمي معطل - دائماً false
-    bool isMock = false;
+    // فحص الموقع الوهمي - مُفعّل
+    bool isMock = position.isMocked;
+    String? mockReason;
+    
+    if (isMock) {
+      _logger.w('⚠️ MOCK DETECTED in quick location: isMocked = true');
+      mockReason = 'ANDROID_MOCKED_FLAG';
+    }
 
     return LocationData(
       latitude: position.latitude,
@@ -274,6 +319,7 @@ class LocationService {
       altitude: position.altitude,
       speed: position.speed,
       isMockLocation: isMock,
+      mockReason: mockReason,
       timestamp: position.timestamp ?? DateTime.now(),
     );
   }

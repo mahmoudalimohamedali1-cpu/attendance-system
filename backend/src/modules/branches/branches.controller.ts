@@ -23,13 +23,14 @@ import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('branches')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('branches')
 export class BranchesController {
-  constructor(private readonly branchesService: BranchesService) {}
+  constructor(private readonly branchesService: BranchesService) { }
 
   // ============ Branch Endpoints ============
 
@@ -37,15 +38,18 @@ export class BranchesController {
   @Roles('ADMIN')
   @ApiOperation({ summary: 'إنشاء فرع جديد' })
   @ApiResponse({ status: 201, description: 'تم إنشاء الفرع بنجاح' })
-  async createBranch(@Body() createBranchDto: CreateBranchDto) {
-    return this.branchesService.createBranch(createBranchDto);
+  async createBranch(
+    @Body() createBranchDto: CreateBranchDto,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.branchesService.createBranch(createBranchDto, companyId);
   }
 
   @Get()
   @ApiOperation({ summary: 'قائمة الفروع' })
   @ApiResponse({ status: 200, description: 'قائمة الفروع' })
-  async findAllBranches() {
-    return this.branchesService.findAllBranches();
+  async findAllBranches(@CurrentUser('companyId') companyId: string) {
+    return this.branchesService.findAllBranches(companyId);
   }
 
   @Get(':id')
@@ -62,8 +66,9 @@ export class BranchesController {
   async updateBranch(
     @Param('id') id: string,
     @Body() updateBranchDto: UpdateBranchDto,
+    @CurrentUser('companyId') companyId: string,
   ) {
-    return this.branchesService.updateBranch(id, updateBranchDto);
+    return this.branchesService.updateBranch(id, updateBranchDto, companyId);
   }
 
   @Delete(':id')
@@ -78,8 +83,11 @@ export class BranchesController {
   @Roles('ADMIN')
   @ApiOperation({ summary: 'تفعيل/تعطيل فرع' })
   @ApiResponse({ status: 200, description: 'تم تغيير الحالة' })
-  async toggleBranchStatus(@Param('id') id: string) {
-    return this.branchesService.toggleBranchStatus(id);
+  async toggleBranchStatus(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.branchesService.toggleBranchStatus(id, companyId);
   }
 
   // ============ Schedule Endpoints ============
@@ -87,8 +95,11 @@ export class BranchesController {
   @Get(':id/schedule')
   @ApiOperation({ summary: 'جدول عمل الفرع' })
   @ApiResponse({ status: 200, description: 'جدول العمل' })
-  async getBranchSchedule(@Param('id') id: string) {
-    return this.branchesService.getBranchSchedule(id);
+  async getBranchSchedule(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.branchesService.getBranchSchedule(id, companyId);
   }
 
   @Patch(':id/schedule')
@@ -108,15 +119,21 @@ export class BranchesController {
   @Roles('ADMIN')
   @ApiOperation({ summary: 'إنشاء قسم جديد' })
   @ApiResponse({ status: 201, description: 'تم إنشاء القسم بنجاح' })
-  async createDepartment(@Body() createDepartmentDto: CreateDepartmentDto) {
-    return this.branchesService.createDepartment(createDepartmentDto);
+  async createDepartment(
+    @Body() createDepartmentDto: CreateDepartmentDto,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.branchesService.createDepartment(createDepartmentDto, companyId);
   }
 
   @Get('departments/all')
   @ApiOperation({ summary: 'قائمة الأقسام' })
   @ApiResponse({ status: 200, description: 'قائمة الأقسام' })
-  async findAllDepartments(@Query('branchId') branchId?: string) {
-    return this.branchesService.findAllDepartments(branchId);
+  async findAllDepartments(
+    @CurrentUser('companyId') companyId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.branchesService.findAllDepartments(companyId, branchId);
   }
 
   @Patch('departments/:id')

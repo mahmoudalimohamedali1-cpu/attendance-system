@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/utils/error_handler.dart';
 import '../models/attendance_model.dart';
 
 abstract class AttendanceRemoteDataSource {
@@ -70,9 +72,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         message: response.data['message'] ?? 'فشل تسجيل الحضور',
         statusCode: response.statusCode,
       );
+    } on DioException catch (e) {
+      throw ServerException(
+        message: ErrorHandler.handleDioError(e),
+        statusCode: e.response?.statusCode,
+      );
     } catch (e) {
       if (e is ServerException) rethrow;
-      throw ServerException(message: 'فشل تسجيل الحضور: ${e.toString()}');
+      throw ServerException(message: ErrorHandler.handleError(e, defaultMessage: 'فشل تسجيل الحضور'));
     }
   }
 
@@ -105,9 +112,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         message: response.data['message'] ?? 'فشل تسجيل الانصراف',
         statusCode: response.statusCode,
       );
+    } on DioException catch (e) {
+      throw ServerException(
+        message: ErrorHandler.handleDioError(e),
+        statusCode: e.response?.statusCode,
+      );
     } catch (e) {
       if (e is ServerException) rethrow;
-      throw ServerException(message: 'فشل تسجيل الانصراف: ${e.toString()}');
+      throw ServerException(message: ErrorHandler.handleError(e, defaultMessage: 'فشل تسجيل الانصراف'));
     }
   }
 

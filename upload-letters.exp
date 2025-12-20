@@ -1,0 +1,125 @@
+#!/usr/bin/expect -f
+set timeout 120
+
+# نقل مجلد letters
+puts "📤 نقل مجلد letters..."
+spawn scp -r -o StrictHostKeyChecking=no /Users/gamal/attendance-system/backend/src/modules/letters root@72.61.239.170:/var/www/attendance-system/backend/src/modules/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+# نقل app.module.ts
+puts "📤 نقل app.module.ts..."
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/backend/src/app.module.ts root@72.61.239.170:/var/www/attendance-system/backend/src/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+# نقل reports.service.ts
+puts "📤 نقل reports.service.ts..."
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/backend/src/modules/reports/reports.service.ts root@72.61.239.170:/var/www/attendance-system/backend/src/modules/reports/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+# نقل schema.prisma
+puts "📤 نقل schema.prisma..."
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/backend/prisma/schema.prisma root@72.61.239.170:/var/www/attendance-system/backend/prisma/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+# نقل migration
+puts "📤 نقل migration..."
+spawn scp -r -o StrictHostKeyChecking=no /Users/gamal/attendance-system/backend/prisma/migrations/20251215002000_add_letter_requests root@72.61.239.170:/var/www/attendance-system/backend/prisma/migrations/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/backend/prisma/migrations/apply_letters_migration.sql root@72.61.239.170:/var/www/attendance-system/backend/prisma/migrations/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+# نقل ملفات Dashboard
+puts "📤 نقل ملفات Dashboard..."
+spawn scp -r -o StrictHostKeyChecking=no /Users/gamal/attendance-system/web-admin/src/pages/letters root@72.61.239.170:/var/www/attendance-system/web-admin/src/pages/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/web-admin/src/App.tsx root@72.61.239.170:/var/www/attendance-system/web-admin/src/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/web-admin/src/components/layout/MainLayout.tsx root@72.61.239.170:/var/www/attendance-system/web-admin/src/components/layout/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/web-admin/src/config/api.ts root@72.61.239.170:/var/www/attendance-system/web-admin/src/config/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/web-admin/src/pages/dashboard/DashboardPage.tsx root@72.61.239.170:/var/www/attendance-system/web-admin/src/pages/dashboard/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+spawn scp -o StrictHostKeyChecking=no /Users/gamal/attendance-system/web-admin/src/pages/letters/LettersPage.tsx root@72.61.239.170:/var/www/attendance-system/web-admin/src/pages/letters/
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "✅ تم نقل الملفات!"
+

@@ -4,8 +4,8 @@ import {
   IsEnum,
   IsDateString,
   IsOptional,
-  MinLength,
-  Matches,
+  IsArray,
+  MaxLength,
 } from 'class-validator';
 
 enum LeaveType {
@@ -13,9 +13,25 @@ enum LeaveType {
   SICK = 'SICK',
   PERSONAL = 'PERSONAL',
   EMERGENCY = 'EMERGENCY',
-  WORK_FROM_HOME = 'WORK_FROM_HOME',
+  NEW_BABY = 'NEW_BABY',
+  MARRIAGE = 'MARRIAGE',
+  BEREAVEMENT = 'BEREAVEMENT',
+  HAJJ = 'HAJJ',
+  EXAM = 'EXAM',
+  WORK_MISSION = 'WORK_MISSION',
+  UNPAID = 'UNPAID',
   EARLY_LEAVE = 'EARLY_LEAVE',
   OTHER = 'OTHER',
+}
+
+// واجهة المرفق
+export interface LeaveAttachment {
+  originalName: string;
+  filename: string;
+  path?: string;
+  url: string;
+  size?: number;
+  mimeType?: string;
 }
 
 export class CreateLeaveRequestDto {
@@ -31,19 +47,20 @@ export class CreateLeaveRequestDto {
   @IsDateString()
   endDate: string;
 
-  @ApiProperty({ description: 'وقت البداية (للخروج المبكر)', required: false })
+  @ApiProperty({ description: 'السبب أو الملاحظات', required: false })
   @IsOptional()
-  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
-  startTime?: string;
-
-  @ApiProperty({ description: 'وقت النهاية (للخروج المبكر)', required: false })
-  @IsOptional()
-  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
-  endTime?: string;
-
-  @ApiProperty({ description: 'سبب الطلب' })
   @IsString()
-  @MinLength(10, { message: 'يرجى كتابة سبب واضح للطلب (10 أحرف على الأقل)' })
-  reason: string;
+  @MaxLength(500, { message: 'الملاحظات يجب ألا تتجاوز 500 حرف' })
+  reason?: string;
+
+  @ApiProperty({ description: 'ملاحظات', required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: 'الملاحظات يجب ألا تتجاوز 500 حرف' })
+  notes?: string;
+
+  @ApiProperty({ description: 'المرفقات', required: false, type: 'array' })
+  @IsOptional()
+  attachments?: LeaveAttachment[];
 }
 

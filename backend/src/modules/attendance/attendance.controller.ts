@@ -26,10 +26,10 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('attendance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(private readonly attendanceService: AttendanceService) { }
 
   // ============ Employee Endpoints ============
 
@@ -59,8 +59,11 @@ export class AttendanceController {
   @Get('today')
   @ApiOperation({ summary: 'الحصول على حضور اليوم' })
   @ApiResponse({ status: 200, description: 'بيانات الحضور لليوم' })
-  async getTodayAttendance(@CurrentUser('id') userId: string) {
-    return this.attendanceService.getTodayAttendance(userId);
+  async getTodayAttendance(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.attendanceService.getTodayAttendance(userId, companyId);
   }
 
   @Get('history')
@@ -68,9 +71,10 @@ export class AttendanceController {
   @ApiResponse({ status: 200, description: 'قائمة سجلات الحضور' })
   async getAttendanceHistory(
     @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
     @Query() query: AttendanceQueryDto,
   ) {
-    return this.attendanceService.getAttendanceHistory(userId, query);
+    return this.attendanceService.getAttendanceHistory(userId, companyId, query);
   }
 
   @Get('stats/monthly/:year/:month')
@@ -78,29 +82,36 @@ export class AttendanceController {
   @ApiResponse({ status: 200, description: 'إحصائيات الشهر' })
   async getMonthlyStats(
     @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
     @Param('year', ParseIntPipe) year: number,
     @Param('month', ParseIntPipe) month: number,
   ) {
-    return this.attendanceService.getMonthlyStats(userId, year, month);
+    return this.attendanceService.getMonthlyStats(userId, companyId, year, month);
   }
 
-  // ============ Admin Endpoints ============
+  // ============ Permission-Based Endpoints (uses PermissionsService) ============
 
   @Get('admin/all')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'جميع سجلات الحضور (للأدمن)' })
-  @ApiResponse({ status: 200, description: 'قائمة جميع السجلات' })
-  async getAllAttendance(@Query() query: AttendanceQueryDto) {
-    return this.attendanceService.getAllAttendance(query);
+  @ApiOperation({ summary: 'جميع سجلات الحضور (حسب صلاحياتك)' })
+  @ApiResponse({ status: 200, description: 'قائمة سجلات الحضور التي لديك صلاحية عليها' })
+  async getAllAttendance(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Query() query: AttendanceQueryDto,
+  ) {
+    return this.attendanceService.getAllAttendance(userId, companyId, query);
   }
 
   @Get('admin/daily-stats')
+  @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'إحصائيات الحضور اليومية' })
   @ApiQuery({ name: 'date', required: false, description: 'تاريخ الإحصائيات' })
   @ApiResponse({ status: 200, description: 'إحصائيات اليوم' })
-  async getDailyStats(@Query('date') date?: string) {
-    return this.attendanceService.getDailyStats(date ? new Date(date) : undefined);
+  async getDailyStats(
+    @CurrentUser('companyId') companyId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.attendanceService.getDailyStats(companyId, date ? new Date(date) : undefined);
   }
 }
-

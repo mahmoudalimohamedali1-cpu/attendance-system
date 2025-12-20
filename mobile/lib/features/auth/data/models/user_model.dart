@@ -14,6 +14,9 @@ class UserModel extends UserEntity {
     required super.status,
     super.branch,
     super.department,
+    super.annualLeaveDays,
+    super.usedLeaveDays,
+    super.remainingLeaveDays,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +37,9 @@ class UserModel extends UserEntity {
       department: json['department'] != null
           ? DepartmentModel.fromJson(json['department'] as Map<String, dynamic>)
           : null,
+      annualLeaveDays: json['annualLeaveDays'] as int?,
+      usedLeaveDays: json['usedLeaveDays'] as int?,
+      remainingLeaveDays: json['remainingLeaveDays'] as int?,
     );
   }
 
@@ -52,6 +58,9 @@ class UserModel extends UserEntity {
       'branch': branch != null ? (branch as BranchModel).toJson() : null,
       'department':
           department != null ? (department as DepartmentModel).toJson() : null,
+      'annualLeaveDays': annualLeaveDays,
+      'usedLeaveDays': usedLeaveDays,
+      'remainingLeaveDays': remainingLeaveDays,
     };
   }
 }

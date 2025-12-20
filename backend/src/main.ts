@@ -1,11 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // تقديم الملفات الثابتة (uploads)
+  // استخدام نفس المسار المستخدم في upload.service.ts
+  const uploadsPath = process.env.NODE_ENV === 'production'
+    ? '/var/www/attendance-system/uploads'
+    : join(process.cwd(), 'uploads');
+
+  app.useStaticAssets(uploadsPath, {
+    prefix: '/uploads/',
+  });
 
   // زيادة حجم الـ body المسموح به (50MB للصور)
   app.use(bodyParser.json({ limit: '50mb' }));
@@ -14,10 +26,10 @@ async function bootstrap() {
   // Enable CORS
   // في بيئة التطوير، اسمح بجميع المصادر للسماح بالاتصال من الموبايل
   const isDevelopment = process.env.NODE_ENV === 'development';
-  
+
   // جمع جميع URLs المسموح بها
   const allowedOrigins: (string | boolean)[] = [];
-  
+
   if (isDevelopment) {
     // في التطوير، اسمح بجميع المصادر
     allowedOrigins.push(true);
@@ -31,9 +43,9 @@ async function bootstrap() {
       allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(','));
     }
   }
-  
+
   app.enableCors({
-    origin: isDevelopment ? true : (allowedOrigins.length > 0 ? allowedOrigins : ['http://localhost:5173']),
+    origin: isDevelopment ? true : ['http://72.61.239.170', 'http://localhost:5173'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -49,7 +61,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,

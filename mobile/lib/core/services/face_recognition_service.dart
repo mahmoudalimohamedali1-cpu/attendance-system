@@ -131,7 +131,7 @@ class FaceRecognitionService {
           }
         }
         
-        return FaceDetectionResult.error('فشل في استخراج ملامح الوجه - تأكد من تشغيل خدمة التعرف على الوجه');
+        return FaceDetectionResult.error('فشل في استخراج ملامح الوجه - تأكد من وضوح الصورة والإضاءة الجيدة');
       }
       
       return FaceDetectionResult.success(

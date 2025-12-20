@@ -2,6 +2,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsBoolean, IsString, Min, Max } from 'class-validator';
 
 export class CheckOutDto {
+  @ApiProperty({ description: 'معرف الشركة' })
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
   @ApiProperty({
     description: 'خط العرض',
     example: 24.7136,

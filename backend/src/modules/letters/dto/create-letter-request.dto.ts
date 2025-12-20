@@ -1,12 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, MaxLength, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
-
-export enum LetterType {
-  REQUEST = 'REQUEST',
-  COMPLAINT = 'COMPLAINT',
-  CERTIFICATION = 'CERTIFICATION',
-}
+import { LetterType } from '@prisma/client';
 
 export interface LetterAttachment {
   originalName: string;

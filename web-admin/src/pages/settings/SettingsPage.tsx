@@ -34,6 +34,8 @@ import {
   CalendarMonth,
   Security,
   Notifications,
+  EventNote,
+  Refresh,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -45,6 +47,11 @@ interface Holiday {
   nameEn: string;
   date: string;
   isRecurring: boolean;
+}
+
+interface LeavePolicy {
+  disableLeaveCarryover: boolean;
+  description: string;
 }
 
 export const SettingsPage = () => {
@@ -72,6 +79,40 @@ export const SettingsPage = () => {
   });
 
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [disableLeaveCarryover, setDisableLeaveCarryover] = useState(false);
+
+  // تحميل سياسة ترحيل الإجازات
+  const { data: leavePolicy, isLoading: loadingLeavePolicy } = useQuery<LeavePolicy>({
+    queryKey: ['leave-policy'],
+    queryFn: () => api.get('/settings/leave-policy/carryover'),
+  });
+
+  // تحديث حالة الترحيل عند تحميل البيانات
+  useEffect(() => {
+    if (leavePolicy) {
+      setDisableLeaveCarryover(leavePolicy.disableLeaveCarryover || false);
+    }
+  }, [leavePolicy]);
+
+  // حفظ سياسة ترحيل الإجازات
+  const saveLeavePolicyMutation = useMutation({
+    mutationFn: (disableCarryover: boolean) =>
+      api.post('/settings/leave-policy/carryover', { disableCarryover }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leave-policy'] });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    },
+  });
+
+  // إعادة ضبط رصيد الإجازات
+  const resetLeaveBalancesMutation = useMutation({
+    mutationFn: () => api.post('/settings/leave-policy/reset-balances'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leave-policy'] });
+      alert('تم إعادة ضبط رصيد الإجازات لجميع الموظفين');
+    },
+  });
 
   // تحميل الإعدادات من الـ backend
   const { data: savedSettings, isLoading: loadingSettings } = useQuery({
@@ -182,6 +223,7 @@ export const SettingsPage = () => {
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
           <Tab icon={<SettingsIcon />} iconPosition="start" label="إعدادات عامة" />
+          <Tab icon={<EventNote />} iconPosition="start" label="الإجازات" />
           <Tab icon={<CalendarMonth />} iconPosition="start" label="العطلات" />
           <Tab icon={<Security />} iconPosition="start" label="الأمان" />
           <Tab icon={<Notifications />} iconPosition="start" label="الإشعارات" />
@@ -304,8 +346,127 @@ export const SettingsPage = () => {
         </Grid>
       )}
 
-      {/* Holidays */}
+      {/* Leave Policy */}
       {tabValue === 1 && (
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>سياسة ترحيل الإجازات</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  تحكم في كيفية حساب رصيد الإجازات السنوية للموظفين
+                </Typography>
+                
+                {loadingLeavePolicy ? (
+                  <CircularProgress />
+                ) : (
+                  <List>
+                    <ListItem>
+                      <ListItemText
+                        primary="شركتنا لا ترحل الإجازات"
+                        secondary={
+                          disableLeaveCarryover
+                            ? "الرصيد يُعاد ضبطه في بداية كل سنة (21 يوم، أو 30 يوم بعد 5 سنوات خدمة)"
+                            : "الأيام المتبقية تنتقل للسنة الجديدة"
+                        }
+                      />
+                      <Switch
+                        checked={disableLeaveCarryover}
+                        onChange={(e) => setDisableLeaveCarryover(e.target.checked)}
+                      />
+                    </ListItem>
+                  </List>
+                )}
+
+                <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="contained"
+                    startIcon={saveLeavePolicyMutation.isPending ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                    onClick={() => saveLeavePolicyMutation.mutate(disableLeaveCarryover)}
+                    disabled={saveLeavePolicyMutation.isPending}
+                  >
+                    حفظ السياسة
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>إعادة ضبط رصيد الإجازات</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  إعادة ضبط رصيد الإجازات يدوياً لجميع الموظفين
+                </Typography>
+                
+                <Box sx={{ p: 2, bgcolor: 'warning.light', borderRadius: 1, mb: 2 }}>
+                  <Typography variant="body2">
+                    ⚠️ <strong>تحذير:</strong> هذا الإجراء سيؤدي إلى:
+                  </Typography>
+                  <Typography variant="body2" component="ul" sx={{ mt: 1, pl: 2 }}>
+                    <li>إعادة ضبط الأيام المستخدمة إلى صفر</li>
+                    <li>حساب الأيام السنوية بناءً على سنوات الخدمة</li>
+                    <li>21 يوم للموظفين الجدد، 30 يوم بعد 5 سنوات</li>
+                  </Typography>
+                </Box>
+
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={resetLeaveBalancesMutation.isPending ? <CircularProgress size={20} /> : <Refresh />}
+                  onClick={() => {
+                    if (confirm('هل أنت متأكد من إعادة ضبط رصيد الإجازات لجميع الموظفين؟')) {
+                      resetLeaveBalancesMutation.mutate();
+                    }
+                  }}
+                  disabled={resetLeaveBalancesMutation.isPending || !disableLeaveCarryover}
+                >
+                  إعادة ضبط الرصيد الآن
+                </Button>
+
+                {!disableLeaveCarryover && (
+                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                    يجب تفعيل "لا ترحيل الإجازات" أولاً
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>معلومات حساب الإجازات</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" fontWeight="bold">النظام الحالي:</Typography>
+                      <Typography variant="body2">
+                        {disableLeaveCarryover
+                          ? "بدون ترحيل - إعادة ضبط سنوية"
+                          : "مع ترحيل - الأيام تنتقل للسنة الجديدة"}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" fontWeight="bold">حساب الأيام:</Typography>
+                      <Typography variant="body2">
+                        • أقل من 5 سنوات خدمة: 21 يوم<br />
+                        • 5 سنوات أو أكثر: 30 يوم
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Holidays */}
+      {tabValue === 2 && (
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -365,7 +526,7 @@ export const SettingsPage = () => {
       )}
 
       {/* Security */}
-      {tabValue === 2 && (
+      {tabValue === 3 && (
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>إعدادات الأمان</Typography>
@@ -405,7 +566,7 @@ export const SettingsPage = () => {
       )}
 
       {/* Notifications */}
-      {tabValue === 3 && (
+      {tabValue === 4 && (
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>إعدادات الإشعارات</Typography>

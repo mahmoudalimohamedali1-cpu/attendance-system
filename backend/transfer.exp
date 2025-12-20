@@ -1,0 +1,21 @@
+#!/usr/bin/expect -f
+set password "GamalSaad35@#"
+set timeout -1
+
+spawn scp /Users/gamal/attendance-system/backend/src/modules/leaves/leaves.service.ts root@72.61.239.170:/var/www/attendance-system/backend/src/modules/leaves/
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+spawn scp /Users/gamal/attendance-system/backend/prisma/schema.prisma root@72.61.239.170:/var/www/attendance-system/backend/prisma/
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+spawn scp /Users/gamal/attendance-system/backend/src/modules/users/users.service.ts root@72.61.239.170:/var/www/attendance-system/backend/src/modules/users/
+expect {
+    "password:" { send "$password\r"; exp_continue }
+    eof
+}

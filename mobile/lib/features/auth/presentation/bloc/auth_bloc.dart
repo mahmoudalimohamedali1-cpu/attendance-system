@@ -1,7 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/services/storage_service.dart';
+import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/permissions_service.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
 import '../../domain/usecases/refresh_token_usecase.dart';
@@ -84,12 +87,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final LogoutUseCase logoutUseCase;
   final RefreshTokenUseCase refreshTokenUseCase;
   final StorageService storageService;
+  final NotificationService notificationService;
+  final AuthRepository authRepository;
 
   AuthBloc({
     required this.loginUseCase,
     required this.logoutUseCase,
     required this.refreshTokenUseCase,
     required this.storageService,
+    required this.notificationService,
+    required this.authRepository,
   }) : super(AuthInitial()) {
     on<CheckAuthStatusEvent>(_onCheckAuthStatus);
     on<LoginEvent>(_onLogin);
@@ -101,38 +108,44 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     CheckAuthStatusEvent event,
     Emitter<AuthState> emit,
   ) async {
-    emit(AuthLoading());
+    try {
+      emit(AuthLoading());
 
-    final token = await storageService.getAccessToken();
-    final userData = await storageService.getUserData();
+      final token = await storageService.getAccessToken();
+      final userData = await storageService.getUserData();
 
-    if (token != null && userData != null) {
-      // Try to get user from cache
-      // In real app, you might want to refresh the token here
-      try {
-        // For now, we'll just parse the cached user
-        final userJson = await storageService.getUserData();
-        if (userJson != null) {
-          // Parse and emit authenticated state
-          // This is simplified - in production, parse the JSON properly
-          final refreshToken = await storageService.getRefreshToken();
-          if (refreshToken != null) {
-            add(RefreshTokenEvent());
-            return;
+      if (token != null && userData != null) {
+        // Try to get user from cache
+        // In real app, you might want to refresh the token here
+        try {
+          // For now, we'll just parse the cached user
+          final userJson = await storageService.getUserData();
+          if (userJson != null) {
+            // Parse and emit authenticated state
+            // This is simplified - in production, parse the JSON properly
+            final refreshToken = await storageService.getRefreshToken();
+            if (refreshToken != null) {
+              add(RefreshTokenEvent());
+              return;
+            }
           }
+        } catch (e) {
+          print('⚠️ Error checking auth status: $e');
+          // If anything fails, show unauthenticated
         }
-      } catch (e) {
-        // If anything fails, show unauthenticated
       }
+
+      final lastEmail = storageService.getLastEmail();
+      final rememberMe = storageService.getRememberMe();
+
+      emit(AuthUnauthenticated(
+        lastEmail: rememberMe ? lastEmail : null,
+        rememberMe: rememberMe,
+      ));
+    } catch (e) {
+      print('❌ Critical error in CheckAuthStatus: $e');
+      emit(AuthUnauthenticated());
     }
-
-    final lastEmail = storageService.getLastEmail();
-    final rememberMe = storageService.getRememberMe();
-
-    emit(AuthUnauthenticated(
-      lastEmail: rememberMe ? lastEmail : null,
-      rememberMe: rememberMe,
-    ));
   }
 
   Future<void> _onLogin(
@@ -149,8 +162,36 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     result.fold(
       (failure) => emit(AuthError(failure.message)),
-      (authResult) => emit(AuthAuthenticated(authResult.user)),
+      (authResult) async {
+        emit(AuthAuthenticated(authResult.user));
+        
+        // Fetch and cache user permissions
+        try {
+          await getPermissionsService().fetchMyPermissions();
+        } catch (e) {
+          print('⚠️ Failed to fetch permissions: $e');
+        }
+        
+        // Send FCM token to backend after successful login
+        _sendFcmTokenToBackend();
+      },
     );
+  }
+
+  Future<void> _sendFcmTokenToBackend() async {
+    try {
+      final fcmToken = await notificationService.getFCMToken();
+      if (fcmToken != null) {
+        print('📱 Sending FCM token to backend: $fcmToken');
+        await authRepository.updateFcmToken(fcmToken);
+        print('✅ FCM token sent successfully');
+      } else {
+        print('⚠️ FCM token is null');
+      }
+    } catch (e) {
+      print('❌ Failed to send FCM token: $e');
+      // Don't emit error - FCM token update is not critical
+    }
   }
 
   Future<void> _onLogout(
@@ -190,7 +231,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           rememberMe: storageService.getRememberMe(),
         ));
       },
-      (authResult) => emit(AuthAuthenticated(authResult.user)),
+      (authResult) async {
+        emit(AuthAuthenticated(authResult.user));
+        
+        // Send FCM token to backend after token refresh
+        _sendFcmTokenToBackend();
+      },
     );
   }
 }

@@ -20,7 +20,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   async login(loginDto: LoginDto, deviceInfo?: string, ipAddress?: string) {
     const { email, password } = loginDto;
@@ -47,7 +47,7 @@ export class AuthService {
     }
 
     // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
+    const tokens = await this.generateTokens(user.id, user.email, user.role, user.companyId || '');
 
     // Save refresh token
     await this.prisma.refreshToken.create({
@@ -139,6 +139,7 @@ export class AuthService {
       storedToken.user.id,
       storedToken.user.email,
       storedToken.user.role,
+      storedToken.user.companyId || '',
     );
 
     // Save new refresh token
@@ -192,14 +193,14 @@ export class AuthService {
 
     // Generate reset token (in production, send this via email)
     const resetToken = uuidv4();
-    
+
     // Store reset token (you could use a separate table or cache like Redis)
     // For now, we'll use a simple approach
-    
+
     // TODO: Send email with reset link
     // await this.emailService.sendPasswordReset(user.email, resetToken);
 
-    return { 
+    return {
       message: 'إذا كان البريد موجودًا، سيتم إرسال رابط إعادة التعيين',
       // Only for development:
       ...(this.configService.get('NODE_ENV') === 'development' && { resetToken }),
@@ -208,7 +209,7 @@ export class AuthService {
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const { token, newPassword } = resetPasswordDto;
-    
+
     // TODO: Validate token and find user
     // For now, this is a placeholder
 
@@ -234,8 +235,8 @@ export class AuthService {
     return user;
   }
 
-  private async generateTokens(userId: string, email: string, role: string) {
-    const payload = { sub: userId, email, role };
+  private async generateTokens(userId: string, email: string, role: string, companyId: string) {
+    const payload = { sub: userId, email, role, companyId };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {

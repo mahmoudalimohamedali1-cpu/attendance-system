@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -31,15 +32,15 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   // ============ Profile Endpoints ============
 
-  @Get('me')
-  @ApiOperation({ summary: 'الحصول على بيانات المستخدم الحالي' })
-  @ApiResponse({ status: 200, description: 'بيانات المستخدم' })
-  async getProfile(@CurrentUser('id') userId: string) {
-    return this.usersService.getProfile(userId);
+  async getProfile(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.getProfile(userId, companyId);
   }
 
   @Patch('me')
@@ -48,8 +49,9 @@ export class UsersController {
   async updateProfile(
     @CurrentUser('id') userId: string,
     @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser('companyId') companyId: string,
   ) {
-    return this.usersService.updateProfile(userId, updateUserDto);
+    return this.usersService.updateProfile(userId, updateUserDto, companyId);
   }
 
   @Post('me/change-password')
@@ -68,52 +70,67 @@ export class UsersController {
 
   // ============ Admin Endpoints ============
 
-  @Post()
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'إنشاء مستخدم جديد' })
-  @ApiResponse({ status: 201, description: 'تم إنشاء المستخدم بنجاح' })
-  async create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.create(createUserDto, companyId);
   }
 
   @Get()
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'قائمة المستخدمين' })
+  @ApiOperation({ summary: 'قائمة المستخدمين (حسب صلاحياتك)' })
   @ApiResponse({ status: 200, description: 'قائمة المستخدمين' })
-  async findAll(@Query() query: UserQueryDto) {
-    return this.usersService.findAll(query);
+  async findAll(
+    @Request() req: any,
+    @Query() query: UserQueryDto,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.findAll(query, companyId, req.user.id, req.user.role);
   }
 
   @Get('my-team')
   @Roles('MANAGER')
   @ApiOperation({ summary: 'موظفي الفريق (للمدير)' })
   @ApiResponse({ status: 200, description: 'قائمة موظفي الفريق' })
-  async getMyTeam(@CurrentUser('id') managerId: string) {
-    return this.usersService.getEmployeesByManager(managerId);
+  async getMyTeam(
+    @CurrentUser('id') managerId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.getEmployeesByManager(managerId, companyId);
   }
 
   @Get(':id')
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'بيانات مستخدم محدد' })
   @ApiResponse({ status: 200, description: 'بيانات المستخدم' })
-  async findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.findOne(id, companyId);
   }
 
   @Patch(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'تعديل مستخدم' })
   @ApiResponse({ status: 200, description: 'تم التعديل بنجاح' })
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.update(id, updateUserDto, companyId);
   }
 
   @Delete(':id')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'حذف/تعطيل مستخدم' })
   @ApiResponse({ status: 200, description: 'تم تعطيل المستخدم' })
-  async remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.remove(id, companyId);
   }
 
   @Patch(':id/activate')
@@ -128,16 +145,22 @@ export class UsersController {
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'إعادة تعيين الوجه المسجل للموظف' })
   @ApiResponse({ status: 200, description: 'تم إعادة تعيين الوجه بنجاح' })
-  async resetFace(@Param('id') id: string) {
-    return this.usersService.resetFace(id);
+  async resetFace(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.resetFace(id, companyId);
   }
 
   @Post('import')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'استيراد موظفين من ملف' })
   @ApiResponse({ status: 201, description: 'نتائج الاستيراد' })
-  async importUsers(@Body() importUsersDto: ImportUsersDto) {
-    return this.usersService.importUsers(importUsersDto);
+  async importUsers(
+    @Body() importUsersDto: ImportUsersDto,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.usersService.importUsers(importUsersDto, companyId);
   }
 }
 

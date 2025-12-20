@@ -206,5 +206,56 @@ class ApiClient {
   Future<Response> getLetterRequestById(String id) async {
     return await _dio.get('/letters/$id');
   }
+
+  // Permissions endpoints
+  Future<Response> getMyPermissions() async {
+    print('📤 Fetching my permissions from: ${_dio.options.baseUrl}/permissions/my');
+    try {
+      final response = await _dio.get('/permissions/my');
+      print('✅ Permissions response: ${response.statusCode}');
+      return response;
+    } catch (e) {
+      print('❌ Error fetching permissions: $e');
+      rethrow;
+    }
+  }
+
+  // Raises endpoints
+  Future<Response> createRaiseRequest(Map<String, dynamic> data) async {
+    print('📤 Sending raise request to: ${_dio.options.baseUrl}/raises');
+    print('📤 Data: $data');
+    try {
+      final response = await _dio.post('/raises', data: data);
+      print('✅ Response: ${response.statusCode}');
+      return response;
+    } catch (e) {
+      print('❌ Error in createRaiseRequest: $e');
+      rethrow;
+    }
+  }
+
+  Future<Response> getMyRaiseRequests() async {
+    return await _dio.get('/raises/my');
+  }
+
+  Future<Response> cancelRaiseRequest(String id) async {
+    return await _dio.post('/raises/$id/cancel', data: {});
+  }
+
+  Future<Response> getRaiseStats() async {
+    return await _dio.get('/raises/stats');
+  }
+
+  Future<Response> uploadRaiseAttachments(List<String> filePaths) async {
+    final formData = FormData();
+    for (final path in filePaths) {
+      formData.files.add(MapEntry(
+        'files',
+        await MultipartFile.fromFile(path, filename: path.split('/').last),
+      ));
+    }
+    print('📤 Uploading ${filePaths.length} raise attachments');
+    return await _dio.post('/raises/upload-attachments', data: formData);
+  }
 }
 

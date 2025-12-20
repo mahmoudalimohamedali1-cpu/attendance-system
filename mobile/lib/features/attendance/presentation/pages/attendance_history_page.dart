@@ -66,7 +66,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                 children: [
                   Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 16),
-                  Text('حدث خطأ: ${state.message}'),
+                  Text(state.message),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _loadHistory,

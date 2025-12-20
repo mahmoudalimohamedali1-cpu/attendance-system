@@ -18,17 +18,11 @@ class AppConfig {
   /// 
   /// لتغيير الـ URL عند البناء:
   /// flutter build apk --dart-define=API_URL=http://YOUR_IP:3000/api/v1
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'http://192.168.1.17:3000/api/v1', // IP الكمبيوتر - تأكد أن السيرفر يعمل على هذا العنوان
-  );
+  // API URL - hardcoded for production
+  static const String apiBaseUrl = 'http://72.61.239.170/api/v1';
   
   /// Face Recognition Service URL - خدمة التعرف على الوجه Python
-  /// يجب أن تعمل على نفس الشبكة
-  static const String faceRecognitionUrl = String.fromEnvironment(
-    'FACE_URL',
-    defaultValue: 'http://192.168.1.17:5001', // عنوان خدمة التعرف على الوجه
-  );
+  static const String faceRecognitionUrl = 'http://72.61.239.170/face-api';
   
   /// API Endpoints
   static const String apiVersion = 'v1';

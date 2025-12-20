@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsNumber,
   IsDateString,
+  IsBoolean,
 } from 'class-validator';
 
 enum Role {
@@ -38,6 +39,11 @@ export class CreateUserDto {
   @ApiProperty({ description: 'الاسم الأخير' })
   @IsString()
   lastName: string;
+
+  @ApiProperty({ description: 'كود الموظف', required: false })
+  @IsOptional()
+  @IsString()
+  employeeCode?: string;
 
   @ApiProperty({ description: 'رقم الهاتف', required: false })
   @IsOptional()
@@ -83,5 +89,30 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   managerId?: string;
+
+  @ApiProperty({ description: 'معرف الدرجة الوظيفية', required: false })
+  @IsOptional()
+  @IsString()
+  jobTitleId?: string;
+
+  @ApiProperty({ description: 'عدد أيام الإجازة السنوية', default: 21 })
+  @IsOptional()
+  @IsNumber()
+  annualLeaveDays?: number;
+
+  @ApiProperty({ description: 'الجنسية', required: false })
+  @IsOptional()
+  @IsString()
+  nationality?: string;
+
+  @ApiProperty({ description: 'هل الموظف سعودي؟', default: true })
+  @IsOptional()
+  @IsBoolean()
+  isSaudi?: boolean;
+
+  @ApiProperty({ description: 'معرف مركز التكلفة', required: false })
+  @IsOptional()
+  @IsString()
+  costCenterId?: string;
 }
 

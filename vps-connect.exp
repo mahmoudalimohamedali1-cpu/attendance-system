@@ -1,0 +1,15 @@
+#!/usr/bin/expect -f
+set timeout 60
+spawn ssh -o StrictHostKeyChecking=no root@72.61.239.170 "ls -la /var/www/ && echo '---PATH---' && find /var/www -name 'package.json' -path '*/backend/*' 2>/dev/null | head -1 && pm2 list 2>/dev/null"
+expect {
+    "password:" {
+        send "GamalSaad35@#\r"
+        exp_continue
+    }
+    timeout {
+        puts "Timeout"
+        exit 1
+    }
+    eof
+}
+

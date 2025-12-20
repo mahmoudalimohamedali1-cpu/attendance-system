@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -19,6 +19,7 @@ import {
   Divider,
   useTheme,
   useMediaQuery,
+  CircularProgress,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -34,31 +35,139 @@ import {
   Person,
   Sync as SyncIcon,
   Description,
+  Security,
+  MonetizationOn,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
+import { api } from '@/services/api.service';
 
 const drawerWidth = 250;
 
-const menuItems = [
+interface MenuItem {
+  text: string;
+  icon: JSX.Element;
+  path: string;
+  badge?: boolean;
+  // Permission requirements - if undefined, always visible
+  // 'ADMIN' = admin only, 'MANAGER' = admin or manager, permission codes for specific permissions
+  requiredRole?: 'ADMIN' | 'MANAGER';
+  requiredPermission?: string[]; // Any of these permissions grants access
+}
+
+const allMenuItems: MenuItem[] = [
   { text: 'لوحة التحكم', icon: <Dashboard />, path: '/dashboard' },
-  { text: 'المستخدمين', icon: <People />, path: '/users' },
-  { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance' },
-  { text: 'الفروع والأقسام', icon: <Business />, path: '/branches' },
-  { text: 'الإجازات', icon: <EventNote />, path: '/leaves' },
-  { text: 'الخطابات', icon: <Description />, path: '/letters' },
-  { text: 'طلبات التحديث', icon: <SyncIcon />, path: '/data-updates', badge: true },
-  { text: 'التقارير', icon: <Assessment />, path: '/reports' },
-  { text: 'الإعدادات', icon: <Settings />, path: '/settings' },
+  { text: 'المستخدمين', icon: <People />, path: '/users', requiredRole: 'ADMIN', requiredPermission: ['EMPLOYEES_VIEW', 'EMPLOYEES_EDIT'] },
+  { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance', requiredPermission: ['ATTENDANCE_VIEW', 'ATTENDANCE_EDIT'] },
+  { text: 'الفروع والأقسام', icon: <Business />, path: '/branches', requiredRole: 'ADMIN' },
+  { text: 'الدرجات الوظيفية', icon: <Business />, path: '/job-titles', requiredRole: 'ADMIN' },
+  { text: 'الرواتب', icon: <MonetizationOn />, path: '/salary', requiredRole: 'ADMIN' },
+  { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos', requiredRole: 'ADMIN' },
+  { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay', requiredRole: 'ADMIN' },
+  { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
+  { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
+  { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises', requiredPermission: ['RAISES_VIEW', 'RAISES_APPROVE', 'RAISES_APPROVE_MANAGER', 'RAISES_APPROVE_HR'] },
+  { text: 'السلف', icon: <MonetizationOn />, path: '/advances', requiredPermission: ['ADVANCES_VIEW', 'ADVANCES_APPROVE_MANAGER', 'ADVANCES_APPROVE_HR'] },
+  { text: 'طلبات التحديث', icon: <SyncIcon />, path: '/data-updates', badge: true, requiredRole: 'ADMIN' },
+  { text: 'التقارير', icon: <Assessment />, path: '/reports' }, // Always visible - shows own reports
+  { text: 'الصلاحيات', icon: <Security />, path: '/permissions', requiredRole: 'ADMIN' },
+  { text: 'السياسات', icon: <Security />, path: '/policies', requiredRole: 'ADMIN' },
+  { text: 'سجلات التدقيق', icon: <Security />, path: '/audit', requiredRole: 'ADMIN' },
+  { text: 'الإعدادات', icon: <Settings />, path: '/settings', requiredRole: 'ADMIN' },
 ];
+
+interface UserPermission {
+  id: string;
+  scope: string;
+  permission: {
+    code: string;
+    name: string;
+  };
+}
 
 export const MainLayout = () => {
   useTheme();
-  useMediaQuery('(min-width:600px)'); // Keep for potential future use
+  useMediaQuery('(min-width:600px)');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [notificationCount, setNotificationCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+
+  // Fetch user permissions on mount
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const response = await api.get('/permissions/my') as UserPermission[];
+        // Extract permission codes from user permissions (nested permission.code)
+        const codes = response.map((up: UserPermission) => up.permission?.code).filter(Boolean) as string[];
+        setUserPermissions(codes);
+      } catch (error) {
+        console.error('Failed to fetch permissions:', error);
+        setUserPermissions([]);
+      } finally {
+        setPermissionsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchPermissions();
+    } else {
+      setPermissionsLoading(false);
+    }
+  }, [user]);
+
+  // Fetch notification count
+  useEffect(() => {
+    const fetchNotificationCount = async () => {
+      try {
+        const response = await api.get('/notifications/unread-count') as { count: number };
+        setNotificationCount(response.count || 0);
+      } catch (error) {
+        console.error('Failed to fetch notification count:', error);
+      }
+    };
+    fetchNotificationCount();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchNotificationCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Filter menu items based on user role and permissions
+  const visibleMenuItems = allMenuItems.filter((item) => {
+    // If no requirements, always visible
+    if (!item.requiredRole && !item.requiredPermission) {
+      return true;
+    }
+
+    // Check role requirement
+    if (item.requiredRole) {
+      if (item.requiredRole === 'ADMIN' && user?.role === 'ADMIN') {
+        return true;
+      }
+      if (item.requiredRole === 'MANAGER' && (user?.role === 'ADMIN' || user?.role === 'MANAGER')) {
+        return true;
+      }
+      // If role requirement not met and no permission requirement, hide
+      if (!item.requiredPermission) {
+        return false;
+      }
+    }
+
+    // Check permission requirement - any of the listed permissions grants access
+    if (item.requiredPermission) {
+      // Admins always have access
+      if (user?.role === 'ADMIN') {
+        return true;
+      }
+      // Check if user has any of the required permissions
+      return item.requiredPermission.some((perm) => userPermissions.includes(perm));
+    }
+
+    return false;
+  });
 
   const handleLogout = async () => {
     setAnchorEl(null);
@@ -79,34 +188,40 @@ export const MainLayout = () => {
           نظام الحضور
         </Typography>
         <Typography variant="caption" sx={{ opacity: 0.8 }}>
-          لوحة تحكم الإدارة
+          {user?.role === 'ADMIN' ? 'لوحة تحكم الإدارة' : 'لوحة التحكم'}
         </Typography>
       </Box>
 
       <List sx={{ flex: 1, py: 1 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                setMobileOpen(false);
-              }}
-              sx={{
-                borderRadius: 2,
-                '&.Mui-selected': {
-                  bgcolor: 'primary.main',
-                  color: 'white',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                  '& .MuiListItemIcon-root': { color: 'white' },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+        {permissionsLoading ? (
+          <Box display="flex" justifyContent="center" py={4}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : (
+          visibleMenuItems.map((item) => (
+            <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+              <ListItemButton
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  setMobileOpen(false);
+                }}
+                sx={{
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    '&:hover': { bgcolor: 'primary.dark' },
+                    '& .MuiListItemIcon-root': { color: 'white' },
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))
+        )}
       </List>
 
       <Divider />
@@ -120,7 +235,7 @@ export const MainLayout = () => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', direction: 'rtl' }}>
-      {/* Sidebar - على اليمين (أول عنصر في RTL) */}
+      {/* Sidebar */}
       <Box
         component="nav"
         sx={{
@@ -202,11 +317,11 @@ export const MainLayout = () => {
             </IconButton>
 
             <Typography variant="h6" color="text.primary" fontWeight="bold" sx={{ flexGrow: 1 }}>
-              {menuItems.find((item) => item.path === location.pathname)?.text || 'لوحة التحكم'}
+              {allMenuItems.find((item) => item.path === location.pathname)?.text || 'لوحة التحكم'}
             </Typography>
 
-            <IconButton sx={{ ml: 1 }}>
-              <Badge badgeContent={5} color="error">
+            <IconButton sx={{ ml: 1 }} onClick={() => navigate('/notifications')}>
+              <Badge badgeContent={notificationCount} color="error">
                 <Notifications color="action" />
               </Badge>
             </IconButton>

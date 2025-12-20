@@ -1,10 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../bloc/leaves_bloc.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 class CreateLeaveRequestPage extends StatefulWidget {
   const CreateLeaveRequestPage({super.key});
@@ -19,6 +23,9 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   DateTime? _startDate;
   DateTime? _endDate;
   final _reasonController = TextEditingController();
+  final List<File> _attachments = [];
+  bool _isSubmitting = false;
+  bool _isUploadingFiles = false;
 
   final _leaveTypes = [
     {'value': 'ANNUAL', 'label': 'إجازة سنوية'},
@@ -58,7 +65,113 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
     }
   }
 
-  bool _isSubmitting = false;
+  // اختيار صورة من الكاميرا
+  Future<void> _pickFromCamera() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 80,
+    );
+    if (image != null) {
+      setState(() {
+        _attachments.add(File(image.path));
+      });
+    }
+  }
+
+  // اختيار صورة من المعرض
+  Future<void> _pickFromGallery() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (image != null) {
+      setState(() {
+        _attachments.add(File(image.path));
+      });
+    }
+  }
+
+  // اختيار ملف
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+      allowMultiple: true,
+    );
+    if (result != null) {
+      setState(() {
+        for (final file in result.files) {
+          if (file.path != null) {
+            _attachments.add(File(file.path!));
+          }
+        }
+      });
+    }
+  }
+
+  // عرض خيارات اختيار المرفق
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'إضافة مرفق',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _AttachmentOption(
+                    icon: Icons.camera_alt,
+                    label: 'الكاميرا',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromCamera();
+                    },
+                  ),
+                  _AttachmentOption(
+                    icon: Icons.photo_library,
+                    label: 'المعرض',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromGallery();
+                    },
+                  ),
+                  _AttachmentOption(
+                    icon: Icons.attach_file,
+                    label: 'ملف',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFile();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // حذف مرفق
+  void _removeAttachment(int index) {
+    setState(() {
+      _attachments.removeAt(index);
+    });
+  }
 
   void _submit() {
     if (_formKey.currentState?.validate() ?? false) {
@@ -74,13 +187,32 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
 
       setState(() => _isSubmitting = true);
 
-      // إرسال الطلب للسيرفر
-      context.read<LeavesBloc>().add(CreateLeaveEvent({
+      // تحويل التواريخ إلى صيغة YYYY-MM-DD فقط (بدون وقت)
+      final dateFormat = DateFormat('yyyy-MM-dd');
+      final reasonText = _reasonController.text.trim();
+      
+      // إعداد البيانات
+      final requestData = <String, dynamic>{
         'type': _selectedType,
-        'startDate': _startDate!.toIso8601String(),
-        'endDate': _endDate!.toIso8601String(),
-        'reason': _reasonController.text,
-      }));
+        'startDate': dateFormat.format(_startDate!),
+        'endDate': dateFormat.format(_endDate!),
+      };
+      
+      // إضافة reason فقط إذا كان موجوداً
+      if (reasonText.isNotEmpty) {
+        requestData['reason'] = reasonText;
+      }
+      
+      // إضافة المرفقات إذا وجدت
+      final attachmentPaths = _attachments.map((f) => f.path).toList();
+      
+      print('📤 Leave request data: $requestData');
+      print('📎 Attachments: ${attachmentPaths.length}');
+      
+      context.read<LeavesBloc>().add(CreateLeaveWithAttachmentsEvent(
+        requestData,
+        attachmentPaths,
+      ));
     }
   }
 
@@ -88,7 +220,9 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   Widget build(BuildContext context) {
     return BlocListener<LeavesBloc, LeavesState>(
       listener: (context, state) {
-        if (state is LeavesLoaded) {
+        print('🔔 LeavesBloc state: $state');
+        if (state is LeaveCreatedSuccess) {
+          print('✅ Leave request successful!');
           setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -98,13 +232,16 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
           );
           context.pop();
         } else if (state is LeavesError) {
+          print('❌ Leave request error: ${state.message}');
           setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('فشل إرسال الطلب: ${state.message}'),
+              content: Text(state.message),
               backgroundColor: AppTheme.errorColor,
             ),
           );
+        } else if (state is LeavesLoading) {
+          print('⏳ Loading...');
         }
       },
       child: Scaffold(
@@ -112,11 +249,73 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
           title: Text(context.tr('new_leave_request')),
         ),
         body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // Leave Type
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              // Leave Balance Card
+              BlocBuilder<AuthBloc, AuthState>(
+                builder: (context, state) {
+                  if (state is AuthAuthenticated) {
+                    final user = state.user;
+                    final remaining = user.remainingLeaveDays ?? 0;
+                    final annual = user.annualLeaveDays ?? 0;
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'رصيد الإجازات المتبقي',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '$remaining يوم',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (annual > 0) ...[
+                              const Divider(height: 24),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('الإجمالي السنوي: $annual يوم', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                  Text('المستخدم: ${(user.usedLeaveDays) ?? 0} يوم', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+
+              // Leave Type
             DropdownButtonFormField<String>(
               value: _selectedType,
               decoration: InputDecoration(
@@ -204,6 +403,105 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
                 return null;
               },
             ),
+            const SizedBox(height: 24),
+
+            // المرفقات
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.attach_file, color: AppTheme.primaryColor),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'المرفقات',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '(اختياري)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton.icon(
+                          onPressed: _showAttachmentOptions,
+                          icon: const Icon(Icons.add),
+                          label: const Text('إضافة'),
+                        ),
+                      ],
+                    ),
+                    if (_attachments.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: Text(
+                            'يمكنك إرفاق صور أو ملفات (تقارير طبية، وثائق...)',
+                            style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                          ),
+                        ),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _attachments.length,
+                        itemBuilder: (context, index) {
+                          final file = _attachments[index];
+                          final fileName = file.path.split('/').last;
+                          final isImage = fileName.toLowerCase().endsWith('.jpg') ||
+                              fileName.toLowerCase().endsWith('.jpeg') ||
+                              fileName.toLowerCase().endsWith('.png');
+                          
+                          return ListTile(
+                            leading: isImage
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      file,
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.description, color: Colors.blue),
+                                  ),
+                            title: Text(
+                              fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.close, color: Colors.red),
+                              onPressed: () => _removeAttachment(index),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 32),
 
             // Submit Button
@@ -228,3 +526,41 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   }
 }
 
+// Widget لخيارات المرفقات
+class _AttachmentOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _AttachmentOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppTheme.primaryColor, size: 28),
+            ),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(fontSize: 14)),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -24,9 +24,18 @@ class _CreateLetterRequestPageState extends State<CreateLetterRequestPage> {
   bool _isUploadingFiles = false;
 
   final _letterTypes = [
-    {'value': 'REQUEST', 'label': 'طلب'},
-    {'value': 'COMPLAINT', 'label': 'شكوى'},
-    {'value': 'CERTIFICATION', 'label': 'تصديق'},
+    {'value': 'SALARY_DEFINITION', 'label': 'خطاب تعريف راتب'},
+    {'value': 'SERVICE_CONFIRMATION', 'label': 'خطاب تأكيد خدمة'},
+    {'value': 'SALARY_ADJUSTMENT', 'label': 'خطاب تعديل راتب'},
+    {'value': 'PROMOTION', 'label': 'خطاب ترقية'},
+    {'value': 'TRANSFER_ASSIGNMENT', 'label': 'خطاب نقل / تكليف'},
+    {'value': 'RESIGNATION', 'label': 'خطاب استقالة (معتمد من الشركة)'},
+    {'value': 'TERMINATION', 'label': 'خطاب إنهاء خدمة'},
+    {'value': 'CLEARANCE', 'label': 'خطاب إخلاء طرف'},
+    {'value': 'EXPERIENCE', 'label': 'خطاب خبرة'},
+    {'value': 'SALARY_DEFINITION_DIRECTED', 'label': 'خطاب تعريف راتب (موجّه لجهة محددة)'},
+    {'value': 'NOC', 'label': 'خطاب عدم ممانعة'},
+    {'value': 'DELEGATION', 'label': 'خطاب تفويض'},
   ];
 
   @override
@@ -242,32 +251,35 @@ class _CreateLetterRequestPageState extends State<CreateLetterRequestPage> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _letterTypes.map((type) {
-                  final isSelected = _selectedType == type['value'];
-                  return ChoiceChip(
-                    label: Text(type['label']!),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedType = selected ? type['value'] : null;
-                      });
-                    },
-                    selectedColor: AppTheme.primaryColor.withOpacity(0.2),
-                    checkmarkColor: AppTheme.primaryColor,
+              DropdownButtonFormField<String>(
+                value: _selectedType,
+                decoration: InputDecoration(
+                  labelText: 'اختر نوع الخطاب',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: Icon(Icons.description_outlined, color: Colors.grey[400]),
+                ),
+                items: _letterTypes.map((type) {
+                  return DropdownMenuItem<String>(
+                    value: type['value'],
+                    child: Text(type['label']!),
                   );
                 }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedType = value;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'يرجى اختيار نوع الخطاب';
+                  }
+                  return null;
+                },
+                isExpanded: true,
+                menuMaxHeight: 300,
               ),
-              if (_selectedType == null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'يرجى تعبئة البيانات',
-                    style: TextStyle(color: AppTheme.errorColor, fontSize: 12),
-                  ),
-                ),
               const SizedBox(height: 24),
 
               // الملاحظات

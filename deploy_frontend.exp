@@ -1,0 +1,43 @@
+#!/usr/bin/expect -f
+set timeout 1200
+set password "GamalSaad35@#"
+set host "72.61.239.170"
+set project_path "/var/www/attendance-system"
+
+# Sync src directory
+spawn scp -o StrictHostKeyChecking=no -r web-admin/src root@$host:$project_path/web-admin/
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}
+
+# Sync config files
+set config_files {
+    "web-admin/package.json"
+    "web-admin/tsconfig.json"
+    "web-admin/vite.config.ts"
+}
+
+foreach file $config_files {
+    spawn scp -o StrictHostKeyChecking=no $file root@$host:$project_path/web-admin/
+    expect {
+        "password:" {
+            send "$password\r"
+            exp_continue
+        }
+        eof
+    }
+}
+
+# Rebuild on VPS
+spawn ssh -o StrictHostKeyChecking=no root@$host "cd $project_path/web-admin && npm install && npm run build && (pm2 restart web-admin || pm2 restart all)"
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}

@@ -99,8 +99,14 @@ class _FaceRegistrationPageState extends State<FaceRegistrationPage> with Widget
       // بدء الكشف المستمر
       _startFaceDetection();
     } catch (e) {
+      String errorMessage = 'خطأ في تهيئة الكاميرا';
+      if (e.toString().contains('CameraException')) {
+        errorMessage = 'تعذر الوصول للكاميرا. أغلق التطبيقات الأخرى وحاول مرة أخرى';
+      } else if (e.toString().contains('permission')) {
+        errorMessage = 'يرجى السماح بالوصول للكاميرا من إعدادات التطبيق';
+      }
       setState(() {
-        _statusMessage = 'خطأ في تهيئة الكاميرا: $e';
+        _statusMessage = errorMessage;
         _statusColor = Colors.red;
       });
     }
@@ -255,8 +261,16 @@ class _FaceRegistrationPageState extends State<FaceRegistrationPage> with Widget
         });
       }
     } catch (e) {
+      String errorMessage = 'حدث خطأ غير متوقع';
+      if (e.toString().contains('CameraException')) {
+        errorMessage = 'خطأ في الكاميرا. أغلق التطبيقات الأخرى وأعد المحاولة';
+      } else if (e.toString().contains('takePicture')) {
+        errorMessage = 'فشل التقاط الصورة. حاول مرة أخرى';
+      } else if (e.toString().contains('face')) {
+        errorMessage = 'لم يتم اكتشاف وجه. تأكد من الإضاءة الجيدة';
+      }
       setState(() {
-        _statusMessage = 'خطأ: $e';
+        _statusMessage = errorMessage;
         _statusColor = Colors.red;
       });
     } finally {

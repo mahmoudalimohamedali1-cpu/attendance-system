@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/l10n/app_localizations.dart';
@@ -105,10 +106,37 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     type: notification['type'] ?? 'GENERAL',
                     isRead: notification['isRead'] ?? false,
                     onTap: () {
+                      // Mark as read first
                       if (!(notification['isRead'] ?? false)) {
                         context.read<NotificationsBloc>().add(
                           MarkAsReadEvent(notification['id']),
                         );
+                      }
+                      
+                      // Navigate based on notification type and data
+                      final data = notification['data'];
+                      final type = notification['type'] ?? '';
+                      
+                      if (data != null && data is Map) {
+                        // Letter notifications
+                        if (type.contains('LETTER') || 
+                            notification['title']?.toString().contains('خطاب') == true) {
+                          final letterId = data['letterRequestId'] ?? data['letterId'] ?? data['requestId'] ?? data['id'];
+                          if (letterId != null) {
+                            context.push('/letters/details/$letterId');
+                            return;
+                          }
+                        }
+                        
+                        // Leave notifications
+                        if (type.contains('LEAVE') || 
+                            notification['title']?.toString().contains('إجازة') == true) {
+                          final leaveId = data['leaveId'] ?? data['requestId'] ?? data['id'];
+                          if (leaveId != null) {
+                            context.push('/leaves/details/$leaveId');
+                            return;
+                          }
+                        }
                       }
                     },
                   );

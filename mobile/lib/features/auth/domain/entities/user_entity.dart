@@ -13,6 +13,9 @@ class UserEntity extends Equatable {
   final String status;
   final BranchEntity? branch;
   final DepartmentEntity? department;
+  final int? annualLeaveDays;
+  final int? usedLeaveDays;
+  final int? remainingLeaveDays;
 
   const UserEntity({
     required this.id,
@@ -27,6 +30,9 @@ class UserEntity extends Equatable {
     required this.status,
     this.branch,
     this.department,
+    this.annualLeaveDays,
+    this.usedLeaveDays,
+    this.remainingLeaveDays,
   });
 
   String get fullName => '$firstName $lastName';
@@ -50,6 +56,9 @@ class UserEntity extends Equatable {
         status,
         branch,
         department,
+        annualLeaveDays,
+        usedLeaveDays,
+        remainingLeaveDays,
       ];
 }
 

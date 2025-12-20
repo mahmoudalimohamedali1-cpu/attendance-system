@@ -1,58 +1,126 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ExportService } from './services/export.service';
 import { ReportQueryDto } from './dto/report-query.dto';
+import { PermissionsService } from '../permissions/permissions.service';
 
 @Injectable()
 export class ReportsService {
   constructor(
     private prisma: PrismaService,
     private exportService: ExportService,
-  ) {}
+    private permissionsService: PermissionsService,
+  ) { }
 
-  async getDashboardStats() {
+  async getDashboardStats(companyId: string, userId?: string, userRole?: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Get accessible employees based on permissions
+    let accessibleEmployeeIds: string[] = [];
+    if (userId) {
+      accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(userId, companyId, 'REPORTS_VIEW');
+    }
+
+    // ADMIN sees everything, or users with accessible employees see aggregated dashboard
+    if (userRole === 'ADMIN' || accessibleEmployeeIds.length > 0) {
+      const employeeFilter = userRole === 'ADMIN'
+        ? {}
+        : { id: { in: accessibleEmployeeIds } };
+
+      const attendanceFilter = userRole === 'ADMIN'
+        ? { date: today }
+        : { date: today, userId: { in: accessibleEmployeeIds } };
+
+      const leaveFilter = userRole === 'ADMIN'
+        ? { status: 'PENDING' as const }
+        : { status: 'PENDING' as const, userId: { in: accessibleEmployeeIds } };
+
+      const letterFilter = userRole === 'ADMIN'
+        ? { status: 'PENDING' as const }
+        : { status: 'PENDING' as const, userId: { in: accessibleEmployeeIds } };
+
+      const [
+        totalEmployees,
+        activeEmployees,
+        todayAttendance,
+        pendingLeaves,
+        pendingLetters,
+      ] = await Promise.all([
+        this.prisma.user.count({ where: { role: 'EMPLOYEE', ...employeeFilter } }),
+        this.prisma.user.count({ where: { role: 'EMPLOYEE', status: 'ACTIVE', ...employeeFilter } }),
+        this.prisma.attendance.findMany({
+          where: attendanceFilter,
+        }),
+        this.prisma.leaveRequest.count({ where: leaveFilter }),
+        this.prisma.letterRequest.count({ where: letterFilter }),
+      ]);
+
+      const presentToday = todayAttendance.filter((a) => a.checkInTime).length;
+      const lateToday = todayAttendance.filter((a) => a.status === 'LATE').length;
+      const earlyLeaveToday = todayAttendance.filter((a) => a.status === 'EARLY_LEAVE').length;
+      const workFromHomeToday = todayAttendance.filter((a) => a.isWorkFromHome).length;
+
+      return {
+        employees: {
+          total: totalEmployees,
+          active: activeEmployees,
+        },
+        today: {
+          present: presentToday,
+          late: lateToday,
+          earlyLeave: earlyLeaveToday,
+          absent: activeEmployees - presentToday,
+          workFromHome: workFromHomeToday,
+        },
+        pendingLeaves,
+        pendingLetters,
+      };
+    }
+
+    // For EMPLOYEE (or users with no accessible employees): show personal dashboard
     const [
-      totalEmployees,
-      activeEmployees,
-      todayAttendance,
-      pendingLeaves,
-      pendingLetters,
+      myAttendanceToday,
+      myPendingLeaves,
+      myPendingLetters,
+      myApprovedLeaves,
+      myUserData,
     ] = await Promise.all([
-      this.prisma.user.count({ where: { role: 'EMPLOYEE' } }),
-      this.prisma.user.count({ where: { role: 'EMPLOYEE', status: 'ACTIVE' } }),
-      this.prisma.attendance.findMany({
-        where: { date: today },
+      this.prisma.attendance.findFirst({
+        where: { userId, date: today },
       }),
-      this.prisma.leaveRequest.count({ where: { status: 'PENDING' } }),
-      this.prisma.letterRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.leaveRequest.count({ where: { userId, status: 'PENDING' } }),
+      this.prisma.letterRequest.count({ where: { userId, status: 'PENDING' } }),
+      this.prisma.leaveRequest.count({ where: { userId, status: 'APPROVED' } }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          annualLeaveDays: true,
+          usedLeaveDays: true,
+          remainingLeaveDays: true,
+        },
+      }),
     ]);
 
-    const presentToday = todayAttendance.filter((a) => a.checkInTime).length;
-    const lateToday = todayAttendance.filter((a) => a.status === 'LATE').length;
-    const earlyLeaveToday = todayAttendance.filter((a) => a.status === 'EARLY_LEAVE').length;
-    const workFromHomeToday = todayAttendance.filter((a) => a.isWorkFromHome).length;
-
     return {
-      employees: {
-        total: totalEmployees,
-        active: activeEmployees,
-      },
-      today: {
-        present: presentToday,
-        late: lateToday,
-        earlyLeave: earlyLeaveToday,
-        absent: activeEmployees - presentToday,
-        workFromHome: workFromHomeToday,
-      },
-      pendingLeaves,
-      pendingLetters,
+      isEmployeeDashboard: true,
+      myAttendance: myAttendanceToday ? {
+        checkedIn: !!myAttendanceToday.checkInTime,
+        checkInTime: myAttendanceToday.checkInTime,
+        checkOutTime: myAttendanceToday.checkOutTime,
+        status: myAttendanceToday.status,
+        workingMinutes: myAttendanceToday.workingMinutes,
+      } : null,
+      myPendingLeaves,
+      myPendingLetters,
+      myApprovedLeaves,
+      remainingLeaveDays: myUserData?.remainingLeaveDays ?? 0,
+      annualLeaveDays: myUserData?.annualLeaveDays ?? 0,
+      usedLeaveDays: myUserData?.usedLeaveDays ?? 0,
     };
   }
 
-  async getWeeklySummary() {
+  async getWeeklySummary(userId?: string, userRole?: string) {
     const today = new Date();
     const weekAgo = new Date();
     weekAgo.setDate(today.getDate() - 6);
@@ -103,16 +171,30 @@ export class ReportsService {
     };
   }
 
-  async getAttendanceReport(query: ReportQueryDto) {
+  async getAttendanceReport(query: ReportQueryDto, companyId: string, requesterId?: string) {
     const { startDate, endDate, branchId, departmentId, userId } = query;
+
+    // Get accessible employee IDs based on permissions
+    let accessibleEmployeeIds: string[] = [];
+    if (requesterId) {
+      accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(requesterId, companyId, 'REPORTS_VIEW');
+      // If no accessible employees, user can only see their own report
+      if (accessibleEmployeeIds.length === 0) {
+        accessibleEmployeeIds = [requesterId];
+      }
+    }
 
     const where: any = {};
 
     if (startDate) {
-      where.date = { gte: new Date(startDate) };
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      where.date = { gte: start };
     }
     if (endDate) {
-      where.date = { ...where.date, lte: new Date(endDate) };
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      where.date = { ...where.date, lte: end };
     }
     if (branchId) {
       where.branchId = branchId;
@@ -120,8 +202,17 @@ export class ReportsService {
     if (departmentId) {
       where.user = { departmentId };
     }
+
+    // Filter by accessible employees or specific userId
     if (userId) {
+      // Check if user has access to view this employee
+      if (requesterId && !accessibleEmployeeIds.includes(userId)) {
+        throw new ForbiddenException('ليس لديك صلاحية لعرض تقرير هذا الموظف');
+      }
       where.userId = userId;
+    } else if (requesterId) {
+      // Only show accessible employees
+      where.userId = { in: accessibleEmployeeIds };
     }
 
     const attendances = await this.prisma.attendance.findMany({
@@ -158,8 +249,16 @@ export class ReportsService {
     };
   }
 
-  async getEmployeeReport(userId: string, query: ReportQueryDto) {
+  async getEmployeeReport(userId: string, query: ReportQueryDto, companyId: string, requesterId?: string) {
     const { startDate, endDate } = query;
+
+    // Check if requester has access to view this employee's report
+    if (requesterId && requesterId !== userId) {
+      const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(requesterId, companyId, 'REPORTS_VIEW');
+      if (!accessibleEmployeeIds.includes(userId)) {
+        throw new ForbiddenException('ليس لديك صلاحية لعرض تقرير هذا الموظف');
+      }
+    }
 
     const where: any = { userId };
     if (startDate) {
@@ -245,8 +344,18 @@ export class ReportsService {
     };
   }
 
-  async getLateReport(query: ReportQueryDto) {
+  async getLateReport(query: ReportQueryDto, companyId: string, requesterId?: string) {
     const { startDate, endDate, branchId, departmentId } = query;
+
+    // Get accessible employee IDs based on permissions
+    let accessibleEmployeeIds: string[] = [];
+    if (requesterId) {
+      accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(requesterId, companyId, 'REPORTS_VIEW');
+      // If no accessible employees, user can only see their own report
+      if (accessibleEmployeeIds.length === 0) {
+        accessibleEmployeeIds = [requesterId];
+      }
+    }
 
     const where: any = { status: 'LATE' };
 
@@ -261,6 +370,11 @@ export class ReportsService {
     }
     if (departmentId) {
       where.user = { departmentId };
+    }
+
+    // Filter by accessible employees
+    if (requesterId) {
+      where.userId = { in: accessibleEmployeeIds };
     }
 
     const lateRecords = await this.prisma.attendance.findMany({
@@ -368,15 +482,15 @@ export class ReportsService {
     return payrollData;
   }
 
-  async exportToExcel(reportType: string, query: ReportQueryDto): Promise<Buffer> {
+  async exportToExcel(reportType: string, query: ReportQueryDto, companyId: string, requesterId?: string): Promise<Buffer> {
     let data: any;
 
     switch (reportType) {
       case 'attendance':
-        data = await this.getAttendanceReport(query);
+        data = await this.getAttendanceReport(query, companyId, requesterId);
         return this.exportService.exportAttendanceToExcel(data.data);
       case 'late':
-        data = await this.getLateReport(query);
+        data = await this.getLateReport(query, companyId, requesterId);
         return this.exportService.exportLateReportToExcel(data.data);
       case 'payroll':
         data = await this.getPayrollSummary(query);
@@ -386,16 +500,16 @@ export class ReportsService {
     }
   }
 
-  async exportToPdf(reportType: string, query: ReportQueryDto): Promise<Buffer> {
+  async exportToPdf(reportType: string, query: ReportQueryDto, companyId: string, requesterId?: string): Promise<Buffer> {
     let data: any;
 
     switch (reportType) {
       case 'attendance':
-        data = await this.getAttendanceReport(query);
+        data = await this.getAttendanceReport(query, companyId, requesterId);
         return this.exportService.exportAttendanceToPdf(data.data);
       case 'employee':
         if (!query.userId) throw new Error('معرف الموظف مطلوب');
-        data = await this.getEmployeeReport(query.userId, query);
+        data = await this.getEmployeeReport(query.userId, query, companyId, requesterId);
         return this.exportService.exportEmployeeReportToPdf(data);
       default:
         throw new Error('نوع التقرير غير معروف');

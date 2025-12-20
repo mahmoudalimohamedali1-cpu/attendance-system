@@ -3,12 +3,12 @@ import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
 import { GeofenceService } from './services/geofence.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, PermissionsModule],
   controllers: [AttendanceController],
   providers: [AttendanceService, GeofenceService],
   exports: [AttendanceService],
 })
-export class AttendanceModule {}
-
+export class AttendanceModule { }

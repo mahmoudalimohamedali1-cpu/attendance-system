@@ -5,6 +5,7 @@
 
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
+  FILE_BASE_URL: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1').replace('/api/v1', ''),
   TIMEOUT: 30000, // 30 seconds
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
@@ -20,7 +21,7 @@ export const API_ENDPOINTS = {
     RESET_PASSWORD: '/auth/reset-password',
     UPDATE_FCM_TOKEN: '/auth/fcm-token',
   },
-  
+
   // Users
   USERS: {
     LIST: '/users',
@@ -35,7 +36,7 @@ export const API_ENDPOINTS = {
     MY_TEAM: '/users/my-team',
     IMPORT: '/users/import',
   },
-  
+
   // Attendance
   ATTENDANCE: {
     CHECK_IN: '/attendance/check-in',
@@ -46,7 +47,7 @@ export const API_ENDPOINTS = {
     ALL: '/attendance/admin/all',
     DAILY_STATS: '/attendance/admin/daily-stats',
   },
-  
+
   // Branches
   BRANCHES: {
     LIST: '/branches',
@@ -58,7 +59,7 @@ export const API_ENDPOINTS = {
     SCHEDULE: (id: string) => `/branches/${id}/schedule`,
     UPDATE_SCHEDULE: (id: string) => `/branches/${id}/schedule`,
   },
-  
+
   // Departments
   DEPARTMENTS: {
     LIST: '/branches/departments/all',
@@ -66,7 +67,7 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/branches/departments/${id}`,
     DELETE: (id: string) => `/branches/departments/${id}`,
   },
-  
+
   // Leaves
   LEAVES: {
     CREATE: '/leaves',
@@ -80,7 +81,7 @@ export const API_ENDPOINTS = {
     WORK_FROM_HOME: '/leaves/work-from-home',
     DISABLE_WFH: (userId: string, date: string) => `/leaves/work-from-home/${userId}/${date}`,
   },
-  
+
   // Letters
   LETTERS: {
     CREATE: '/letters',
@@ -92,7 +93,7 @@ export const API_ENDPOINTS = {
     REJECT: (id: string) => `/letters/${id}/reject`,
     ALL: '/letters/admin/all',
   },
-  
+
   // Notifications
   NOTIFICATIONS: {
     LIST: '/notifications',
@@ -102,7 +103,7 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/notifications/${id}`,
     BROADCAST: '/notifications/broadcast',
   },
-  
+
   // Reports
   REPORTS: {
     DASHBOARD: '/reports/dashboard',
@@ -114,7 +115,7 @@ export const API_ENDPOINTS = {
     EXPORT_EXCEL: (type: string) => `/reports/export/excel/${type}`,
     EXPORT_PDF: (type: string) => `/reports/export/pdf/${type}`,
   },
-  
+
   // Settings
   SETTINGS: {
     LIST: '/settings',
@@ -123,7 +124,7 @@ export const API_ENDPOINTS = {
     BULK_SET: '/settings/bulk',
     DELETE: (key: string) => `/settings/${key}`,
   },
-  
+
   // Holidays
   HOLIDAYS: {
     LIST: '/settings/holidays/all',
@@ -131,7 +132,7 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/settings/holidays/${id}`,
     DELETE: (id: string) => `/settings/holidays/${id}`,
   },
-  
+
   // Audit
   AUDIT: {
     LOGS: '/audit/logs',

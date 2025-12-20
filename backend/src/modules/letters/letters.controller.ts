@@ -26,20 +26,18 @@ import { CreateLetterRequestDto } from './dto/create-letter-request.dto';
 import { LetterQueryDto } from './dto/letter-query.dto';
 import { ApproveLetterDto } from './dto/approve-letter.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { UploadService } from '../../common/upload/upload.service';
 
 @ApiTags('letters')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('letters')
 export class LettersController {
   constructor(
     private readonly lettersService: LettersService,
     private readonly uploadService: UploadService,
-  ) {}
+  ) { }
 
   // ============ Employee Endpoints ============
 
@@ -47,11 +45,13 @@ export class LettersController {
   @ApiOperation({ summary: 'رفع مرفقات طلب الخطاب' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 201, description: 'تم رفع الملفات بنجاح' })
-  @UseInterceptors(FilesInterceptor('files', 5))
+  @UseInterceptors(FilesInterceptor('files', 5, {
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+  }))
   async uploadAttachments(
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    const uploadedFiles = await this.uploadService.uploadLeaveAttachments(files);
+    const uploadedFiles = await this.uploadService.uploadLetterAttachments(files);
     return {
       message: 'تم رفع الملفات بنجاح',
       files: uploadedFiles,
@@ -66,7 +66,6 @@ export class LettersController {
     @Body() createLetterDto: CreateLetterRequestDto,
     @Req() req: Request,
   ) {
-    // استخدام attachments من raw body لتجنب مشكلة التحويل
     const rawBody = req.body as any;
     if (rawBody.attachments && Array.isArray(rawBody.attachments)) {
       createLetterDto.attachments = rawBody.attachments;
@@ -104,41 +103,82 @@ export class LettersController {
     return this.lettersService.cancelLetterRequest(id, userId);
   }
 
-  // ============ Manager/Admin Endpoints ============
+  // ============ Permission-Based Endpoints (uses PermissionsService) ============
 
   @Get('pending/all')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'الطلبات المعلقة' })
-  @ApiResponse({ status: 200, description: 'قائمة الطلبات المعلقة' })
+  @ApiOperation({ summary: 'الطلبات المعلقة (حسب صلاحياتك)' })
+  @ApiResponse({ status: 200, description: 'قائمة الطلبات المعلقة التي لديك صلاحية عليها' })
   async getPendingRequests(
     @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
     @Query() query: LetterQueryDto,
   ) {
-    return this.lettersService.getPendingRequests(userId, query);
+    return this.lettersService.getPendingRequests(userId, companyId, query);
   }
 
   @Patch(':id/approve')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'الموافقة على طلب خطاب' })
+  @ApiOperation({ summary: 'الموافقة على طلب خطاب (حسب صلاحياتك)' })
   @ApiResponse({ status: 200, description: 'تمت الموافقة' })
   async approveLetterRequest(
     @Param('id') id: string,
     @CurrentUser('id') approverId: string,
-    @Body() approveDto: ApproveLetterDto,
+    @Body() body: { notes?: string; attachments?: any[] },
   ) {
-    return this.lettersService.approveLetterRequest(id, approverId, approveDto.notes);
+    return this.lettersService.approveLetterRequest(id, approverId, body.notes, body.attachments);
   }
 
   @Patch(':id/reject')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'رفض طلب خطاب' })
+  @ApiOperation({ summary: 'رفض طلب خطاب (حسب صلاحياتك)' })
   @ApiResponse({ status: 200, description: 'تم الرفض' })
   async rejectLetterRequest(
     @Param('id') id: string,
     @CurrentUser('id') approverId: string,
-    @Body() approveDto: ApproveLetterDto,
+    @Body() body: { notes?: string; attachments?: any[] },
   ) {
-    return this.lettersService.rejectLetterRequest(id, approverId, approveDto.notes);
+    return this.lettersService.rejectLetterRequest(id, approverId, body.notes, body.attachments);
+  }
+
+  // ==================== Workflow Endpoints (Multi-Step Approval) ====================
+
+  @Get('inbox/manager')
+  @ApiOperation({ summary: 'طلبات تنتظر موافقة المدير' })
+  @ApiResponse({ status: 200, description: 'قائمة الطلبات التي تنتظر موافقتك كمدير' })
+  async getManagerInbox(
+    @CurrentUser('id') managerId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.lettersService.getManagerInbox(managerId, companyId);
+  }
+
+  @Get('inbox/hr')
+  @ApiOperation({ summary: 'طلبات تنتظر موافقة HR' })
+  @ApiResponse({ status: 200, description: 'قائمة الطلبات التي تنتظر موافقة HR' })
+  async getHRInbox(
+    @CurrentUser('id') hrUserId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.lettersService.getHRInbox(hrUserId, companyId);
+  }
+
+  @Post(':id/manager-decision')
+  @ApiOperation({ summary: 'قرار المدير على طلب الخطاب (موافقة/رفض)' })
+  @ApiResponse({ status: 200, description: 'تم تسجيل قرار المدير' })
+  async managerDecision(
+    @Param('id') id: string,
+    @CurrentUser('id') managerId: string,
+    @Body() body: { decision: 'APPROVED' | 'REJECTED'; notes?: string; attachments?: any[] },
+  ) {
+    return this.lettersService.managerDecision(id, managerId, body.decision, body.notes, body.attachments);
+  }
+
+  @Post(':id/hr-decision')
+  @ApiOperation({ summary: 'قرار HR على طلب الخطاب (موافقة/رفض/تأجيل)' })
+  @ApiResponse({ status: 200, description: 'تم تسجيل قرار HR' })
+  async hrDecision(
+    @Param('id') id: string,
+    @CurrentUser('id') hrUserId: string,
+    @Body() body: { decision: 'APPROVED' | 'REJECTED' | 'DELAYED'; notes?: string; attachments?: any[] },
+  ) {
+    return this.lettersService.hrDecision(id, hrUserId, body.decision, body.notes, body.attachments);
   }
 }
-

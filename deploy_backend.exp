@@ -1,0 +1,53 @@
+#!/usr/bin/expect -f
+set timeout 300
+set password "GamalSaad35@#"
+set host "72.61.239.170"
+
+# 1. Upload schema.prisma
+spawn scp -o StrictHostKeyChecking=no backend/prisma/schema.prisma root@$host:/var/www/attendance-system/backend/prisma/schema.prisma
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}
+
+# 2. Upload migration.sql
+spawn ssh -o StrictHostKeyChecking=no root@$host "mkdir -p /var/www/attendance-system/backend/scripts"
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}
+
+spawn scp -o StrictHostKeyChecking=no backend/scripts/migration.sql root@$host:/var/www/attendance-system/backend/scripts/migration.sql
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}
+
+# 3. Upload source code
+spawn rsync -avz -e "ssh -o StrictHostKeyChecking=no" backend/src/ root@$host:/var/www/attendance-system/backend/src/
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}
+
+# 4. Execute Migration and Deploy
+spawn ssh -o StrictHostKeyChecking=no root@$host "sudo -u postgres psql -d attendance_db -c 'ALTER TABLE job_titles DROP CONSTRAINT IF EXISTS job_titles_name_key CASCADE;' && sudo -u postgres psql -d attendance_db -f /var/www/attendance-system/backend/scripts/migration.sql && cd /var/www/attendance-system/backend && npx prisma db push --accept-data-loss && npx prisma generate && npm run build && pm2 restart attendance-backend"
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}

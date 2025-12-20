@@ -8,9 +8,22 @@ import { AttendancePage } from '@/pages/attendance/AttendancePage';
 import { BranchesPage } from '@/pages/branches/BranchesPage';
 import { LeavesPage } from '@/pages/leaves/LeavesPage';
 import { LettersPage } from '@/pages/letters/LettersPage';
+import RaisesPage from '@/pages/raises/RaisesPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
-import { SettingsPage } from '@/pages/settings/SettingsPage';
+import { SettingsPage } from './pages/settings/SettingsPage';
 import DataUpdatesPage from '@/pages/data-updates/DataUpdatesPage';
+import PermissionsPage from '@/pages/permissions/PermissionsPage';
+import PermissionAuditPage from '@/pages/permissions/PermissionAuditPage';
+import JobTitlesPage from '@/pages/job-titles/JobTitlesPage';
+import NotificationsPage from '@/pages/notifications/NotificationsPage';
+import AdvancesPage from '@/pages/advances/AdvancesPage';
+import { SalaryPage } from './pages/salary/SalaryPage';
+import { PayrollRunNewPage } from './pages/salary/PayrollRunNewPage';
+import { PayrollRunDetailsPage } from './pages/salary/PayrollRunDetailsPage';
+import { EosCalculatorPage } from './pages/eos/EosCalculatorPage';
+import { RetroPayPage } from './pages/retro-pay/RetroPayPage';
+import { PoliciesPage } from './pages/policies/PoliciesPage';
+import { AuditLogsPage } from './pages/audit/AuditLogsPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -53,8 +66,21 @@ function App() {
         <Route path="branches" element={<BranchesPage />} />
         <Route path="leaves" element={<LeavesPage />} />
         <Route path="letters" element={<LettersPage />} />
+        <Route path="raises" element={<RaisesPage />} />
+        <Route path="advances" element={<AdvancesPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="data-updates" element={<DataUpdatesPage />} />
+        <Route path="permissions" element={<PermissionsPage />} />
+        <Route path="permissions/audit" element={<PermissionAuditPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="job-titles" element={<JobTitlesPage />} />
+        <Route path="salary" element={<SalaryPage />} />
+        <Route path="salary/runs/new" element={<PayrollRunNewPage />} />
+        <Route path="salary/runs/:id" element={<PayrollRunDetailsPage />} />
+        <Route path="eos" element={<EosCalculatorPage />} />
+        <Route path="retro-pay" element={<RetroPayPage />} />
+        <Route path="policies" element={<PoliciesPage />} />
+        <Route path="audit" element={<AuditLogsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

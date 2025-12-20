@@ -6,11 +6,28 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
+  // Create default company
+  const defaultCompany = await prisma.company.upsert({
+    where: { id: 'default-company-id' },
+    update: {},
+    create: {
+      id: 'default-company-id',
+      name: 'شركة نظام الحضور',
+      nameEn: 'Attendance System Company',
+      crNumber: '1234567890',
+      taxId: '300000000000003',
+      address: 'الرياض، المملكة العربية السعودية',
+      email: 'info@company.com',
+      phone: '+966500000000',
+    },
+  });
+  console.log('✅ Default company created:', defaultCompany.name);
+
   // Create admin user
   const adminPassword = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@company.com' },
-    update: {},
+    update: { companyId: defaultCompany.id },
     create: {
       email: 'admin@company.com',
       password: adminPassword,
@@ -21,6 +38,7 @@ async function main() {
       status: 'ACTIVE',
       phone: '+966500000001',
       jobTitle: 'مدير النظام',
+      companyId: defaultCompany.id,
     },
   });
   console.log('✅ Admin user created:', admin.email);
@@ -108,7 +126,7 @@ async function main() {
   const managerPassword = await bcrypt.hash('manager123', 10);
   const manager = await prisma.user.upsert({
     where: { email: 'manager@company.com' },
-    update: {},
+    update: { companyId: defaultCompany.id },
     create: {
       email: 'manager@company.com',
       password: managerPassword,
@@ -121,13 +139,14 @@ async function main() {
       jobTitle: 'مدير قسم تقنية المعلومات',
       branchId: mainBranch.id,
       departmentId: itDepartment.id,
+      companyId: defaultCompany.id,
     },
   });
   console.log('✅ Manager user created:', manager.email);
 
   // Create employee users
   const employeePassword = await bcrypt.hash('employee123', 10);
-  
+
   const employees = [
     {
       email: 'employee1@company.com',
@@ -159,7 +178,7 @@ async function main() {
     const emp = employees[i];
     await prisma.user.upsert({
       where: { email: emp.email },
-      update: {},
+      update: { companyId: defaultCompany.id },
       create: {
         email: emp.email,
         password: employeePassword,
@@ -174,6 +193,7 @@ async function main() {
         departmentId: emp.departmentId,
         managerId: manager.id,
         salary: 8000 + (i * 500),
+        companyId: defaultCompany.id,
       },
     });
     console.log('✅ Employee created:', emp.email);
@@ -188,11 +208,17 @@ async function main() {
     { key: 'late_deduction_percentage', value: '1', description: 'نسبة خصم التأخير (%)' },
     { key: 'absent_deduction_days', value: '1', description: 'خصم الغياب بالأيام' },
     { key: 'overtime_rate', value: '1.5', description: 'معامل الساعات الإضافية' },
+    { key: 'disableLeaveCarryover', value: 'false', description: 'سياسة ترحيل الإجازات - true = لا ترحيل (إعادة ضبط سنوية)' },
   ];
 
   for (const setting of settings) {
     await prisma.systemSetting.upsert({
-      where: { key: setting.key },
+      where: {
+        key_companyId: {
+          key: setting.key,
+          companyId: null as any
+        }
+      },
       update: { value: setting.value },
       create: setting,
     });

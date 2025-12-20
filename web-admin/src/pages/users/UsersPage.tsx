@@ -27,6 +27,10 @@ import {
   CircularProgress,
   Alert,
   Tooltip,
+  FormControlLabel,
+  Switch,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Search,
@@ -37,9 +41,11 @@ import {
   Visibility,
   FileDownload,
   Face,
+  AccountBalance,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import { User } from '@/store/auth.store';
+import { BankAccountsTab } from './components/BankAccountsTab';
 
 interface UsersResponse {
   data: User[];
@@ -65,6 +71,26 @@ interface Department {
   branchId: string;
 }
 
+interface JobTitle {
+  id: string;
+  name: string;
+  nameEn?: string;
+  level: 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
+  isDirectManager: boolean;
+}
+
+interface DirectManagerUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle?: string;
+  jobTitleRef?: {
+    name: string;
+    level: string;
+  };
+}
+
 export const UsersPage = () => {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
@@ -80,6 +106,7 @@ export const UsersPage = () => {
     lastName: '',
     phone: '',
     jobTitle: '',
+    jobTitleId: '', // الدرجة الوظيفية الجديدة
     role: 'EMPLOYEE',
     status: 'ACTIVE',
     branchId: '',
@@ -87,8 +114,12 @@ export const UsersPage = () => {
     managerId: '',
     salary: '',
     hireDate: '',
+    annualLeaveDays: '',
+    nationality: '',
+    isSaudi: true,
   });
-  
+  const [activeViewTab, setActiveViewTab] = useState(0);
+
   // حالة الأخطاء
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
@@ -112,12 +143,24 @@ export const UsersPage = () => {
     queryFn: () => api.get('/branches/departments/all'),
   });
 
-  // جلب المديرين (MANAGER و ADMIN)
-  const { data: managersData } = useQuery<UsersResponse>({
-    queryKey: ['managers'],
-    queryFn: () => api.get('/users?role=MANAGER&limit=100'),
+  // جلب المديرين (MANAGER و ADMIN) - طريقة قديمة
+  // const { data: managersData } = useQuery<UsersResponse>({
+  //   queryKey: ['managers'],
+  //   queryFn: () => api.get('/users?role=MANAGER&limit=100'),
+  // });
+  // const managers = managersData?.data || [];
+
+  // جلب الدرجات الوظيفية
+  const { data: jobTitles } = useQuery<JobTitle[]>({
+    queryKey: ['job-titles'],
+    queryFn: () => api.get('/job-titles'),
   });
-  const managers = managersData?.data || [];
+
+  // جلب المستخدمين الذين لديهم درجة وظيفية مدير مباشر
+  const { data: directManagerUsers } = useQuery<DirectManagerUser[]>({
+    queryKey: ['direct-manager-users'],
+    queryFn: () => api.get('/job-titles/direct-manager-users'),
+  });
 
   // فلترة الأقسام حسب الفرع المختار
   const filteredDepartments = departments?.filter(
@@ -132,7 +175,9 @@ export const UsersPage = () => {
         branchId: userData.branchId || undefined,
         departmentId: userData.departmentId || undefined,
         managerId: userData.managerId || undefined,
+        jobTitleId: userData.jobTitleId || undefined,
         hireDate: userData.hireDate || undefined,
+        annualLeaveDays: userData.annualLeaveDays ? parseInt(userData.annualLeaveDays) : 21,
       };
       return api.post('/users', payload);
     },
@@ -170,6 +215,7 @@ export const UsersPage = () => {
         branchId: data.branchId || undefined,
         departmentId: data.departmentId || undefined,
         managerId: data.managerId || undefined,
+        jobTitleId: data.jobTitleId || undefined,
         hireDate: data.hireDate || undefined,
       };
       if (!payload.password) {
@@ -230,6 +276,7 @@ export const UsersPage = () => {
         lastName: user.lastName,
         phone: user.phone || '',
         jobTitle: user.jobTitle || '',
+        jobTitleId: (user as any).jobTitleId || '',
         role: user.role,
         status: user.status || 'ACTIVE',
         branchId: user.branch?.id || '',
@@ -237,6 +284,9 @@ export const UsersPage = () => {
         managerId: user.manager?.id || '',
         salary: user.salary ? String(user.salary) : '',
         hireDate: user.hireDate ? new Date(user.hireDate).toISOString().split('T')[0] : '',
+        annualLeaveDays: user.annualLeaveDays ? String(user.annualLeaveDays) : '',
+        nationality: (user as any).nationality || '',
+        isSaudi: (user as any).isSaudi ?? true,
       });
     } else {
       setSelectedUser(null);
@@ -247,6 +297,7 @@ export const UsersPage = () => {
         lastName: '',
         phone: '',
         jobTitle: '',
+        jobTitleId: '',
         role: 'EMPLOYEE',
         status: 'ACTIVE',
         branchId: '',
@@ -254,6 +305,9 @@ export const UsersPage = () => {
         managerId: '',
         salary: '',
         hireDate: '',
+        annualLeaveDays: '',
+        nationality: '',
+        isSaudi: true,
       });
     }
     setOpenDialog(true);
@@ -269,29 +323,29 @@ export const UsersPage = () => {
   // التحقق من صحة النموذج
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    
+
     // الحقول الإلزامية فقط
     if (!formData.firstName.trim()) {
       errors.firstName = 'الاسم الأول مطلوب';
     }
-    
+
     if (!formData.lastName.trim()) {
       errors.lastName = 'الاسم الأخير مطلوب';
     }
-    
+
     if (!formData.email.trim()) {
       errors.email = 'البريد الإلكتروني مطلوب';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'البريد الإلكتروني غير صالح';
     }
-    
+
     // كلمة المرور مطلوبة فقط للمستخدم الجديد
     if (!selectedUser && !formData.password) {
       errors.password = 'كلمة المرور مطلوبة';
     } else if (!selectedUser && formData.password.length < 6) {
       errors.password = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -300,7 +354,7 @@ export const UsersPage = () => {
     if (!validateForm()) {
       return;
     }
-    
+
     setApiError(null);
     if (selectedUser) {
       updateMutation.mutate({ id: selectedUser.id, data: formData });
@@ -401,6 +455,7 @@ export const UsersPage = () => {
                       <TableCell>القسم</TableCell>
                       <TableCell>الدور</TableCell>
                       <TableCell>الحالة</TableCell>
+                      <TableCell align="center">رصيد الإجازات</TableCell>
                       <TableCell align="center">الإجراءات</TableCell>
                     </TableRow>
                   </TableHead>
@@ -453,6 +508,11 @@ export const UsersPage = () => {
                             size="small"
                             variant="outlined"
                           />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Typography variant="body2" fontWeight="bold" color="primary">
+                            {user.remainingLeaveDays ?? 0} يوم
+                          </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Tooltip title="عرض">
@@ -533,7 +593,7 @@ export const UsersPage = () => {
               {apiError}
             </Alert>
           )}
-          
+
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             {/* البيانات الأساسية */}
             <Grid item xs={12}>
@@ -612,12 +672,41 @@ export const UsersPage = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="المسمى الوظيفي"
-                value={formData.jobTitle}
-                onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
-                placeholder="مثال: مطور برمجيات"
+                label="الجنسية"
+                value={formData.nationality}
+                onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
                 helperText="اختياري"
               />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.isSaudi}
+                    onChange={(e) => setFormData({ ...formData, isSaudi: e.target.checked })}
+                  />
+                }
+                label="موظف سعودي؟"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                select
+                label="الدرجة الوظيفية"
+                value={formData.jobTitleId}
+                onChange={(e) => setFormData({ ...formData, jobTitleId: e.target.value })}
+                helperText="اختياري - اختر الدرجة الوظيفية للموظف"
+              >
+                <MenuItem value="">
+                  <em>بدون درجة وظيفية</em>
+                </MenuItem>
+                {jobTitles?.map((jt) => (
+                  <MenuItem key={jt.id} value={jt.id}>
+                    {jt.name} {jt.isDirectManager && '⭐'}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
 
             {/* الفرع والقسم */}
@@ -716,12 +805,13 @@ export const UsersPage = () => {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="تاريخ التوظيف"
+                label="تاريخ مباشرة العمل *"
                 type="date"
                 value={formData.hireDate}
                 onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
                 InputLabelProps={{ shrink: true }}
-                helperText="اختياري - تاريخ بداية العمل"
+                helperText="مطلوب - يُحسب رصيد الإجازات تلقائياً منه (قانون العمل السعودي)"
+                required
               />
             </Grid>
             <Grid item xs={12} md={6}>
@@ -731,17 +821,28 @@ export const UsersPage = () => {
                 label="المدير المباشر"
                 value={formData.managerId}
                 onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
-                helperText="اختياري - المدير المسؤول عن هذا الموظف"
+                helperText="اختياري - يظهر فقط أصحاب الدرجات الوظيفية المحددة كمديرين مباشرين"
               >
                 <MenuItem value="">لا يوجد</MenuItem>
-                {managers?.map((manager) => (
+                {directManagerUsers?.map((manager) => (
                   <MenuItem key={manager.id} value={manager.id}>
-                    {manager.firstName} {manager.lastName} ({getRoleLabel(manager.role)})
+                    {manager.firstName} {manager.lastName}
+                    {manager.jobTitleRef && ` (${manager.jobTitleRef.name})`}
                   </MenuItem>
                 ))}
               </TextField>
             </Grid>
-            
+
+            {/* معلومة عن حساب الإجازات */}
+            <Grid item xs={12}>
+              <Alert severity="success" sx={{ mt: 1 }}>
+                <strong>📌 حساب الإجازات تلقائياً (قانون العمل السعودي المادة 109):</strong><br />
+                • أقل من 5 سنوات خدمة = 21 يوم/سنة<br />
+                • 5 سنوات أو أكثر = 30 يوم/سنة<br />
+                • الأشهر الجزئية تُحسب بنسبة
+              </Alert>
+            </Grid>
+
             {/* ملاحظة الحقول المطلوبة */}
             <Grid item xs={12}>
               <Alert severity="info" sx={{ mt: 1 }}>
@@ -773,76 +874,91 @@ export const UsersPage = () => {
         <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>
           تفاصيل المستخدم
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers>
           {selectedUser && (
-            <Box sx={{ pt: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                {/* صورة الوجه المسجلة */}
-                {(selectedUser as any).faceData?.faceImage ? (
-                  <Avatar 
-                    src={`data:image/jpeg;base64,${(selectedUser as any).faceData.faceImage}`}
-                    sx={{ width: 80, height: 80, border: '3px solid', borderColor: 'success.main' }}
-                  />
-                ) : (
-                  <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.main', fontSize: 32 }}>
-                    {selectedUser.firstName?.[0]}
-                  </Avatar>
-                )}
-                <Box>
-                  <Typography variant="h5" fontWeight="bold">
-                    {selectedUser.firstName} {selectedUser.lastName}
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                    <Chip
-                      label={getRoleLabel(selectedUser.role)}
-                      color={getRoleColor(selectedUser.role) as 'error' | 'warning' | 'primary'}
-                      size="small"
-                    />
-                    {(selectedUser as any).faceRegistered ? (
-                      <Chip label="وجه مسجل ✓" color="success" size="small" variant="outlined" />
-                    ) : (
-                      <Chip label="بدون وجه" color="warning" size="small" variant="outlined" />
-                    )}
-                  </Box>
-                </Box>
-              </Box>
+            <Box>
+              <Tabs
+                value={activeViewTab}
+                onChange={(_, v) => setActiveViewTab(v)}
+                sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+              >
+                <Tab label="البيانات الشخصية" icon={<Visibility />} iconPosition="start" />
+                <Tab label="الحسابات البنكية" icon={<AccountBalance />} iconPosition="start" />
+              </Tabs>
 
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">البريد الإلكتروني</Typography>
-                  <Typography>{selectedUser.email}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">رقم الهاتف</Typography>
-                  <Typography>{selectedUser.phone || '-'}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">المسمى الوظيفي</Typography>
-                  <Typography>{selectedUser.jobTitle || '-'}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">الفرع</Typography>
-                  <Typography>
-                    {selectedUser.branch?.name || (
-                      <Typography component="span" color="text.secondary">غير محدد</Typography>
+              {activeViewTab === 0 ? (
+                <Box sx={{ pt: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                    {/* صورة الوجه المسجلة */}
+                    {(selectedUser as any).faceData?.faceImage ? (
+                      <Avatar
+                        src={`data:image/jpeg;base64,${(selectedUser as any).faceData.faceImage}`}
+                        sx={{ width: 80, height: 80, border: '3px solid', borderColor: 'success.main' }}
+                      />
+                    ) : (
+                      <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.main', fontSize: 32 }}>
+                        {selectedUser.firstName?.[0]}
+                      </Avatar>
                     )}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">القسم</Typography>
-                  <Typography>
-                    {selectedUser.department?.name || (
-                      <Typography component="span" color="text.secondary">غير محدد</Typography>
-                    )}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">الحالة</Typography>
-                  <Box>
-                    <Chip label="نشط" color="success" size="small" />
+                    <Box>
+                      <Typography variant="h5" fontWeight="bold">
+                        {selectedUser.firstName} {selectedUser.lastName}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Chip
+                          label={getRoleLabel(selectedUser.role)}
+                          color={getRoleColor(selectedUser.role) as 'error' | 'warning' | 'primary'}
+                          size="small"
+                        />
+                        {(selectedUser as any).faceRegistered ? (
+                          <Chip label="وجه مسجل ✓" color="success" size="small" variant="outlined" />
+                        ) : (
+                          <Chip label="بدون وجه" color="warning" size="small" variant="outlined" />
+                        )}
+                      </Box>
+                    </Box>
                   </Box>
-                </Grid>
-              </Grid>
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">البريد الإلكتروني</Typography>
+                      <Typography>{selectedUser.email}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">رقم الهاتف</Typography>
+                      <Typography>{selectedUser.phone || '-'}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">المسمى الوظيفي</Typography>
+                      <Typography>{selectedUser.jobTitle || '-'}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">الفرع</Typography>
+                      <Typography>
+                        {selectedUser.branch?.name || (
+                          <Typography component="span" color="text.secondary">غير محدد</Typography>
+                        )}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">القسم</Typography>
+                      <Typography>
+                        {selectedUser.department?.name || (
+                          <Typography component="span" color="text.secondary">غير محدد</Typography>
+                        )}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="caption" color="text.secondary">الحالة</Typography>
+                      <Box>
+                        <Chip label="نشط" color="success" size="small" />
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Box>
+              ) : (
+                <BankAccountsTab userId={selectedUser.id} />
+              )}
             </Box>
           )}
         </DialogContent>

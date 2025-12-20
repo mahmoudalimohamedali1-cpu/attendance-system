@@ -5,6 +5,7 @@ import {
   Param,
   Res,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -21,49 +22,47 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('reports')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(private readonly reportsService: ReportsService) { }
 
   @Get('dashboard')
-  @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'إحصائيات لوحة التحكم' })
   @ApiResponse({ status: 200, description: 'الإحصائيات' })
-  async getDashboardStats() {
-    return this.reportsService.getDashboardStats();
+  async getDashboardStats(@Request() req: any) {
+    return this.reportsService.getDashboardStats(req.user.id, req.user.role);
   }
 
   @Get('weekly-summary')
-  @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'ملخص الأسبوع' })
   @ApiResponse({ status: 200, description: 'ملخص الأسبوع' })
-  async getWeeklySummary() {
-    return this.reportsService.getWeeklySummary();
+  async getWeeklySummary(@Request() req: any) {
+    return this.reportsService.getWeeklySummary(req.user.id, req.user.role);
   }
 
   @Get('attendance')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'تقرير الحضور' })
+  @ApiOperation({ summary: 'تقرير الحضور (حسب صلاحياتك)' })
   @ApiResponse({ status: 200, description: 'تقرير الحضور' })
-  async getAttendanceReport(@Query() query: ReportQueryDto) {
-    return this.reportsService.getAttendanceReport(query);
+  async getAttendanceReport(@Request() req: any, @Query() query: ReportQueryDto) {
+    return this.reportsService.getAttendanceReport(query, req.user.id);
   }
 
   @Get('employee/:userId')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'تقرير موظف' })
+  @ApiOperation({ summary: 'تقرير موظف (حسب صلاحياتك)' })
   @ApiResponse({ status: 200, description: 'تقرير الموظف' })
   async getEmployeeReport(
+    @Request() req: any,
     @Param('userId') userId: string,
     @Query() query: ReportQueryDto,
   ) {
-    return this.reportsService.getEmployeeReport(userId, query);
+    return this.reportsService.getEmployeeReport(userId, query, req.user.id);
   }
 
   @Get('branch/:branchId')
+  @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'تقرير فرع' })
+  @ApiOperation({ summary: 'تقرير فرع (للأدمن والمدراء فقط)' })
   @ApiResponse({ status: 200, description: 'تقرير الفرع' })
   async getBranchReport(
     @Param('branchId') branchId: string,
@@ -73,16 +72,16 @@ export class ReportsController {
   }
 
   @Get('late')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'تقرير التأخيرات' })
+  @ApiOperation({ summary: 'تقرير التأخيرات (حسب صلاحياتك)' })
   @ApiResponse({ status: 200, description: 'تقرير التأخيرات' })
-  async getLateReport(@Query() query: ReportQueryDto) {
-    return this.reportsService.getLateReport(query);
+  async getLateReport(@Request() req: any, @Query() query: ReportQueryDto) {
+    return this.reportsService.getLateReport(query, req.user.id);
   }
 
   @Get('payroll')
+  @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'ملخص الرواتب' })
+  @ApiOperation({ summary: 'ملخص الرواتب (للأدمن فقط)' })
   @ApiResponse({ status: 200, description: 'ملخص الرواتب' })
   async getPayrollSummary(@Query() query: ReportQueryDto) {
     return this.reportsService.getPayrollSummary(query);
@@ -90,39 +89,38 @@ export class ReportsController {
 
   // Export endpoints
   @Get('export/excel/:type')
-  @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'تصدير تقرير Excel' })
   async exportToExcel(
+    @Request() req: any,
     @Param('type') type: string,
     @Query() query: ReportQueryDto,
     @Res() res: Response,
   ) {
-    const buffer = await this.reportsService.exportToExcel(type, query);
-    
+    const buffer = await this.reportsService.exportToExcel(type, query, req.user.id);
+
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="report-${type}-${Date.now()}.xlsx"`,
     });
-    
+
     res.send(buffer);
   }
 
   @Get('export/pdf/:type')
-  @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'تصدير تقرير PDF' })
   async exportToPdf(
+    @Request() req: any,
     @Param('type') type: string,
     @Query() query: ReportQueryDto,
     @Res() res: Response,
   ) {
-    const buffer = await this.reportsService.exportToPdf(type, query);
-    
+    const buffer = await this.reportsService.exportToPdf(type, query, req.user.id);
+
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="report-${type}-${Date.now()}.pdf"`,
     });
-    
+
     res.send(buffer);
   }
 }
-

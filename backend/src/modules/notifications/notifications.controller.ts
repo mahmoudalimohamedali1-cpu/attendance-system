@@ -16,6 +16,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
+import { SmartNotificationService } from './smart-notification.service';
 import { BroadcastNotificationDto } from './dto/broadcast-notification.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -27,7 +28,10 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly smartNotificationService: SmartNotificationService,
+  ) { }
 
   @Get()
   @ApiOperation({ summary: 'قائمة الإشعارات' })
@@ -38,8 +42,8 @@ export class NotificationsController {
     @Query('limit') limit?: string,
   ) {
     return this.notificationsService.getNotifications(
-      userId, 
-      page ? parseInt(page) : 1, 
+      userId,
+      page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20
     );
   }
@@ -93,5 +97,14 @@ export class NotificationsController {
       dto.data,
     );
   }
+
+  @Get('trigger-reminders')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'تشغيل التذكيرات يدوياً (للاختبار)' })
+  @ApiResponse({ status: 200, description: 'تم تشغيل التذكيرات' })
+  async triggerReminders() {
+    return this.smartNotificationService.triggerReminderManually();
+  }
 }
+
 
