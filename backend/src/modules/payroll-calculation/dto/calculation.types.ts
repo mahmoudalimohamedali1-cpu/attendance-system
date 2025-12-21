@@ -94,6 +94,9 @@ export interface EmployeePayrollCalculation {
 
     // تتبع الحساب (للشفافية)
     calculationTrace: CalculationTraceItem[];
+
+    // نتائج السياسات (للربط الديناميكي مع PayslipLines)
+    policyLines?: PolicyPayrollLine[];
 }
 
 export interface CalculationTraceItem {
@@ -101,4 +104,28 @@ export interface CalculationTraceItem {
     description: string;
     formula: string;
     result: number;
+}
+
+/**
+ * نتيجة حساب سياسة - للربط الديناميكي بين السياسة والـ Payslip
+ */
+export interface PolicyPayrollLine {
+    // معرف المكوّن الناتج من السياسة
+    componentId: string;
+    componentCode: string;
+    componentName: string;
+
+    // نوع الناتج (استحقاق/خصم)
+    sign: 'EARNING' | 'DEDUCTION';
+
+    // المبلغ المحسوب
+    amount: number;
+
+    // مصدر الحساب (للتتبع)
+    source: {
+        policyId: string;
+        policyCode: string;
+        ruleId: string;
+        ruleCode: string;
+    };
 }

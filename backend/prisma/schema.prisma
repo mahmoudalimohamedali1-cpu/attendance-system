@@ -1326,6 +1326,7 @@ model SalaryComponent {
   
   structureLines      SalaryStructureLine[]
   PayslipLine        PayslipLine[]
+  policyRules        PolicyRule[]  @relation("PolicyOutputComponent")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")
  
@@ -1658,6 +1659,11 @@ model PolicyRule {
   valueType       String          @map("value_type") // PERCENTAGE, FIXED, FORMULA
   value           String          // القيمة أو المعادلة
   
+  // 🔥 مكوّن الناتج - أين تُسجَّل نتيجة هذه القاعدة في قسيمة الراتب
+  outputComponentId  String?      @map("output_component_id")
+  outputComponent    SalaryComponent? @relation("PolicyOutputComponent", fields: [outputComponentId], references: [id])
+  outputSign         String       @default("EARNING") @map("output_sign") // EARNING | DEDUCTION
+  
   // ترتيب التطبيق
   order           Int             @default(0)
   isActive        Boolean         @default(true) @map("is_active")
@@ -1666,6 +1672,7 @@ model PolicyRule {
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
   @@index([policyId, isActive])
+  @@index([outputComponentId])
   @@map("policy_rules")
 }
 

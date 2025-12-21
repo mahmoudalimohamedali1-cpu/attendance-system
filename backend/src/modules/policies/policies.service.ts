@@ -125,7 +125,13 @@ export class PoliciesService {
                     },
                 ],
             },
-            include: { rules: { where: { isActive: true }, orderBy: { order: 'asc' } } },
+            include: {
+                rules: {
+                    where: { isActive: true },
+                    orderBy: { order: 'asc' },
+                    include: { outputComponent: true }
+                }
+            },
             orderBy: [{ priority: 'desc' }],
         });
 
