@@ -210,22 +210,58 @@ export class MudadService {
 
     /**
      * رفع ملف WPS (مع التحقق من تغيير الهاش)
+     * 
+     * Edge Cases:
+     * Case A: نفس الملف → no-op (no status change)
+     * Case B: ملف اتغير قبل submit → RESUBMIT_REQUIRED
+     * Case C: ملف اتغير بعد submit → RESUBMIT_REQUIRED  
+     * Case D: ملف اتغير بعد accept → 400 ممنوع
      */
     async attachWpsFile(id: string, fileUrl: string, companyId: string, fileHashSha256?: string, userId?: string) {
         const submission = await this.findOne(id, companyId);
 
+        // 🛑 Case D: منع تغيير الملف بعد ACCEPTED (نهائي)
+        if (submission.status === 'ACCEPTED') {
+            // تسجيل محاولة التلاعب
+            if (userId) {
+                await this.statusLogService.logStatusChange({
+                    entityType: SubmissionEntityType.MUDAD,
+                    entityId: id,
+                    fromStatus: submission.status,
+                    toStatus: submission.status,
+                    reason: 'DENIED_AFTER_ACCEPT',
+                    meta: JSON.stringify({
+                        attemptedBy: userId,
+                        attemptedFile: fileUrl,
+                        attemptedHash: fileHashSha256,
+                    }),
+                }, companyId, userId);
+            }
+            throw new BadRequestException('لا يمكن تعديل ملف تقديم تم قبوله. يرجى إنشاء تقديم جديد.');
+        }
+
         // التحقق من تغيير الملف
-        const hashChanged = submission.fileHashSha256 &&
-            fileHashSha256 &&
-            submission.fileHashSha256 !== fileHashSha256;
+        const hasExistingHash = !!submission.fileHashSha256;
+        const hashProvided = !!fileHashSha256;
+        const hashChanged = hasExistingHash && hashProvided && submission.fileHashSha256 !== fileHashSha256;
+        const sameHash = hasExistingHash && hashProvided && submission.fileHashSha256 === fileHashSha256;
 
         let newStatus = submission.status;
         let reason = '';
+        let shouldLog = false;
 
-        if (hashChanged) {
-            // تغير الملف - يتطلب إعادة رفع
+        // ✅ Case A: نفس الملف → no-op (optional log)
+        if (sameHash) {
+            // لا تغيير في الحالة، الملف نفسه
+            // ممكن نسجل log اختياري
+            reason = 'FILE_REATTACHED_SAME_HASH';
+            // لا نغير status
+        }
+        // 🔄 Case B & C: ملف اتغير (قبل أو بعد submit)
+        else if (hashChanged) {
             newStatus = 'RESUBMIT_REQUIRED' as any;
             reason = 'FILE_HASH_CHANGED';
+            shouldLog = true;
 
             // تسجيل تغيير الهاش في سجل التدقيق
             if (userId) {
@@ -242,8 +278,46 @@ export class MudadService {
                     }),
                 }, companyId, userId);
             }
-        } else if (submission.status === 'PENDING') {
+        }
+        // 📥 أول مرة يتم إرفاق ملف (من PENDING)
+        else if (submission.status === 'PENDING') {
             newStatus = 'PREPARED' as any;
+            reason = 'FIRST_FILE_ATTACHED';
+            shouldLog = true;
+
+            if (userId) {
+                await this.statusLogService.logStatusChange({
+                    entityType: SubmissionEntityType.MUDAD,
+                    entityId: id,
+                    fromStatus: submission.status,
+                    toStatus: newStatus,
+                    reason: reason,
+                    meta: JSON.stringify({
+                        fileHash: fileHashSha256,
+                        fileName: fileUrl.split('/').pop(),
+                    }),
+                }, companyId, userId);
+            }
+        }
+        // 🔄 Re-attach على RESUBMIT_REQUIRED → PREPARED
+        else if (submission.status === 'RESUBMIT_REQUIRED') {
+            newStatus = 'PREPARED' as any;
+            reason = 'FILE_REATTACHED_AFTER_RESUBMIT';
+            shouldLog = true;
+
+            if (userId) {
+                await this.statusLogService.logStatusChange({
+                    entityType: SubmissionEntityType.MUDAD,
+                    entityId: id,
+                    fromStatus: submission.status,
+                    toStatus: newStatus,
+                    reason: reason,
+                    meta: JSON.stringify({
+                        newHash: fileHashSha256,
+                        fileName: fileUrl.split('/').pop(),
+                    }),
+                }, companyId, userId);
+            }
         }
 
         return this.prisma.mudadSubmission.update({

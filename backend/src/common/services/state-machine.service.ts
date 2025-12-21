@@ -9,12 +9,12 @@ import { MudadStatus, WpsStatus } from '@prisma/client';
 // Valid transitions for Mudad
 const MUDAD_TRANSITIONS: Record<MudadStatus, MudadStatus[]> = {
     PENDING: ['PREPARED'],
-    PREPARED: ['SUBMITTED', 'PENDING'], // can go back to pending
-    SUBMITTED: ['ACCEPTED', 'REJECTED'],
-    ACCEPTED: [], // final state - no transitions allowed
+    PREPARED: ['SUBMITTED', 'PENDING', 'RESUBMIT_REQUIRED'], // can go to RESUBMIT_REQUIRED if file hash changes
+    SUBMITTED: ['ACCEPTED', 'REJECTED', 'RESUBMIT_REQUIRED'], // can go to RESUBMIT_REQUIRED if file hash changes
+    ACCEPTED: [], // final state - no transitions allowed (protected)
     REJECTED: ['RESUBMITTED'],
     RESUBMITTED: ['ACCEPTED', 'REJECTED'],
-    RESUBMIT_REQUIRED: ['PREPARED', 'SUBMITTED'], // can recover after file hash changed
+    RESUBMIT_REQUIRED: ['PREPARED'], // can recover after re-attaching file
 };
 
 // Valid transitions for WPS
