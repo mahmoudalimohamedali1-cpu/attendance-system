@@ -1418,6 +1418,7 @@ enum PayslipLineSource {
   POLICY // من السياسات
   MANUAL // إدخال يدوي
   ADJUSTMENT // تعديل/فرق
+  STATUTORY // خصومات قانونية (GOSI, ضرائب)
 }
 
 model PayslipLine {
