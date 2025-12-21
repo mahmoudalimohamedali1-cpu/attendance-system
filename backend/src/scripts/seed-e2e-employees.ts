@@ -90,12 +90,14 @@ async function main() {
                     lastName: emp.lastName,
                     employeeCode: emp.code,
                     role: 'EMPLOYEE',
+                    status: 'ACTIVE',
                     isSaudi: emp.isSaudi,
                     nationality: emp.isSaudi ? 'Saudi' : 'Egyptian',
                     phone: `050000000${testEmployees.indexOf(emp)}`,
                 }
             });
             console.log(`  ✅ Created: ${emp.code} - ${emp.firstName} ${emp.lastName}`);
+
         } else {
             await prisma.user.update({
                 where: { id: user.id },
