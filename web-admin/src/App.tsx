@@ -24,6 +24,13 @@ import { EosCalculatorPage } from './pages/eos/EosCalculatorPage';
 import { RetroPayPage } from './pages/retro-pay/RetroPayPage';
 import { PoliciesPage } from './pages/policies/PoliciesPage';
 import { AuditLogsPage } from './pages/audit/AuditLogsPage';
+import ContractsPage from './pages/contracts/ContractsPage';
+import WpsExportPage from './pages/wps-export/WpsExportPage';
+import ExceptionsCenterPage from './pages/exceptions/ExceptionsCenterPage';
+import BankAccountsPage from './pages/bank-accounts/BankAccountsPage';
+import DevicesPage from './pages/devices/DevicesPage';
+import LoanPaymentsPage from './pages/loan-payments/LoanPaymentsPage';
+import CompaniesPage from './pages/companies/CompaniesPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -82,6 +89,13 @@ function App() {
         <Route path="policies" element={<PoliciesPage />} />
         <Route path="audit" element={<AuditLogsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="contracts" element={<ContractsPage />} />
+        <Route path="wps-export" element={<WpsExportPage />} />
+        <Route path="exceptions" element={<ExceptionsCenterPage />} />
+        <Route path="bank-accounts" element={<BankAccountsPage />} />
+        <Route path="devices" element={<DevicesPage />} />
+        <Route path="loan-payments" element={<LoanPaymentsPage />} />
+        <Route path="companies" element={<CompaniesPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

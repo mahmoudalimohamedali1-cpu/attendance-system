@@ -15,10 +15,11 @@ export class AdvancesService {
 
     // ==================== إنشاء طلب سلفة ====================
 
-    async createAdvanceRequest(userId: string, dto: CreateAdvanceRequestDto) {
+    async createAdvanceRequest(userId: string, companyId: string, dto: CreateAdvanceRequestDto) {
         const request = await this.prisma.advanceRequest.create({
             data: {
                 userId,
+                companyId,
                 type: dto.type as any,
                 amount: dto.amount,
                 startDate: dto.startDate,
@@ -34,7 +35,7 @@ export class AdvancesService {
         });
 
         // إشعار للمدير
-        const managers = await this.getApproversForStep('ADVANCES_APPROVE_MANAGER', userId);
+        const managers = await this.getApproversForStep('ADVANCES_APPROVE_MANAGER', userId, companyId);
         for (const managerId of managers) {
             await this.notificationsService.sendNotification(
                 managerId,
@@ -84,10 +85,10 @@ export class AdvancesService {
 
     // ==================== قرار المدير ====================
 
-    async managerDecision(requestId: string, managerId: string, dto: ManagerDecisionDto) {
-        const request = await this.prisma.advanceRequest.findUnique({
-            where: { id: requestId },
-            include: { user: { select: { firstName: true, lastName: true } } },
+    async managerDecision(requestId: string, companyId: string, managerId: string, dto: ManagerDecisionDto) {
+        const request = await this.prisma.advanceRequest.findFirst({
+            where: { id: requestId, companyId },
+            include: { user: { select: { firstName: true, lastName: true, id: true, companyId: true } } },
         });
 
         if (!request) throw new NotFoundException('الطلب غير موجود');
@@ -98,7 +99,7 @@ export class AdvancesService {
         const isApproved = dto.decision === 'APPROVED';
 
         const updated = await this.prisma.advanceRequest.update({
-            where: { id: requestId },
+            where: { id: requestId, companyId },
             data: {
                 managerApproverId: managerId,
                 managerDecision: isApproved ? ApprovalDecision.APPROVED : ApprovalDecision.REJECTED,
@@ -122,7 +123,7 @@ export class AdvancesService {
 
         // إذا تمت الموافقة، إشعار لـ HR
         if (isApproved) {
-            const hrUsers = await this.getApproversForStep('ADVANCES_APPROVE_HR', request.userId);
+            const hrUsers = await this.getApproversForStep('ADVANCES_APPROVE_HR', request.userId, companyId);
             for (const hrId of hrUsers) {
                 await this.notificationsService.sendNotification(
                     hrId,
@@ -174,9 +175,9 @@ export class AdvancesService {
 
     // ==================== قرار HR ====================
 
-    async hrDecision(requestId: string, hrId: string, dto: HrDecisionDto) {
-        const request = await this.prisma.advanceRequest.findUnique({
-            where: { id: requestId },
+    async hrDecision(requestId: string, companyId: string, hrId: string, dto: HrDecisionDto) {
+        const request = await this.prisma.advanceRequest.findFirst({
+            where: { id: requestId, companyId },
             include: { user: { select: { firstName: true, lastName: true } } },
         });
 
@@ -188,7 +189,7 @@ export class AdvancesService {
         const isApproved = dto.decision === 'APPROVED';
 
         const updated = await this.prisma.advanceRequest.update({
-            where: { id: requestId },
+            where: { id: requestId, companyId },
             data: {
                 hrApproverId: hrId,
                 hrDecision: isApproved ? ApprovalDecision.APPROVED : ApprovalDecision.REJECTED,
@@ -231,18 +232,18 @@ export class AdvancesService {
 
     // ==================== طلباتي ====================
 
-    async getMyRequests(userId: string) {
+    async getMyRequests(userId: string, companyId: string) {
         return this.prisma.advanceRequest.findMany({
-            where: { userId },
+            where: { userId, companyId },
             orderBy: { createdAt: 'desc' },
         });
     }
 
     // ==================== تفاصيل الطلب ====================
 
-    async getRequestDetails(requestId: string) {
-        return this.prisma.advanceRequest.findUnique({
-            where: { id: requestId },
+    async getRequestDetails(requestId: string, companyId: string) {
+        return this.prisma.advanceRequest.findFirst({
+            where: { id: requestId, companyId },
             include: {
                 user: {
                     select: {
@@ -264,19 +265,21 @@ export class AdvancesService {
 
     // ==================== السلف السابقة للموظف (لـ HR) ====================
 
-    async getEmployeePreviousAdvances(employeeId: string) {
+    async getEmployeePreviousAdvances(employeeId: string, companyId: string) {
         return this.prisma.advanceRequest.findMany({
-            where: { userId: employeeId },
+            where: { userId: employeeId, companyId },
             orderBy: { createdAt: 'desc' },
         });
     }
 
     // ==================== Helper Methods ====================
 
-    private async getApproversForStep(permissionCode: string, employeeId: string): Promise<string[]> {
+    private async getApproversForStep(permissionCode: string, employeeId: string, companyId: string): Promise<string[]> {
         const users = await this.prisma.userPermission.findMany({
             where: {
                 permission: { code: permissionCode },
+                companyId, // التحقق من نفس الشركة
+                user: { status: 'ACTIVE' }
             },
             select: { userId: true },
             distinct: ['userId'],

@@ -170,4 +170,154 @@ export class PoliciesService {
 
         return this.prisma.policyRule.delete({ where: { id: ruleId } });
     }
+
+    // ==================== Rule Evaluation Engine ====================
+
+    /**
+     * تقييم القواعد للحصول على القيمة المناسبة
+     * @param policy السياسة
+     * @param context السياق (مثل: dayType، hours، salary)
+     */
+    evaluateRules(policy: any, context: Record<string, any>): { rule: any; value: any } | null {
+        if (!policy?.rules || policy.rules.length === 0) return null;
+
+        for (const rule of policy.rules) {
+            if (!rule.isActive) continue;
+
+            // فحص الشروط
+            const conditions = rule.conditions as Record<string, any>;
+            if (this.matchesConditions(conditions, context)) {
+                const computedValue = this.computeRuleValue(rule, context);
+                return { rule, value: computedValue };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * فحص هل الشروط تتطابق مع السياق
+     */
+    private matchesConditions(conditions: Record<string, any>, context: Record<string, any>): boolean {
+        if (!conditions || Object.keys(conditions).length === 0) return true;
+
+        for (const [key, condition] of Object.entries(conditions)) {
+            const contextValue = context[key];
+
+            // شرط بسيط (قيمة مباشرة)
+            if (typeof condition !== 'object') {
+                if (contextValue !== condition) return false;
+                continue;
+            }
+
+            // شروط معقدة
+            if (condition.eq !== undefined && contextValue !== condition.eq) return false;
+            if (condition.ne !== undefined && contextValue === condition.ne) return false;
+            if (condition.gt !== undefined && !(contextValue > condition.gt)) return false;
+            if (condition.gte !== undefined && !(contextValue >= condition.gte)) return false;
+            if (condition.lt !== undefined && !(contextValue < condition.lt)) return false;
+            if (condition.lte !== undefined && !(contextValue <= condition.lte)) return false;
+            if (condition.in !== undefined && !condition.in.includes(contextValue)) return false;
+            if (condition.notIn !== undefined && condition.notIn.includes(contextValue)) return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * حساب قيمة القاعدة
+     */
+    private computeRuleValue(rule: any, context: Record<string, any>): number | string {
+        const valueType = rule.valueType;
+        const value = rule.value;
+
+        switch (valueType) {
+            case 'FIXED':
+                return parseFloat(value) || 0;
+
+            case 'PERCENTAGE':
+                const baseValue = context.baseValue || context.salary || 0;
+                return (baseValue * parseFloat(value)) / 100;
+
+            case 'FORMULA':
+                return this.evaluateFormula(value, context);
+
+            case 'MULTIPLIER':
+                const hourlyRate = context.hourlyRate || (context.salary / (context.workingHours || 240));
+                return hourlyRate * parseFloat(value);
+
+            default:
+                return parseFloat(value) || value;
+        }
+    }
+
+    /**
+     * تقييم معادلة بسيطة
+     * مثال: "hourlyRate * hours * 1.5"
+     */
+    private evaluateFormula(formula: string, context: Record<string, any>): number {
+        try {
+            // استبدال المتغيرات بقيمها
+            let expression = formula;
+            for (const [key, value] of Object.entries(context)) {
+                const regex = new RegExp(`\\b${key}\\b`, 'g');
+                expression = expression.replace(regex, String(value));
+            }
+
+            // تقييم التعبير الرياضي البسيط (آمن)
+            // فقط أرقام وعمليات حسابية أساسية
+            if (!/^[\d\s+\-*/().]+$/.test(expression)) {
+                console.warn('Formula contains invalid characters:', formula);
+                return 0;
+            }
+
+            return eval(expression) || 0;
+        } catch (e) {
+            console.error('Error evaluating formula:', formula, e);
+            return 0;
+        }
+    }
+
+    /**
+     * الحصول على قيمة من سياسة معينة
+     * يجمع resolvePolicy و evaluateRules في خطوة واحدة
+     */
+    async getPolicyValue(
+        type: string,
+        employeeId: string,
+        companyId: string,
+        context: Record<string, any>,
+        date?: Date
+    ): Promise<{ policy: any; rule: any; value: any } | null> {
+        const policy = await this.resolvePolicy(type as any, employeeId, companyId, date);
+        if (!policy) return null;
+
+        const result = this.evaluateRules(policy, context);
+        if (!result) return null;
+
+        return {
+            policy,
+            rule: result.rule,
+            value: result.value,
+        };
+    }
+
+    /**
+     * الحصول على إعدادات سياسة (بدون قواعد)
+     */
+    async getPolicySetting(
+        type: string,
+        employeeId: string,
+        companyId: string,
+        settingKey: string,
+        defaultValue?: any,
+        date?: Date
+    ): Promise<any> {
+        const policy = await this.resolvePolicy(type as any, employeeId, companyId, date);
+        if (!policy) return defaultValue;
+
+        const settings = policy.settings as Record<string, any>;
+        return settings[settingKey] ?? defaultValue;
+    }
 }
+

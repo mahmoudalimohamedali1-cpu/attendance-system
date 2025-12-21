@@ -33,7 +33,7 @@ export class SalaryStructuresService {
 
     async findAll(companyId: string) {
         return this.prisma.salaryStructure.findMany({
-            where: { companyId },
+            where: { companyId, isActive: true },
             include: {
                 lines: {
                     include: { component: true },
@@ -109,11 +109,15 @@ export class SalaryStructuresService {
 
         // فحص إذا كان الهيكل مرتبط بموظفين
         const assigned = await this.prisma.employeeSalaryAssignment.findFirst({
-            where: { structureId: id, employee: { companyId } }
+            where: { structureId: id }
         });
 
         if (assigned) {
-            throw new Error('لا يمكن حذف الهيكل لأنه مرتبط بموظفين');
+            // Enterprise behavior: Soft delete (Archive) instead of blocking
+            return this.prisma.salaryStructure.update({
+                where: { id },
+                data: { isActive: false }
+            });
         }
 
         return this.prisma.salaryStructure.delete({

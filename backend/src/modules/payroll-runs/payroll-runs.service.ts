@@ -228,12 +228,12 @@ export class PayrollRunsService {
         return this.prisma.$transaction(async (tx) => {
             const run = await tx.payrollRun.updateMany({
                 where: { id, companyId },
-                data: { status: 'APPROVED' },
+                data: { status: 'FINANCE_APPROVED' },
             });
 
             await tx.payslip.updateMany({
                 where: { runId: id, companyId },
-                data: { status: 'APPROVED' }
+                data: { status: 'FINANCE_APPROVED' }
             });
 
             return run;

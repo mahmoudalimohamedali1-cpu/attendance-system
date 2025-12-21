@@ -43,6 +43,9 @@ import { PoliciesModule } from './modules/policies/policies.module';
 import { LoanPaymentsModule } from './modules/loan-payments/loan-payments.module';
 import { PayrollCalculationModule } from './modules/payroll-calculation/payroll-calculation.module';
 import { CompaniesModule } from './modules/companies/companies.module';
+import { WpsExportModule } from './modules/wps-export/wps-export.module';
+import { ExceptionsModule } from './modules/exceptions/exceptions.module';
+import { ContractsModule } from './modules/contracts/contracts.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -96,6 +99,9 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     LoanPaymentsModule,     // تتبع سداد السلف
     PayrollCalculationModule, // محرك الحساب
     CompaniesModule,        // إدارة الشركات
+    WpsExportModule,        // تصدير WPS للبنوك
+    ExceptionsModule,       // مركز الاستثناءات
+    ContractsModule,        // إدارة العقود
   ],
   controllers: [AppController],
   providers: [

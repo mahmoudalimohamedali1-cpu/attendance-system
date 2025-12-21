@@ -20,6 +20,7 @@ import { CreateRaiseRequestDto } from './dto/create-raise-request.dto';
 import { ManagerDecisionDto, HRDecisionDto } from './dto/raise-decision.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { UploadService } from '../../common/upload/upload.service';
+import { TenantId } from '../auth/decorators/tenant-id.decorator';
 
 @ApiTags('raises')
 @ApiBearerAuth()
@@ -57,7 +58,7 @@ export class RaisesController {
     @ApiResponse({ status: 201, description: 'تم إنشاء الطلب بنجاح' })
     async createRaiseRequest(
         @CurrentUser('id') userId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
         @Body() createRaiseDto: CreateRaiseRequestDto,
     ) {
         return this.raisesService.createRaiseRequest(userId, companyId, createRaiseDto);
@@ -68,7 +69,7 @@ export class RaisesController {
     @ApiResponse({ status: 200, description: 'قائمة طلبات الزيادة' })
     async getMyRaiseRequests(
         @CurrentUser('id') userId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
     ) {
         return this.raisesService.getMyRaiseRequests(userId, companyId);
     }
@@ -77,9 +78,9 @@ export class RaisesController {
     @ApiOperation({ summary: 'إحصائيات طلبات الزيادة' })
     async getStats(
         @CurrentUser('id') userId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
     ) {
-        return this.raisesService.getRaiseStats(userId, companyId);
+        return this.raisesService.getRaiseStats(companyId, userId);
     }
 
     @Get(':id')
@@ -87,7 +88,7 @@ export class RaisesController {
     async getRaiseRequestById(
         @Param('id') id: string,
         @CurrentUser('id') userId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
     ) {
         return this.raisesService.getRaiseRequestById(id, userId, companyId);
     }
@@ -97,7 +98,7 @@ export class RaisesController {
     async cancelRaiseRequest(
         @Param('id') id: string,
         @CurrentUser('id') userId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
     ) {
         return this.raisesService.cancelRaiseRequest(id, userId, companyId);
     }
@@ -109,7 +110,7 @@ export class RaisesController {
     @Roles(Role.MANAGER, Role.ADMIN)
     async getManagerInbox(
         @CurrentUser('id') managerId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
     ) {
         return this.raisesService.getManagerInbox(managerId, companyId);
     }
@@ -120,7 +121,7 @@ export class RaisesController {
     async managerDecision(
         @Param('id') id: string,
         @CurrentUser('id') managerId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
         @Body() dto: ManagerDecisionDto,
     ) {
         return this.raisesService.managerDecision(id, companyId, managerId, dto);
@@ -133,7 +134,7 @@ export class RaisesController {
     @Roles(Role.MANAGER, Role.ADMIN)
     async getHRInbox(
         @CurrentUser('id') hrUserId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
     ) {
         return this.raisesService.getHRInbox(hrUserId, companyId);
     }
@@ -144,7 +145,7 @@ export class RaisesController {
     async hrDecision(
         @Param('id') id: string,
         @CurrentUser('id') hrUserId: string,
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
         @Body() dto: HRDecisionDto,
     ) {
         return this.raisesService.hrDecision(id, companyId, hrUserId, dto);
@@ -156,7 +157,7 @@ export class RaisesController {
     @ApiOperation({ summary: 'جميع طلبات الزيادة' })
     @Roles(Role.ADMIN)
     async getAllRaiseRequests(
-        @CurrentUser('companyId') companyId: string,
+        @TenantId() companyId: string,
         @Query('status') status?: string,
     ) {
         return this.raisesService.getAllRaiseRequests(companyId, status as any);

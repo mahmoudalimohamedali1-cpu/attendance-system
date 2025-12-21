@@ -54,7 +54,7 @@ export class JobTitlesService {
      */
     async findAll(companyId: string) {
         return this.prisma.jobTitle.findMany({
-            where: { companyId },
+            where: { companyId, isActive: true },
             orderBy: { name: 'asc' },
             include: {
                 _count: {
@@ -169,9 +169,12 @@ export class JobTitlesService {
         });
 
         if (usersCount > 0) {
-            throw new ConflictException(
-                `لا يمكن حذف هذه الدرجة الوظيفية لأنها مربوطة بـ ${usersCount} موظف`,
-            );
+            // Soft delete: Archive instead of blocking
+            await this.prisma.jobTitle.update({
+                where: { id },
+                data: { isActive: false }
+            });
+            return { message: `تم أرشفة الدرجة الوظيفية (مرتبطة بـ ${usersCount} موظف)` };
         }
 
         await this.prisma.jobTitle.delete({ where: { id } });

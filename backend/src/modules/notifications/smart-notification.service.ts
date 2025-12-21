@@ -123,25 +123,27 @@ export class SmartNotificationService {
 
     // ==================== Helper Methods ====================
 
-    private async getApprovers(type: 'leaves' | 'letters' | 'raises'): Promise<{ id: string, companyId: string }[]> {
+    private async getApprovers(type: 'leaves' | 'letters' | 'raises', companyId?: string): Promise<{ id: string, companyId: string }[]> {
         const permissionCode = `${type.toUpperCase()}_APPROVE_MANAGER`;
         const hrPermissionCode = `${type.toUpperCase()}_APPROVE_HR`;
 
-        // جلب كل المستخدمين اللي عندهم صلاحية موافقة
+        // جلب كل المستخدمين اللي عندهم صلاحية موافقة مع فلترة للشركة إذا وجدت
         const users = await this.prisma.userPermission.findMany({
             where: {
                 permission: {
                     code: { in: [permissionCode, hrPermissionCode] }
-                }
+                },
+                companyId: companyId || undefined, // فلترة اختيارية بالشركة
+                user: { status: 'ACTIVE' }
             },
             select: {
                 userId: true,
-                user: { select: { companyId: true } }
+                companyId: true // نستخدم القيمة من السجل مباشرة
             },
             distinct: ['userId'],
         });
 
-        return users.map(u => ({ id: u.userId, companyId: u.user.companyId || '' }));
+        return users.map(u => ({ id: u.userId, companyId: u.companyId || '' }));
     }
 
     private async getPendingCountForApprover(type: 'leaves' | 'letters' | 'raises', approverId: string, companyId: string): Promise<number> {
@@ -165,6 +167,7 @@ export class SmartNotificationService {
             // Manager step
             const managerCount = await this.prisma.leaveRequest.count({
                 where: {
+                    companyId,
                     userId: { in: accessibleManagerIds },
                     currentStep: ApprovalStep.MANAGER,
                     status: 'PENDING',
@@ -173,6 +176,7 @@ export class SmartNotificationService {
             // HR step
             const hrCount = await this.prisma.leaveRequest.count({
                 where: {
+                    companyId,
                     userId: { in: accessibleHrIds },
                     currentStep: ApprovalStep.HR,
                     status: 'MGR_APPROVED',
@@ -182,6 +186,7 @@ export class SmartNotificationService {
         } else if (type === 'letters') {
             const managerCount = await this.prisma.letterRequest.count({
                 where: {
+                    companyId,
                     userId: { in: accessibleManagerIds },
                     currentStep: 'MANAGER',
                     status: 'PENDING',
@@ -189,6 +194,7 @@ export class SmartNotificationService {
             });
             const hrCount = await this.prisma.letterRequest.count({
                 where: {
+                    companyId,
                     userId: { in: accessibleHrIds },
                     currentStep: 'HR',
                     status: 'MGR_APPROVED',
@@ -198,6 +204,7 @@ export class SmartNotificationService {
         } else {
             const managerCount = await this.prisma.raiseRequest.count({
                 where: {
+                    companyId,
                     userId: { in: accessibleManagerIds },
                     currentStep: 'MANAGER',
                     status: 'PENDING',
@@ -205,6 +212,7 @@ export class SmartNotificationService {
             });
             const hrCount = await this.prisma.raiseRequest.count({
                 where: {
+                    companyId,
                     userId: { in: accessibleHrIds },
                     currentStep: 'HR',
                     status: 'MGR_APPROVED',
@@ -214,7 +222,7 @@ export class SmartNotificationService {
         }
     }
 
-    private async getOverdueRequests(type: 'leaves' | 'letters' | 'raises', overdueDate: Date): Promise<{ id: string; createdAt: Date; userName: string; currentStep: string }[]> {
+    private async getOverdueRequests(type: 'leaves' | 'letters' | 'raises', overdueDate: Date): Promise<{ id: string; createdAt: Date; userName: string; currentStep: string; companyId: string }[]> {
         if (type === 'leaves') {
             const requests = await this.prisma.leaveRequest.findMany({
                 where: {
@@ -230,6 +238,7 @@ export class SmartNotificationService {
                 createdAt: r.createdAt,
                 userName: `${r.user.firstName} ${r.user.lastName}`,
                 currentStep: r.currentStep,
+                companyId: r.companyId || '',
             }));
         } else if (type === 'letters') {
             const requests = await this.prisma.letterRequest.findMany({
@@ -246,6 +255,7 @@ export class SmartNotificationService {
                 createdAt: r.createdAt,
                 userName: `${r.user.firstName} ${r.user.lastName}`,
                 currentStep: r.currentStep,
+                companyId: r.companyId || '',
             }));
         } else {
             const requests = await this.prisma.raiseRequest.findMany({
@@ -262,30 +272,32 @@ export class SmartNotificationService {
                 createdAt: r.createdAt,
                 userName: `${r.user.firstName} ${r.user.lastName}`,
                 currentStep: r.currentStep,
+                companyId: r.companyId || '',
             }));
         }
     }
 
-    private async getApproverForRequest(type: 'leaves' | 'letters' | 'raises', request: { id: string; currentStep: string }): Promise<{ approverId: string | null, companyId: string | null }> {
+    private async getApproverForRequest(type: 'leaves' | 'letters' | 'raises', request: { id: string; currentStep: string; companyId: string }): Promise<{ approverId: string | null, companyId: string | null }> {
         // بناءً على الخطوة الحالية، نحدد نوع الموافق المطلوب
         const permissionCode = request.currentStep === 'MANAGER'
             ? `${type.toUpperCase()}_APPROVE_MANAGER`
             : `${type.toUpperCase()}_APPROVE_HR`;
 
-        // جلب أول موافق متاح (يمكن تحسينه لاحقاً)
+        // جلب أول موافق متاح ضمن نفس الشركة
         const approver = await this.prisma.userPermission.findFirst({
             where: {
                 permission: { code: permissionCode },
+                companyId: request.companyId, // التحقق من نفس الشركة
             },
             select: {
                 userId: true,
-                user: { select: { companyId: true } }
+                companyId: true
             },
         });
 
         return {
             approverId: approver?.userId || null,
-            companyId: approver?.user?.companyId || null
+            companyId: approver?.companyId || null
         };
     }
 

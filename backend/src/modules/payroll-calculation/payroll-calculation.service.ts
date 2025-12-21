@@ -56,17 +56,13 @@ export class PayrollCalculationService {
 
     /**
      * جلب إعدادات الحساب من السياسة
+     * يستخدم Policy Engine للحصول على السياسة المناسبة للموظف بناءً على التسلسل الهرمي
      */
     private async getCalculationSettings(employeeId: string, companyId: string): Promise<CalculationSettings> {
         try {
-            const policy = await this.prisma.policy.findFirst({
-                where: {
-                    companyId,
-                    type: 'ATTENDANCE',
-                    isActive: true,
-                    // TODO: add support for employee specific policies if needed
-                }
-            });
+            // استخدام Policy Engine للحصول على السياسة المناسبة
+            const policy = await this.policiesService.resolvePolicy('ATTENDANCE' as any, employeeId, companyId);
+
             if (policy?.settings && typeof policy.settings === 'object') {
                 return {
                     ...DEFAULT_CALCULATION_SETTINGS,
@@ -75,6 +71,7 @@ export class PayrollCalculationService {
             }
         } catch (e) {
             // لو مفيش سياسة، نستخدم الافتراضي
+            console.warn('No attendance policy found for employee:', employeeId);
         }
         return DEFAULT_CALCULATION_SETTINGS;
     }

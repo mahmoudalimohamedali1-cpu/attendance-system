@@ -117,7 +117,7 @@ export class RaisesService {
         }
 
         return this.prisma.raiseRequest.update({
-            where: { id },
+            where: { id, companyId },
             data: { status: RaiseStatus.CANCELLED },
         });
     }
@@ -199,7 +199,7 @@ export class RaisesService {
         }
 
         const updated = await this.prisma.raiseRequest.update({
-            where: { id: requestId },
+            where: { id: requestId, companyId },
             data: {
                 managerApproverId: managerId,
                 managerDecision: decision,
@@ -242,12 +242,15 @@ export class RaisesService {
         if (decision === ApprovalDecision.APPROVED) {
             const hrUsers = await this.prisma.user.findMany({
                 where: {
+                    companyId,
+                    status: 'ACTIVE',
                     OR: [
                         { role: Role.ADMIN },
                         {
                             userPermissions: {
                                 some: {
-                                    permission: { code: 'RAISES_APPROVE_HR' }
+                                    permission: { code: 'RAISES_APPROVE_HR' },
+                                    companyId
                                 }
                             }
                         },
@@ -360,7 +363,7 @@ export class RaisesService {
         }
 
         const updated = await this.prisma.raiseRequest.update({
-            where: { id: requestId },
+            where: { id: requestId, companyId },
             data: {
                 hrApproverId: hrUserId,
                 hrDecision: decision,

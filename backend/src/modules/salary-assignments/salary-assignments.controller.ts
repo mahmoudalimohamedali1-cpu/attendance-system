@@ -36,6 +36,13 @@ export class SalaryAssignmentsController {
         return this.service.findAll(companyId);
     }
 
+    @Get('all')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'عرض كل تخصيصات الرواتب - endpoint بديل' })
+    findAllAlt(@CurrentUser('companyId') companyId: string) {
+        return this.service.findAll(companyId);
+    }
+
     @Get('employee/:id')
     @ApiOperation({ summary: 'عرض تخصيصات موظف معين' })
     findByEmployee(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {

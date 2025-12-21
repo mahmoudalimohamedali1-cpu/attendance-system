@@ -54,7 +54,7 @@ export class AdvancesController {
         @Request() req: any,
         @Body() dto: CreateAdvanceRequestDto,
     ) {
-        return this.advancesService.createAdvanceRequest(req.user.id, dto);
+        return this.advancesService.createAdvanceRequest(req.user.id, req['tenantId'], dto);
     }
 
     // ==================== طلباتي ====================
@@ -63,7 +63,7 @@ export class AdvancesController {
     @ApiOperation({ summary: 'طلبات السلف الخاصة بي' })
     @ApiResponse({ status: 200, description: 'قائمة الطلبات' })
     async getMyRequests(@Request() req: any) {
-        return this.advancesService.getMyRequests(req.user.id);
+        return this.advancesService.getMyRequests(req.user.id, req['tenantId']);
     }
 
     // ==================== صندوق المدير ====================
@@ -87,7 +87,7 @@ export class AdvancesController {
         @Request() req: any,
         @Body() dto: ManagerDecisionDto,
     ) {
-        return this.advancesService.managerDecision(id, req.user.id, dto);
+        return this.advancesService.managerDecision(id, req['tenantId'], req.user.id, dto);
     }
 
     // ==================== صندوق HR ====================
@@ -111,7 +111,7 @@ export class AdvancesController {
         @Request() req: any,
         @Body() dto: HrDecisionDto,
     ) {
-        return this.advancesService.hrDecision(id, req.user.id, dto);
+        return this.advancesService.hrDecision(id, req['tenantId'], req.user.id, dto);
     }
 
     // ==================== تفاصيل الطلب ====================
@@ -119,8 +119,8 @@ export class AdvancesController {
     @Get(':id')
     @ApiOperation({ summary: 'تفاصيل طلب سلفة' })
     @ApiResponse({ status: 200, description: 'تفاصيل الطلب' })
-    async getRequestDetails(@Param('id') id: string) {
-        return this.advancesService.getRequestDetails(id);
+    async getRequestDetails(@Param('id') id: string, @Request() req: any) {
+        return this.advancesService.getRequestDetails(id, req['tenantId']);
     }
 
     // ==================== السلف السابقة للموظف (لـ HR) ====================
@@ -130,7 +130,7 @@ export class AdvancesController {
     @Roles('ADMIN', 'MANAGER')
     @ApiOperation({ summary: 'السلف السابقة لموظف' })
     @ApiResponse({ status: 200, description: 'قائمة السلف السابقة' })
-    async getEmployeePreviousAdvances(@Param('employeeId') employeeId: string) {
-        return this.advancesService.getEmployeePreviousAdvances(employeeId);
+    async getEmployeePreviousAdvances(@Param('employeeId') employeeId: string, @Request() req: any) {
+        return this.advancesService.getEmployeePreviousAdvances(employeeId, req['tenantId']);
     }
 }

@@ -20,6 +20,7 @@ import {
   useTheme,
   useMediaQuery,
   CircularProgress,
+  Collapse,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -37,6 +38,9 @@ import {
   Description,
   Security,
   MonetizationOn,
+  ExpandLess,
+  ExpandMore,
+  Payments,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
@@ -54,26 +58,49 @@ interface MenuItem {
   requiredPermission?: string[]; // Any of these permissions grants access
 }
 
+interface MenuGroup {
+  text: string;
+  icon: JSX.Element;
+  requiredRole?: 'ADMIN' | 'MANAGER';
+  children: MenuItem[];
+}
+
 const allMenuItems: MenuItem[] = [
   { text: 'لوحة التحكم', icon: <Dashboard />, path: '/dashboard' },
   { text: 'المستخدمين', icon: <People />, path: '/users', requiredRole: 'ADMIN', requiredPermission: ['EMPLOYEES_VIEW', 'EMPLOYEES_EDIT'] },
   { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance', requiredPermission: ['ATTENDANCE_VIEW', 'ATTENDANCE_EDIT'] },
   { text: 'الفروع والأقسام', icon: <Business />, path: '/branches', requiredRole: 'ADMIN' },
   { text: 'الدرجات الوظيفية', icon: <Business />, path: '/job-titles', requiredRole: 'ADMIN' },
-  { text: 'الرواتب', icon: <MonetizationOn />, path: '/salary', requiredRole: 'ADMIN' },
-  { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos', requiredRole: 'ADMIN' },
-  { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay', requiredRole: 'ADMIN' },
+  { text: 'العقود', icon: <Description />, path: '/contracts', requiredRole: 'ADMIN' },
+  { text: 'الأجهزة', icon: <Business />, path: '/devices', requiredRole: 'ADMIN' },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
-  { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises', requiredPermission: ['RAISES_VIEW', 'RAISES_APPROVE', 'RAISES_APPROVE_MANAGER', 'RAISES_APPROVE_HR'] },
   { text: 'السلف', icon: <MonetizationOn />, path: '/advances', requiredPermission: ['ADVANCES_VIEW', 'ADVANCES_APPROVE_MANAGER', 'ADVANCES_APPROVE_HR'] },
   { text: 'طلبات التحديث', icon: <SyncIcon />, path: '/data-updates', badge: true, requiredRole: 'ADMIN' },
-  { text: 'التقارير', icon: <Assessment />, path: '/reports' }, // Always visible - shows own reports
+  { text: 'التقارير', icon: <Assessment />, path: '/reports' },
   { text: 'الصلاحيات', icon: <Security />, path: '/permissions', requiredRole: 'ADMIN' },
   { text: 'السياسات', icon: <Security />, path: '/policies', requiredRole: 'ADMIN' },
   { text: 'سجلات التدقيق', icon: <Security />, path: '/audit', requiredRole: 'ADMIN' },
   { text: 'الإعدادات', icon: <Settings />, path: '/settings', requiredRole: 'ADMIN' },
 ];
+
+// Payroll submenu group
+const payrollGroup: MenuGroup = {
+  text: 'الرواتب والمالية',
+  icon: <Payments />,
+  requiredRole: 'ADMIN',
+  children: [
+    { text: 'إدارة الرواتب', icon: <MonetizationOn />, path: '/salary' },
+    { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises' },
+    { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay' },
+    { text: 'أقساط السلف', icon: <MonetizationOn />, path: '/loan-payments' },
+    { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos' },
+    { text: 'تصدير WPS', icon: <MonetizationOn />, path: '/wps-export' },
+    { text: 'الحسابات البنكية', icon: <MonetizationOn />, path: '/bank-accounts' },
+    { text: 'مركز الاستثناءات', icon: <Security />, path: '/exceptions' },
+    { text: 'الشركات', icon: <Business />, path: '/companies' },
+  ],
+};
 
 interface UserPermission {
   id: string;
@@ -92,6 +119,7 @@ export const MainLayout = () => {
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [payrollOpen, setPayrollOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
@@ -192,35 +220,110 @@ export const MainLayout = () => {
         </Typography>
       </Box>
 
-      <List sx={{ flex: 1, py: 1 }}>
+      <List sx={{ flex: 1, py: 1, overflow: 'auto' }}>
         {permissionsLoading ? (
           <Box display="flex" justifyContent="center" py={4}>
             <CircularProgress size={24} />
           </Box>
         ) : (
-          visibleMenuItems.map((item) => (
-            <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
-              <ListItemButton
-                selected={location.pathname === item.path}
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileOpen(false);
-                }}
-                sx={{
-                  borderRadius: 2,
-                  '&.Mui-selected': {
-                    bgcolor: 'primary.main',
-                    color: 'white',
-                    '&:hover': { bgcolor: 'primary.dark' },
-                    '& .MuiListItemIcon-root': { color: 'white' },
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            </ListItem>
-          ))
+          <>
+            {/* First render items before payroll section */}
+            {visibleMenuItems.slice(0, 5).map((item) => (
+              <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                <ListItemButton
+                  selected={location.pathname === item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    setMobileOpen(false);
+                  }}
+                  sx={{
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      '&:hover': { bgcolor: 'primary.dark' },
+                      '& .MuiListItemIcon-root': { color: 'white' },
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+
+            {/* Payroll Submenu */}
+            {(user?.role === 'ADMIN' || payrollGroup.requiredRole !== 'ADMIN') && (
+              <>
+                <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                  <ListItemButton
+                    onClick={() => setPayrollOpen(!payrollOpen)}
+                    sx={{
+                      borderRadius: 2,
+                      bgcolor: payrollOpen ? 'action.selected' : 'transparent',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>{payrollGroup.icon}</ListItemIcon>
+                    <ListItemText primary={payrollGroup.text} />
+                    {payrollOpen ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={payrollOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {payrollGroup.children.map((item) => (
+                      <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
+                        <ListItemButton
+                          selected={location.pathname === item.path}
+                          onClick={() => {
+                            navigate(item.path);
+                            setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': { bgcolor: 'primary.dark' },
+                              '& .MuiListItemIcon-root': { color: 'white' },
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 30, '& svg': { fontSize: 18 } }}>{item.icon}</ListItemIcon>
+                          <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            )}
+
+            {/* Remaining items after payroll */}
+            {visibleMenuItems.slice(5).map((item) => (
+              <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                <ListItemButton
+                  selected={location.pathname === item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    setMobileOpen(false);
+                  }}
+                  sx={{
+                    borderRadius: 2,
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      '&:hover': { bgcolor: 'primary.dark' },
+                      '& .MuiListItemIcon-root': { color: 'white' },
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </>
         )}
       </List>
 

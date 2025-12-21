@@ -339,7 +339,7 @@ const JobTitlesPage: React.FC = () => {
                                                 setSelectedJobTitle(jt);
                                                 setDeleteDialogOpen(true);
                                             }}
-                                            disabled={(jt._count?.users || 0) > 0}
+                                            disabled={false}
                                             title="حذف"
                                         >
                                             <DeleteIcon />

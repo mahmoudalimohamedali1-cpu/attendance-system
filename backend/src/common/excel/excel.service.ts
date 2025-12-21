@@ -69,7 +69,7 @@ export class ExcelService {
                 Number(payslip.grossSalary),
                 Number(payslip.totalDeductions),
                 Number(payslip.netSalary),
-                payslip.status === 'PAID' ? 'مدفوع' : payslip.status === 'APPROVED' ? 'معتمد' : 'مسودة',
+                payslip.status === 'PAID' ? 'مدفوع' : (payslip.status === 'FINANCE_APPROVED' || payslip.status === 'LOCKED') ? 'معتمد' : 'مسودة',
             ]);
 
             // Alternate row colors
@@ -354,7 +354,7 @@ export class ExcelService {
         headerRow.font = { bold: true };
         headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E91E63' } };
 
-        advances.forEach(adv => {
+        (advances as any[]).forEach(adv => {
             const approved = adv.approvedAmount ? Number(adv.approvedAmount) : Number(adv.amount);
             const paid = adv.payments.reduce((s: number, p: any) => s + Number(p.amount), 0);
             sheet.addRow([
