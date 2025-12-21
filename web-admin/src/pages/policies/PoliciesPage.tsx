@@ -89,6 +89,10 @@ export const PoliciesPage = () => {
         description: '',
         type: 'OVERTIME',
         scope: 'COMPANY',
+        branchId: '',
+        departmentId: '',
+        jobTitleId: '',
+        employeeId: '',
         effectiveFrom: new Date().toISOString().split('T')[0],
         effectiveTo: '',
         priority: 0,
@@ -114,6 +118,27 @@ export const PoliciesPage = () => {
     const { data: components = [] } = useQuery<SalaryComponent[]>({
         queryKey: ['salary-components'],
         queryFn: () => api.get('/salary-components') as Promise<SalaryComponent[]>,
+    });
+
+    // Reference data for scope targeting
+    const { data: branches = [] } = useQuery<any[]>({
+        queryKey: ['branches'],
+        queryFn: () => api.get('/branches') as Promise<any[]>,
+    });
+
+    const { data: departments = [] } = useQuery<any[]>({
+        queryKey: ['departments'],
+        queryFn: () => api.get('/departments') as Promise<any[]>,
+    });
+
+    const { data: jobTitles = [] } = useQuery<any[]>({
+        queryKey: ['job-titles'],
+        queryFn: () => api.get('/job-titles') as Promise<any[]>,
+    });
+
+    const { data: employees = [] } = useQuery<any[]>({
+        queryKey: ['users'],
+        queryFn: () => api.get('/users') as Promise<any[]>,
     });
 
     const createMutation = useMutation({
@@ -155,6 +180,7 @@ export const PoliciesPage = () => {
         setFormData({
             code: '', nameAr: '', nameEn: '', description: '',
             type: 'OVERTIME', scope: 'COMPANY',
+            branchId: '', departmentId: '', jobTitleId: '', employeeId: '',
             effectiveFrom: new Date().toISOString().split('T')[0],
             effectiveTo: '', priority: 0, isActive: true,
         });
@@ -314,12 +340,90 @@ export const PoliciesPage = () => {
                                 <Select
                                     value={formData.scope}
                                     label="النطاق"
-                                    onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        scope: e.target.value,
+                                        branchId: '',
+                                        departmentId: '',
+                                        jobTitleId: '',
+                                        employeeId: '',
+                                    })}
                                 >
                                     {policyScopes.map(s => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
                                 </Select>
                             </FormControl>
                         </Grid>
+
+                        {/* Dynamic Scope Target Selection */}
+                        {formData.scope === 'BRANCH' && (
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>اختر الفرع</InputLabel>
+                                    <Select
+                                        value={formData.branchId}
+                                        label="اختر الفرع"
+                                        onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                                    >
+                                        {branches.map((b: any) => (
+                                            <MenuItem key={b.id} value={b.id}>{b.nameAr || b.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        )}
+
+                        {formData.scope === 'DEPARTMENT' && (
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>اختر القسم</InputLabel>
+                                    <Select
+                                        value={formData.departmentId}
+                                        label="اختر القسم"
+                                        onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+                                    >
+                                        {departments.map((d: any) => (
+                                            <MenuItem key={d.id} value={d.id}>{d.nameAr || d.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        )}
+
+                        {formData.scope === 'JOB_TITLE' && (
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>اختر الدرجة الوظيفية</InputLabel>
+                                    <Select
+                                        value={formData.jobTitleId}
+                                        label="اختر الدرجة الوظيفية"
+                                        onChange={(e) => setFormData({ ...formData, jobTitleId: e.target.value })}
+                                    >
+                                        {jobTitles.map((j: any) => (
+                                            <MenuItem key={j.id} value={j.id}>{j.nameAr || j.name}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        )}
+
+                        {formData.scope === 'EMPLOYEE' && (
+                            <Grid item xs={12} sm={6}>
+                                <FormControl fullWidth>
+                                    <InputLabel>اختر الموظف</InputLabel>
+                                    <Select
+                                        value={formData.employeeId}
+                                        label="اختر الموظف"
+                                        onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                                    >
+                                        {employees.map((emp: any) => (
+                                            <MenuItem key={emp.id} value={emp.id}>
+                                                {emp.firstName} {emp.lastName} ({emp.employeeCode || emp.email})
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        )}
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth type="date" label="تاريخ البداية" required
