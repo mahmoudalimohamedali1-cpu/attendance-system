@@ -2,11 +2,13 @@ import { Module } from '@nestjs/common';
 import { MudadController } from './mudad.controller';
 import { MudadService } from './mudad.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
+import { StatusLogService } from '../../common/services/status-log.service';
 
 @Module({
     imports: [PrismaModule],
     controllers: [MudadController],
-    providers: [MudadService],
+    providers: [MudadService, StatusLogService],
     exports: [MudadService],
 })
 export class MudadModule { }
+

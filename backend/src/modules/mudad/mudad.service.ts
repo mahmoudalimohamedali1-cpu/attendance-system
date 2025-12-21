@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { MudadStatus } from '@prisma/client';
+import { MudadStatus, SubmissionEntityType } from '@prisma/client';
+import { StatusLogService } from '../../common/services/status-log.service';
 
 interface CreateMudadSubmissionDto {
     payrollRunId: string;
@@ -13,11 +14,15 @@ interface UpdateMudadStatusDto {
     mudadRef?: string;
     rejectionNote?: string;
     notes?: string;
+    reason?: string; // سبب التغيير للـ audit log
 }
 
 @Injectable()
 export class MudadService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private statusLogService: StatusLogService,
+    ) { }
 
     /**
      * إنشاء سجل تقديم لمُدد
@@ -58,7 +63,7 @@ export class MudadService {
             throw new BadRequestException('يوجد تقديم سابق لهذه المسيرة');
         }
 
-        return this.prisma.mudadSubmission.create({
+        const submission = await this.prisma.mudadSubmission.create({
             data: {
                 companyId,
                 payrollRunId: dto.payrollRunId,
@@ -70,11 +75,23 @@ export class MudadService {
                 notes: dto.notes,
                 preparedBy: userId,
                 preparedAt: new Date(),
+                generatorVersion: '1.0.0',
             },
             include: {
                 payrollRun: { include: { period: true } },
             },
         });
+
+        // تسجيل في سجل التدقيق
+        await this.statusLogService.logStatusChange({
+            entityType: SubmissionEntityType.MUDAD,
+            entityId: submission.id,
+            fromStatus: null,
+            toStatus: 'PENDING',
+            reason: 'إنشاء سجل جديد',
+        }, companyId, userId);
+
+        return submission;
     }
 
     /**
@@ -87,6 +104,7 @@ export class MudadService {
 
         if (!submission) throw new NotFoundException('سجل التقديم غير موجود');
 
+        const oldStatus = submission.status;
         const updateData: any = {
             status: dto.status,
             notes: dto.notes,
@@ -118,13 +136,25 @@ export class MudadService {
                 break;
         }
 
-        return this.prisma.mudadSubmission.update({
+        const updated = await this.prisma.mudadSubmission.update({
             where: { id },
             data: updateData,
             include: {
                 payrollRun: { include: { period: true } },
             },
         });
+
+        // تسجيل في سجل التدقيق
+        await this.statusLogService.logStatusChange({
+            entityType: SubmissionEntityType.MUDAD,
+            entityId: id,
+            fromStatus: oldStatus,
+            toStatus: dto.status,
+            reason: dto.reason || dto.rejectionNote,
+            externalRef: dto.mudadRef,
+        }, companyId, userId);
+
+        return updated;
     }
 
     /**

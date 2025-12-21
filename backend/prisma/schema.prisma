@@ -51,8 +51,9 @@ model Company {
   permissionAuditLogs PermissionAuditLog[]
   raiseRequests       RaiseRequest[]
   userPermissions     UserPermission[]
-  mudadSubmissions    MudadSubmission[]
-  wpsSubmissions      WpsSubmission[]
+  mudadSubmissions       MudadSubmission[]
+  wpsSubmissions         WpsSubmission[]
+  submissionStatusLogs   SubmissionStatusLog[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1763,6 +1764,11 @@ model MudadSubmission {
   rejectedAt    DateTime?   @map("rejected_at")
   rejectionNote String?     @map("rejection_note")
   
+  // File Integrity (للتدقيق)
+  fileHashSha256    String?  @db.VarChar(64) @map("file_hash_sha256")
+  fileSize          Int?     @map("file_size")
+  generatorVersion  String?  @map("generator_version")
+  
   // Notes
   notes         String?     @db.Text
 
@@ -1815,6 +1821,10 @@ model WpsSubmission {
   submittedAt  DateTime? @map("submitted_at") // تم الرفع للبنك
   processedAt  DateTime? @map("processed_at") // تم التحويل
 
+  // File Integrity (للتدقيق)
+  fileHashSha256    String?  @db.VarChar(64) @map("file_hash_sha256")
+  generatorVersion  String?  @map("generator_version")
+
   // Notes & Errors
   notes        String?   @db.Text
   errors       Json?     // أخطاء التحقق
@@ -1857,4 +1867,42 @@ enum AuditModule {
   MUDAD // مُدد
   WPS // حماية الأجور
   CONTRACT // العقود
+}
+
+// ==================== Compliance: Status Change Audit Trail ====================
+
+enum SubmissionEntityType {
+  MUDAD
+  WPS
+  QIWA
+}
+
+// سجل تغيير الحالة (Audit Trail) - لكل تغيير status
+model SubmissionStatusLog {
+  id        String @id @default(uuid())
+  companyId String @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Reference to entity
+  entityType SubmissionEntityType @map("entity_type")
+  entityId   String               @map("entity_id")
+
+  // Status change
+  fromStatus String? @map("from_status") // null for initial creation
+  toStatus   String  @map("to_status")
+
+  // Actor
+  changedByUserId String   @map("changed_by_user_id")
+  changedAt       DateTime @default(now()) @map("changed_at")
+
+  // Context
+  reason          String?  // سبب التغيير (اختياري)
+  externalRef     String?  @map("external_ref") // مرجع خارجي إن وجد
+  meta            Json?    // بيانات إضافية
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([companyId, entityType, entityId])
+  @@index([changedAt])
+  @@map("submission_status_logs")
 }
