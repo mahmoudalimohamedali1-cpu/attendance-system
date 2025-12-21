@@ -108,6 +108,7 @@ export interface CalculationTraceItem {
 
 /**
  * نتيجة حساب سياسة - للربط الديناميكي بين السياسة والـ Payslip
+ * Extended for Audit, WPS, GOSI compliance
  */
 export interface PolicyPayrollLine {
     // معرف المكوّن الناتج من السياسة
@@ -121,11 +122,22 @@ export interface PolicyPayrollLine {
     // المبلغ المحسوب
     amount: number;
 
-    // مصدر الحساب (للتتبع)
+    // 🔥 Audit fields
+    descriptionAr: string;          // سبب السطر: "خصم تأخير - سياسة كذا"
+    units?: number;                 // OT hours, late minutes, absent days
+    rate?: number;                  // multiplier (e.g., 1.5x)
+
+    // 🔥 مصدر الحساب (للتتبع)
     source: {
         policyId: string;
         policyCode: string;
         ruleId: string;
         ruleCode: string;
+        eventRef?: string;          // attendanceId, leaveId, etc.
     };
+
+    // 🔥 Component flags (from SalaryComponent)
+    taxable?: boolean;
+    gosiEligible?: boolean;
+    wpsIncluded?: boolean;
 }
