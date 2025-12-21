@@ -211,13 +211,14 @@ export class MudadService {
     /**
      * رفع ملف WPS
      */
-    async attachWpsFile(id: string, fileUrl: string, companyId: string) {
+    async attachWpsFile(id: string, fileUrl: string, companyId: string, fileHashSha256?: string) {
         const submission = await this.findOne(id, companyId);
 
         return this.prisma.mudadSubmission.update({
             where: { id },
             data: {
                 wpsFileUrl: fileUrl,
+                fileHashSha256: fileHashSha256,
                 status: submission.status === 'PENDING' ? 'PREPARED' : submission.status,
                 preparedAt: submission.preparedAt || new Date(),
             },

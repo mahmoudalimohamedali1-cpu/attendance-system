@@ -1,20 +1,20 @@
 import { Controller, Get, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { StatusLogService } from '../../common/services/status-log.service';
 import { SubmissionEntityType } from '@prisma/client';
 
 @ApiTags('Audit - سجل التدقيق')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('audit')
 export class AuditController {
     constructor(private readonly statusLogService: StatusLogService) { }
 
     @Get('submissions/:entityType/:entityId/logs')
-    @Roles('ADMIN', 'FINANCE', 'HR')
+    @RequirePermission('AUDIT_VIEW')
     @ApiOperation({ summary: 'جلب سجل تغييرات الحالة لكيان معين' })
     @ApiParam({ name: 'entityType', enum: ['MUDAD', 'WPS', 'QIWA'] })
     @ApiParam({ name: 'entityId', description: 'UUID of the entity' })
@@ -31,7 +31,7 @@ export class AuditController {
     }
 
     @Get('submissions/logs')
-    @Roles('ADMIN', 'FINANCE')
+    @RequirePermission('AUDIT_VIEW')
     @ApiOperation({ summary: 'جلب جميع سجلات التدقيق لفترة محددة' })
     @ApiQuery({ name: 'startDate', required: false, description: 'ISO date string' })
     @ApiQuery({ name: 'endDate', required: false, description: 'ISO date string' })
@@ -47,7 +47,7 @@ export class AuditController {
     }
 
     @Get('submissions/by-user/:userId')
-    @Roles('ADMIN')
+    @RequirePermission('AUDIT_VIEW')
     @ApiOperation({ summary: 'جلب سجلات مستخدم معين (لمراجعة الصلاحيات)' })
     @ApiParam({ name: 'userId', description: 'UUID of the user' })
     async getLogsByUser(

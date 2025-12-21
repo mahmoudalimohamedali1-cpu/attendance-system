@@ -80,6 +80,25 @@ const enterprisePermissions = [
     { code: 'ADMIN_USER_MANAGE', name: 'إدارة المستخدمين', nameEn: 'Manage Users', category: 'مسؤول النظام' },
     { code: 'ADMIN_PERMISSION_MANAGE', name: 'إدارة الصلاحيات', nameEn: 'Manage Permissions', category: 'مسؤول النظام' },
     { code: 'ADMIN_AUDIT_LOG', name: 'سجل التدقيق', nameEn: 'Audit Log', category: 'مسؤول النظام' },
+
+    // === مُدد (Mudad) ===
+    { code: 'MUDAD_VIEW', name: 'عرض تقديمات مُدد', nameEn: 'View Mudad Submissions', category: 'مُدد' },
+    { code: 'MUDAD_PREPARE', name: 'تحضير ملف مُدد', nameEn: 'Prepare Mudad File', category: 'مُدد' },
+    { code: 'MUDAD_SUBMIT', name: 'رفع ملف مُدد', nameEn: 'Submit to Mudad', category: 'مُدد' },
+    { code: 'MUDAD_ACCEPT', name: 'قبول/رفض مُدد', nameEn: 'Accept/Reject Mudad', category: 'مُدد' },
+
+    // === WPS (حماية الأجور) ===
+    { code: 'WPS_VIEW', name: 'عرض ملفات WPS', nameEn: 'View WPS Files', category: 'حماية الأجور' },
+    { code: 'WPS_GENERATE', name: 'توليد ملف WPS', nameEn: 'Generate WPS File', category: 'حماية الأجور' },
+    { code: 'WPS_SUBMIT', name: 'رفع WPS للبنك', nameEn: 'Submit WPS to Bank', category: 'حماية الأجور' },
+    { code: 'WPS_APPROVE', name: 'تأكيد معالجة WPS', nameEn: 'Approve WPS Processing', category: 'حماية الأجور' },
+
+    // === قوى (Qiwa) ===
+    { code: 'QIWA_EXPORT', name: 'تصدير بيانات قوى', nameEn: 'Export Qiwa Data', category: 'قوى' },
+
+    // === التدقيق ===
+    { code: 'AUDIT_VIEW', name: 'عرض سجل التدقيق', nameEn: 'View Audit Log', category: 'التدقيق' },
+    { code: 'AUDIT_EXPORT', name: 'تصدير سجل التدقيق', nameEn: 'Export Audit Log', category: 'التدقيق' },
 ];
 
 async function seedPermissions() {
