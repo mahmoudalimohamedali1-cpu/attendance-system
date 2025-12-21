@@ -1,17 +1,60 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DashboardSummaryDto, DashboardHealthDto, DashboardExceptionsDto, DashboardTrendsDto } from './dto/dashboard.dto';
+import Redis from 'ioredis';
+
+const CACHE_TTL = {
+    SUMMARY: 60,      // 1 minute
+    HEALTH: 60,       // 1 minute  
+    EXCEPTIONS: 120,  // 2 minutes
+    TRENDS: 300,      // 5 minutes
+};
 
 @Injectable()
 export class DashboardService {
     private readonly logger = new Logger(DashboardService.name);
 
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    ) { }
 
     /**
-     * Executive Summary - Main Dashboard Cards
+     * Cache helper - get or set
+     */
+    private async cached<T>(key: string, ttl: number, factory: () => Promise<T>): Promise<T> {
+        try {
+            const cached = await this.redis.get(key);
+            if (cached) {
+                this.logger.debug(`Cache HIT: ${key}`);
+                return JSON.parse(cached);
+            }
+        } catch (e) {
+            this.logger.warn(`Cache read error: ${e}`);
+        }
+
+        const data = await factory();
+
+        try {
+            await this.redis.setex(key, ttl, JSON.stringify(data));
+            this.logger.debug(`Cache SET: ${key} (TTL: ${ttl}s)`);
+        } catch (e) {
+            this.logger.warn(`Cache write error: ${e}`);
+        }
+
+        return data;
+    }
+
+
+    /**
+     * Executive Summary - Main Dashboard Cards (CACHED)
      */
     async getSummary(companyId: string, year: number, month: number): Promise<DashboardSummaryDto> {
+        const cacheKey = `dashboard:summary:${companyId}:${year}:${month}`;
+        return this.cached(cacheKey, CACHE_TTL.SUMMARY, () => this._getSummaryImpl(companyId, year, month));
+    }
+
+    private async _getSummaryImpl(companyId: string, year: number, month: number): Promise<DashboardSummaryDto> {
         // Get period
         const period = await this.prisma.payrollPeriod.findFirst({
             where: { companyId, year, month }
