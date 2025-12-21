@@ -174,11 +174,12 @@ export const PayrollRunDetailsPage = () => {
                 </TableContainer>
             </Card>
 
-            <Dialog open={!!selectedPayslip} onClose={() => setSelectedPayslip(null)} maxWidth="sm" fullWidth>
+            <Dialog open={!!selectedPayslip} onClose={() => setSelectedPayslip(null)} maxWidth="md" fullWidth>
                 <DialogTitle>تفاصيل قسيمة الراتب</DialogTitle>
                 <DialogContent dividers>
                     {selectedPayslip && (
                         <Box>
+                            {/* Employee Info */}
                             <Box display="flex" justifyContent="space-between" mb={2}>
                                 <Typography fontWeight="bold">الموظف:</Typography>
                                 <Typography>{selectedPayslip.employee.firstName} {selectedPayslip.employee.lastName}</Typography>
@@ -187,21 +188,161 @@ export const PayrollRunDetailsPage = () => {
                                 <Typography fontWeight="bold">الراتب الأساسي:</Typography>
                                 <Typography>{parseFloat(selectedPayslip.baseSalary).toLocaleString()} ريال</Typography>
                             </Box>
+
                             <Divider sx={{ my: 2 }} />
+
+                            {/* Enhanced Payslip Lines */}
                             <Typography variant="subtitle2" color="primary" gutterBottom>مكونات الراتب التفصيلية:</Typography>
-                            {selectedPayslip.lines.map((line: any) => (
-                                <Box key={line.id} display="flex" justifyContent="space-between" mb={1} sx={{ opacity: 0.9 }}>
-                                    <Typography variant="body2">{line.component.nameAr}</Typography>
-                                    <Typography variant="body2" color={line.component.type === 'EARNING' ? 'success.main' : 'error.main'}>
-                                        {line.component.type === 'EARNING' ? '+' : '-'} {parseFloat(line.amount).toLocaleString()} ريال
+
+                            <TableContainer sx={{ mb: 2 }}>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow sx={{ bgcolor: 'grey.50' }}>
+                                            <TableCell>المكوّن</TableCell>
+                                            <TableCell>المصدر</TableCell>
+                                            <TableCell>الوصف</TableCell>
+                                            <TableCell align="center">الوحدات</TableCell>
+                                            <TableCell align="center">المعدل</TableCell>
+                                            <TableCell align="left">القيمة</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {selectedPayslip.lines.map((line: any) => {
+                                            const getSourceBadge = (sourceType: string) => {
+                                                const badges: Record<string, { label: string; color: 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning' }> = {
+                                                    'STRUCTURE': { label: 'هيكل', color: 'default' },
+                                                    'POLICY': { label: 'سياسات', color: 'primary' },
+                                                    'STATUTORY': { label: 'تأمينات', color: 'info' },
+                                                    'MANUAL': { label: 'يدوي', color: 'warning' },
+                                                    'ADJUSTMENT': { label: 'تعديل', color: 'secondary' },
+                                                };
+                                                return badges[sourceType] || { label: sourceType, color: 'default' };
+                                            };
+
+                                            const badge = getSourceBadge(line.sourceType || 'STRUCTURE');
+                                            const isDeduction = line.sign === 'DEDUCTION' || line.component?.type === 'DEDUCTION';
+
+                                            return (
+                                                <TableRow key={line.id} hover>
+                                                    <TableCell>
+                                                        <Typography variant="body2" fontWeight="medium">
+                                                            {line.component?.nameAr || '-'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Box
+                                                            component="span"
+                                                            sx={{
+                                                                px: 1,
+                                                                py: 0.5,
+                                                                borderRadius: 1,
+                                                                fontSize: '0.7rem',
+                                                                bgcolor: badge.color === 'default' ? 'grey.200' :
+                                                                    badge.color === 'primary' ? 'primary.100' :
+                                                                        badge.color === 'info' ? 'info.100' :
+                                                                            badge.color === 'warning' ? 'warning.100' :
+                                                                                badge.color === 'secondary' ? 'secondary.100' : 'grey.200',
+                                                                color: badge.color === 'default' ? 'grey.700' :
+                                                                    badge.color === 'primary' ? 'primary.main' :
+                                                                        badge.color === 'info' ? 'info.main' :
+                                                                            badge.color === 'warning' ? 'warning.main' :
+                                                                                badge.color === 'secondary' ? 'secondary.main' : 'grey.700',
+                                                            }}
+                                                        >
+                                                            {badge.label}
+                                                        </Box>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {line.descriptionAr || '-'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        {line.units ? `${parseFloat(line.units).toFixed(2)}` : '-'}
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        {line.rate ? `x${parseFloat(line.rate).toFixed(2)}` : '-'}
+                                                    </TableCell>
+                                                    <TableCell align="left">
+                                                        <Typography
+                                                            variant="body2"
+                                                            fontWeight="bold"
+                                                            color={isDeduction ? 'error.main' : 'success.main'}
+                                                        >
+                                                            {isDeduction ? '-' : '+'} {parseFloat(line.amount).toLocaleString()} ريال
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+
+                            {/* Summary */}
+                            <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 2 }}>
+                                <Box display="flex" justifyContent="space-between" mb={1}>
+                                    <Typography>إجمالي الاستحقاقات:</Typography>
+                                    <Typography color="success.main" fontWeight="bold">
+                                        {parseFloat(selectedPayslip.grossSalary).toLocaleString()} ريال
                                     </Typography>
                                 </Box>
-                            ))}
-                            <Divider sx={{ my: 2 }} />
-                            <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'grey.100', p: 1, borderRadius: 1 }}>
-                                <Typography fontWeight="bold">صافي الراتب:</Typography>
-                                <Typography fontWeight="bold" color="primary">{parseFloat(selectedPayslip.netSalary).toLocaleString()} ريال</Typography>
+                                <Box display="flex" justifyContent="space-between" mb={1}>
+                                    <Typography>إجمالي الاستقطاعات:</Typography>
+                                    <Typography color="error.main" fontWeight="bold">
+                                        {parseFloat(selectedPayslip.totalDeductions).toLocaleString()} ريال
+                                    </Typography>
+                                </Box>
+                                <Divider sx={{ my: 1 }} />
+                                <Box display="flex" justifyContent="space-between">
+                                    <Typography fontWeight="bold">صافي الراتب:</Typography>
+                                    <Typography fontWeight="bold" color="primary" fontSize="1.1rem">
+                                        {parseFloat(selectedPayslip.netSalary).toLocaleString()} ريال
+                                    </Typography>
+                                </Box>
                             </Box>
+
+                            {/* Calculation Trace Accordion */}
+                            {selectedPayslip.calculationTrace && Array.isArray(selectedPayslip.calculationTrace) && selectedPayslip.calculationTrace.length > 0 && (
+                                <Box sx={{ mt: 2 }}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        color="text.secondary"
+                                        gutterBottom
+                                        sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1 }}
+                                        onClick={() => {
+                                            const el = document.getElementById('trace-content');
+                                            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+                                        }}
+                                    >
+                                        📊 عرض خطوات الحساب ({selectedPayslip.calculationTrace.length} خطوة)
+                                    </Typography>
+                                    <Box id="trace-content" sx={{ display: 'none', bgcolor: 'grey.50', p: 2, borderRadius: 1, maxHeight: 300, overflow: 'auto' }}>
+                                        {selectedPayslip.calculationTrace.map((step: any, idx: number) => (
+                                            <Box key={idx} sx={{ mb: 2, pb: 1, borderBottom: '1px dashed #ddd' }}>
+                                                <Typography variant="body2" fontWeight="bold" color="primary">
+                                                    {idx + 1}. {step.step || step.description || 'خطوة'}
+                                                </Typography>
+                                                {step.description && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {step.description}
+                                                    </Typography>
+                                                )}
+                                                {step.formula && (
+                                                    <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace', bgcolor: 'grey.200', p: 0.5, borderRadius: 0.5, mt: 0.5 }}>
+                                                        {step.formula}
+                                                    </Typography>
+                                                )}
+                                                {step.result !== undefined && (
+                                                    <Typography variant="body2" fontWeight="bold" color="success.main">
+                                                        = {typeof step.result === 'number' ? step.result.toLocaleString() : step.result}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                </Box>
+                            )}
                         </Box>
                     )}
                 </DialogContent>
