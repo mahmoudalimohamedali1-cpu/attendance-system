@@ -209,17 +209,49 @@ export class MudadService {
     }
 
     /**
-     * رفع ملف WPS
+     * رفع ملف WPS (مع التحقق من تغيير الهاش)
      */
-    async attachWpsFile(id: string, fileUrl: string, companyId: string, fileHashSha256?: string) {
+    async attachWpsFile(id: string, fileUrl: string, companyId: string, fileHashSha256?: string, userId?: string) {
         const submission = await this.findOne(id, companyId);
+
+        // التحقق من تغيير الملف
+        const hashChanged = submission.fileHashSha256 &&
+            fileHashSha256 &&
+            submission.fileHashSha256 !== fileHashSha256;
+
+        let newStatus = submission.status;
+        let reason = '';
+
+        if (hashChanged) {
+            // تغير الملف - يتطلب إعادة رفع
+            newStatus = 'RESUBMIT_REQUIRED' as any;
+            reason = 'FILE_HASH_CHANGED';
+
+            // تسجيل تغيير الهاش في سجل التدقيق
+            if (userId) {
+                await this.statusLogService.logStatusChange({
+                    entityType: SubmissionEntityType.MUDAD,
+                    entityId: id,
+                    fromStatus: submission.status,
+                    toStatus: newStatus,
+                    reason: reason,
+                    meta: JSON.stringify({
+                        oldHash: submission.fileHashSha256,
+                        newHash: fileHashSha256,
+                        fileName: fileUrl.split('/').pop(),
+                    }),
+                }, companyId, userId);
+            }
+        } else if (submission.status === 'PENDING') {
+            newStatus = 'PREPARED' as any;
+        }
 
         return this.prisma.mudadSubmission.update({
             where: { id },
             data: {
                 wpsFileUrl: fileUrl,
                 fileHashSha256: fileHashSha256,
-                status: submission.status === 'PENDING' ? 'PREPARED' : submission.status,
+                status: newStatus,
                 preparedAt: submission.preparedAt || new Date(),
             },
         });

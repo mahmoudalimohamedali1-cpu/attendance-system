@@ -66,7 +66,7 @@ export class MudadController {
     @RequirePermission('MUDAD_PREPARE')
     @ApiOperation({ summary: 'إرفاق ملف WPS' })
     attachWpsFile(@Param('id') id: string, @Body() dto: { fileUrl: string; fileHashSha256?: string }, @Request() req: any) {
-        return this.mudadService.attachWpsFile(id, dto.fileUrl, req.user.companyId, dto.fileHashSha256);
+        return this.mudadService.attachWpsFile(id, dto.fileUrl, req.user.companyId, dto.fileHashSha256, req.user.id);
     }
 
     @Delete(':id')

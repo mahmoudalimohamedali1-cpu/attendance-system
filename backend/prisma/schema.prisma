@@ -1782,12 +1782,13 @@ model MudadSubmission {
 }
 
 enum MudadStatus {
-  PENDING      // في انتظار التحضير
-  PREPARED     // تم تحضير الملف
-  SUBMITTED    // تم الرفع على مُدد
-  ACCEPTED     // مقبول
-  REJECTED     // مرفوض
-  RESUBMITTED  // تم إعادة الرفع
+  PENDING            // في انتظار التحضير
+  PREPARED           // تم تحضير الملف
+  SUBMITTED          // تم الرفع على مُدد
+  ACCEPTED           // مقبول
+  REJECTED           // مرفوض
+  RESUBMITTED        // تم إعادة الرفع
+  RESUBMIT_REQUIRED  // يتطلب إعادة رفع (تغير الملف)
 }
 
 // WPS File Submissions (تتبع ملفات WPS المرفوعة)

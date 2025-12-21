@@ -14,6 +14,7 @@ const MUDAD_TRANSITIONS: Record<MudadStatus, MudadStatus[]> = {
     ACCEPTED: [], // final state - no transitions allowed
     REJECTED: ['RESUBMITTED'],
     RESUBMITTED: ['ACCEPTED', 'REJECTED'],
+    RESUBMIT_REQUIRED: ['PREPARED', 'SUBMITTED'], // can recover after file hash changed
 };
 
 // Valid transitions for WPS
