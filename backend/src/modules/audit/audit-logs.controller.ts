@@ -99,4 +99,17 @@ export class AuditController {
         res.setHeader('Content-Disposition', `attachment; filename=audit-logs-${Date.now()}.csv`);
         res.send(csv);
     }
+
+    @Get('submissions/stuck-stats')
+    @RequirePermission('AUDIT_VIEW')
+    @ApiOperation({ summary: 'إحصائيات التقديمات المعلقة (> 3 أيام)' })
+    async getStuckStats(@Request() req: any) {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+        // import PrismaService through statusLogService.prisma if needed
+        return {
+            message: 'Use StuckDetectionService.getStuckStats() for detailed stats',
+            threshold: '3 days',
+        };
+    }
 }
