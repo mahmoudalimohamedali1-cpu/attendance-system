@@ -46,7 +46,8 @@ async function bootstrap() {
 
         console.log('\n✅ PayrollRun created successfully!');
         console.log(`Run ID: ${result.id}`);
-        console.log(`Payslips: ${result.payslips?.length || 'N/A'}`);
+        console.log(`Status: ${result.status}`);
+
 
     } catch (error: any) {
         console.error('\n❌ Error:', error.message);
