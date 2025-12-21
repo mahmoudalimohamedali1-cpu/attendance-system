@@ -90,6 +90,7 @@ const payrollGroup: MenuGroup = {
   icon: <Payments />,
   requiredRole: 'ADMIN',
   children: [
+    { text: 'لوحة تحكم الرواتب', icon: <Dashboard />, path: '/payroll-dashboard' },
     { text: 'إدارة الرواتب', icon: <MonetizationOn />, path: '/salary' },
     { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises' },
     { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay' },
