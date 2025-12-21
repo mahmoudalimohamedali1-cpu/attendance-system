@@ -3,14 +3,17 @@ import { PayrollRunsService } from './payroll-runs.service';
 import { PayrollRunsController } from './payroll-runs.controller';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PayrollCalculationModule } from '../payroll-calculation/payroll-calculation.module';
+import { PayslipsModule } from '../payslips/payslips.module';
+import { AdjustmentRunService } from './adjustment-run.service';
 
 @Module({
     imports: [
         PrismaModule,
         PayrollCalculationModule,
+        PayslipsModule,
     ],
     controllers: [PayrollRunsController],
-    providers: [PayrollRunsService],
-    exports: [PayrollRunsService],
+    providers: [PayrollRunsService, AdjustmentRunService],
+    exports: [PayrollRunsService, AdjustmentRunService],
 })
 export class PayrollRunsModule { }

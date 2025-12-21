@@ -1482,6 +1482,13 @@ model PayrollRun {
 
   processedBy String? @map("processed_by")
 
+  // 🔥 Adjustment Run Support
+  isAdjustment     Boolean      @default(false) @map("is_adjustment")
+  originalRunId    String?      @map("original_run_id")
+  originalRun      PayrollRun?  @relation("AdjustmentRuns", fields: [originalRunId], references: [id])
+  adjustmentRuns   PayrollRun[] @relation("AdjustmentRuns")
+  adjustmentReason String?      @map("adjustment_reason")
+
   // Enterprise: Workflow Timestamps
   calculatedAt      DateTime? @map("calculated_at")
   calculatedBy      String?   @map("calculated_by")
@@ -1500,6 +1507,7 @@ model PayrollRun {
 
   @@index([companyId, status])
   @@index([periodId])
+  @@index([originalRunId])
   @@map("payroll_runs")
 }
 
