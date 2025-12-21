@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { WpsStatus } from '@prisma/client';
+import { WpsStatus, WpsSubmission } from '@prisma/client';
 
 interface CreateWpsSubmissionDto {
     payrollRunId: string;
@@ -150,19 +150,19 @@ export class WpsTrackingService {
             };
         }
 
-        const submissions = await this.prisma.wpsSubmission.findMany({ where });
+        const submissions: WpsSubmission[] = await this.prisma.wpsSubmission.findMany({ where });
 
         return {
             total: submissions.length,
-            generated: submissions.filter(s => s.status === 'GENERATED').length,
-            downloaded: submissions.filter(s => s.status === 'DOWNLOADED').length,
-            submitted: submissions.filter(s => s.status === 'SUBMITTED').length,
-            processing: submissions.filter(s => s.status === 'PROCESSING').length,
-            processed: submissions.filter(s => s.status === 'PROCESSED').length,
-            failed: submissions.filter(s => s.status === 'FAILED').length,
+            generated: submissions.filter((s: WpsSubmission) => s.status === 'GENERATED').length,
+            downloaded: submissions.filter((s: WpsSubmission) => s.status === 'DOWNLOADED').length,
+            submitted: submissions.filter((s: WpsSubmission) => s.status === 'SUBMITTED').length,
+            processing: submissions.filter((s: WpsSubmission) => s.status === 'PROCESSING').length,
+            processed: submissions.filter((s: WpsSubmission) => s.status === 'PROCESSED').length,
+            failed: submissions.filter((s: WpsSubmission) => s.status === 'FAILED').length,
             totalAmount: submissions
-                .filter(s => s.status === 'PROCESSED')
-                .reduce((sum, s) => sum + Number(s.totalAmount), 0),
+                .filter((s: WpsSubmission) => s.status === 'PROCESSED')
+                .reduce((sum: number, s: WpsSubmission) => sum + Number(s.totalAmount), 0),
         };
     }
 
