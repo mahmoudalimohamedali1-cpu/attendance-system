@@ -1,35 +1,41 @@
 /**
  * Salary Components API Service
  * مكونات الراتب (بدلات/خصومات)
+ * متوافق مع Backend Schema
  */
 
 import { api } from './api.service';
 
 export type ComponentType = 'EARNING' | 'DEDUCTION';
+export type ComponentNature = 'FIXED' | 'VARIABLE' | 'FORMULA';
 
 export interface SalaryComponent {
     id: string;
-    name: string;
+    code: string;
+    nameAr: string;
     nameEn?: string;
     type: ComponentType;
-    isFixed: boolean;
-    defaultValue?: number;
-    isPercentage: boolean;
-    isTaxable: boolean;
-    isGosiApplicable: boolean;
+    nature: ComponentNature;
+    description?: string;
+    gosiEligible: boolean;
+    otEligible: boolean;
+    taxable?: boolean;
+    formula?: string;
     isActive: boolean;
     createdAt: string;
 }
 
 export interface CreateSalaryComponentDto {
-    name: string;
+    code: string;
+    nameAr: string;
     nameEn?: string;
     type: ComponentType;
-    isFixed: boolean;
-    defaultValue?: number;
-    isPercentage: boolean;
-    isTaxable: boolean;
-    isGosiApplicable: boolean;
+    nature: ComponentNature;
+    description?: string;
+    gosiEligible?: boolean;
+    otEligible?: boolean;
+    taxable?: boolean;
+    formula?: string;
 }
 
 export const componentTypeLabels: Record<ComponentType, string> = {
@@ -37,11 +43,22 @@ export const componentTypeLabels: Record<ComponentType, string> = {
     DEDUCTION: 'خصم',
 };
 
+export const componentNatureLabels: Record<ComponentNature, string> = {
+    FIXED: 'ثابت',
+    VARIABLE: 'متغير',
+    FORMULA: 'معادلة',
+};
+
 class SalaryComponentsService {
     private readonly basePath = '/salary-components';
 
     async getAll(): Promise<SalaryComponent[]> {
         const response = await api.get(this.basePath) as SalaryComponent[] | { data: SalaryComponent[] };
+        return (response as any).data || response;
+    }
+
+    async getById(id: string): Promise<SalaryComponent> {
+        const response = await api.get(`${this.basePath}/${id}`) as SalaryComponent | { data: SalaryComponent };
         return (response as any).data || response;
     }
 
