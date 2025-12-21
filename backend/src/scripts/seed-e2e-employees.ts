@@ -36,11 +36,22 @@ async function main() {
     const branch = await prisma.branch.findFirst({ where: { companyId: company.id } });
     if (!branch) throw new Error('No branch found');
 
-    const structure = await prisma.salaryStructure.findFirst({
+    let structure = await prisma.salaryStructure.findFirst({
         where: { companyId: company.id, isActive: true }
     });
-    if (!structure) throw new Error('No active salary structure found');
-    console.log(`✅ Structure: ${structure.name} (${structure.id})`);
+    if (!structure) {
+        structure = await prisma.salaryStructure.create({
+            data: {
+                companyId: company.id,
+                name: 'E2E Test Structure',
+                isActive: true,
+                effectiveDate: new Date(CONFIG.testYear, 0, 1),
+            }
+        });
+        console.log(`✅ Created Structure: ${structure.name}`);
+    } else {
+        console.log(`✅ Structure: ${structure.name} (${structure.id})`);
+    }
 
     // Create/update period
     let period = await prisma.payrollPeriod.findFirst({
