@@ -46,6 +46,7 @@ import { CompaniesModule } from './modules/companies/companies.module';
 import { WpsExportModule } from './modules/wps-export/wps-export.module';
 import { ExceptionsModule } from './modules/exceptions/exceptions.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
+import { PayslipsModule } from './modules/payslips/payslips.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -102,6 +103,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     WpsExportModule,        // تصدير WPS للبنوك
     ExceptionsModule,       // مركز الاستثناءات
     ContractsModule,        // إدارة العقود
+    PayslipsModule,         // قسائم الرواتب
   ],
   controllers: [AppController],
   providers: [

@@ -11,49 +11,49 @@ datasource db {
 // ==================== الشركات (Tenant) ====================
 
 model Company {
-  id              String      @id @default(uuid())
-  name            String      @unique
-  nameEn          String?     @map("name_en")
-  crNumber        String?     @unique @map("cr_number") // رقم السجل التجاري
-  taxId           String?     @unique @map("tax_id")    // الرقم الضريبي
-  logo            String?
-  address         String?
-  phone           String?
-  email           String?
-  website         String?
-  
-  // روابط العلاقات
-  users           User[]
-  branches        Branch[]
-  jobTitles       JobTitle[]
-  costCenters     CostCenter[]
-  salaryComponents SalaryComponent[]
-  salaryStructures SalaryStructure[]
-  policies        Policy[]
-  payrollPeriods  PayrollPeriod[]
-  payrollRuns     PayrollRun[]
-  holidays        Holiday[]
-  gosiConfigs     GosiConfig[]
-  departments     Department[]
-  workSchedules   WorkSchedule[]
-  attendances     Attendance[]
-  leaveRequests   LeaveRequest[]
-  letterRequests  LetterRequest[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  advanceRequests AdvanceRequest[]
-  retroPays       RetroPay[]
-  suspiciousAttempts SuspiciousAttempt[]
-  workFromHomes   WorkFromHome[]
-  approvalLogs    ApprovalLog[]
-  payslips        Payslip[]
-  systemSettings  SystemSetting[]
-  permissionAuditLogs PermissionAuditLog[]
-  raiseRequests   RaiseRequest[]
-  userPermissions UserPermission[]
+  id       String  @id @default(uuid())
+  name     String  @unique
+  nameEn   String? @map("name_en")
+  crNumber String? @unique @map("cr_number") // رقم السجل التجاري
+  taxId    String? @unique @map("tax_id") // الرقم الضريبي
+  logo     String?
+  address  String?
+  phone    String?
+  email    String?
+  website  String?
 
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  // روابط العلاقات
+  users               User[]
+  branches            Branch[]
+  jobTitles           JobTitle[]
+  costCenters         CostCenter[]
+  salaryComponents    SalaryComponent[]
+  salaryStructures    SalaryStructure[]
+  policies            Policy[]
+  payrollPeriods      PayrollPeriod[]
+  payrollRuns         PayrollRun[]
+  holidays            Holiday[]
+  gosiConfigs         GosiConfig[]
+  departments         Department[]
+  workSchedules       WorkSchedule[]
+  attendances         Attendance[]
+  leaveRequests       LeaveRequest[]
+  letterRequests      LetterRequest[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  advanceRequests     AdvanceRequest[]
+  retroPays           RetroPay[]
+  suspiciousAttempts  SuspiciousAttempt[]
+  workFromHomes       WorkFromHome[]
+  approvalLogs        ApprovalLog[]
+  payslips            Payslip[]
+  systemSettings      SystemSetting[]
+  permissionAuditLogs PermissionAuditLog[]
+  raiseRequests       RaiseRequest[]
+  userPermissions     UserPermission[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("companies")
 }
@@ -73,142 +73,142 @@ enum UserStatus {
 }
 
 enum ContractType {
-  PERMANENT      // عقد دائم (غير محدد المدة)
-  FIXED_TERM     // عقد محدد المدة
-  PART_TIME      // دوام جزئي
-  SEASONAL       // موسمي
-  PROBATION      // فترة تجربة
+  PERMANENT // عقد دائم (غير محدد المدة)
+  FIXED_TERM // عقد محدد المدة
+  PART_TIME // دوام جزئي
+  SEASONAL // موسمي
+  PROBATION // فترة تجربة
 }
 
 enum ContractStatus {
-  ACTIVE         // ساري
-  EXPIRED        // منتهي
-  TERMINATED     // منهي
-  RENEWED        // مجدد
-  SUSPENDED      // موقوف
+  ACTIVE // ساري
+  EXPIRED // منتهي
+  TERMINATED // منهي
+  RENEWED // مجدد
+  SUSPENDED // موقوف
 }
 
 model User {
-  id              String     @id @default(uuid())
-  email           String     @unique
-  phone           String?    @unique
-  password        String
-  firstName       String     @map("first_name")
-  lastName        String     @map("last_name")
-  avatar          String?
-  employeeCode    String?    @map("employee_code")
-  jobTitle        String?    @map("job_title")  // Legacy - مسمى وظيفي نصي
-  role            Role       @default(EMPLOYEE)
-  status          UserStatus @default(ACTIVE)
-  salary          Decimal?   @db.Decimal(10, 2)
-  hireDate        DateTime?  @map("hire_date")
-  nationality     String?    @map("nationality")
-  isSaudi         Boolean    @default(true) @map("is_saudi")
-  fcmToken        String?    @map("fcm_token")
-  nationalId      String?    @unique @map("national_id") // رقم الهوية أو الإقامة
-  
+  id           String     @id @default(uuid())
+  email        String     @unique
+  phone        String?    @unique
+  password     String
+  firstName    String     @map("first_name")
+  lastName     String     @map("last_name")
+  avatar       String?
+  employeeCode String?    @map("employee_code")
+  jobTitle     String?    @map("job_title") // Legacy - مسمى وظيفي نصي
+  role         Role       @default(EMPLOYEE)
+  status       UserStatus @default(ACTIVE)
+  salary       Decimal?   @db.Decimal(10, 2)
+  hireDate     DateTime?  @map("hire_date")
+  nationality  String?    @map("nationality")
+  isSaudi      Boolean    @default(true) @map("is_saudi")
+  fcmToken     String?    @map("fcm_token")
+  nationalId   String?    @unique @map("national_id") // رقم الهوية أو الإقامة
+
   // Super Admin - يتخطى كل الـ guards
-  isSuperAdmin    Boolean    @default(false) @map("is_super_admin")
-  
+  isSuperAdmin Boolean @default(false) @map("is_super_admin")
+
   // الدرجة الوظيفية (الجديد)
-  jobTitleId      String?    @map("job_title_id")
-  jobTitleRef     JobTitle?  @relation(fields: [jobTitleId], references: [id])
-  
+  jobTitleId  String?   @map("job_title_id")
+  jobTitleRef JobTitle? @relation(fields: [jobTitleId], references: [id])
+
   // رصيد الإجازات
-  annualLeaveDays     Int        @default(21) @map("annual_leave_days")    // إجمالي أيام الإجازة السنوية
-  usedLeaveDays       Int        @default(0) @map("used_leave_days")       // الأيام المستخدمة
-  remainingLeaveDays  Int        @default(21) @map("remaining_leave_days") // الأيام المتبقية
-  
+  annualLeaveDays    Int @default(21) @map("annual_leave_days") // إجمالي أيام الإجازة السنوية
+  usedLeaveDays      Int @default(0) @map("used_leave_days") // الأيام المستخدمة
+  remainingLeaveDays Int @default(21) @map("remaining_leave_days") // الأيام المتبقية
+
   // بيانات التعرف على الوجه
-  faceRegistered    Boolean    @default(false) @map("face_registered")
-  faceData          FaceData?
-  
+  faceRegistered Boolean   @default(false) @map("face_registered")
+  faceData       FaceData?
+
   // العلاقات
-  companyId       String?    @map("company_id")
-  company         Company?    @relation(fields: [companyId], references: [id])
-  branchId        String?    @map("branch_id")
-  branch          Branch?    @relation(fields: [branchId], references: [id])
-  departmentId    String?    @map("department_id")
-  department      Department? @relation(fields: [departmentId], references: [id])
-  managerId       String?    @map("manager_id")
-  manager         User?      @relation("ManagerEmployees", fields: [managerId], references: [id])
-  employees       User[]     @relation("ManagerEmployees")
-  
+  companyId    String?     @map("company_id")
+  company      Company?    @relation(fields: [companyId], references: [id])
+  branchId     String?     @map("branch_id")
+  branch       Branch?     @relation(fields: [branchId], references: [id])
+  departmentId String?     @map("department_id")
+  department   Department? @relation(fields: [departmentId], references: [id])
+  managerId    String?     @map("manager_id")
+  manager      User?       @relation("ManagerEmployees", fields: [managerId], references: [id])
+  employees    User[]      @relation("ManagerEmployees")
+
   // السجلات
-  attendances     Attendance[]
-  leaveRequests   LeaveRequest[]  @relation("EmployeeLeaveRequests")
-  approvedLeaves  LeaveRequest[]  @relation("ApproverLeaveRequests")
-  managerApprovedLeaves LeaveRequest[] @relation("ManagerApproverLeaveRequests")
-  hrApprovedLeaves      LeaveRequest[] @relation("HRApproverLeaveRequests")
-  letterRequests  LetterRequest[] @relation("EmployeeLetterRequests")
-  approvedLetters LetterRequest[] @relation("ApproverLetterRequests")
-  managerApprovedLetters LetterRequest[] @relation("ManagerApproverLetterRequests")
-  hrApprovedLetters      LetterRequest[] @relation("HRApproverLetterRequests")
-  raiseRequests   RaiseRequest[]  @relation("EmployeeRaiseRequests")
-  managerApprovedRaises  RaiseRequest[]  @relation("ManagerApproverRaiseRequests")
-  hrApprovedRaises       RaiseRequest[]  @relation("HRApproverRaiseRequests")
-  advanceRequests AdvanceRequest[] @relation("EmployeeAdvanceRequests")
+  attendances             Attendance[]
+  leaveRequests           LeaveRequest[]   @relation("EmployeeLeaveRequests")
+  approvedLeaves          LeaveRequest[]   @relation("ApproverLeaveRequests")
+  managerApprovedLeaves   LeaveRequest[]   @relation("ManagerApproverLeaveRequests")
+  hrApprovedLeaves        LeaveRequest[]   @relation("HRApproverLeaveRequests")
+  letterRequests          LetterRequest[]  @relation("EmployeeLetterRequests")
+  approvedLetters         LetterRequest[]  @relation("ApproverLetterRequests")
+  managerApprovedLetters  LetterRequest[]  @relation("ManagerApproverLetterRequests")
+  hrApprovedLetters       LetterRequest[]  @relation("HRApproverLetterRequests")
+  raiseRequests           RaiseRequest[]   @relation("EmployeeRaiseRequests")
+  managerApprovedRaises   RaiseRequest[]   @relation("ManagerApproverRaiseRequests")
+  hrApprovedRaises        RaiseRequest[]   @relation("HRApproverRaiseRequests")
+  advanceRequests         AdvanceRequest[] @relation("EmployeeAdvanceRequests")
   managerApprovedAdvances AdvanceRequest[] @relation("ManagerApproverAdvanceRequests")
   hrApprovedAdvances      AdvanceRequest[] @relation("HRApproverAdvanceRequests")
-  notifications   Notification[]
-  refreshTokens   RefreshToken[]
-  auditLogs       AuditLog[]
-  
+  notifications           Notification[]
+  refreshTokens           RefreshToken[]
+  auditLogs               AuditLog[]
+
   // إعدادات العمل من المنزل
-  workFromHome    WorkFromHome[]
-  
+  workFromHome WorkFromHome[]
+
   // المحاولات المشبوهة
   suspiciousAttempts SuspiciousAttempt[]
-  
+
   // الأجهزة المسجلة
   registeredDevices RegisteredDevice[]
-  
+
   // صلاحيات المستخدم
   userPermissions UserPermission[]
-  
+
   // سجل الموافقات (Audit)
-  approvalLogs    ApprovalLog[]
-  
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
+  approvalLogs ApprovalLog[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // روابط الرواتب والموارد البشرية الجديدة
-  bankAccounts    EmployeeBankAccount[]
-  contracts       Contract[]
+  bankAccounts      EmployeeBankAccount[]
+  contracts         Contract[]
   salaryAssignments EmployeeSalaryAssignment[] @relation("EmployeeSalaryAssignments")
-  payslips        Payslip[]
-  costCenterId    String?    @map("cost_center_id")
-  costCenter      CostCenter? @relation(fields: [costCenterId], references: [id])
-  retroPays       RetroPay[]
-  policyTargets   Policy[]     @relation("PolicyTargetEmployee")
-  
-  @@map("users")
+  payslips          Payslip[]
+  costCenterId      String?                    @map("cost_center_id")
+  costCenter        CostCenter?                @relation(fields: [costCenterId], references: [id])
+  retroPays         RetroPay[]
+  policyTargets     Policy[]                   @relation("PolicyTargetEmployee")
+
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
+  @@map("users")
 }
 
 // ==================== الدرجات الوظيفية ====================
 
 model JobTitle {
-  id            String    @id @default(uuid())
-  companyId     String?   @map("company_id")
-  company       Company?  @relation(fields: [companyId], references: [id])
-  name          String
-  nameEn        String?   @map("name_en")  // الاسم بالإنجليزية (اختياري)
-  level         Role      @default(EMPLOYEE)  // الدرجة: ADMIN, MANAGER, EMPLOYEE
-  isDirectManager Boolean @default(false) @map("is_direct_manager")  // هل يمكن أن يكون مدير مباشر؟
-  isActive      Boolean   @default(true) @map("is_active")  // للحذف الناعم
-  
+  id              String   @id @default(uuid())
+  companyId       String?  @map("company_id")
+  company         Company? @relation(fields: [companyId], references: [id])
+  name            String
+  nameEn          String?  @map("name_en") // الاسم بالإنجليزية (اختياري)
+  level           Role     @default(EMPLOYEE) // الدرجة: ADMIN, MANAGER, EMPLOYEE
+  isDirectManager Boolean  @default(false) @map("is_direct_manager") // هل يمكن أن يكون مدير مباشر؟
+  isActive        Boolean  @default(true) @map("is_active") // للحذف الناعم
+
   // الموظفين بهذه الدرجة
-  users         User[]
-  
+  users User[]
+
   // الصلاحيات الافتراضية لهذه الدرجة
   defaultPermissions JobTitlePermission[]
-  policies      Policy[]  // سياسات على مستوى الدرجة
-  
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  
+  policies           Policy[] // سياسات على مستوى الدرجة
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([companyId, name])
   @@index([companyId, isActive])
   @@map("job_titles")
@@ -217,10 +217,10 @@ model JobTitle {
 // ==================== الأجهزة المسجلة للموظفين ====================
 
 enum DeviceStatus {
-  ACTIVE      // نشط ومعتمد
-  PENDING     // في انتظار الموافقة
-  BLOCKED     // محظور
-  INACTIVE    // غير نشط
+  ACTIVE // نشط ومعتمد
+  PENDING // في انتظار الموافقة
+  BLOCKED // محظور
+  INACTIVE // غير نشط
 }
 
 enum DevicePlatform {
@@ -231,41 +231,41 @@ enum DevicePlatform {
 }
 
 model RegisteredDevice {
-  id              String       @id @default(uuid())
-  userId          String       @map("user_id")
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // معرف الجهاز الفريد
-  deviceId        String       @map("device_id")           // Unique device identifier
-  deviceFingerprint String?    @map("device_fingerprint")  // Hash of device info
-  
+  deviceId          String  @map("device_id") // Unique device identifier
+  deviceFingerprint String? @map("device_fingerprint") // Hash of device info
+
   // معلومات الجهاز
-  deviceName      String?      @map("device_name")         // e.g., "iPhone 14 Pro"
-  deviceModel     String?      @map("device_model")        // e.g., "iPhone14,3"
-  deviceBrand     String?      @map("device_brand")        // e.g., "Apple"
-  platform        DevicePlatform @default(UNKNOWN)
-  osVersion       String?      @map("os_version")          // e.g., "iOS 17.2"
-  appVersion      String?      @map("app_version")         // e.g., "1.0.0"
-  
+  deviceName  String?        @map("device_name") // e.g., "iPhone 14 Pro"
+  deviceModel String?        @map("device_model") // e.g., "iPhone14,3"
+  deviceBrand String?        @map("device_brand") // e.g., "Apple"
+  platform    DevicePlatform @default(UNKNOWN)
+  osVersion   String?        @map("os_version") // e.g., "iOS 17.2"
+  appVersion  String?        @map("app_version") // e.g., "1.0.0"
+
   // حالة الجهاز
-  status          DeviceStatus @default(PENDING)
-  isMainDevice    Boolean      @default(false) @map("is_main_device") // الجهاز الرئيسي
-  
+  status       DeviceStatus @default(PENDING)
+  isMainDevice Boolean      @default(false) @map("is_main_device") // الجهاز الرئيسي
+
   // الموافقة
-  approvedBy      String?      @map("approved_by")
-  approvedAt      DateTime?    @map("approved_at")
-  blockedReason   String?      @map("blocked_reason")
-  
+  approvedBy    String?   @map("approved_by")
+  approvedAt    DateTime? @map("approved_at")
+  blockedReason String?   @map("blocked_reason")
+
   // إحصائيات الاستخدام
-  lastUsedAt      DateTime?    @map("last_used_at")
-  usageCount      Int          @default(0) @map("usage_count")
-  
+  lastUsedAt DateTime? @map("last_used_at")
+  usageCount Int       @default(0) @map("usage_count")
+
   // سجل المحاولات
-  deviceLogs      DeviceAccessLog[]
-  
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  
+  deviceLogs DeviceAccessLog[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([userId, deviceId])
   @@index([deviceId])
   @@index([userId, status])
@@ -274,28 +274,28 @@ model RegisteredDevice {
 
 // سجل محاولات الوصول من الأجهزة
 model DeviceAccessLog {
-  id              String   @id @default(uuid())
-  deviceId        String?  @map("device_id")
-  device          RegisteredDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  
-  userId          String   @map("user_id")
+  id       String            @id @default(uuid())
+  deviceId String?           @map("device_id")
+  device   RegisteredDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  userId            String @map("user_id")
   attemptedDeviceId String @map("attempted_device_id") // معرف الجهاز المستخدم
-  
+
   // نوع المحاولة
-  actionType      String   @map("action_type") // CHECK_IN, CHECK_OUT, LOGIN
-  isSuccess       Boolean  @map("is_success")
-  isKnownDevice   Boolean  @map("is_known_device")
-  
+  actionType    String  @map("action_type") // CHECK_IN, CHECK_OUT, LOGIN
+  isSuccess     Boolean @map("is_success")
+  isKnownDevice Boolean @map("is_known_device")
+
   // معلومات إضافية
-  deviceInfo      String?  @map("device_info") @db.Text // JSON with full device info
-  ipAddress       String?  @map("ip_address")
-  location        String?  // lat,lng
-  
+  deviceInfo String? @map("device_info") @db.Text // JSON with full device info
+  ipAddress  String? @map("ip_address")
+  location   String? // lat,lng
+
   // سبب الفشل
-  failureReason   String?  @map("failure_reason")
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+  failureReason String? @map("failure_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([userId, createdAt])
   @@index([attemptedDeviceId])
   @@map("device_access_logs")
@@ -304,57 +304,57 @@ model DeviceAccessLog {
 // ==================== طلبات تحديث بيانات الحضور ====================
 
 enum UpdateRequestStatus {
-  PENDING     // في انتظار المراجعة
-  APPROVED    // تمت الموافقة
-  REJECTED    // مرفوض
-  CANCELLED   // ملغي من الموظف
+  PENDING // في انتظار المراجعة
+  APPROVED // تمت الموافقة
+  REJECTED // مرفوض
+  CANCELLED // ملغي من الموظف
 }
 
 enum UpdateRequestType {
-  FACE_UPDATE       // تحديث بيانات الوجه فقط
-  DEVICE_UPDATE     // تحديث بيانات الجهاز فقط
-  BOTH              // تحديث كليهما
-  DEVICE_CHANGE     // تغيير جهاز (موبايل جديد)
+  FACE_UPDATE // تحديث بيانات الوجه فقط
+  DEVICE_UPDATE // تحديث بيانات الجهاز فقط
+  BOTH // تحديث كليهما
+  DEVICE_CHANGE // تغيير جهاز (موبايل جديد)
 }
 
 model DataUpdateRequest {
-  id              String              @id @default(uuid())
-  userId          String              @map("user_id")
-  
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+
   // نوع التحديث
-  requestType     UpdateRequestType   @map("request_type")
-  status          UpdateRequestStatus @default(PENDING)
-  
+  requestType UpdateRequestType   @map("request_type")
+  status      UpdateRequestStatus @default(PENDING)
+
   // سبب الطلب من الموظف
-  reason          String?             @db.Text
-  
+  reason String? @db.Text
+
   // ============ بيانات الوجه الجديدة ============
-  newFaceEmbedding  String?           @map("new_face_embedding") @db.Text
-  newFaceImage      String?           @map("new_face_image") @db.Text     // صورة Base64
-  faceImageQuality  Float?            @map("face_image_quality")
-  
+  newFaceEmbedding String? @map("new_face_embedding") @db.Text
+  newFaceImage     String? @map("new_face_image") @db.Text // صورة Base64
+  faceImageQuality Float?  @map("face_image_quality")
+
   // ============ بيانات الجهاز الجديد ============
-  newDeviceId         String?         @map("new_device_id")
-  newDeviceFingerprint String?        @map("new_device_fingerprint")
-  newDeviceName       String?         @map("new_device_name")
-  newDeviceModel      String?         @map("new_device_model")
-  newDeviceBrand      String?         @map("new_device_brand")
-  newDevicePlatform   DevicePlatform? @map("new_device_platform")
-  newDeviceOsVersion  String?         @map("new_device_os_version")
-  newDeviceAppVersion String?         @map("new_device_app_version")
-  
+  newDeviceId          String?         @map("new_device_id")
+  newDeviceFingerprint String?         @map("new_device_fingerprint")
+  newDeviceName        String?         @map("new_device_name")
+  newDeviceModel       String?         @map("new_device_model")
+  newDeviceBrand       String?         @map("new_device_brand")
+  newDevicePlatform    DevicePlatform? @map("new_device_platform")
+  newDeviceOsVersion   String?         @map("new_device_os_version")
+  newDeviceAppVersion  String?         @map("new_device_app_version")
+
   // ============ بيانات المراجعة ============
-  reviewedBy      String?             @map("reviewed_by")
-  reviewedAt      DateTime?           @map("reviewed_at")
-  reviewNote      String?             @map("review_note")      // ملاحظة المسؤول
-  rejectionReason String?             @map("rejection_reason")
-  
+  reviewedBy      String?   @map("reviewed_by")
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewNote      String?   @map("review_note") // ملاحظة المسؤول
+  rejectionReason String?   @map("rejection_reason")
+
   // ============ معلومات إضافية ============
-  oldDeviceId     String?             @map("old_device_id")    // الجهاز القديم للمقارنة
-  
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
-  
+  oldDeviceId String? @map("old_device_id") // الجهاز القديم للمقارنة
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@index([userId, status])
   @@index([status, createdAt])
   @@map("data_update_requests")
@@ -363,103 +363,103 @@ model DataUpdateRequest {
 // ==================== بيانات التعرف على الوجه ====================
 
 model FaceData {
-  id              String   @id @default(uuid())
-  userId          String   @unique @map("user_id")
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(uuid())
+  userId String @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Face Embeddings - مصفوفة الأرقام التي تمثل ملامح الوجه
-  faceEmbedding   String   @map("face_embedding") @db.Text // JSON array of floats
-  
+  faceEmbedding String @map("face_embedding") @db.Text // JSON array of floats
+
   // صورة الوجه المرجعية (Base64 مشفرة)
-  faceImage       String?  @map("face_image") @db.Text
-  
+  faceImage String? @map("face_image") @db.Text
+
   // معلومات إضافية
-  registeredAt    DateTime @default(now()) @map("registered_at")
-  lastVerifiedAt  DateTime? @map("last_verified_at")
-  verificationCount Int    @default(0) @map("verification_count")
-  
+  registeredAt      DateTime  @default(now()) @map("registered_at")
+  lastVerifiedAt    DateTime? @map("last_verified_at")
+  verificationCount Int       @default(0) @map("verification_count")
+
   // جودة الصورة والتحقق
-  imageQuality    Float?   @map("image_quality") // 0-1
-  confidence      Float?   // ثقة التسجيل
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
+  imageQuality Float? @map("image_quality") // 0-1
+  confidence   Float? // ثقة التسجيل
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@map("face_data")
 }
 
 model RefreshToken {
-  id          String   @id @default(uuid())
-  token       String   @unique
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceInfo  String?  @map("device_info")
-  ipAddress   String?  @map("ip_address")
-  expiresAt   DateTime @map("expires_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceInfo String?  @map("device_info")
+  ipAddress  String?  @map("ip_address")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
   @@map("refresh_tokens")
 }
 
 // ==================== الفروع والأقسام ====================
 
 model Branch {
-  id              String   @id @default(uuid())
-  companyId       String?  @map("company_id")
-  company         Company? @relation(fields: [companyId], references: [id])
-  name            String
-  nameEn          String?  @map("name_en")
-  address         String?
-  latitude        Decimal  @db.Decimal(10, 8)
-  longitude       Decimal  @db.Decimal(11, 8)
-  geofenceRadius  Int      @default(100) @map("geofence_radius") // بالمتر
-  timezone        String   @default("Asia/Riyadh")
-  isActive        Boolean  @default(true) @map("is_active")
-  
+  id             String   @id @default(uuid())
+  companyId      String?  @map("company_id")
+  company        Company? @relation(fields: [companyId], references: [id])
+  name           String
+  nameEn         String?  @map("name_en")
+  address        String?
+  latitude       Decimal  @db.Decimal(10, 8)
+  longitude      Decimal  @db.Decimal(11, 8)
+  geofenceRadius Int      @default(100) @map("geofence_radius") // بالمتر
+  timezone       String   @default("Asia/Riyadh")
+  isActive       Boolean  @default(true) @map("is_active")
+
   // مواعيد العمل الافتراضية
-  workStartTime   String   @default("09:00") @map("work_start_time")
-  workEndTime     String   @default("17:00") @map("work_end_time")
-  
+  workStartTime String @default("09:00") @map("work_start_time")
+  workEndTime   String @default("17:00") @map("work_end_time")
+
   // فترات السماح
-  lateGracePeriod     Int  @default(10) @map("late_grace_period") // دقائق
-  earlyCheckInPeriod  Int  @default(15) @map("early_check_in_period") // دقائق قبل بداية الدوام
-  earlyCheckOutPeriod Int  @default(0) @map("early_check_out_period") // دقائق
-  
+  lateGracePeriod     Int @default(10) @map("late_grace_period") // دقائق
+  earlyCheckInPeriod  Int @default(15) @map("early_check_in_period") // دقائق قبل بداية الدوام
+  earlyCheckOutPeriod Int @default(0) @map("early_check_out_period") // دقائق
+
   // أيام العمل
-  workingDays     String   @default("1,2,3,4,5") @map("working_days") // 0=الأحد, 6=السبت
-  
-  users           User[]
-  departments     Department[]
-  attendances     Attendance[]
-  schedules       WorkSchedule[]
-  policies        Policy[]  // سياسات على مستوى الفرع
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
+  workingDays String @default("1,2,3,4,5") @map("working_days") // 0=الأحد, 6=السبت
+
+  users       User[]
+  departments Department[]
+  attendances Attendance[]
+  schedules   WorkSchedule[]
+  policies    Policy[] // سياسات على مستوى الفرع
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([companyId, name])
   @@map("branches")
 }
 
 model Department {
-  id          String   @id @default(uuid())
-  companyId   String?  @map("company_id")
-  company     Company? @relation(fields: [companyId], references: [id])
-  name        String
-  nameEn      String?  @map("name_en")
-  branchId    String   @map("branch_id")
-  branch      Branch   @relation(fields: [branchId], references: [id])
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  name      String
+  nameEn    String?  @map("name_en")
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+
   // جدول عمل خاص بالقسم (اختياري)
-  workStartTime   String?  @map("work_start_time")
-  workEndTime     String?  @map("work_end_time")
-  
-  users       User[]
-  policies    Policy[]  // سياسات على مستوى القسم
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
+  workStartTime String? @map("work_start_time")
+  workEndTime   String? @map("work_end_time")
+
+  users    User[]
+  policies Policy[] // سياسات على مستوى القسم
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([companyId, name])
   @@map("departments")
 }
@@ -467,20 +467,20 @@ model Department {
 // ==================== جدول العمل ====================
 
 model WorkSchedule {
-  id              String   @id @default(uuid())
-  companyId       String?  @map("company_id")
-  company         Company? @relation(fields: [companyId], references: [id])
-  branchId        String   @map("branch_id")
-  branch          Branch   @relation(fields: [branchId], references: [id])
-  
-  dayOfWeek       Int      @map("day_of_week") // 0-6 (الأحد - السبت)
-  workStartTime   String   @map("work_start_time")
-  workEndTime     String   @map("work_end_time")
-  isWorkingDay    Boolean  @default(true) @map("is_working_day")
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+
+  dayOfWeek     Int     @map("day_of_week") // 0-6 (الأحد - السبت)
+  workStartTime String  @map("work_start_time")
+  workEndTime   String  @map("work_end_time")
+  isWorkingDay  Boolean @default(true) @map("is_working_day")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([branchId, dayOfWeek])
   @@map("work_schedules")
 }
@@ -488,11 +488,11 @@ model WorkSchedule {
 // ==================== سجلات الحضور ====================
 
 enum AttendanceStatus {
-  PRESENT       // حضر في الوقت
-  LATE          // متأخر
-  EARLY_LEAVE   // انصراف مبكر
-  ABSENT        // غائب
-  ON_LEAVE      // إجازة
+  PRESENT // حضر في الوقت
+  LATE // متأخر
+  EARLY_LEAVE // انصراف مبكر
+  ABSENT // غائب
+  ON_LEAVE // إجازة
   WORK_FROM_HOME // عمل من المنزل
 }
 
@@ -502,53 +502,53 @@ enum CheckType {
 }
 
 model Attendance {
-  id              String           @id @default(uuid())
-  companyId       String?          @map("company_id")
-  company         Company?         @relation(fields: [companyId], references: [id])
-  userId          String           @map("user_id")
-  user            User             @relation(fields: [userId], references: [id])
-  branchId        String           @map("branch_id")
-  branch          Branch           @relation(fields: [branchId], references: [id])
-  
-  date            DateTime         @db.Date
-  
-  status          AttendanceStatus @default(ABSENT)
-  checkInTime     DateTime?        @map("check_in_time")
-  checkOutTime    DateTime?        @map("check_out_time")
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+
+  date DateTime @db.Date
+
+  status       AttendanceStatus @default(ABSENT)
+  checkInTime  DateTime?        @map("check_in_time")
+  checkOutTime DateTime?        @map("check_out_time")
+
   // معلومات الموقع عند الحضور
-  checkInLatitude     Decimal?     @db.Decimal(10, 8) @map("check_in_latitude")
-  checkInLongitude    Decimal?     @db.Decimal(11, 8) @map("check_in_longitude")
-  checkInDistance     Int?         @map("check_in_distance") // المسافة بالمتر من الفرع
-  
+  checkInLatitude  Decimal? @map("check_in_latitude") @db.Decimal(10, 8)
+  checkInLongitude Decimal? @map("check_in_longitude") @db.Decimal(11, 8)
+  checkInDistance  Int?     @map("check_in_distance") // المسافة بالمتر من الفرع
+
   // معلومات الموقع عند الانصراف
-  checkOutLatitude    Decimal?     @db.Decimal(10, 8) @map("check_out_latitude")
-  checkOutLongitude   Decimal?     @db.Decimal(11, 8) @map("check_out_longitude")
-  checkOutDistance    Int?         @map("check_out_distance")
-  
+  checkOutLatitude  Decimal? @map("check_out_latitude") @db.Decimal(10, 8)
+  checkOutLongitude Decimal? @map("check_out_longitude") @db.Decimal(11, 8)
+  checkOutDistance  Int?     @map("check_out_distance")
+
   // إحصائيات الحضور (يتم حسابها بعد الانصراف)
-  lateMinutes     Int              @default(0) @map("late_minutes")
-  earlyLeaveMinutes Int            @default(0) @map("early_leave_minutes")
-  workingMinutes  Int              @default(0) @map("working_minutes")
-  overtimeMinutes Int              @default(0) @map("overtime_minutes")
-  
+  lateMinutes       Int @default(0) @map("late_minutes")
+  earlyLeaveMinutes Int @default(0) @map("early_leave_minutes")
+  workingMinutes    Int @default(0) @map("working_minutes")
+  overtimeMinutes   Int @default(0) @map("overtime_minutes")
+
   // ملاحظات
-  notes           String?
-  isWorkFromHome  Boolean          @default(false) @map("is_work_from_home")
-  
+  notes          String?
+  isWorkFromHome Boolean @default(false) @map("is_work_from_home")
+
   // محاولات مشبوهة
-  isMockLocation  Boolean          @default(false) @map("is_mock_location")
-  deviceInfo      String?          @map("device_info")
-  
+  isMockLocation Boolean @default(false) @map("is_mock_location")
+  deviceInfo     String? @map("device_info")
+
   // التحقق بالوجه
-  checkInFaceVerified   Boolean    @default(false) @map("check_in_face_verified")
-  checkInFaceConfidence Float?     @map("check_in_face_confidence")
-  checkOutFaceVerified  Boolean    @default(false) @map("check_out_face_verified")
-  checkOutFaceConfidence Float?    @map("check_out_face_confidence")
-  
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  
+  checkInFaceVerified    Boolean @default(false) @map("check_in_face_verified")
+  checkInFaceConfidence  Float?  @map("check_in_face_confidence")
+  checkOutFaceVerified   Boolean @default(false) @map("check_out_face_verified")
+  checkOutFaceConfidence Float?  @map("check_out_face_confidence")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([userId, date])
   @@index([companyId, date])
   @@index([userId, date])
@@ -558,76 +558,76 @@ model Attendance {
 
 // سجل محاولات التحقق بالوجه
 model FaceVerificationLog {
-  id              String   @id @default(uuid())
-  userId          String   @map("user_id")
-  
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+
   verificationType String  @map("verification_type") // CHECK_IN, CHECK_OUT, REGISTRATION
-  isSuccess       Boolean  @map("is_success")
-  confidence      Float?   // نسبة التطابق
-  threshold       Float?   // الحد الأدنى المطلوب
-  
+  isSuccess        Boolean @map("is_success")
+  confidence       Float? // نسبة التطابق
+  threshold        Float? // الحد الأدنى المطلوب
+
   // معلومات الجهاز
-  deviceInfo      String?  @map("device_info")
-  ipAddress       String?  @map("ip_address")
-  
+  deviceInfo String? @map("device_info")
+  ipAddress  String? @map("ip_address")
+
   // صورة المحاولة (اختياري للتدقيق)
-  attemptImage    String?  @map("attempt_image") @db.Text
-  
-  errorMessage    String?  @map("error_message")
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+  attemptImage String? @map("attempt_image") @db.Text
+
+  errorMessage String? @map("error_message")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([userId, createdAt])
   @@map("face_verification_logs")
 }
 
 // سجل محاولات الحضور المشبوهة
 model SuspiciousAttempt {
-  id              String   @id @default(uuid())
-  companyId       String?  @map("company_id")
-  company         Company? @relation(fields: [companyId], references: [id])
-  userId          String   @map("user_id")
-  user            User     @relation(fields: [userId], references: [id])
-  attemptType     String   @map("attempt_type") // MOCK_LOCATION, OUT_OF_RANGE, etc.
-  latitude        Decimal? @db.Decimal(10, 8)
-  longitude       Decimal? @db.Decimal(11, 8)
-  distance        Int?     // المسافة من الفرع
-  deviceInfo      String?  @map("device_info")
-  ipAddress       String?  @map("ip_address")
-  notes           String?
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+  id          String   @id @default(uuid())
+  companyId   String?  @map("company_id")
+  company     Company? @relation(fields: [companyId], references: [id])
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  attemptType String   @map("attempt_type") // MOCK_LOCATION, OUT_OF_RANGE, etc.
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+  distance    Int? // المسافة من الفرع
+  deviceInfo  String?  @map("device_info")
+  ipAddress   String?  @map("ip_address")
+  notes       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@map("suspicious_attempts")
 }
 
 // ==================== طلبات الإجازات ====================
 
 enum LeaveType {
-  ANNUAL          // إجازة سنوية
-  SICK            // إجازة مرضية
-  PERSONAL        // إجازة شخصية
-  EMERGENCY       // إجازة طارئة
-  NEW_BABY        // مولود جديد
-  MARRIAGE        // إجازة زواج
-  BEREAVEMENT     // إجازة الوفاة
-  HAJJ            // إجازة الحج
-  EXAM            // إجازة اختبارات
-  WORK_MISSION    // مهمة عمل
-  UNPAID          // إجازة بدون راتب
-  EARLY_LEAVE     // انصراف مبكر (كطلب إجازة)
-  OTHER           // أخرى
+  ANNUAL // إجازة سنوية
+  SICK // إجازة مرضية
+  PERSONAL // إجازة شخصية
+  EMERGENCY // إجازة طارئة
+  NEW_BABY // مولود جديد
+  MARRIAGE // إجازة زواج
+  BEREAVEMENT // إجازة الوفاة
+  HAJJ // إجازة الحج
+  EXAM // إجازة اختبارات
+  WORK_MISSION // مهمة عمل
+  UNPAID // إجازة بدون راتب
+  EARLY_LEAVE // انصراف مبكر (كطلب إجازة)
+  OTHER // أخرى
 }
 
 enum LeaveStatus {
   PENDING
-  MGR_APPROVED    // موافقة المدير (الخطوة الأولى)
-  MGR_REJECTED    // رفض المدير
-  APPROVED        // موافقة نهائية (HR)
-  REJECTED        // رفض نهائي (HR)
-  MODIFIED        // تم التعديل والموافقة
+  MGR_APPROVED // موافقة المدير (الخطوة الأولى)
+  MGR_REJECTED // رفض المدير
+  APPROVED // موافقة نهائية (HR)
+  REJECTED // رفض نهائي (HR)
+  MODIFIED // تم التعديل والموافقة
   CANCELLED
-  DELAYED         // مؤجل
+  DELAYED // مؤجل
 }
 
 enum ApprovalStep {
@@ -644,53 +644,53 @@ enum ApprovalDecision {
 }
 
 model LeaveRequest {
-  id              String      @id @default(uuid())
-  companyId       String?     @map("company_id")
-  company         Company?    @relation(fields: [companyId], references: [id])
-  userId          String      @map("user_id")
-  user            User        @relation("EmployeeLeaveRequests", fields: [userId], references: [id])
-  
-  type            LeaveType
-  startDate       DateTime    @map("start_date") @db.Date
-  endDate         DateTime    @map("end_date") @db.Date
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation("EmployeeLeaveRequests", fields: [userId], references: [id])
+
+  type      LeaveType
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime  @map("end_date") @db.Date
+
   // عدد الأيام
-  requestedDays   Int         @map("requested_days")  // الأيام المطلوبة
-  approvedDays    Int?        @map("approved_days")   // الأيام المعتمدة (قد تختلف)
-  
-  reason          String      @db.Text                // السبب
-  notes           String?     @db.VarChar(500)        // ملاحظات إضافية
-  attachments     Json?       // مرفقات
-  status          LeaveStatus @default(PENDING)
-  
+  requestedDays Int  @map("requested_days") // الأيام المطلوبة
+  approvedDays  Int? @map("approved_days") // الأيام المعتمدة (قد تختلف)
+
+  reason      String      @db.Text // السبب
+  notes       String?     @db.VarChar(500) // ملاحظات إضافية
+  attachments Json? // مرفقات
+  status      LeaveStatus @default(PENDING)
+
   // ========== Workflow متعدد المراحل ==========
-  currentStep       ApprovalStep     @default(MANAGER) @map("current_step")
-  
+  currentStep ApprovalStep @default(MANAGER) @map("current_step")
+
   // موافقة المدير المباشر
-  managerApproverId String?          @map("manager_approver_id")
-  managerApprover   User?            @relation("ManagerApproverLeaveRequests", fields: [managerApproverId], references: [id])
-  managerDecision   ApprovalDecision @default(PENDING) @map("manager_decision")
-  managerDecisionAt DateTime?        @map("manager_decision_at")
-  managerNotes      String?          @map("manager_notes") @db.VarChar(500)
-  managerAttachments Json?           @map("manager_attachments")
-  
+  managerApproverId  String?          @map("manager_approver_id")
+  managerApprover    User?            @relation("ManagerApproverLeaveRequests", fields: [managerApproverId], references: [id])
+  managerDecision    ApprovalDecision @default(PENDING) @map("manager_decision")
+  managerDecisionAt  DateTime?        @map("manager_decision_at")
+  managerNotes       String?          @map("manager_notes") @db.VarChar(500)
+  managerAttachments Json?            @map("manager_attachments")
+
   // موافقة HR
-  hrApproverId      String?          @map("hr_approver_id")
-  hrApprover        User?            @relation("HRApproverLeaveRequests", fields: [hrApproverId], references: [id])
-  hrDecision        ApprovalDecision @default(PENDING) @map("hr_decision")
-  hrDecisionAt      DateTime?        @map("hr_decision_at")
-  hrDecisionNotes   String?          @map("hr_decision_notes") @db.VarChar(500)
-  hrAttachments     Json?            @map("hr_attachments")
-  
+  hrApproverId    String?          @map("hr_approver_id")
+  hrApprover      User?            @relation("HRApproverLeaveRequests", fields: [hrApproverId], references: [id])
+  hrDecision      ApprovalDecision @default(PENDING) @map("hr_decision")
+  hrDecisionAt    DateTime?        @map("hr_decision_at")
+  hrDecisionNotes String?          @map("hr_decision_notes") @db.VarChar(500)
+  hrAttachments   Json?            @map("hr_attachments")
+
   // Legacy: الموافقة القديمة (للتوافق)
-  approverId      String?     @map("approver_id")
-  approver        User?       @relation("ApproverLeaveRequests", fields: [approverId], references: [id])
-  approverNotes   String?     @map("approver_notes")
-  approvedAt      DateTime?   @map("approved_at")
-  
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
-  
+  approverId    String?   @map("approver_id")
+  approver      User?     @relation("ApproverLeaveRequests", fields: [approverId], references: [id])
+  approverNotes String?   @map("approver_notes")
+  approvedAt    DateTime? @map("approved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@index([companyId, status])
   @@index([userId, status])
   @@map("leave_requests")
@@ -699,70 +699,70 @@ model LeaveRequest {
 // ==================== طلبات الخطابات ====================
 
 enum LetterType {
-  SALARY_DEFINITION           // خطاب تعريف راتب
-  SERVICE_CONFIRMATION        // خطاب تأكيد خدمة
-  SALARY_ADJUSTMENT           // خطاب تعديل راتب
-  PROMOTION                   // خطاب ترقية
-  TRANSFER_ASSIGNMENT         // خطاب نقل / تكليف
-  RESIGNATION                 // خطاب استقالة (معتمد من الشركة)
-  TERMINATION                 // خطاب إنهاء خدمة
-  CLEARANCE                   // خطاب إخلاء طرف
-  EXPERIENCE                  // خطاب خبرة
-  SALARY_DEFINITION_DIRECTED  // خطاب تعريف راتب (موجّه لجهة محددة)
-  NOC                         // خطاب عدم ممانعة
-  DELEGATION                  // خطاب تفويض
+  SALARY_DEFINITION // خطاب تعريف راتب
+  SERVICE_CONFIRMATION // خطاب تأكيد خدمة
+  SALARY_ADJUSTMENT // خطاب تعديل راتب
+  PROMOTION // خطاب ترقية
+  TRANSFER_ASSIGNMENT // خطاب نقل / تكليف
+  RESIGNATION // خطاب استقالة (معتمد من الشركة)
+  TERMINATION // خطاب إنهاء خدمة
+  CLEARANCE // خطاب إخلاء طرف
+  EXPERIENCE // خطاب خبرة
+  SALARY_DEFINITION_DIRECTED // خطاب تعريف راتب (موجّه لجهة محددة)
+  NOC // خطاب عدم ممانعة
+  DELEGATION // خطاب تفويض
 }
 
 enum LetterStatus {
   PENDING
-  MGR_APPROVED    // موافقة المدير
-  MGR_REJECTED    // رفض المدير
-  APPROVED        // موافقة نهائية (HR)
-  REJECTED        // رفض نهائي (HR)
-  DELAYED         // مؤجل
+  MGR_APPROVED // موافقة المدير
+  MGR_REJECTED // رفض المدير
+  APPROVED // موافقة نهائية (HR)
+  REJECTED // رفض نهائي (HR)
+  DELAYED // مؤجل
   CANCELLED
 }
 
 model LetterRequest {
-  id              String       @id @default(uuid())
-  companyId       String?      @map("company_id")
-  company         Company?     @relation(fields: [companyId], references: [id])
-  userId          String       @map("user_id")
-  user            User         @relation("EmployeeLetterRequests", fields: [userId], references: [id])
-  
-  type            LetterType
-  notes           String?      @db.VarChar(200)  // الملاحظات (حد أقصى 200 حرف)
-  attachments     Json?        // مرفقات (صور/ملفات)
-  status          LetterStatus @default(PENDING)
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation("EmployeeLetterRequests", fields: [userId], references: [id])
+
+  type        LetterType
+  notes       String?      @db.VarChar(200) // الملاحظات (حد أقصى 200 حرف)
+  attachments Json? // مرفقات (صور/ملفات)
+  status      LetterStatus @default(PENDING)
+
   // ========== Workflow متعدد المراحل ==========
-  currentStep       ApprovalStep     @default(MANAGER) @map("current_step")
-  
+  currentStep ApprovalStep @default(MANAGER) @map("current_step")
+
   // موافقة المدير المباشر
-  managerApproverId String?          @map("manager_approver_id")
-  managerApprover   User?            @relation("ManagerApproverLetterRequests", fields: [managerApproverId], references: [id])
-  managerDecision   ApprovalDecision @default(PENDING) @map("manager_decision")
-  managerDecisionAt DateTime?        @map("manager_decision_at")
-  managerNotes      String?          @map("manager_notes") @db.VarChar(500)
-  managerAttachments Json?           @map("manager_attachments")
-  
+  managerApproverId  String?          @map("manager_approver_id")
+  managerApprover    User?            @relation("ManagerApproverLetterRequests", fields: [managerApproverId], references: [id])
+  managerDecision    ApprovalDecision @default(PENDING) @map("manager_decision")
+  managerDecisionAt  DateTime?        @map("manager_decision_at")
+  managerNotes       String?          @map("manager_notes") @db.VarChar(500)
+  managerAttachments Json?            @map("manager_attachments")
+
   // موافقة HR
-  hrApproverId      String?          @map("hr_approver_id")
-  hrApprover        User?            @relation("HRApproverLetterRequests", fields: [hrApproverId], references: [id])
-  hrDecision        ApprovalDecision @default(PENDING) @map("hr_decision")
-  hrDecisionAt      DateTime?        @map("hr_decision_at")
-  hrDecisionNotes   String?          @map("hr_decision_notes") @db.VarChar(500)
-  hrAttachments     Json?            @map("hr_attachments")
-  
+  hrApproverId    String?          @map("hr_approver_id")
+  hrApprover      User?            @relation("HRApproverLetterRequests", fields: [hrApproverId], references: [id])
+  hrDecision      ApprovalDecision @default(PENDING) @map("hr_decision")
+  hrDecisionAt    DateTime?        @map("hr_decision_at")
+  hrDecisionNotes String?          @map("hr_decision_notes") @db.VarChar(500)
+  hrAttachments   Json?            @map("hr_attachments")
+
   // Legacy: الموافقة القديمة (للتوافق)
-  approverId      String?      @map("approver_id")
-  approver        User?        @relation("ApproverLetterRequests", fields: [approverId], references: [id])
-  approverNotes   String?      @map("approver_notes")
-  approvedAt      DateTime?    @map("approved_at")
-  
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  
+  approverId    String?   @map("approver_id")
+  approver      User?     @relation("ApproverLetterRequests", fields: [approverId], references: [id])
+  approverNotes String?   @map("approver_notes")
+  approvedAt    DateTime? @map("approved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@index([companyId, status])
   @@map("letter_requests")
 }
@@ -770,17 +770,17 @@ model LetterRequest {
 // ==================== العمل من المنزل ====================
 
 model WorkFromHome {
-  id          String   @id @default(uuid())
-  companyId   String?  @map("company_id")
-  company     Company? @relation(fields: [companyId], references: [id])
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id])
-  date        DateTime @db.Date
-  reason      String?
-  approvedBy  String?  @map("approved_by")
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  
+  id         String   @id @default(uuid())
+  companyId  String?  @map("company_id")
+  company    Company? @relation(fields: [companyId], references: [id])
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  date       DateTime @db.Date
+  reason     String?
+  approvedBy String?  @map("approved_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@unique([userId, date])
   @@map("work_from_home")
 }
@@ -800,24 +800,24 @@ enum NotificationType {
 }
 
 model Notification {
-  id          String           @id @default(uuid())
-  companyId   String?          @map("company_id")
-  company     Company?         @relation(fields: [companyId], references: [id])
-  userId      String           @map("user_id")
-  user        User             @relation(fields: [userId], references: [id])
-  
-  type        NotificationType
-  title       String
-  titleEn     String?          @map("title_en")
-  body        String
-  bodyEn      String?          @map("body_en")
-  data        Json?            // بيانات إضافية
-  
-  isRead      Boolean          @default(false) @map("is_read")
-  readAt      DateTime?        @map("read_at")
-  
-  createdAt   DateTime         @default(now()) @map("created_at")
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+
+  type    NotificationType
+  title   String
+  titleEn String?          @map("title_en")
+  body    String
+  bodyEn  String?          @map("body_en")
+  data    Json? // بيانات إضافية
+
+  isRead Boolean   @default(false) @map("is_read")
+  readAt DateTime? @map("read_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([companyId])
   @@index([userId, isRead])
   @@map("notifications")
@@ -837,23 +837,23 @@ enum AuditAction {
 }
 
 model AuditLog {
-  id          String      @id @default(uuid())
-  companyId   String?     @map("company_id")
-  company     Company?    @relation(fields: [companyId], references: [id])
-  userId      String?     @map("user_id")
-  user        User?       @relation(fields: [userId], references: [id])
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id])
+
   action      AuditAction
-  entity      String      // اسم الكيان (User, Branch, etc.)
+  entity      String // اسم الكيان (User, Branch, etc.)
   entityId    String?     @map("entity_id")
   oldValue    Json?       @map("old_value")
   newValue    Json?       @map("new_value")
   description String?
   ipAddress   String?     @map("ip_address")
   userAgent   String?     @map("user_agent")
-  
-  createdAt   DateTime    @default(now()) @map("created_at")
-  
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([companyId, createdAt])
   @@index([userId])
   @@index([entity, entityId])
@@ -871,10 +871,10 @@ model Holiday {
   nameEn      String?  @map("name_en")
   date        DateTime @db.Date
   isRecurring Boolean  @default(false) @map("is_recurring") // تتكرر كل سنة
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@map("holidays")
 }
 
@@ -887,10 +887,10 @@ model SystemSetting {
   key         String
   value       String
   description String?
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([key, companyId])
   @@map("system_settings")
 }
@@ -898,102 +898,99 @@ model SystemSetting {
 // ==================== نظام الصلاحيات ====================
 
 enum PermissionScope {
-  SELF       // نفسي فقط
-  TEAM       // فريقي المباشر (المرؤوسين)
-  BRANCH     // فرع معين
+  SELF // نفسي فقط
+  TEAM // فريقي المباشر (المرؤوسين)
+  BRANCH // فرع معين
   DEPARTMENT // قسم معين
-  ALL        // كل الموظفين
-  CUSTOM     // موظفين محددين
+  ALL // كل الموظفين
+  CUSTOM // موظفين محددين
 }
 
 model Permission {
-  id                  String   @id @default(uuid())
-  code                String   @unique  // LEAVES_VIEW, LEAVES_APPROVE, etc.
-  name                String             // الاسم بالعربي
-  nameEn              String?  @map("name_en")
-  category            String             // التصنيف
-  description         String?
-  
+  id          String  @id @default(uuid())
+  code        String  @unique // LEAVES_VIEW, LEAVES_APPROVE, etc.
+  name        String // الاسم بالعربي
+  nameEn      String? @map("name_en")
+  category    String // التصنيف
+  description String?
+
   // الصلاحية المطلوبة مسبقاً
-  requiresPermission  String?  @map("requires_permission")
-  
-  isActive            Boolean  @default(true) @map("is_active")
-  sortOrder           Int      @default(0) @map("sort_order")
-  
+  requiresPermission String? @map("requires_permission")
+
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
   userPermissions     UserPermission[]
   jobTitlePermissions JobTitlePermission[]
-  
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-  
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@index([category])
   @@index([code])
   @@map("permissions")
 }
 
 model UserPermission {
-  id              String   @id @default(uuid())
-  userId          String   @map("user_id")
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  permissionId    String   @map("permission_id")
-  permission      Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
-  companyId       String?  @map("company_id")
-  company         Company? @relation(fields: [companyId], references: [id])
-  
+  id           String     @id @default(uuid())
+  userId       String     @map("user_id")
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id")
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+
   // نطاق الصلاحية
-  scope           PermissionScope @default(SELF)
-  branchId        String?  @map("branch_id")
-  departmentId    String?  @map("department_id")
-  
+  scope        PermissionScope @default(SELF)
+  branchId     String?         @map("branch_id")
+  departmentId String?         @map("department_id")
+
   // الموظفين المحددين (إذا كان النطاق CUSTOM)
   assignedEmployees UserPermissionEmployee[]
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   // السماح بنفس الصلاحية بنطاقات مختلفة
   @@unique([userId, permissionId, scope, branchId, departmentId])
-  
   // فهارس للأداء
   @@index([userId])
   @@index([permissionId])
   @@index([userId, permissionId])
   @@index([scope, branchId])
   @@index([scope, departmentId])
-  
-  @@map("user_permissions")
   @@index([companyId])
+  @@map("user_permissions")
 }
 
 model UserPermissionEmployee {
-  id                  String   @id @default(uuid())
-  userPermissionId    String   @map("user_permission_id")
-  userPermission      UserPermission @relation(fields: [userPermissionId], references: [id], onDelete: Cascade)
-  employeeId          String   @map("employee_id")
-  
-  createdAt           DateTime @default(now()) @map("created_at")
-  
+  id               String         @id @default(uuid())
+  userPermissionId String         @map("user_permission_id")
+  userPermission   UserPermission @relation(fields: [userPermissionId], references: [id], onDelete: Cascade)
+  employeeId       String         @map("employee_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@unique([userPermissionId, employeeId])
   @@index([userPermissionId])
   @@index([employeeId])
-  
   @@map("user_permission_employees")
 }
 
 // ==================== الصلاحيات الافتراضية للدرجات الوظيفية ====================
 
 model JobTitlePermission {
-  id            String     @id @default(uuid())
-  jobTitleId    String     @map("job_title_id")
-  jobTitle      JobTitle   @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
-  permissionId  String     @map("permission_id")
-  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
+  id           String     @id @default(uuid())
+  jobTitleId   String     @map("job_title_id")
+  jobTitle     JobTitle   @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id")
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
   // النطاق الافتراضي للصلاحية
-  scope         PermissionScope @default(TEAM)
-  
-  createdAt     DateTime   @default(now()) @map("created_at")
-  
+  scope PermissionScope @default(TEAM)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@unique([jobTitleId, permissionId])
   @@index([jobTitleId])
   @@index([permissionId])
@@ -1003,38 +1000,38 @@ model JobTitlePermission {
 // ==================== سجل تدقيق الصلاحيات ====================
 
 enum PermissionAuditAction {
-  ADDED       // تمت إضافة صلاحية
-  REMOVED     // تم حذف صلاحية
-  MODIFIED    // تم تعديل النطاق
+  ADDED // تمت إضافة صلاحية
+  REMOVED // تم حذف صلاحية
+  MODIFIED // تم تعديل النطاق
 }
 
 model PermissionAuditLog {
-  id              String   @id @default(uuid())
-  companyId       String?  @map("company_id")
-  company         Company? @relation(fields: [companyId], references: [id])
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+
   // من قام بالإجراء
-  performedById   String   @map("performed_by_id")
-  
+  performedById String @map("performed_by_id")
+
   // على من تم الإجراء
-  targetUserId    String   @map("target_user_id")
-  targetUserName  String   @map("target_user_name")  // حفظ الاسم للـ history
-  
+  targetUserId   String @map("target_user_id")
+  targetUserName String @map("target_user_name") // حفظ الاسم للـ history
+
   // تفاصيل الإجراء
-  action          PermissionAuditAction
-  permissionCode  String   @map("permission_code")
-  permissionName  String   @map("permission_name")
-  
+  action         PermissionAuditAction
+  permissionCode String                @map("permission_code")
+  permissionName String                @map("permission_name")
+
   // تفاصيل النطاق
-  scope           PermissionScope?
-  scopeDetails    String?  @map("scope_details")  // اسم الفرع/القسم/الموظفين
-  
+  scope        PermissionScope?
+  scopeDetails String?          @map("scope_details") // اسم الفرع/القسم/الموظفين
+
   // معلومات إضافية
-  ipAddress       String?  @map("ip_address")
-  userAgent       String?  @map("user_agent")
-  
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([performedById])
   @@index([targetUserId])
   @@index([createdAt])
@@ -1048,15 +1045,15 @@ model ApprovalLog {
   id          String   @id @default(uuid())
   companyId   String?  @map("company_id")
   company     Company? @relation(fields: [companyId], references: [id])
-  requestType String   @map("request_type")  // LEAVE, LETTER, DATA_UPDATE, RAISE
+  requestType String   @map("request_type") // LEAVE, LETTER, DATA_UPDATE, RAISE
   requestId   String   @map("request_id")
-  step        String   // MANAGER, HR
-  decision    String   // APPROVED, REJECTED, DELAYED
+  step        String // MANAGER, HR
+  decision    String // APPROVED, REJECTED, DELAYED
   notes       String?  @db.VarChar(500)
   byUserId    String   @map("by_user_id")
   byUser      User     @relation(fields: [byUserId], references: [id])
   createdAt   DateTime @default(now()) @map("created_at")
-  
+
   @@index([requestType, requestId])
   @@index([byUserId])
   @@map("approval_logs")
@@ -1065,60 +1062,60 @@ model ApprovalLog {
 // ==================== طلبات الزيادة ====================
 
 enum RaiseType {
-  SALARY_INCREASE       // زيادة راتب
-  ANNUAL_LEAVE_BONUS    // بدل إجازة سنوية
-  BUSINESS_TRIP         // رحلة عمل
-  BONUS                 // مكافأة
-  ALLOWANCE             // بدل
-  OTHER                 // أخرى
+  SALARY_INCREASE // زيادة راتب
+  ANNUAL_LEAVE_BONUS // بدل إجازة سنوية
+  BUSINESS_TRIP // رحلة عمل
+  BONUS // مكافأة
+  ALLOWANCE // بدل
+  OTHER // أخرى
 }
 
 enum RaiseStatus {
   PENDING
-  MGR_APPROVED    // موافقة المدير
-  MGR_REJECTED    // رفض المدير
-  APPROVED        // موافقة نهائية (HR)
-  REJECTED        // رفض نهائي (HR)
-  DELAYED         // مؤجل
+  MGR_APPROVED // موافقة المدير
+  MGR_REJECTED // رفض المدير
+  APPROVED // موافقة نهائية (HR)
+  REJECTED // رفض نهائي (HR)
+  DELAYED // مؤجل
   CANCELLED
 }
 
 model RaiseRequest {
-  id              String       @id @default(uuid())
-  companyId       String?      @map("company_id")
-  company         Company?     @relation(fields: [companyId], references: [id])
-  userId          String       @map("user_id")
-  user            User         @relation("EmployeeRaiseRequests", fields: [userId], references: [id])
-  
-  type            RaiseType
-  amount          Decimal      @db.Decimal(10, 2)  // المبلغ المطلوب
-  effectiveMonth  DateTime     @map("effective_month") @db.Date  // الزيادة لشهر
-  notes           String?      @db.VarChar(200)  // الملاحظات (حد أقصى 200 حرف)
-  attachments     Json?        // مرفقات (صور/ملفات)
-  status          RaiseStatus  @default(PENDING)
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation("EmployeeRaiseRequests", fields: [userId], references: [id])
+
+  type           RaiseType
+  amount         Decimal     @db.Decimal(10, 2) // المبلغ المطلوب
+  effectiveMonth DateTime    @map("effective_month") @db.Date // الزيادة لشهر
+  notes          String?     @db.VarChar(200) // الملاحظات (حد أقصى 200 حرف)
+  attachments    Json? // مرفقات (صور/ملفات)
+  status         RaiseStatus @default(PENDING)
+
   // ========== Workflow متعدد المراحل ==========
-  currentStep       ApprovalStep     @default(MANAGER) @map("current_step")
-  
+  currentStep ApprovalStep @default(MANAGER) @map("current_step")
+
   // موافقة المدير المباشر
-  managerApproverId String?          @map("manager_approver_id")
-  managerApprover   User?            @relation("ManagerApproverRaiseRequests", fields: [managerApproverId], references: [id])
-  managerDecision   ApprovalDecision @default(PENDING) @map("manager_decision")
-  managerDecisionAt DateTime?        @map("manager_decision_at")
-  managerNotes      String?          @map("manager_notes") @db.VarChar(500)
-  managerAttachments Json?           @map("manager_attachments")
-  
+  managerApproverId  String?          @map("manager_approver_id")
+  managerApprover    User?            @relation("ManagerApproverRaiseRequests", fields: [managerApproverId], references: [id])
+  managerDecision    ApprovalDecision @default(PENDING) @map("manager_decision")
+  managerDecisionAt  DateTime?        @map("manager_decision_at")
+  managerNotes       String?          @map("manager_notes") @db.VarChar(500)
+  managerAttachments Json?            @map("manager_attachments")
+
   // موافقة HR
-  hrApproverId      String?          @map("hr_approver_id")
-  hrApprover        User?            @relation("HRApproverRaiseRequests", fields: [hrApproverId], references: [id])
-  hrDecision        ApprovalDecision @default(PENDING) @map("hr_decision")
-  hrDecisionAt      DateTime?        @map("hr_decision_at")
-  hrDecisionNotes   String?          @map("hr_decision_notes") @db.VarChar(500)
-  hrAttachments     Json?            @map("hr_attachments")
-  
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  
+  hrApproverId    String?          @map("hr_approver_id")
+  hrApprover      User?            @relation("HRApproverRaiseRequests", fields: [hrApproverId], references: [id])
+  hrDecision      ApprovalDecision @default(PENDING) @map("hr_decision")
+  hrDecisionAt    DateTime?        @map("hr_decision_at")
+  hrDecisionNotes String?          @map("hr_decision_notes") @db.VarChar(500)
+  hrAttachments   Json?            @map("hr_attachments")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@index([userId, status])
   @@index([status, createdAt])
   @@map("raise_requests")
@@ -1127,53 +1124,53 @@ model RaiseRequest {
 // ==================== السلف (Advance Requests) ====================
 
 enum AdvanceType {
-  BANK_TRANSFER  // سلفة تحويل بنكي
-  CASH           // سلفه نقداً
+  BANK_TRANSFER // سلفة تحويل بنكي
+  CASH // سلفه نقداً
 }
 
 model AdvanceRequest {
-  id               String         @id @default(uuid())
-  companyId        String?        @map("company_id")
-  company          Company?       @relation(fields: [companyId], references: [id])
-  userId           String         @map("user_id")
-  user             User           @relation("EmployeeAdvanceRequests", fields: [userId], references: [id])
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation("EmployeeAdvanceRequests", fields: [userId], references: [id])
+
   // بيانات الطلب
-  type             AdvanceType    // نوع السلفة
-  amount           Decimal        @db.Decimal(10, 2)  // المبلغ المطلوب
-  startDate        DateTime       @map("start_date") @db.Date  // من تاريخ
-  endDate          DateTime       @map("end_date") @db.Date    // إلى تاريخ
-  periodMonths     Int            @map("period_months")        // الفترة بالشهور
-  monthlyDeduction Decimal        @map("monthly_deduction") @db.Decimal(10, 2)  // الاستقطاع الشهري المقترح
-  notes            String?        @db.VarChar(500)  // ملاحظات
-  attachments      Json?          // مرفقات (صور/ملفات)
-  
+  type             AdvanceType // نوع السلفة
+  amount           Decimal     @db.Decimal(10, 2) // المبلغ المطلوب
+  startDate        DateTime    @map("start_date") @db.Date // من تاريخ
+  endDate          DateTime    @map("end_date") @db.Date // إلى تاريخ
+  periodMonths     Int         @map("period_months") // الفترة بالشهور
+  monthlyDeduction Decimal     @map("monthly_deduction") @db.Decimal(10, 2) // الاستقطاع الشهري المقترح
+  notes            String?     @db.VarChar(500) // ملاحظات
+  attachments      Json? // مرفقات (صور/ملفات)
+
   // الحالة
-  status           String         @default("PENDING")
-  currentStep      ApprovalStep   @default(MANAGER) @map("current_step")
-  
+  status      String       @default("PENDING")
+  currentStep ApprovalStep @default(MANAGER) @map("current_step")
+
   // موافقة المدير المباشر
   managerApproverId String?          @map("manager_approver_id")
   managerApprover   User?            @relation("ManagerApproverAdvanceRequests", fields: [managerApproverId], references: [id])
   managerDecision   ApprovalDecision @default(PENDING) @map("manager_decision")
   managerDecisionAt DateTime?        @map("manager_decision_at")
   managerNotes      String?          @map("manager_notes") @db.VarChar(500)
-  
+
   // موافقة HR (مع إمكانية تعديل المبلغ والاستقطاع)
-  hrApproverId          String?          @map("hr_approver_id")
-  hrApprover            User?            @relation("HRApproverAdvanceRequests", fields: [hrApproverId], references: [id])
-  hrDecision            ApprovalDecision @default(PENDING) @map("hr_decision")
-  hrDecisionAt          DateTime?        @map("hr_decision_at")
-  hrDecisionNotes       String?          @map("hr_decision_notes") @db.VarChar(500)
-  approvedAmount        Decimal?         @map("approved_amount") @db.Decimal(10, 2)     // المبلغ المعتمد (قد يختلف عن المطلوب)
-  approvedMonthlyDeduction Decimal?      @map("approved_monthly_deduction") @db.Decimal(10, 2)  // الاستقطاع المعتمد
-  
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
-  
+  hrApproverId             String?          @map("hr_approver_id")
+  hrApprover               User?            @relation("HRApproverAdvanceRequests", fields: [hrApproverId], references: [id])
+  hrDecision               ApprovalDecision @default(PENDING) @map("hr_decision")
+  hrDecisionAt             DateTime?        @map("hr_decision_at")
+  hrDecisionNotes          String?          @map("hr_decision_notes") @db.VarChar(500)
+  approvedAmount           Decimal?         @map("approved_amount") @db.Decimal(10, 2) // المبلغ المعتمد (قد يختلف عن المطلوب)
+  approvedMonthlyDeduction Decimal?         @map("approved_monthly_deduction") @db.Decimal(10, 2) // الاستقطاع المعتمد
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   // سجل المدفوعات
-  payments          LoanPayment[]
-  
+  payments LoanPayment[]
+
   @@index([userId, status])
   @@index([status, createdAt])
   @@map("advance_requests")
@@ -1181,24 +1178,24 @@ model AdvanceRequest {
 
 // ==================== سداد السلف (Loan Payments) ====================
 model LoanPayment {
-  id              String         @id @default(uuid())
-  advanceId       String         @map("advance_id")
-  advance         AdvanceRequest @relation(fields: [advanceId], references: [id], onDelete: Cascade)
-  
+  id        String         @id @default(uuid())
+  advanceId String         @map("advance_id")
+  advance   AdvanceRequest @relation(fields: [advanceId], references: [id], onDelete: Cascade)
+
   // تفاصيل السداد
-  amount          Decimal        @db.Decimal(10, 2)  // مبلغ السداد
-  paymentDate     DateTime       @map("payment_date") @db.Date
-  paymentType     String         @default("SALARY_DEDUCTION") @map("payment_type") // SALARY_DEDUCTION, MANUAL, CASH
-  
+  amount      Decimal  @db.Decimal(10, 2) // مبلغ السداد
+  paymentDate DateTime @map("payment_date") @db.Date
+  paymentType String   @default("SALARY_DEDUCTION") @map("payment_type") // SALARY_DEDUCTION, MANUAL, CASH
+
   // ربط بمسير الرواتب (إن وجد)
-  payrollRunId    String?        @map("payroll_run_id")
-  payslipId       String?        @map("payslip_id")
-  
-  notes           String?        @db.VarChar(500)
-  createdById     String?        @map("created_by_id")
-  
-  createdAt       DateTime       @default(now()) @map("created_at")
-  
+  payrollRunId String? @map("payroll_run_id")
+  payslipId    String? @map("payslip_id")
+
+  notes       String? @db.VarChar(500)
+  createdById String? @map("created_by_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
   @@index([advanceId])
   @@index([paymentDate])
   @@map("loan_payments")
@@ -1207,25 +1204,25 @@ model LoanPayment {
 // ==================== موديولات الرواتب الجديدة ====================
 
 model EmployeeBankAccount {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Bank Details
-  iban              String   // IBAN (will be validated in service)
-  accountHolderName String?  @map("account_holder_name") // اسم صاحب الحساب (مطلوب لـ WPS)
-  bankName          String   @map("bank_name")
-  bankCode          String?  @map("bank_code")  // رمز البنك (مثل SABB, RJHI)
-  swiftCode         String?  @map("swift_code") // للتحويلات الدولية
-  
+  iban              String // IBAN (will be validated in service)
+  accountHolderName String? @map("account_holder_name") // اسم صاحب الحساب (مطلوب لـ WPS)
+  bankName          String  @map("bank_name")
+  bankCode          String? @map("bank_code") // رمز البنك (مثل SABB, RJHI)
+  swiftCode         String? @map("swift_code") // للتحويلات الدولية
+
   // Status
-  isPrimary         Boolean  @default(false) @map("is_primary")
-  isVerified        Boolean  @default(false) @map("is_verified")
-  verifiedAt        DateTime? @map("verified_at")
-  verifiedBy        String?  @map("verified_by")
-  
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  isVerified Boolean   @default(false) @map("is_verified")
+  verifiedAt DateTime? @map("verified_at")
+  verifiedBy String?   @map("verified_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, iban])
   @@index([userId, isPrimary])
@@ -1233,37 +1230,37 @@ model EmployeeBankAccount {
 }
 
 model Contract {
-  id                String         @id @default(uuid())
-  userId            String         @map("user_id")
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Contract Details
-  contractNumber    String?        @unique @map("contract_number")
-  type              ContractType   @default(PERMANENT)
-  status            ContractStatus @default(ACTIVE)
-  
+  contractNumber String?        @unique @map("contract_number")
+  type           ContractType   @default(PERMANENT)
+  status         ContractStatus @default(ACTIVE)
+
   // Dates
-  startDate         DateTime       @map("start_date") @db.Date
-  endDate           DateTime?      @map("end_date") @db.Date
-  probationEndDate  DateTime?      @map("probation_end_date") @db.Date
-  
+  startDate        DateTime  @map("start_date") @db.Date
+  endDate          DateTime? @map("end_date") @db.Date
+  probationEndDate DateTime? @map("probation_end_date") @db.Date
+
   // Termination
-  terminatedAt      DateTime?      @map("terminated_at")
-  terminationReason String?        @map("termination_reason")
-  terminatedBy      String?        @map("terminated_by")
-  
+  terminatedAt      DateTime? @map("terminated_at")
+  terminationReason String?   @map("termination_reason")
+  terminatedBy      String?   @map("terminated_by")
+
   // Renewal
-  renewalCount      Int            @default(0) @map("renewal_count")
-  previousContractId String?       @map("previous_contract_id")
-  
+  renewalCount       Int     @default(0) @map("renewal_count")
+  previousContractId String? @map("previous_contract_id")
+
   // Salary
-  salaryCycle       String         @default("MONTHLY") @map("salary_cycle")
-  
+  salaryCycle String @default("MONTHLY") @map("salary_cycle")
+
   // Documents
-  documentUrl       String?        @map("document_url")
-  
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
+  documentUrl String? @map("document_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId, status])
   @@index([endDate])
@@ -1271,16 +1268,16 @@ model Contract {
 }
 
 model CostCenter {
-  id              String   @id @default(uuid())
-  companyId       String?  @map("company_id")
-  company         Company? @relation(fields: [companyId], references: [id])
-  code            String   @unique
-  name            String
-  description     String?
-  users           User[]
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
- 
+  id          String   @id @default(uuid())
+  companyId   String?  @map("company_id")
+  company     Company? @relation(fields: [companyId], references: [id])
+  code        String   @unique
+  name        String
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
   @@unique([companyId, code])
   @@map("cost_centers")
 }
@@ -1288,51 +1285,51 @@ model CostCenter {
 // ==================== موديولات الرواتب: المكونات والهياكل ====================
 
 enum SalaryComponentType {
-  EARNING    // استحقاق (بدلات، راتب أساسي)
-  DEDUCTION  // استقطاع (تأمينات، غرامات)
+  EARNING // استحقاق (بدلات، راتب أساسي)
+  DEDUCTION // استقطاع (تأمينات، غرامات)
 }
 
 enum SalaryComponentNature {
-  FIXED      // مبلغ ثابت
-  VARIABLE   // مبلغ متغير (يدخل يدوياً كل شهر)
-  FORMULA    // محسوب بناءً على معادلة
+  FIXED // مبلغ ثابت
+  VARIABLE // مبلغ متغير (يدخل يدوياً كل شهر)
+  FORMULA // محسوب بناءً على معادلة
 }
 
 model SalaryComponent {
-  id                  String               @id @default(uuid())
-  companyId           String?              @map("company_id")
-  company             Company?             @relation(fields: [companyId], references: [id])
-  code                String               // مثال: BASIC, HRA, TRANSPORT
-  nameAr              String               @map("name_ar")
-  nameEn              String?              @map("name_en")
-  type                SalaryComponentType
-  nature              SalaryComponentNature @default(FIXED)
-  
-  description         String?
-  gosiEligible        Boolean              @default(false) @map("gosi_eligible")
-  otEligible          Boolean              @default(false) @map("ot_eligible")
-  taxable             Boolean              @default(false) // خاضع للضريبة
-  
+  id        String                @id @default(uuid())
+  companyId String?               @map("company_id")
+  company   Company?              @relation(fields: [companyId], references: [id])
+  code      String // مثال: BASIC, HRA, TRANSPORT
+  nameAr    String                @map("name_ar")
+  nameEn    String?               @map("name_en")
+  type      SalaryComponentType
+  nature    SalaryComponentNature @default(FIXED)
+
+  description  String?
+  gosiEligible Boolean @default(false) @map("gosi_eligible")
+  otEligible   Boolean @default(false) @map("ot_eligible")
+  taxable      Boolean @default(false) // خاضع للضريبة
+
   // لربط المكون باللي يعتمد عليه (مثلاً السكن 25% من الأساسي)
-  formula             String?              // المعادلة (سيتم استخدامها لاحقاً في Rules Engine)
-  
+  formula String? // المعادلة (سيتم استخدامها لاحقاً في Rules Engine)
+
   // Enterprise: Versioning & Effective Dating
-  version             Int                  @default(1)
-  effectiveDate       DateTime             @default(now()) @map("effective_date")
-  endDate             DateTime?            @map("end_date")
-  isActive            Boolean              @default(true) @map("is_active")
-  
+  version       Int       @default(1)
+  effectiveDate DateTime  @default(now()) @map("effective_date")
+  endDate       DateTime? @map("end_date")
+  isActive      Boolean   @default(true) @map("is_active")
+
   // Enterprise: Rounding & Display
-  roundingMode        String               @default("ROUND") @map("rounding_mode") // ROUND, FLOOR, CEIL
-  decimals            Int                  @default(2)
-  priority            Int                  @default(100) // ترتيب الظهور في الـ Payslip
-  
-  structureLines      SalaryStructureLine[]
-  PayslipLine        PayslipLine[]
-  policyRules        PolicyRule[]  @relation("PolicyOutputComponent")
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
- 
+  roundingMode String @default("ROUND") @map("rounding_mode") // ROUND, FLOOR, CEIL
+  decimals     Int    @default(2)
+  priority     Int    @default(100) // ترتيب الظهور في الـ Payslip
+
+  structureLines SalaryStructureLine[]
+  PayslipLine    PayslipLine[]
+  policyRules    PolicyRule[]          @relation("PolicyOutputComponent")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
   @@unique([companyId, type, code, version])
   @@index([companyId, isActive])
   @@index([effectiveDate, endDate])
@@ -1352,25 +1349,25 @@ enum PayrollStatus {
 }
 
 model SalaryStructure {
-  id              String               @id @default(uuid())
-  companyId       String?              @map("company_id")
-  company         Company?             @relation(fields: [companyId], references: [id])
-  name            String
-  description     String?
-  isActive        Boolean              @default(true) @map("is_active")
-  
-  // Enterprise: Versioning
-  version         Int                  @default(1)
-  effectiveDate   DateTime             @default(now()) @map("effective_date")
-  endDate         DateTime?            @map("end_date")
-  
-  // المكونات التابعة لهذا الهيكل
-  lines           SalaryStructureLine[]
-  assignments     EmployeeSalaryAssignment[]
+  id          String   @id @default(uuid())
+  companyId   String?  @map("company_id")
+  company     Company? @relation(fields: [companyId], references: [id])
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
 
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
- 
+  // Enterprise: Versioning
+  version       Int       @default(1)
+  effectiveDate DateTime  @default(now()) @map("effective_date")
+  endDate       DateTime? @map("end_date")
+
+  // المكونات التابعة لهذا الهيكل
+  lines       SalaryStructureLine[]
+  assignments EmployeeSalaryAssignment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([companyId, name, version])
   @@index([companyId, isActive])
   @@index([effectiveDate, endDate])
@@ -1378,74 +1375,95 @@ model SalaryStructure {
 }
 
 model SalaryStructureLine {
-  id              String          @id @default(uuid())
-  structureId     String          @map("structure_id")
-  structure       SalaryStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
-  
-  componentId     String          @map("component_id")
-  component       SalaryComponent @relation(fields: [componentId], references: [id])
-  
-  amount          Decimal         @db.Decimal(10, 2) @default(0)
-  percentage      Decimal?        @db.Decimal(5, 2)  // إذا كان مبلغ البدلة نسبة من الأساسي
-  
-  priority        Int             @default(0)        // ترتيب الحساب
+  id          String          @id @default(uuid())
+  structureId String          @map("structure_id")
+  structure   SalaryStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  componentId String          @map("component_id")
+  component   SalaryComponent @relation(fields: [componentId], references: [id])
+
+  amount     Decimal  @default(0) @db.Decimal(10, 2)
+  percentage Decimal? @db.Decimal(5, 2) // إذا كان مبلغ البدلة نسبة من الأساسي
+
+  priority Int @default(0) // ترتيب الحساب
 
   @@map("salary_structure_lines")
 }
 
 model EmployeeSalaryAssignment {
-  id              String          @id @default(uuid())
-  employeeId      String          @map("employee_id")
-  employee        User            @relation("EmployeeSalaryAssignments", fields: [employeeId], references: [id])
-  
-  structureId     String          @map("structure_id")
-  structure       SalaryStructure @relation(fields: [structureId], references: [id])
-  
-  baseSalary      Decimal         @map("base_salary") @db.Decimal(10, 2)
-  effectiveDate   DateTime        @map("effective_date") @db.Date
-  endDate         DateTime?       @map("end_date") @db.Date
-  
-  isActive        Boolean         @default(true) @map("is_active")
+  id         String @id @default(uuid())
+  employeeId String @map("employee_id")
+  employee   User   @relation("EmployeeSalaryAssignments", fields: [employeeId], references: [id])
 
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  structureId String          @map("structure_id")
+  structure   SalaryStructure @relation(fields: [structureId], references: [id])
+
+  baseSalary    Decimal   @map("base_salary") @db.Decimal(10, 2)
+  effectiveDate DateTime  @map("effective_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("employee_salary_assignments")
 }
 
 // قشرة قسيمة الراتب (سيتم إضافتها بالكامل في Step 2 لكن نحتاج الموديلات للعلاقات)
+
+// 🔥 مصدر سطر قسيمة الراتب
+enum PayslipLineSource {
+  STRUCTURE // من هيكل الراتب
+  POLICY // من السياسات
+  MANUAL // إدخال يدوي
+  ADJUSTMENT // تعديل/فرق
+}
+
 model PayslipLine {
-  id              String          @id @default(uuid())
-  payslipId       String          @map("payslip_id")
-  payslip         Payslip         @relation(fields: [payslipId], references: [id])
-  componentId     String          @map("component_id")
-  component       SalaryComponent @relation(fields: [componentId], references: [id])
-  amount          Decimal         @db.Decimal(10, 2)
-  
+  id          String          @id @default(uuid())
+  payslipId   String          @map("payslip_id")
+  payslip     Payslip         @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  componentId String          @map("component_id")
+  component   SalaryComponent @relation(fields: [componentId], references: [id])
+
+  // 🔥 Extended fields for Policy Engine integration
+  sign          String            @default("EARNING") // EARNING | DEDUCTION
+  amount        Decimal           @db.Decimal(10, 2)
+  sourceType    PayslipLineSource @default(STRUCTURE) @map("source_type")
+  sourceRef     String?           @map("source_ref") // policyId:ruleId or "MERGED"
+  descriptionAr String?           @map("description_ar") // وصف السطر
+  units         Decimal?          @db.Decimal(10, 2) // ساعات OT، دقائق تأخير
+  rate          Decimal?          @db.Decimal(10, 4) // معدل الحساب
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([payslipId, sourceType])
+  @@index([payslipId, componentId])
   @@map("payslip_lines")
 }
 
 model PayrollPeriod {
-  id              String       @id @default(uuid())
-  companyId       String?      @map("company_id")
-  company         Company?     @relation(fields: [companyId], references: [id])
-  month           Int          // 1-12
-  year            Int
-  startDate       DateTime     @map("start_date") @db.Date
-  endDate         DateTime     @map("end_date") @db.Date
-  status          PayrollStatus @default(DRAFT)
-  
-  // Enterprise: Cut-off & Lock
-  cutOffDate      DateTime?    @map("cut_off_date") @db.Date  // آخر يوم لتسجيل الحضور
-  inputsLockedAt  DateTime?    @map("inputs_locked_at")       // تاريخ تجميد المدخلات
-  lockedAt        DateTime?    @map("locked_at")              // تاريخ القفل النهائي
-  lockedBy        String?      @map("locked_by")              // من قام بالقفل
-  
-  runs            PayrollRun[]
-  payslips        Payslip[]
+  id        String        @id @default(uuid())
+  companyId String?       @map("company_id")
+  company   Company?      @relation(fields: [companyId], references: [id])
+  month     Int // 1-12
+  year      Int
+  startDate DateTime      @map("start_date") @db.Date
+  endDate   DateTime      @map("end_date") @db.Date
+  status    PayrollStatus @default(DRAFT)
 
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  // Enterprise: Cut-off & Lock
+  cutOffDate     DateTime? @map("cut_off_date") @db.Date // آخر يوم لتسجيل الحضور
+  inputsLockedAt DateTime? @map("inputs_locked_at") // تاريخ تجميد المدخلات
+  lockedAt       DateTime? @map("locked_at") // تاريخ القفل النهائي
+  lockedBy       String?   @map("locked_by") // من قام بالقفل
+
+  runs     PayrollRun[]
+  payslips Payslip[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, month, year])
   @@index([companyId, status])
@@ -1453,32 +1471,32 @@ model PayrollPeriod {
 }
 
 model PayrollRun {
-  id              String       @id @default(uuid())
-  companyId       String?      @map("company_id")
-  company         Company?     @relation(fields: [companyId], references: [id])
-  periodId        String       @map("period_id")
-  period          PayrollPeriod @relation(fields: [periodId], references: [id])
-  
-  runDate         DateTime     @default(now()) @map("run_date")
-  status          PayrollStatus @default(DRAFT)
-  
-  processedBy     String?      @map("processed_by")
-  
-  // Enterprise: Workflow Timestamps
-  calculatedAt    DateTime?    @map("calculated_at")
-  calculatedBy    String?      @map("calculated_by")
-  hrApprovedAt    DateTime?    @map("hr_approved_at")
-  hrApprovedBy    String?      @map("hr_approved_by")
-  financeApprovedAt DateTime?  @map("finance_approved_at")
-  financeApprovedBy String?    @map("finance_approved_by")
-  lockedAt        DateTime?    @map("locked_at")
-  lockedBy        String?      @map("locked_by")
-  paidAt          DateTime?    @map("paid_at")
-  
-  payslips        Payslip[]
+  id        String        @id @default(uuid())
+  companyId String?       @map("company_id")
+  company   Company?      @relation(fields: [companyId], references: [id])
+  periodId  String        @map("period_id")
+  period    PayrollPeriod @relation(fields: [periodId], references: [id])
 
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  runDate DateTime      @default(now()) @map("run_date")
+  status  PayrollStatus @default(DRAFT)
+
+  processedBy String? @map("processed_by")
+
+  // Enterprise: Workflow Timestamps
+  calculatedAt      DateTime? @map("calculated_at")
+  calculatedBy      String?   @map("calculated_by")
+  hrApprovedAt      DateTime? @map("hr_approved_at")
+  hrApprovedBy      String?   @map("hr_approved_by")
+  financeApprovedAt DateTime? @map("finance_approved_at")
+  financeApprovedBy String?   @map("finance_approved_by")
+  lockedAt          DateTime? @map("locked_at")
+  lockedBy          String?   @map("locked_by")
+  paidAt            DateTime? @map("paid_at")
+
+  payslips Payslip[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([companyId, status])
   @@index([periodId])
@@ -1486,63 +1504,63 @@ model PayrollRun {
 }
 
 model Payslip {
-  id              String       @id @default(uuid())
-  companyId       String?      @map("company_id")
-  company         Company?     @relation(fields: [companyId], references: [id])
-  employeeId      String       @map("employee_id")
-  employee        User         @relation(fields: [employeeId], references: [id])
-  
-  periodId        String       @map("period_id")
-  period          PayrollPeriod @relation(fields: [periodId], references: [id])
-  
-  runId           String?      @map("run_id")
-  run             PayrollRun?  @relation(fields: [runId], references: [id])
-  
-  baseSalary      Decimal      @map("base_salary") @db.Decimal(10, 2)
-  grossSalary     Decimal      @map("gross_salary") @db.Decimal(10, 2)
-  totalDeductions Decimal      @map("total_deductions") @db.Decimal(10, 2)
-  netSalary       Decimal      @map("net_salary") @db.Decimal(10, 2)
-  
-  status          PayrollStatus @default(DRAFT)
-  
-  lines           PayslipLine[]
-  calculationTrace Json?      @map("calculation_trace")
+  id         String   @id @default(uuid())
+  companyId  String?  @map("company_id")
+  company    Company? @relation(fields: [companyId], references: [id])
+  employeeId String   @map("employee_id")
+  employee   User     @relation(fields: [employeeId], references: [id])
 
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  periodId String        @map("period_id")
+  period   PayrollPeriod @relation(fields: [periodId], references: [id])
+
+  runId String?     @map("run_id")
+  run   PayrollRun? @relation(fields: [runId], references: [id])
+
+  baseSalary      Decimal @map("base_salary") @db.Decimal(10, 2)
+  grossSalary     Decimal @map("gross_salary") @db.Decimal(10, 2)
+  totalDeductions Decimal @map("total_deductions") @db.Decimal(10, 2)
+  netSalary       Decimal @map("net_salary") @db.Decimal(10, 2)
+
+  status PayrollStatus @default(DRAFT)
+
+  lines            PayslipLine[]
+  calculationTrace Json?         @map("calculation_trace")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("payslips")
 }
 
 model GosiConfig {
-  id                String    @id @default(uuid())
-  companyId         String?   @map("company_id")
-  company           Company?  @relation(fields: [companyId], references: [id])
-  
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+
   // Version Control
-  version           Int       @default(1)
-  effectiveDate     DateTime  @default(now()) @map("effective_date") @db.Date
-  endDate           DateTime? @map("end_date") @db.Date
-  
+  version       Int       @default(1)
+  effectiveDate DateTime  @default(now()) @map("effective_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+
   // Contribution Rates
-  employeeRate      Decimal   @map("employee_rate") @db.Decimal(5, 2)   // e.g., 9.00%
-  employerRate      Decimal   @map("employer_rate") @db.Decimal(5, 2)   // e.g., 9.00%
-  sanedRate         Decimal   @map("saned_rate") @db.Decimal(5, 2)      // e.g., 0.75%
-  hazardRate        Decimal   @map("hazard_rate") @db.Decimal(5, 2)     // e.g., 2.00%
-  
+  employeeRate Decimal @map("employee_rate") @db.Decimal(5, 2) // e.g., 9.00%
+  employerRate Decimal @map("employer_rate") @db.Decimal(5, 2) // e.g., 9.00%
+  sanedRate    Decimal @map("saned_rate") @db.Decimal(5, 2) // e.g., 0.75%
+  hazardRate   Decimal @map("hazard_rate") @db.Decimal(5, 2) // e.g., 2.00%
+
   // Wage Caps
-  maxCapAmount      Decimal   @map("max_cap_amount") @db.Decimal(10, 2) @default(45000)
-  minBaseSalary     Decimal   @map("min_base_salary") @db.Decimal(10, 2) @default(0)
-  
+  maxCapAmount  Decimal @default(45000) @map("max_cap_amount") @db.Decimal(10, 2)
+  minBaseSalary Decimal @default(0) @map("min_base_salary") @db.Decimal(10, 2)
+
   // Settings
-  isSaudiOnly       Boolean   @default(true) @map("is_saudi_only")
-  includeAllowances Boolean   @default(false) @map("include_allowances") // هل تشمل البدلات
-  isActive          Boolean   @default(true) @map("is_active")
+  isSaudiOnly       Boolean @default(true) @map("is_saudi_only")
+  includeAllowances Boolean @default(false) @map("include_allowances") // هل تشمل البدلات
+  isActive          Boolean @default(true) @map("is_active")
   notes             String?
-  
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
- 
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@unique([companyId, version])
   @@index([companyId, isActive])
   @@index([effectiveDate, endDate])
@@ -1551,108 +1569,108 @@ model GosiConfig {
 
 // ==================== Retro Pay (الفروقات) ====================
 enum RetroPayStatus {
-  PENDING    // في الانتظار
-  APPROVED   // معتمد
-  PAID       // مدفوع
-  CANCELLED  // ملغي
+  PENDING // في الانتظار
+  APPROVED // معتمد
+  PAID // مدفوع
+  CANCELLED // ملغي
 }
 
 model RetroPay {
-  id            String          @id @default(uuid())
-  companyId     String?         @map("company_id")
-  company       Company?        @relation(fields: [companyId], references: [id])
-  employeeId    String          @map("employee_id")
-  employee      User            @relation(fields: [employeeId], references: [id])
-  
-  reason        String          // سبب الفرق (زيادة راتب، تصحيح خطأ، إلخ)
-  effectiveFrom DateTime        @map("effective_from") // تاريخ بداية الفرق
-  effectiveTo   DateTime        @map("effective_to")   // تاريخ نهاية الفرق
-  
-  oldAmount     Decimal         @map("old_amount") @db.Decimal(10, 2)
-  newAmount     Decimal         @map("new_amount") @db.Decimal(10, 2)
-  difference    Decimal         @db.Decimal(10, 2) // الفرق = new - old
-  
-  monthsCount   Int             @map("months_count") // عدد الأشهر المتأثرة
-  totalAmount   Decimal         @map("total_amount") @db.Decimal(10, 2) // الإجمالي = difference * months
-  
-  status        RetroPayStatus  @default(PENDING)
-  notes         String?
-  
-  createdById   String?         @map("created_by_id")
-  approvedById  String?         @map("approved_by_id")
-  approvedAt    DateTime?       @map("approved_at")
-  paidAt        DateTime?       @map("paid_at")
-  
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  companyId  String?  @map("company_id")
+  company    Company? @relation(fields: [companyId], references: [id])
+  employeeId String   @map("employee_id")
+  employee   User     @relation(fields: [employeeId], references: [id])
+
+  reason        String // سبب الفرق (زيادة راتب، تصحيح خطأ، إلخ)
+  effectiveFrom DateTime @map("effective_from") // تاريخ بداية الفرق
+  effectiveTo   DateTime @map("effective_to") // تاريخ نهاية الفرق
+
+  oldAmount  Decimal @map("old_amount") @db.Decimal(10, 2)
+  newAmount  Decimal @map("new_amount") @db.Decimal(10, 2)
+  difference Decimal @db.Decimal(10, 2) // الفرق = new - old
+
+  monthsCount Int     @map("months_count") // عدد الأشهر المتأثرة
+  totalAmount Decimal @map("total_amount") @db.Decimal(10, 2) // الإجمالي = difference * months
+
+  status RetroPayStatus @default(PENDING)
+  notes  String?
+
+  createdById  String?   @map("created_by_id")
+  approvedById String?   @map("approved_by_id")
+  approvedAt   DateTime? @map("approved_at")
+  paidAt       DateTime? @map("paid_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("retro_pays")
 }
 
 // ==================== Policy Engine ====================
 enum PolicyType {
-  OVERTIME         // سياسة الوقت الإضافي
-  LEAVE            // سياسة الإجازات
-  DEDUCTION        // سياسة الاستقطاعات  
-  ALLOWANCE        // سياسة البدلات
-  ATTENDANCE       // سياسة الحضور والانصراف
-  GENERAL          // سياسة عامة
+  OVERTIME // سياسة الوقت الإضافي
+  LEAVE // سياسة الإجازات
+  DEDUCTION // سياسة الاستقطاعات  
+  ALLOWANCE // سياسة البدلات
+  ATTENDANCE // سياسة الحضور والانصراف
+  GENERAL // سياسة عامة
 }
 
 enum PolicyScope {
-  COMPANY          // على مستوى الشركة = rank 1
-  BRANCH           // على مستوى الفرع = rank 2
-  DEPARTMENT       // على مستوى القسم = rank 3
-  JOB_TITLE        // على مستوى الدرجة الوظيفية = rank 4
-  EMPLOYEE         // على مستوى الموظف = rank 5
+  COMPANY // على مستوى الشركة = rank 1
+  BRANCH // على مستوى الفرع = rank 2
+  DEPARTMENT // على مستوى القسم = rank 3
+  JOB_TITLE // على مستوى الدرجة الوظيفية = rank 4
+  EMPLOYEE // على مستوى الموظف = rank 5
 }
 
 // نوع الناتج من قاعدة السياسة
 enum OutputSign {
-  EARNING          // إضافة/استحقاق
-  DEDUCTION        // خصم/استقطاع
+  EARNING // إضافة/استحقاق
+  DEDUCTION // خصم/استقطاع
 }
 
 model Policy {
-  id              String          @id @default(uuid())
-  companyId       String?         @map("company_id")
-  company         Company?        @relation(fields: [companyId], references: [id])
-  code            String
-  nameAr          String          @map("name_ar")
-  nameEn          String?         @map("name_en")
-  description     String?
-  
-  type            PolicyType
-  scope           PolicyScope     @default(COMPANY)
-  
+  id          String   @id @default(uuid())
+  companyId   String?  @map("company_id")
+  company     Company? @relation(fields: [companyId], references: [id])
+  code        String
+  nameAr      String   @map("name_ar")
+  nameEn      String?  @map("name_en")
+  description String?
+
+  type  PolicyType
+  scope PolicyScope @default(COMPANY)
+
   // التاريخ الفعال
-  effectiveFrom   DateTime        @map("effective_from")
-  effectiveTo     DateTime?       @map("effective_to")
-  
+  effectiveFrom DateTime  @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+
   // الربط بالنطاق (حسب scope)
-  branchId        String?         @map("branch_id")
-  departmentId    String?         @map("department_id")
-  jobTitleId      String?         @map("job_title_id")
-  employeeId      String?         @map("employee_id")
-  
+  branchId     String? @map("branch_id")
+  departmentId String? @map("department_id")
+  jobTitleId   String? @map("job_title_id")
+  employeeId   String? @map("employee_id")
+
   // الإعدادات (JSON مرنة)
-  settings        Json            @default("{}")
-  
-  isActive        Boolean         @default(true) @map("is_active")
-  priority        Int             @default(0) // أولوية التطبيق (الأعلى يُطبق أولاً)
-  scopeRank       Int             @default(1) @map("scope_rank") // COMPANY=1, BRANCH=2, DEPARTMENT=3, JOB_TITLE=4, EMPLOYEE=5
-  
-  rules           PolicyRule[]
-  
+  settings Json @default("{}")
+
+  isActive  Boolean @default(true) @map("is_active")
+  priority  Int     @default(0) // أولوية التطبيق (الأعلى يُطبق أولاً)
+  scopeRank Int     @default(1) @map("scope_rank") // COMPANY=1, BRANCH=2, DEPARTMENT=3, JOB_TITLE=4, EMPLOYEE=5
+
+  rules PolicyRule[]
+
   // Relations for scope targets
-  branch          Branch?         @relation(fields: [branchId], references: [id])
-  department      Department?     @relation(fields: [departmentId], references: [id])
-  jobTitle        JobTitle?       @relation(fields: [jobTitleId], references: [id])
-  targetEmployee  User?           @relation("PolicyTargetEmployee", fields: [employeeId], references: [id])
-  
-  createdById     String?         @map("created_by_id")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  branch         Branch?     @relation(fields: [branchId], references: [id])
+  department     Department? @relation(fields: [departmentId], references: [id])
+  jobTitle       JobTitle?   @relation(fields: [jobTitleId], references: [id])
+  targetEmployee User?       @relation("PolicyTargetEmployee", fields: [employeeId], references: [id])
+
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, code])
   @@index([companyId, type, scope, effectiveFrom])
@@ -1666,31 +1684,31 @@ model Policy {
 }
 
 model PolicyRule {
-  id              String          @id @default(uuid())
-  policyId        String          @map("policy_id")
-  policy          Policy          @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  
-  code            String          // مثال: OT_WEEKDAY, OT_WEEKEND, LATE_PENALTY
-  nameAr          String          @map("name_ar")
-  
+  id       String @id @default(uuid())
+  policyId String @map("policy_id")
+  policy   Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  code   String // مثال: OT_WEEKDAY, OT_WEEKEND, LATE_PENALTY
+  nameAr String @map("name_ar")
+
   // شروط التطبيق (JSON)
-  conditions      Json            @default("{}")
-  
+  conditions Json @default("{}")
+
   // القيمة/النتيجة
-  valueType       String          @map("value_type") // PERCENTAGE, FIXED, FORMULA
-  value           String          // القيمة أو المعادلة
-  
+  valueType String @map("value_type") // PERCENTAGE, FIXED, FORMULA
+  value     String // القيمة أو المعادلة
+
   // 🔥 مكوّن الناتج - أين تُسجَّل نتيجة هذه القاعدة في قسيمة الراتب
-  outputComponentId  String?      @map("output_component_id")
-  outputComponent    SalaryComponent? @relation("PolicyOutputComponent", fields: [outputComponentId], references: [id])
-  outputSign         OutputSign   @default(EARNING) @map("output_sign")
-  
+  outputComponentId String?          @map("output_component_id")
+  outputComponent   SalaryComponent? @relation("PolicyOutputComponent", fields: [outputComponentId], references: [id])
+  outputSign        OutputSign       @default(EARNING) @map("output_sign")
+
   // ترتيب التطبيق (الأقل→ يُنفذ أولاً)
-  ruleOrder       Int             @default(0) @map("rule_order")
-  isActive        Boolean         @default(true) @map("is_active")
-  
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  ruleOrder Int     @default(0) @map("rule_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([policyId, code])
   @@index([policyId, isActive, ruleOrder])
@@ -1700,23 +1718,20 @@ model PolicyRule {
 
 // ==================== Module enum for Audit ====================
 enum AuditModule {
-  AUTH           // تسجيل الدخول
-  USER           // إدارة الموظفين
-  PAYROLL        // الرواتب
-  PAYSLIP        // قسائم الرواتب
-  BANK_ACCOUNT   // الحسابات البنكية
-  SALARY         // هياكل الرواتب
-  LEAVE          // الإجازات
-  ATTENDANCE     // الحضور والانصراف
-  ADVANCE        // السلف
-  GOSI           // التأمينات
-  EOS            // نهاية الخدمة
-  PERMISSION     // الصلاحيات
-  POLICY         // السياسات
-  RETRO_PAY      // الفروقات
-  LETTER         // الخطابات
-  SETTINGS       // الإعدادات
+  AUTH // تسجيل الدخول
+  USER // إدارة الموظفين
+  PAYROLL // الرواتب
+  PAYSLIP // قسائم الرواتب
+  BANK_ACCOUNT // الحسابات البنكية
+  SALARY // هياكل الرواتب
+  LEAVE // الإجازات
+  ATTENDANCE // الحضور والانصراف
+  ADVANCE // السلف
+  GOSI // التأمينات
+  EOS // نهاية الخدمة
+  PERMISSION // الصلاحيات
+  POLICY // السياسات
+  RETRO_PAY // الفروقات
+  LETTER // الخطابات
+  SETTINGS // الإعدادات
 }
-
-
-
