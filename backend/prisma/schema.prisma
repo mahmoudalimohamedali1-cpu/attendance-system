@@ -180,7 +180,7 @@ model User {
   costCenterId    String?    @map("cost_center_id")
   costCenter      CostCenter? @relation(fields: [costCenterId], references: [id])
   retroPays       RetroPay[]
-
+  policyTargets   Policy[]     @relation("PolicyTargetEmployee")
   
   @@map("users")
   @@unique([companyId, employeeCode])
@@ -204,6 +204,7 @@ model JobTitle {
   
   // الصلاحيات الافتراضية لهذه الدرجة
   defaultPermissions JobTitlePermission[]
+  policies      Policy[]  // سياسات على مستوى الدرجة
   
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
@@ -431,6 +432,7 @@ model Branch {
   departments     Department[]
   attendances     Attendance[]
   schedules       WorkSchedule[]
+  policies        Policy[]  // سياسات على مستوى الفرع
   
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -453,6 +455,7 @@ model Department {
   workEndTime     String?  @map("work_end_time")
   
   users       User[]
+  policies    Policy[]  // سياسات على مستوى القسم
   
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -1597,11 +1600,17 @@ enum PolicyType {
 }
 
 enum PolicyScope {
-  COMPANY          // على مستوى الشركة
-  BRANCH           // على مستوى الفرع
-  DEPARTMENT       // على مستوى القسم
-  JOB_TITLE        // على مستوى الدرجة الوظيفية
-  EMPLOYEE         // على مستوى الموظف
+  COMPANY          // على مستوى الشركة = rank 1
+  BRANCH           // على مستوى الفرع = rank 2
+  DEPARTMENT       // على مستوى القسم = rank 3
+  JOB_TITLE        // على مستوى الدرجة الوظيفية = rank 4
+  EMPLOYEE         // على مستوى الموظف = rank 5
+}
+
+// نوع الناتج من قاعدة السياسة
+enum OutputSign {
+  EARNING          // إضافة/استحقاق
+  DEDUCTION        // خصم/استقطاع
 }
 
 model Policy {
@@ -1631,16 +1640,28 @@ model Policy {
   
   isActive        Boolean         @default(true) @map("is_active")
   priority        Int             @default(0) // أولوية التطبيق (الأعلى يُطبق أولاً)
+  scopeRank       Int             @default(1) @map("scope_rank") // COMPANY=1, BRANCH=2, DEPARTMENT=3, JOB_TITLE=4, EMPLOYEE=5
   
   rules           PolicyRule[]
+  
+  // Relations for scope targets
+  branch          Branch?         @relation(fields: [branchId], references: [id])
+  department      Department?     @relation(fields: [departmentId], references: [id])
+  jobTitle        JobTitle?       @relation(fields: [jobTitleId], references: [id])
+  targetEmployee  User?           @relation("PolicyTargetEmployee", fields: [employeeId], references: [id])
   
   createdById     String?         @map("created_by_id")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
   @@unique([companyId, code])
+  @@index([companyId, type, scope, effectiveFrom])
   @@index([type, scope, isActive])
   @@index([effectiveFrom, effectiveTo])
+  @@index([branchId])
+  @@index([departmentId])
+  @@index([jobTitleId])
+  @@index([employeeId])
   @@map("policies")
 }
 
@@ -1662,16 +1683,17 @@ model PolicyRule {
   // 🔥 مكوّن الناتج - أين تُسجَّل نتيجة هذه القاعدة في قسيمة الراتب
   outputComponentId  String?      @map("output_component_id")
   outputComponent    SalaryComponent? @relation("PolicyOutputComponent", fields: [outputComponentId], references: [id])
-  outputSign         String       @default("EARNING") @map("output_sign") // EARNING | DEDUCTION
+  outputSign         OutputSign   @default(EARNING) @map("output_sign")
   
-  // ترتيب التطبيق
-  order           Int             @default(0)
+  // ترتيب التطبيق (الأقل→ يُنفذ أولاً)
+  ruleOrder       Int             @default(0) @map("rule_order")
   isActive        Boolean         @default(true) @map("is_active")
   
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
-  @@index([policyId, isActive])
+  @@unique([policyId, code])
+  @@index([policyId, isActive, ruleOrder])
   @@index([outputComponentId])
   @@map("policy_rules")
 }

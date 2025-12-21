@@ -44,7 +44,7 @@ export class CreatePolicyRuleDto {
     @ApiPropertyOptional({ description: 'ترتيب التطبيق' })
     @IsNumber()
     @IsOptional()
-    order?: number;
+    ruleOrder?: number;
 }
 
 export class CreatePolicyDto {

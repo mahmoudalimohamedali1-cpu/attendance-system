@@ -1,6 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePolicyDto, PolicyScope, PolicyType } from './dto/create-policy.dto';
+
+// Deterministic scope rank for ordering
+const SCOPE_RANK: Record<string, number> = {
+    COMPANY: 1,
+    BRANCH: 2,
+    DEPARTMENT: 3,
+    JOB_TITLE: 4,
+    EMPLOYEE: 5,
+};
 
 @Injectable()
 export class PoliciesService {
@@ -15,19 +24,43 @@ export class PoliciesService {
         });
         if (existing) throw new BadRequestException('يوجد سياسة بنفس الكود في هذه الشركة');
 
+        // 🔥 Scope Target Validation
+        if (dto.scope === 'BRANCH' && !dto.branchId) {
+            throw new BadRequestException('branchId مطلوب عند اختيار نطاق الفرع');
+        }
+        if (dto.scope === 'DEPARTMENT' && !dto.departmentId) {
+            throw new BadRequestException('departmentId مطلوب عند اختيار نطاق القسم');
+        }
+        if (dto.scope === 'JOB_TITLE' && !dto.jobTitleId) {
+            throw new BadRequestException('jobTitleId مطلوب عند اختيار نطاق الدرجة الوظيفية');
+        }
+        if (dto.scope === 'EMPLOYEE' && !dto.employeeId) {
+            throw new BadRequestException('employeeId مطلوب عند اختيار نطاق الموظف');
+        }
+
+        // Clear non-relevant target IDs
+        const cleanTargets = {
+            branchId: dto.scope === 'BRANCH' ? dto.branchId : null,
+            departmentId: dto.scope === 'DEPARTMENT' ? dto.departmentId : null,
+            jobTitleId: dto.scope === 'JOB_TITLE' ? dto.jobTitleId : null,
+            employeeId: dto.scope === 'EMPLOYEE' ? dto.employeeId : null,
+        };
+
         return this.prisma.policy.create({
             data: {
                 ...policyData,
+                ...cleanTargets,
                 companyId,
                 effectiveFrom: new Date(dto.effectiveFrom),
                 effectiveTo: dto.effectiveTo ? new Date(dto.effectiveTo) : null,
                 settings: dto.settings || {},
+                scopeRank: SCOPE_RANK[dto.scope] || 1, // 🔥 Deterministic rank
                 createdById,
                 rules: rules ? {
                     create: rules.map((r, i) => ({
                         ...r,
                         conditions: r.conditions || {},
-                        order: r.order ?? i,
+                        ruleOrder: r.ruleOrder ?? i,
                     })),
                 } : undefined,
             },
@@ -41,7 +74,7 @@ export class PoliciesService {
                 companyId,
                 ...(type ? { type, isActive: true } : { isActive: true })
             },
-            include: { rules: { where: { isActive: true }, orderBy: { order: 'asc' } } },
+            include: { rules: { where: { isActive: true }, orderBy: { ruleOrder: 'asc' } } },
             orderBy: [{ priority: 'desc' }, { effectiveFrom: 'desc' }],
         });
     }
@@ -49,7 +82,7 @@ export class PoliciesService {
     async findOne(id: string, companyId: string) {
         const policy = await this.prisma.policy.findFirst({
             where: { id, companyId },
-            include: { rules: { orderBy: { order: 'asc' } } },
+            include: { rules: { orderBy: { ruleOrder: 'asc' } } },
         });
         if (!policy) throw new NotFoundException('السياسة غير موجودة');
         return policy;
@@ -89,10 +122,12 @@ export class PoliciesService {
     /**
      * الحصول على السياسة المطبقة لموظف معين
      * يطبق سلسلة الأولوية: موظف → درجة وظيفية → قسم → فرع → شركة
+     * Uses scopeRank (DB field) for deterministic ordering
      */
     async resolvePolicy(type: PolicyType, employeeId: string, companyId: string, date?: Date) {
         const effectiveDate = date || new Date();
 
+        // 🔥 Validate employee belongs to same company
         const employee = await this.prisma.user.findFirst({
             where: { id: employeeId, companyId },
             select: { id: true, branchId: true, departmentId: true, jobTitleId: true },
@@ -100,7 +135,7 @@ export class PoliciesService {
 
         if (!employee) throw new NotFoundException('الموظف غير موجود');
 
-        // البحث عن السياسات حسب الأولوية
+        // البحث عن السياسات مع الترتيب المحسوب في DB
         const policies = await this.prisma.policy.findMany({
             where: {
                 companyId,
@@ -128,41 +163,60 @@ export class PoliciesService {
             include: {
                 rules: {
                     where: { isActive: true },
-                    orderBy: { order: 'asc' },
+                    orderBy: { ruleOrder: 'asc' }, // 🔥 Use ruleOrder field
                     include: { outputComponent: true }
                 }
             },
-            orderBy: [{ priority: 'desc' }],
+            // 🔥 Deterministic ordering using scopeRank (higher = more specific)
+            orderBy: [
+                { scopeRank: 'desc' },
+                { priority: 'desc' }
+            ],
         });
 
-        // ترتيب حسب النطاق (الأضيق أولاً)
-        const scopePriority: Record<string, number> = {
-            EMPLOYEE: 5,
-            JOB_TITLE: 4,
-            DEPARTMENT: 3,
-            BRANCH: 2,
-            COMPANY: 1,
-        };
-
-        const sorted = [...policies].sort((a: any, b: any) => {
-            const aPriority = scopePriority[a.scope] + (a.priority * 10);
-            const bPriority = scopePriority[b.scope] + (b.priority * 10);
-            return bPriority - aPriority;
-        });
-
-        return sorted[0] || null;
+        // Return highest priority (most specific) policy
+        return policies[0] || null;
     }
 
     // إضافة قاعدة لسياسة
     async addRule(policyId: string, companyId: string, ruleData: any) {
-        await this.findOne(policyId, companyId);
+        const policy = await this.findOne(policyId, companyId);
+
+        // 🔥 Validate outputComponentId belongs to same company
+        if (ruleData.outputComponentId) {
+            const component = await this.prisma.salaryComponent.findFirst({
+                where: { id: ruleData.outputComponentId, companyId }
+            });
+            if (!component) {
+                throw new ForbiddenException('مكوّن الراتب غير موجود أو لا ينتمي لنفس الشركة');
+            }
+        }
+
+        // 🔥 Validate outputSign is valid enum value
+        if (ruleData.outputSign && !['EARNING', 'DEDUCTION'].includes(ruleData.outputSign)) {
+            throw new BadRequestException('outputSign يجب أن يكون EARNING أو DEDUCTION');
+        }
+
+        // Get max order for new rule
+        const maxOrder = await this.prisma.policyRule.aggregate({
+            where: { policyId },
+            _max: { ruleOrder: true }
+        });
 
         return this.prisma.policyRule.create({
             data: {
                 policyId,
-                ...ruleData,
+                code: ruleData.code,
+                nameAr: ruleData.nameAr,
+                valueType: ruleData.valueType,
+                value: ruleData.value,
+                outputComponentId: ruleData.outputComponentId || null,
+                outputSign: ruleData.outputSign || 'EARNING',
                 conditions: ruleData.conditions || {},
+                ruleOrder: ruleData.ruleOrder ?? (maxOrder._max.ruleOrder || 0) + 1,
+                isActive: ruleData.isActive ?? true,
             },
+            include: { outputComponent: true }
         });
     }
 
