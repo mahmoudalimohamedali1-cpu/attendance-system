@@ -2,8 +2,10 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PayslipLineSource } from '@prisma/client';
 
 import { PayrollCalculationService } from '../payroll-calculation/payroll-calculation.service';
+
 
 @Injectable()
 export class PayrollRunsService {
@@ -131,7 +133,7 @@ export class PayrollRunsService {
                     payslipLines.push({
                         componentId: line.componentId,
                         amount: lineAmount,
-                        sourceType: 'STRUCTURE',
+                        sourceType: PayslipLineSource.STRUCTURE,
                         sign: line.component.type === 'EARNING' ? 'EARNING' : 'DEDUCTION'
                     });
                 }
@@ -140,19 +142,19 @@ export class PayrollRunsService {
                 if (calculation.absenceDeduction > 0) {
                     const amount = new Decimal(calculation.absenceDeduction.toFixed(2));
                     totalDeductions = totalDeductions.add(amount);
-                    payslipLines.push({ componentId: components['ABSENCE_DED'].id, amount, sourceType: 'POLICY', sign: 'DEDUCTION' });
+                    payslipLines.push({ componentId: components['ABSENCE_DED'].id, amount, sourceType: PayslipLineSource.POLICY, sign: 'DEDUCTION' });
                 }
 
                 if (calculation.lateDeduction > 0) {
                     const amount = new Decimal(calculation.lateDeduction.toFixed(2));
                     totalDeductions = totalDeductions.add(amount);
-                    payslipLines.push({ componentId: components['LATE_DED'].id, amount, sourceType: 'POLICY', sign: 'DEDUCTION' });
+                    payslipLines.push({ componentId: components['LATE_DED'].id, amount, sourceType: PayslipLineSource.POLICY, sign: 'DEDUCTION' });
                 }
 
                 if (calculation.overtimeAmount > 0) {
                     const amount = new Decimal(calculation.overtimeAmount.toFixed(2));
                     grossSalary = grossSalary.add(amount);
-                    payslipLines.push({ componentId: components['OVERTIME_EARN'].id, amount, sourceType: 'POLICY', sign: 'EARNING' });
+                    payslipLines.push({ componentId: components['OVERTIME_EARN'].id, amount, sourceType: PayslipLineSource.POLICY, sign: 'EARNING' });
                 }
 
                 // 3. إضافة خصومات السلف (Advances)
@@ -160,7 +162,7 @@ export class PayrollRunsService {
                     const deduction = advance.approvedMonthlyDeduction || advance.monthlyDeduction;
                     const deductionAmount = new Decimal(deduction.toString());
                     totalDeductions = totalDeductions.add(deductionAmount);
-                    payslipLines.push({ componentId: components['LOAN_DED'].id, amount: deductionAmount, sourceType: 'POLICY', sign: 'DEDUCTION' });
+                    payslipLines.push({ componentId: components['LOAN_DED'].id, amount: deductionAmount, sourceType: PayslipLineSource.POLICY, sign: 'DEDUCTION' });
                 }
 
                 // 4. حساب GOSI للسعوديين
@@ -171,7 +173,7 @@ export class PayrollRunsService {
 
                     if (gosiDeduction.gt(0)) {
                         totalDeductions = totalDeductions.add(gosiDeduction);
-                        payslipLines.push({ componentId: components['GOSI_DED'].id, amount: gosiDeduction, sourceType: 'STATUTORY', sign: 'DEDUCTION' });
+                        payslipLines.push({ componentId: components['GOSI_DED'].id, amount: gosiDeduction, sourceType: PayslipLineSource.STATUTORY, sign: 'DEDUCTION' });
                     }
                 }
 
