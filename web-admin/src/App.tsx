@@ -31,6 +31,7 @@ import BankAccountsPage from './pages/bank-accounts/BankAccountsPage';
 import DevicesPage from './pages/devices/DevicesPage';
 import LoanPaymentsPage from './pages/loan-payments/LoanPaymentsPage';
 import CompaniesPage from './pages/companies/CompaniesPage';
+import { PayrollDashboardPage } from './pages/payroll/PayrollDashboardPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -96,6 +97,7 @@ function App() {
         <Route path="devices" element={<DevicesPage />} />
         <Route path="loan-payments" element={<LoanPaymentsPage />} />
         <Route path="companies" element={<CompaniesPage />} />
+        <Route path="payroll-dashboard" element={<PayrollDashboardPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
