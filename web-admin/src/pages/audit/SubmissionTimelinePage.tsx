@@ -5,7 +5,7 @@ import {
     CircularProgress, Chip, FormControl, InputLabel, Select,
     Stack, Divider,
 } from '@mui/material';
-import { History, CheckCircle, Error, Pending, Refresh, Search, ArrowForward } from '@mui/icons-material';
+import { History, Search, ArrowForward } from '@mui/icons-material';
 import { auditService, StatusLog } from '@/services/audit.service';
 
 // Status colors
@@ -22,16 +22,6 @@ const statusColors: Record<string, 'success' | 'error' | 'warning' | 'info' | 'p
     PROCESSING: 'warning',
     PROCESSED: 'success',
     FAILED: 'error',
-};
-
-// Status icons (for future UI enhancements with icons)
-const _statusIcons: Record<string, any> = {
-    ACCEPTED: <CheckCircle />,
-    REJECTED: <Error />,
-    PROCESSED: <CheckCircle />,
-    FAILED: <Error />,
-    PENDING: <Pending />,
-    RESUBMIT_REQUIRED: <Refresh />,
 };
 
 // Entity type labels
