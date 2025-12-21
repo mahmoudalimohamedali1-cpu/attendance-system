@@ -48,6 +48,9 @@ import { ExceptionsModule } from './modules/exceptions/exceptions.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
 import { PayslipsModule } from './modules/payslips/payslips.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { MudadModule } from './modules/mudad/mudad.module';
+import { QiwaModule } from './modules/qiwa/qiwa.module';
+import { WpsTrackingModule } from './modules/wps-tracking/wps-tracking.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -106,6 +109,9 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     ContractsModule,        // إدارة العقود
     PayslipsModule,         // قسائم الرواتب
     DashboardModule,        // لوحة التحكم
+    MudadModule,            // تتبع مُدد
+    QiwaModule,             // تصدير قوى
+    WpsTrackingModule,      // تتبع WPS
   ],
   controllers: [AppController],
   providers: [

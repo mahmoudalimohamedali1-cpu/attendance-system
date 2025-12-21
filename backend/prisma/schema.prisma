@@ -51,6 +51,8 @@ model Company {
   permissionAuditLogs PermissionAuditLog[]
   raiseRequests       RaiseRequest[]
   userPermissions     UserPermission[]
+  mudadSubmissions    MudadSubmission[]
+  wpsSubmissions      WpsSubmission[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1502,6 +1504,8 @@ model PayrollRun {
   paidAt            DateTime? @map("paid_at")
 
   payslips Payslip[]
+  mudadSubmissions MudadSubmission[]
+  wpsSubmissions   WpsSubmission[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1725,6 +1729,113 @@ model PolicyRule {
   @@map("policy_rules")
 }
 
+// ==================== Government Compliance Tracking ====================
+
+// مُدد - Mudad Salary Protection Submissions
+model MudadSubmission {
+  id        String @id @default(uuid())
+  companyId String @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Reference to payroll run
+  payrollRunId String     @map("payroll_run_id")
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
+
+  // Submission Details
+  period         String // YYYY-MM format
+  submissionType String @default("SALARY") @map("submission_type") // SALARY, BONUS, EOS
+  
+  // Status Tracking
+  status        MudadStatus @default(PENDING)
+  wpsFileUrl    String?     @map("wps_file_url") // رابط ملف WPS المرفوع
+  mudadRef      String?     @map("mudad_ref") // رقم مرجع مُدد (من المنصة)
+  
+  // Amounts
+  totalAmount   Decimal     @map("total_amount") @db.Decimal(12, 2)
+  employeeCount Int         @map("employee_count")
+  
+  // Submission Workflow
+  preparedAt    DateTime?   @map("prepared_at")
+  preparedBy    String?     @map("prepared_by")
+  submittedAt   DateTime?   @map("submitted_at")
+  submittedBy   String?     @map("submitted_by")
+  acceptedAt    DateTime?   @map("accepted_at")
+  rejectedAt    DateTime?   @map("rejected_at")
+  rejectionNote String?     @map("rejection_note")
+  
+  // Notes
+  notes         String?     @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([payrollRunId, submissionType])
+  @@index([companyId, period])
+  @@index([status])
+  @@map("mudad_submissions")
+}
+
+enum MudadStatus {
+  PENDING      // في انتظار التحضير
+  PREPARED     // تم تحضير الملف
+  SUBMITTED    // تم الرفع على مُدد
+  ACCEPTED     // مقبول
+  REJECTED     // مرفوض
+  RESUBMITTED  // تم إعادة الرفع
+}
+
+// WPS File Submissions (تتبع ملفات WPS المرفوعة)
+model WpsSubmission {
+  id        String @id @default(uuid())
+  companyId String @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Reference
+  payrollRunId String     @map("payroll_run_id")
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
+
+  // File Details
+  filename     String
+  fileFormat   String @default("WPS") @map("file_format") // WPS, SARIE
+  fileUrl      String? @map("file_url")
+  
+  // Amounts
+  totalAmount   Decimal @map("total_amount") @db.Decimal(12, 2)
+  employeeCount Int     @map("employee_count")
+  
+  // Status
+  status       WpsStatus @default(GENERATED)
+  bankName     String?   @map("bank_name") // البنك المستلم
+  bankRef      String?   @map("bank_ref") // رقم مرجع البنك
+  
+  // Workflow
+  generatedAt  DateTime  @default(now()) @map("generated_at")
+  generatedBy  String?   @map("generated_by")
+  downloadedAt DateTime? @map("downloaded_at")
+  submittedAt  DateTime? @map("submitted_at") // تم الرفع للبنك
+  processedAt  DateTime? @map("processed_at") // تم التحويل
+
+  // Notes & Errors
+  notes        String?   @db.Text
+  errors       Json?     // أخطاء التحقق
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@index([payrollRunId])
+  @@map("wps_submissions")
+}
+
+enum WpsStatus {
+  GENERATED    // تم إنشاء الملف
+  DOWNLOADED   // تم تحميل الملف
+  SUBMITTED    // تم الرفع للبنك
+  PROCESSING   // قيد المعالجة
+  PROCESSED    // تم التحويل
+  FAILED       // فشل
+}
+
 // ==================== Module enum for Audit ====================
 enum AuditModule {
   AUTH // تسجيل الدخول
@@ -1743,4 +1854,7 @@ enum AuditModule {
   RETRO_PAY // الفروقات
   LETTER // الخطابات
   SETTINGS // الإعدادات
+  MUDAD // مُدد
+  WPS // حماية الأجور
+  CONTRACT // العقود
 }
