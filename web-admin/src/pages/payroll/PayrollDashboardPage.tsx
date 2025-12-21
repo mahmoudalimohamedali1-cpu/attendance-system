@@ -159,7 +159,7 @@ export const PayrollDashboardPage: React.FC = () => {
     const [month, setMonth] = useState(currentMonth);
 
     // Auto-refresh: enabled when payroll is not locked
-    const { data, isLoading, refetch, isFetching } = useDashboard({ year, month });
+    const { data, isLoading, refetch, isFetching, isError, error } = useDashboard({ year, month });
     const { data: trends } = useDashboardTrends(6);
 
     // Auto-refresh effect
@@ -199,6 +199,24 @@ export const PayrollDashboardPage: React.FC = () => {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
                 <CircularProgress size={60} />
+            </Box>
+        );
+    }
+
+    // Error state
+    if (isError) {
+        return (
+            <Box p={3}>
+                <Typography variant="h4" fontWeight="bold" mb={2}>
+                    لوحة تحكم الرواتب
+                </Typography>
+                <Alert severity="error">
+                    <AlertTitle>خطأ في تحميل البيانات</AlertTitle>
+                    {(error as any)?.message || 'حدث خطأ أثناء جلب البيانات. حاول مرة أخرى.'}
+                </Alert>
+                <Button onClick={() => refetch()} sx={{ mt: 2 }} variant="contained">
+                    إعادة المحاولة
+                </Button>
             </Box>
         );
     }
