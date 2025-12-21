@@ -24,8 +24,8 @@ const statusColors: Record<string, 'success' | 'error' | 'warning' | 'info' | 'p
     FAILED: 'error',
 };
 
-// Status icons
-const statusIcons: Record<string, any> = {
+// Status icons (for future UI enhancements with icons)
+const _statusIcons: Record<string, any> = {
     ACCEPTED: <CheckCircle />,
     REJECTED: <Error />,
     PROCESSED: <CheckCircle />,

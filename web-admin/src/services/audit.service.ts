@@ -1,4 +1,4 @@
-import { api, API_URL } from './api.service';
+import axios from 'axios';
 
 // === Types ===
 export interface StatusLog {
@@ -14,6 +14,14 @@ export interface StatusLog {
     createdAt: string;
 }
 
+// استخدام متغير البيئة - Direct URL to bypass api.service
+const API_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+
+// Helper to get auth header
+const getAuthHeader = () => ({
+    Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+});
+
 // === API Functions ===
 
 /**
@@ -23,8 +31,9 @@ export const getEntityLogs = async (
     entityType: string,
     entityId: string
 ): Promise<StatusLog[]> => {
-    const response = await api.get(
-        `${API_URL}/audit/submissions/${entityType}/${entityId}/logs`
+    const response = await axios.get<StatusLog[]>(
+        `${API_URL}/audit/submissions/${entityType}/${entityId}/logs`,
+        { headers: getAuthHeader() }
     );
     return response.data;
 };
@@ -40,8 +49,9 @@ export const getLogsByPeriod = async (
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
 
-    const response = await api.get(
-        `${API_URL}/audit/submissions/logs?${params.toString()}`
+    const response = await axios.get<StatusLog[]>(
+        `${API_URL}/audit/submissions/logs?${params.toString()}`,
+        { headers: getAuthHeader() }
     );
     return response.data;
 };
@@ -50,8 +60,9 @@ export const getLogsByPeriod = async (
  * جلب سجلات مستخدم معين
  */
 export const getLogsByUser = async (userId: string): Promise<StatusLog[]> => {
-    const response = await api.get(
-        `${API_URL}/audit/submissions/by-user/${userId}`
+    const response = await axios.get<StatusLog[]>(
+        `${API_URL}/audit/submissions/by-user/${userId}`,
+        { headers: getAuthHeader() }
     );
     return response.data;
 };
@@ -67,9 +78,9 @@ export const exportAuditLogsCsv = async (
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
 
-    const response = await api.get(
+    const response = await axios.get<Blob>(
         `${API_URL}/audit/submissions/export/csv?${params.toString()}`,
-        { responseType: 'blob' }
+        { headers: getAuthHeader(), responseType: 'blob' }
     );
     return response.data;
 };
