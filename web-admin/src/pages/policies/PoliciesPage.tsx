@@ -5,9 +5,17 @@ import {
     CircularProgress, Chip, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, IconButton,
     Dialog, DialogTitle, DialogContent, DialogActions, Select, FormControl, InputLabel,
+    Switch, FormControlLabel, Alert,
 } from '@mui/material';
-import { Add, Delete, Policy as PolicyIcon, ToggleOn } from '@mui/icons-material';
+import { Add, Delete, Policy as PolicyIcon, ToggleOn, Rule } from '@mui/icons-material';
 import { api } from '@/services/api.service';
+
+interface SalaryComponent {
+    id: string;
+    code: string;
+    nameAr: string;
+    type: string;
+}
 
 interface PolicyRule {
     id: string;
@@ -16,6 +24,11 @@ interface PolicyRule {
     valueType: string;
     value: string;
     order: number;
+    isActive: boolean;
+    outputComponentId?: string;
+    outputSign?: string;
+    outputComponent?: SalaryComponent;
+    conditions?: Record<string, unknown>;
 }
 
 interface Policy {
@@ -50,9 +63,25 @@ const policyScopes = [
     { value: 'EMPLOYEE', label: 'الموظف' },
 ];
 
+const valueTypes = [
+    { value: 'PERCENTAGE', label: 'نسبة مئوية' },
+    { value: 'FIXED', label: 'مبلغ ثابت' },
+    { value: 'FORMULA', label: 'معادلة' },
+];
+
+const outputSigns = [
+    { value: 'EARNING', label: 'استحقاق (إضافة)' },
+    { value: 'DEDUCTION', label: 'خصم (استقطاع)' },
+];
+
 export const PoliciesPage = () => {
     const queryClient = useQueryClient();
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
+    const [ruleFormOpen, setRuleFormOpen] = useState(false);
+    const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
+    const [editingRule, setEditingRule] = useState<PolicyRule | null>(null);
+
     const [formData, setFormData] = useState({
         code: '',
         nameAr: '',
@@ -63,11 +92,28 @@ export const PoliciesPage = () => {
         effectiveFrom: new Date().toISOString().split('T')[0],
         effectiveTo: '',
         priority: 0,
+        isActive: true,
+    });
+
+    const [ruleFormData, setRuleFormData] = useState({
+        code: '',
+        nameAr: '',
+        valueType: 'PERCENTAGE',
+        value: '',
+        order: 0,
+        outputComponentId: '',
+        outputSign: 'EARNING',
+        isActive: true,
     });
 
     const { data: policies = [], isLoading } = useQuery<Policy[]>({
         queryKey: ['policies'],
         queryFn: () => api.get('/policies') as Promise<Policy[]>,
+    });
+
+    const { data: components = [] } = useQuery<SalaryComponent[]>({
+        queryKey: ['salary-components'],
+        queryFn: () => api.get('/salary-components') as Promise<SalaryComponent[]>,
     });
 
     const createMutation = useMutation({
@@ -80,7 +126,7 @@ export const PoliciesPage = () => {
     });
 
     const toggleMutation = useMutation({
-        mutationFn: (id: string) => api.patch(`/policies/${id}/toggle`, {}),
+        mutationFn: (id: string) => api.patch(`/policies/${id}/toggle-active`, {}),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['policies'] }),
     });
 
@@ -89,17 +135,52 @@ export const PoliciesPage = () => {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['policies'] }),
     });
 
+    // Rule mutations
+    const addRuleMutation = useMutation({
+        mutationFn: (data: { policyId: string; rule: typeof ruleFormData }) =>
+            api.post(`/policies/${data.policyId}/rules`, data.rule),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['policies'] });
+            setRuleFormOpen(false);
+            resetRuleForm();
+        },
+    });
+
+    const deleteRuleMutation = useMutation({
+        mutationFn: (ruleId: string) => api.delete(`/policies/rules/${ruleId}`),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['policies'] }),
+    });
+
     const resetForm = () => {
         setFormData({
             code: '', nameAr: '', nameEn: '', description: '',
             type: 'OVERTIME', scope: 'COMPANY',
             effectiveFrom: new Date().toISOString().split('T')[0],
-            effectiveTo: '', priority: 0,
+            effectiveTo: '', priority: 0, isActive: true,
         });
+    };
+
+    const resetRuleForm = () => {
+        setRuleFormData({
+            code: '', nameAr: '', valueType: 'PERCENTAGE', value: '',
+            order: 0, outputComponentId: '', outputSign: 'EARNING', isActive: true,
+        });
+        setEditingRule(null);
+    };
+
+    const openRulesDialog = (policy: Policy) => {
+        setSelectedPolicy(policy);
+        setRulesDialogOpen(true);
+    };
+
+    const openAddRuleForm = () => {
+        resetRuleForm();
+        setRuleFormOpen(true);
     };
 
     const getTypeLabel = (type: string) => policyTypes.find(t => t.value === type)?.label || type;
     const getScopeLabel = (scope: string) => policyScopes.find(s => s.value === scope)?.label || scope;
+    const getValueTypeLabel = (type: string) => valueTypes.find(t => t.value === type)?.label || type;
 
     if (isLoading) return <CircularProgress />;
 
@@ -144,7 +225,16 @@ export const PoliciesPage = () => {
                                     <TableCell><Chip label={getScopeLabel(policy.scope)} size="small" variant="outlined" /></TableCell>
                                     <TableCell>{new Date(policy.effectiveFrom).toLocaleDateString('ar-SA')}</TableCell>
                                     <TableCell>{policy.priority}</TableCell>
-                                    <TableCell>{policy.rules?.length || 0} قاعدة</TableCell>
+                                    <TableCell>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<Rule />}
+                                            onClick={() => openRulesDialog(policy)}
+                                        >
+                                            {policy.rules?.length || 0} قاعدة
+                                        </Button>
+                                    </TableCell>
                                     <TableCell>
                                         <Chip
                                             label={policy.isActive ? 'مفعّل' : 'معطّل'}
@@ -186,6 +276,7 @@ export const PoliciesPage = () => {
                 </TableContainer>
             </Card>
 
+            {/* Create Policy Dialog */}
             <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
                 <DialogTitle>إضافة سياسة جديدة</DialogTitle>
                 <DialogContent dividers>
@@ -253,6 +344,17 @@ export const PoliciesPage = () => {
                                 helperText="الأعلى يُطبق أولاً"
                             />
                         </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={formData.isActive}
+                                        onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                                    />
+                                }
+                                label="مفعّلة"
+                            />
+                        </Grid>
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth label="الوصف" multiline rows={2}
@@ -268,6 +370,218 @@ export const PoliciesPage = () => {
                         variant="contained"
                         onClick={() => createMutation.mutate(formData)}
                         disabled={!formData.code || !formData.nameAr || createMutation.isPending}
+                    >
+                        حفظ
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Rules Management Dialog */}
+            <Dialog open={rulesDialogOpen} onClose={() => setRulesDialogOpen(false)} maxWidth="lg" fullWidth>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                        <Typography variant="h6">قواعد السياسة: {selectedPolicy?.nameAr}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            كود: {selectedPolicy?.code}
+                        </Typography>
+                    </Box>
+                    <Button variant="contained" size="small" startIcon={<Add />} onClick={openAddRuleForm}>
+                        إضافة قاعدة
+                    </Button>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        القواعد يتم تنفيذها بالترتيب. أول قاعدة تتطابق شروطها هي التي تُطبق.
+                    </Alert>
+                    <TableContainer>
+                        <Table size="small">
+                            <TableHead sx={{ bgcolor: 'grey.100' }}>
+                                <TableRow>
+                                    <TableCell>الترتيب</TableCell>
+                                    <TableCell>الكود</TableCell>
+                                    <TableCell>الاسم</TableCell>
+                                    <TableCell>نوع القيمة</TableCell>
+                                    <TableCell>القيمة</TableCell>
+                                    <TableCell>المكوّن الناتج</TableCell>
+                                    <TableCell>النوع</TableCell>
+                                    <TableCell>الحالة</TableCell>
+                                    <TableCell align="center">إجراءات</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {selectedPolicy?.rules?.map((rule, index) => (
+                                    <TableRow key={rule.id} hover>
+                                        <TableCell>{index + 1}</TableCell>
+                                        <TableCell><code>{rule.code}</code></TableCell>
+                                        <TableCell>{rule.nameAr}</TableCell>
+                                        <TableCell>
+                                            <Chip label={getValueTypeLabel(rule.valueType)} size="small" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <strong>{rule.value}</strong>
+                                            {rule.valueType === 'PERCENTAGE' && '%'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {rule.outputComponent ? (
+                                                <Chip
+                                                    label={rule.outputComponent.nameAr}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="primary"
+                                                />
+                                            ) : (
+                                                <Typography variant="caption" color="text.secondary">-</Typography>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={rule.outputSign === 'EARNING' ? 'استحقاق' : 'خصم'}
+                                                size="small"
+                                                color={rule.outputSign === 'EARNING' ? 'success' : 'error'}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={rule.isActive ? 'مفعّل' : 'معطّل'}
+                                                size="small"
+                                                color={rule.isActive ? 'success' : 'default'}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => {
+                                                    if (window.confirm('هل تريد حذف هذه القاعدة؟')) {
+                                                        deleteRuleMutation.mutate(rule.id);
+                                                    }
+                                                }}
+                                            >
+                                                <Delete fontSize="small" />
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {(!selectedPolicy?.rules || selectedPolicy.rules.length === 0) && (
+                                    <TableRow>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                                            <Typography color="text.secondary">لا يوجد قواعد لهذه السياسة</Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRulesDialogOpen(false)}>إغلاق</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Add/Edit Rule Dialog */}
+            <Dialog open={ruleFormOpen} onClose={() => setRuleFormOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    {editingRule ? 'تعديل قاعدة' : 'إضافة قاعدة جديدة'}
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Grid container spacing={2} sx={{ mt: 0 }}>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth label="كود القاعدة" required
+                                value={ruleFormData.code}
+                                onChange={(e) => setRuleFormData({ ...ruleFormData, code: e.target.value })}
+                                placeholder="مثال: OT_WEEKDAY"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth label="الاسم" required
+                                value={ruleFormData.nameAr}
+                                onChange={(e) => setRuleFormData({ ...ruleFormData, nameAr: e.target.value })}
+                                placeholder="مثال: إضافي أيام العمل"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>نوع القيمة</InputLabel>
+                                <Select
+                                    value={ruleFormData.valueType}
+                                    label="نوع القيمة"
+                                    onChange={(e) => setRuleFormData({ ...ruleFormData, valueType: e.target.value })}
+                                >
+                                    {valueTypes.map(t => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth label="القيمة" required
+                                value={ruleFormData.value}
+                                onChange={(e) => setRuleFormData({ ...ruleFormData, value: e.target.value })}
+                                placeholder={ruleFormData.valueType === 'PERCENTAGE' ? '150' : '500'}
+                                helperText={ruleFormData.valueType === 'PERCENTAGE' ? 'مثال: 150 يعني 150%' : 'المبلغ بالريال'}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>المكوّن الناتج</InputLabel>
+                                <Select
+                                    value={ruleFormData.outputComponentId}
+                                    label="المكوّن الناتج"
+                                    onChange={(e) => setRuleFormData({ ...ruleFormData, outputComponentId: e.target.value })}
+                                >
+                                    <MenuItem value="">-- بدون ربط --</MenuItem>
+                                    {components.map(c => (
+                                        <MenuItem key={c.id} value={c.id}>
+                                            {c.nameAr} ({c.code})
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControl fullWidth>
+                                <InputLabel>نوع الناتج</InputLabel>
+                                <Select
+                                    value={ruleFormData.outputSign}
+                                    label="نوع الناتج"
+                                    onChange={(e) => setRuleFormData({ ...ruleFormData, outputSign: e.target.value })}
+                                >
+                                    {outputSigns.map(s => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                fullWidth type="number" label="الترتيب"
+                                value={ruleFormData.order}
+                                onChange={(e) => setRuleFormData({ ...ruleFormData, order: parseInt(e.target.value) || 0 })}
+                                helperText="القواعد تُنفذ بهذا الترتيب"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={ruleFormData.isActive}
+                                        onChange={(e) => setRuleFormData({ ...ruleFormData, isActive: e.target.checked })}
+                                    />
+                                }
+                                label="مفعّلة"
+                            />
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRuleFormOpen(false)}>إلغاء</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            if (selectedPolicy) {
+                                addRuleMutation.mutate({ policyId: selectedPolicy.id, rule: ruleFormData });
+                            }
+                        }}
+                        disabled={!ruleFormData.code || !ruleFormData.nameAr || !ruleFormData.value || addRuleMutation.isPending}
                     >
                         حفظ
                     </Button>
