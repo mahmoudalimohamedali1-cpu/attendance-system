@@ -64,7 +64,7 @@ async function main() {
     // Step C: GOSI
     console.log('\n📋 Step C: GOSI...');
     for (const p of e2e) {
-        const gosiLine = p.lines.find(l => l.component.code === 'GOSI_EMPLOYEE');
+        const gosiLine = p.lines.find(l => l.component.code === 'GOSI_DED');
         if (p.employee.isSaudi && gosiLine) {
             log(`${p.employee.employeeCode} (Saudi) has GOSI`, true, `${gosiLine.amount}`);
         } else if (!p.employee.isSaudi && !gosiLine) {
