@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PoliciesService } from '../policies/policies.service';
+import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
+import { PolicyEvaluationContext } from './dto/policy-context.types';
 import {
     CalculationMethod,
     CalculationSettings,
@@ -8,6 +10,7 @@ import {
     EmployeePayrollCalculation,
     CalculationTraceItem,
     OvertimeSource,
+    PolicyPayrollLine,
 } from './dto/calculation.types';
 
 @Injectable()
@@ -15,6 +18,7 @@ export class PayrollCalculationService {
     constructor(
         private prisma: PrismaService,
         private policiesService: PoliciesService,
+        private policyEvaluator: PolicyRuleEvaluatorService,
     ) { }
 
     /**
@@ -280,6 +284,59 @@ export class PayrollCalculationService {
             result: netSalary,
         });
 
+        // 11. تقييم السياسات للحصول على خطوط إضافية
+        const periodStart = new Date(year, month - 1, 1);
+        const periodEnd = new Date(year, month, 0);
+
+        const evaluationContext: PolicyEvaluationContext = {
+            employee: {
+                id: employeeId,
+                companyId,
+                branchId: employee.branchId || undefined,
+                departmentId: employee.departmentId || undefined,
+                jobTitleId: employee.jobTitleId || undefined,
+                basicSalary: baseSalary,
+                hourlyRate,
+            },
+            period: {
+                year,
+                month,
+                startDate: periodStart,
+                endDate: periodEnd,
+                workingDays: daysInMonth,
+            },
+            attendance: {
+                otHours: overtimeHours,
+                otHoursWeekday: overtimeHours, // All OT treated as weekday by default
+                otHoursWeekend: 0,
+                otHoursHoliday: 0,
+                lateMinutes: lateMinutes,
+                lateCount: lateMinutes > 0 ? 1 : 0, // Simple estimate
+                absentDays: absentDays,
+                earlyDepartureMinutes: 0,
+                workingHours: presentDays * 8,
+            },
+
+        };
+
+        let policyLines: PolicyPayrollLine[] = [];
+        try {
+            policyLines = await this.policyEvaluator.evaluate(evaluationContext);
+            trace.push({
+                step: 'policyLines',
+                description: `تقييم السياسات: ${policyLines.length} سطور`,
+                formula: policyLines.map(l => `${l.componentCode}: ${l.amount}`).join(', ') || 'لا توجد',
+                result: policyLines.reduce((sum, l) => sum + (l.sign === 'EARNING' ? l.amount : -l.amount), 0),
+            });
+        } catch (err) {
+            trace.push({
+                step: 'policyLines',
+                description: 'خطأ في تقييم السياسات',
+                formula: err.message,
+                result: 0,
+            });
+        }
+
         return {
             employeeId,
             baseSalary,
@@ -297,6 +354,7 @@ export class PayrollCalculationService {
             totalDeductions,
             netSalary,
             calculationTrace: trace,
+            policyLines,
         };
     }
 
