@@ -3,10 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import {
     Box, Card, Typography, Grid, TextField, Button, MenuItem,
     CircularProgress, Chip, FormControl, InputLabel, Select,
-    Timeline, TimelineItem, TimelineSeparator, TimelineConnector,
-    TimelineContent, TimelineDot, TimelineOppositeContent,
+    Stack, Divider,
 } from '@mui/material';
-import { History, CheckCircle, Error, Pending, Refresh, Search } from '@mui/icons-material';
+import { History, CheckCircle, Error, Pending, Refresh, Search, ArrowForward } from '@mui/icons-material';
 import { auditService, StatusLog } from '@/services/audit.service';
 
 // Status colors
@@ -208,90 +207,74 @@ const SubmissionTimelinePage = () => {
                 </Box>
             )}
 
-            {/* Timeline */}
+            {/* Status Change List */}
             {!isLoading && filteredLogs.length > 0 && (
-                <Card sx={{ p: 2 }}>
-                    <Timeline position="alternate">
-                        {filteredLogs.map((log: StatusLog, index: number) => {
-                            const meta = parseMeta(log.meta);
-                            return (
-                                <TimelineItem key={log.id || index}>
-                                    <TimelineOppositeContent sx={{ m: 'auto 0' }}>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {new Date(log.createdAt).toLocaleDateString('ar-SA')}
-                                        </Typography>
+                <Stack spacing={2}>
+                    {filteredLogs.map((log: StatusLog, index: number) => {
+                        const meta = parseMeta(log.meta);
+                        return (
+                            <Card key={log.id || index} variant="outlined" sx={{ p: 2 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Chip
+                                            label={entityLabels[log.entityType] || log.entityType}
+                                            size="small"
+                                            color="primary"
+                                            variant="outlined"
+                                        />
                                         <Typography variant="caption" color="text.secondary">
-                                            {new Date(log.createdAt).toLocaleTimeString('ar-SA')}
+                                            {log.entityId.substring(0, 8)}...
                                         </Typography>
-                                    </TimelineOppositeContent>
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {new Date(log.createdAt).toLocaleDateString('ar-SA')} {new Date(log.createdAt).toLocaleTimeString('ar-SA')}
+                                    </Typography>
+                                </Box>
 
-                                    <TimelineSeparator>
-                                        <TimelineConnector />
-                                        <TimelineDot color={statusColors[log.toStatus] || 'grey'}>
-                                            {statusIcons[log.toStatus] || <History />}
-                                        </TimelineDot>
-                                        <TimelineConnector />
-                                    </TimelineSeparator>
+                                <Divider sx={{ my: 1 }} />
 
-                                    <TimelineContent sx={{ py: '12px', px: 2 }}>
-                                        <Card variant="outlined" sx={{ p: 2 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                                <Chip
-                                                    label={entityLabels[log.entityType] || log.entityType}
-                                                    size="small"
-                                                    color="primary"
-                                                    variant="outlined"
-                                                />
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {log.entityId.substring(0, 8)}...
-                                                </Typography>
-                                            </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Chip
+                                        label={log.fromStatus}
+                                        size="small"
+                                        color={statusColors[log.fromStatus] || 'default'}
+                                        variant="outlined"
+                                    />
+                                    <ArrowForward fontSize="small" color="action" />
+                                    <Chip
+                                        label={log.toStatus}
+                                        size="small"
+                                        color={statusColors[log.toStatus] || 'default'}
+                                    />
+                                </Box>
 
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Chip
-                                                    label={log.fromStatus}
-                                                    size="small"
-                                                    color={statusColors[log.fromStatus] || 'default'}
-                                                    variant="outlined"
-                                                />
-                                                <Typography variant="body2">→</Typography>
-                                                <Chip
-                                                    label={log.toStatus}
-                                                    size="small"
-                                                    color={statusColors[log.toStatus] || 'default'}
-                                                />
-                                            </Box>
+                                {log.reason && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        السبب: {reasonLabels[log.reason] || log.reason}
+                                    </Typography>
+                                )}
 
-                                            {log.reason && (
-                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                                    السبب: {reasonLabels[log.reason] || log.reason}
-                                                </Typography>
-                                            )}
+                                {meta && meta.oldHash && (
+                                    <Box sx={{ mt: 1, p: 1, bgcolor: 'error.light', borderRadius: 1 }}>
+                                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                                            Old: {meta.oldHash.substring(0, 16)}...
+                                        </Typography>
+                                        <br />
+                                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                                            New: {meta.newHash.substring(0, 16)}...
+                                        </Typography>
+                                    </Box>
+                                )}
 
-                                            {meta && meta.oldHash && (
-                                                <Box sx={{ mt: 1, p: 1, bgcolor: 'error.light', borderRadius: 1 }}>
-                                                    <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                                                        Old: {meta.oldHash.substring(0, 16)}...
-                                                    </Typography>
-                                                    <br />
-                                                    <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                                                        New: {meta.newHash.substring(0, 16)}...
-                                                    </Typography>
-                                                </Box>
-                                            )}
-
-                                            {log.changedByName && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                                                    بواسطة: {log.changedByName}
-                                                </Typography>
-                                            )}
-                                        </Card>
-                                    </TimelineContent>
-                                </TimelineItem>
-                            );
-                        })}
-                    </Timeline>
-                </Card>
+                                {log.changedByName && (
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                        بواسطة: {log.changedByName}
+                                    </Typography>
+                                )}
+                            </Card>
+                        );
+                    })}
+                </Stack>
             )}
 
             {/* Empty State */}

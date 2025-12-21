@@ -1,4 +1,4 @@
-import { apiService, API_BASE_URL } from './api.service';
+import { api, API_URL } from './api.service';
 
 // === Types ===
 export interface StatusLog {
@@ -23,8 +23,8 @@ export const getEntityLogs = async (
     entityType: string,
     entityId: string
 ): Promise<StatusLog[]> => {
-    const response = await apiService.get(
-        `${API_BASE_URL}/audit/submissions/${entityType}/${entityId}/logs`
+    const response = await api.get(
+        `${API_URL}/audit/submissions/${entityType}/${entityId}/logs`
     );
     return response.data;
 };
@@ -40,8 +40,8 @@ export const getLogsByPeriod = async (
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
 
-    const response = await apiService.get(
-        `${API_BASE_URL}/audit/submissions/logs?${params.toString()}`
+    const response = await api.get(
+        `${API_URL}/audit/submissions/logs?${params.toString()}`
     );
     return response.data;
 };
@@ -50,8 +50,8 @@ export const getLogsByPeriod = async (
  * جلب سجلات مستخدم معين
  */
 export const getLogsByUser = async (userId: string): Promise<StatusLog[]> => {
-    const response = await apiService.get(
-        `${API_BASE_URL}/audit/submissions/by-user/${userId}`
+    const response = await api.get(
+        `${API_URL}/audit/submissions/by-user/${userId}`
     );
     return response.data;
 };
@@ -67,8 +67,8 @@ export const exportAuditLogsCsv = async (
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
 
-    const response = await apiService.get(
-        `${API_BASE_URL}/audit/submissions/export/csv?${params.toString()}`,
+    const response = await api.get(
+        `${API_URL}/audit/submissions/export/csv?${params.toString()}`,
         { responseType: 'blob' }
     );
     return response.data;
