@@ -24,6 +24,7 @@ import { EosCalculatorPage } from './pages/eos/EosCalculatorPage';
 import { RetroPayPage } from './pages/retro-pay/RetroPayPage';
 import { PoliciesPage } from './pages/policies/PoliciesPage';
 import { AuditLogsPage } from './pages/audit/AuditLogsPage';
+import SubmissionTimelinePage from './pages/audit/SubmissionTimelinePage';
 import ContractsPage from './pages/contracts/ContractsPage';
 import WpsExportPage from './pages/wps-export/WpsExportPage';
 import ExceptionsCenterPage from './pages/exceptions/ExceptionsCenterPage';
@@ -89,6 +90,7 @@ function App() {
         <Route path="retro-pay" element={<RetroPayPage />} />
         <Route path="policies" element={<PoliciesPage />} />
         <Route path="audit" element={<AuditLogsPage />} />
+        <Route path="audit/submissions" element={<SubmissionTimelinePage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="contracts" element={<ContractsPage />} />
         <Route path="wps-export" element={<WpsExportPage />} />
