@@ -81,6 +81,7 @@ export const PoliciesPage = () => {
     const [ruleFormOpen, setRuleFormOpen] = useState(false);
     const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
     const [editingRule, setEditingRule] = useState<PolicyRule | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
         code: '',
@@ -192,6 +193,31 @@ export const PoliciesPage = () => {
             order: 0, outputComponentId: '', outputSign: 'EARNING', isActive: true,
         });
         setEditingRule(null);
+    };
+
+    // 🔥 Validate scope targets before submission
+    const handleSubmitPolicy = () => {
+        setFormError(null);
+
+        // Scope target validation
+        if (formData.scope === 'BRANCH' && !formData.branchId) {
+            setFormError('يجب اختيار الفرع عند تحديد النطاق على مستوى الفرع');
+            return;
+        }
+        if (formData.scope === 'DEPARTMENT' && !formData.departmentId) {
+            setFormError('يجب اختيار القسم عند تحديد النطاق على مستوى القسم');
+            return;
+        }
+        if (formData.scope === 'JOB_TITLE' && !formData.jobTitleId) {
+            setFormError('يجب اختيار الدرجة الوظيفية عند تحديد النطاق على مستوى الدرجة');
+            return;
+        }
+        if (formData.scope === 'EMPLOYEE' && !formData.employeeId) {
+            setFormError('يجب اختيار الموظف عند تحديد النطاق على مستوى الموظف');
+            return;
+        }
+
+        createMutation.mutate(formData);
     };
 
     const openRulesDialog = (policy: Policy) => {
@@ -467,12 +493,17 @@ export const PoliciesPage = () => {
                             />
                         </Grid>
                     </Grid>
+                    {formError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {formError}
+                        </Alert>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDialogOpen(false)}>إلغاء</Button>
                     <Button
                         variant="contained"
-                        onClick={() => createMutation.mutate(formData)}
+                        onClick={handleSubmitPolicy}
                         disabled={!formData.code || !formData.nameAr || createMutation.isPending}
                     >
                         حفظ
