@@ -3,11 +3,12 @@ import { MudadController } from './mudad.controller';
 import { MudadService } from './mudad.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { StatusLogService } from '../../common/services/status-log.service';
+import { StateMachineService } from '../../common/services/state-machine.service';
 
 @Module({
     imports: [PrismaModule],
     controllers: [MudadController],
-    providers: [MudadService, StatusLogService],
+    providers: [MudadService, StatusLogService, StateMachineService],
     exports: [MudadService],
 })
 export class MudadModule { }

@@ -51,6 +51,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { MudadModule } from './modules/mudad/mudad.module';
 import { QiwaModule } from './modules/qiwa/qiwa.module';
 import { WpsTrackingModule } from './modules/wps-tracking/wps-tracking.module';
+import { AuditLogsModule } from './modules/audit/audit-logs.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -112,6 +113,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     MudadModule,            // تتبع مُدد
     QiwaModule,             // تصدير قوى
     WpsTrackingModule,      // تتبع WPS
+    AuditLogsModule,        // سجل التدقيق
   ],
   controllers: [AppController],
   providers: [

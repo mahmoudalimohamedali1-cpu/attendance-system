@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { WpsStatus, WpsSubmission, SubmissionEntityType } from '@prisma/client';
 import { StatusLogService } from '../../common/services/status-log.service';
+import { StateMachineService } from '../../common/services/state-machine.service';
 
 interface CreateWpsSubmissionDto {
     payrollRunId: string;
@@ -24,6 +25,7 @@ export class WpsTrackingService {
     constructor(
         private prisma: PrismaService,
         private statusLogService: StatusLogService,
+        private stateMachineService: StateMachineService,
     ) { }
 
     /**
@@ -86,6 +88,9 @@ export class WpsTrackingService {
         });
 
         if (!submission) throw new NotFoundException('سجل WPS غير موجود');
+
+        // التحقق من صحة التحويل (State Machine)
+        this.stateMachineService.validateWpsTransition(submission.status, dto.status);
 
         const oldStatus = submission.status;
         const updateData: any = {

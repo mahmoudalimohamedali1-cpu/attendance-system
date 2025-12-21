@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { MudadStatus, SubmissionEntityType } from '@prisma/client';
 import { StatusLogService } from '../../common/services/status-log.service';
+import { StateMachineService } from '../../common/services/state-machine.service';
 
 interface CreateMudadSubmissionDto {
     payrollRunId: string;
@@ -22,6 +23,7 @@ export class MudadService {
     constructor(
         private prisma: PrismaService,
         private statusLogService: StatusLogService,
+        private stateMachineService: StateMachineService,
     ) { }
 
     /**
@@ -103,6 +105,9 @@ export class MudadService {
         });
 
         if (!submission) throw new NotFoundException('سجل التقديم غير موجود');
+
+        // التحقق من صحة التحويل (State Machine)
+        this.stateMachineService.validateMudadTransition(submission.status, dto.status);
 
         const oldStatus = submission.status;
         const updateData: any = {
