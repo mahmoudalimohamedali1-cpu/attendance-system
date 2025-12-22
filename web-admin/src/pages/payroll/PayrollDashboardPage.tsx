@@ -34,7 +34,6 @@ import {
     Add as AddIcon,
     OpenInNew as OpenInNewIcon,
     Assessment as AuditIcon,
-    Security as SecurityIcon,
 } from '@mui/icons-material';
 import { useDashboard, useDashboardTrends } from '../../hooks/useDashboard';
 import { useAuthStore } from '../../store/auth.store';
