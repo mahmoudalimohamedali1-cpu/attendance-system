@@ -102,7 +102,7 @@ function App() {
         <Route path="payroll-dashboard" element={<PayrollDashboardPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/settings" replace />} />
     </Routes>
   );
 }
