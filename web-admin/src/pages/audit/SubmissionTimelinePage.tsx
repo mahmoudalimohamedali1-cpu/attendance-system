@@ -17,7 +17,7 @@ import { History, Search, ArrowForward, CheckCircle, Error, Pending, Refresh } f
 import { auditService, StatusLog } from '@/services/audit.service';
 
 // Status colors
-const statusColors: Record<string, 'success' | 'error' | 'warning' | 'info' | 'default'> = {
+const statusColors: Record<string, any> = {
     ACCEPTED: 'success',
     REJECTED: 'error',
     SUBMITTED: 'info',
