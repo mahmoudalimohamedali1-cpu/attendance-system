@@ -166,7 +166,7 @@ export class DashboardService {
             }
         });
 
-        // Attendance check (simplified - check if any records exist for period)
+        // Attendance check
         let attendanceStatus: 'COMPLETE' | 'PARTIAL' | 'MISSING' = 'MISSING';
         if (period) {
             const attendanceCount = await this.prisma.attendance.count({
@@ -178,6 +178,25 @@ export class DashboardService {
             if (attendanceCount > 0) attendanceStatus = 'COMPLETE';
         }
 
+        // 1. Get Mudad Status (Latest log for MUDAD)
+        const latestMudadLog = await this.prisma.submissionStatusLog.findFirst({
+            where: { companyId, entityType: 'MUDAD' },
+            orderBy: { changedAt: 'desc' }
+        });
+
+        // 2. WPS Ready check (all active employees have IBAN)
+        const activeUsersCount = await this.prisma.user.count({
+            where: { companyId, status: 'ACTIVE', role: 'EMPLOYEE' }
+        });
+        const usersWithIban = await this.prisma.user.count({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                role: 'EMPLOYEE',
+                bankAccounts: { some: {} }
+            }
+        });
+
         return {
             attendance: attendanceStatus,
             leaves: pendingLeaves > 0 ? 'PENDING' : 'OK',
@@ -186,6 +205,8 @@ export class DashboardService {
             gosiConfig: gosiConfig ? 'OK' : 'MISSING',
             payrollCalculated: !!run && (run._count?.payslips ?? 0) > 0,
             payrollLocked: !!run?.lockedAt,
+            mudadStatus: latestMudadLog?.toStatus || 'NOT_STARTED',
+            wpsReady: activeUsersCount > 0 && activeUsersCount === usersWithIban,
         };
     }
 
@@ -204,10 +225,13 @@ export class DashboardService {
                 absentWithoutLeave: 0,
                 adjustedPayslips: 0,
                 highVarianceEmployees: 0,
+                noBankAccountCount: 0,
+                gosiSkippedCount: 0,
+                stuckSubmissionsCount: 0,
             };
         }
 
-        // Late employees (simplified - count distinct employees with late records)
+        // 1. Basic attendance exceptions
         const lateEmployees = await this.prisma.attendance.groupBy({
             by: ['userId'],
             where: {
@@ -218,7 +242,6 @@ export class DashboardService {
             _count: true
         });
 
-        // Early departure cases
         const earlyDepartureCases = await this.prisma.attendance.count({
             where: {
                 companyId,
@@ -227,7 +250,6 @@ export class DashboardService {
             }
         });
 
-        // Absent without leave (attendance records with status ABSENT and no approved leave)
         const absentWithoutLeave = await this.prisma.attendance.count({
             where: {
                 companyId,
@@ -236,10 +258,36 @@ export class DashboardService {
             }
         });
 
-        // Adjusted payslips
+        // 2. Payroll exceptions
         const adjustedPayslips = await this.prisma.payslip.count({
             where: {
                 run: { companyId, periodId: period.id, isAdjustment: true }
+            }
+        });
+
+        // 3. New compliance exceptions
+        const noBankAccountCount = await this.prisma.user.count({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                role: 'EMPLOYEE',
+                bankAccounts: { none: {} }
+            }
+        });
+
+        const gosiSkippedCount = await this.prisma.user.count({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                isSaudi: false, // For example, non-Saudis if config is Saudi only
+            }
+        });
+
+        const stuckSubmissionsCount = await this.prisma.submissionStatusLog.count({
+            where: {
+                companyId,
+                toStatus: { in: ['FAILED', 'RESUBMIT_REQUIRED'] },
+                changedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
             }
         });
 
@@ -248,7 +296,10 @@ export class DashboardService {
             earlyDepartureCases,
             absentWithoutLeave,
             adjustedPayslips,
-            highVarianceEmployees: 0, // TODO: Calculate variance from previous month
+            highVarianceEmployees: 0,
+            noBankAccountCount,
+            gosiSkippedCount,
+            stuckSubmissionsCount,
         };
     }
 

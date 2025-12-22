@@ -33,6 +33,8 @@ import {
     Refresh as RefreshIcon,
     Add as AddIcon,
     OpenInNew as OpenInNewIcon,
+    Assessment as AuditIcon,
+    Security as SecurityIcon,
 } from '@mui/icons-material';
 import { useDashboard, useDashboardTrends } from '../../hooks/useDashboard';
 import { useAuthStore } from '../../store/auth.store';
@@ -314,12 +316,20 @@ export const PayrollDashboardPage: React.FC = () => {
                             <RefreshIcon />
                         </IconButton>
                     </Tooltip>
+                    <Button
+                        variant="contained"
+                        startIcon={<AuditIcon />}
+                        onClick={() => navigate('/audit/submissions')}
+                        sx={{ ml: 1, bgcolor: '#1a237e' }}
+                    >
+                        سجل التدقيق (Audit)
+                    </Button>
                 </Box>
             </Box>
 
             {/* Summary Cards */}
             <Grid container spacing={3} mb={3}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={12} sm={6} md={2.4}>
                     <SummaryCard
                         title="عدد الموظفين"
                         value={summary.headcount || 0}
@@ -330,15 +340,23 @@ export const PayrollDashboardPage: React.FC = () => {
                 </Grid>
                 {canSeeFinancials && (
                     <>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={6} md={2.4}>
                             <SummaryCard
-                                title="إجمالي الرواتب"
+                                title="إجمالي الاستحقاقات"
                                 value={`${(summary.grossTotal || 0).toLocaleString()} ر.س`}
                                 icon={<MoneyIcon />}
                                 color="#2e7d32"
                             />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                            <SummaryCard
+                                title="إجمالي الاستقطاعات"
+                                value={`${(summary.deductionsTotal || 0).toLocaleString()} ر.س`}
+                                icon={<MoneyIcon />}
+                                color="#d32f2f"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={2.4}>
                             <SummaryCard
                                 title="التأمينات (GOSI)"
                                 value={`${(summary.gosiTotal || 0).toLocaleString()} ر.س`}
@@ -347,13 +365,13 @@ export const PayrollDashboardPage: React.FC = () => {
                                 onClick={() => navigate('/salary')}
                             />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={6} md={2.4}>
                             <SummaryCard
                                 title="صافي الرواتب"
                                 value={`${(summary.netTotal || 0).toLocaleString()} ر.س`}
                                 icon={summary.isLocked ? <LockIcon /> : <UnlockIcon />}
-                                color={summary.isLocked ? '#d32f2f' : '#9c27b0'}
-                                subtitle={summary.isLocked ? 'مقفل' : 'غير مقفل'}
+                                color={summary.isLocked ? '#7b1fa2' : '#9c27b0'}
+                                subtitle={summary.isLocked ? 'مقفل' : 'غير مقفل (مسودة)'}
                                 onClick={() => navigate('/wps-export')}
                             />
                         </Grid>
@@ -377,6 +395,12 @@ export const PayrollDashboardPage: React.FC = () => {
                             {canSeeFinancials && health.gosiConfig && <HealthBadge label="GOSI" status={health.gosiConfig} />}
                             {health.payrollCalculated !== undefined && (
                                 <HealthBadge label="محسوب" status={health.payrollCalculated} />
+                            )}
+                            {health.mudadStatus && (
+                                <HealthBadge label="Mudad" status={health.mudadStatus} />
+                            )}
+                            {health.wpsReady !== undefined && (
+                                <HealthBadge label="WPS Ready" status={health.wpsReady} />
                             )}
                             {canSeeLock && health.payrollLocked !== undefined && (
                                 <HealthBadge label="مقفل" status={health.payrollLocked} />
@@ -421,6 +445,24 @@ export const PayrollDashboardPage: React.FC = () => {
                                 </Alert>
                             ) : (
                                 <>
+                                    <ClickableExceptionAlert
+                                        title="موظفون بدون حساب بنكي"
+                                        count={exceptions.noBankAccountCount || 0}
+                                        severity="error"
+                                        onClick={() => navigate('/users?filter=no-bank')}
+                                    />
+                                    <ClickableExceptionAlert
+                                        title="تخطي التأمينات (GOSI skipped)"
+                                        count={exceptions.gosiSkippedCount || 0}
+                                        severity="info"
+                                        onClick={() => navigate('/salary')}
+                                    />
+                                    <ClickableExceptionAlert
+                                        title="تقديمات عالقة (Mudad/WPS)"
+                                        count={exceptions.stuckSubmissionsCount || 0}
+                                        severity="error"
+                                        onClick={() => navigate('/audit/submissions')}
+                                    />
                                     <ClickableExceptionAlert
                                         title="موظفون متأخرون"
                                         count={exceptions.lateEmployees || 0}

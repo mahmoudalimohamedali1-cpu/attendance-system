@@ -22,6 +22,8 @@ export interface DashboardHealth {
     gosiConfig: 'OK' | 'MISSING';
     payrollCalculated: boolean;
     payrollLocked: boolean;
+    mudadStatus?: string;
+    wpsReady?: boolean;
 }
 
 export interface DashboardExceptions {
@@ -30,6 +32,9 @@ export interface DashboardExceptions {
     absentWithoutLeave: number;
     adjustedPayslips: number;
     highVarianceEmployees: number;
+    noBankAccountCount?: number;
+    gosiSkippedCount?: number;
+    stuckSubmissionsCount?: number;
 }
 
 export interface DashboardTrends {

@@ -20,6 +20,8 @@ export class DashboardHealthDto {
     @ApiProperty() gosiConfig: 'OK' | 'MISSING';
     @ApiProperty() payrollCalculated: boolean;
     @ApiProperty() payrollLocked: boolean;
+    @ApiProperty({ required: false }) mudadStatus?: string;
+    @ApiProperty({ required: false }) wpsReady?: boolean;
 }
 
 export class DashboardExceptionsDto {
@@ -28,6 +30,9 @@ export class DashboardExceptionsDto {
     @ApiProperty() absentWithoutLeave: number;
     @ApiProperty() adjustedPayslips: number;
     @ApiProperty() highVarianceEmployees: number;
+    @ApiProperty({ required: false }) noBankAccountCount?: number;
+    @ApiProperty({ required: false }) gosiSkippedCount?: number;
+    @ApiProperty({ required: false }) stuckSubmissionsCount?: number;
 }
 
 export class DashboardTrendsDto {
@@ -51,20 +56,20 @@ export class RoleBasedDashboardDto {
 export const ROLE_VISIBILITY = {
     ADMIN: {
         summary: ['period', 'headcount', 'grossTotal', 'deductionsTotal', 'gosiTotal', 'netTotal', 'wpsStatus', 'isLocked'],
-        health: ['attendance', 'leaves', 'advances', 'policies', 'gosiConfig', 'payrollCalculated', 'payrollLocked'],
-        exceptions: ['lateEmployees', 'earlyDepartureCases', 'absentWithoutLeave', 'adjustedPayslips', 'highVarianceEmployees'],
+        health: ['attendance', 'leaves', 'advances', 'policies', 'gosiConfig', 'payrollCalculated', 'payrollLocked', 'mudadStatus', 'wpsReady'],
+        exceptions: ['lateEmployees', 'earlyDepartureCases', 'absentWithoutLeave', 'adjustedPayslips', 'highVarianceEmployees', 'noBankAccountCount', 'gosiSkippedCount', 'stuckSubmissionsCount'],
         trends: ['periods', 'gross', 'net', 'gosi', 'otHours'],
     },
     HR: {
         summary: ['period', 'headcount', 'isLocked'],
-        health: ['attendance', 'leaves', 'advances', 'payrollCalculated', 'payrollLocked'],
-        exceptions: ['lateEmployees', 'earlyDepartureCases', 'absentWithoutLeave'],
+        health: ['attendance', 'leaves', 'advances', 'payrollCalculated', 'payrollLocked', 'mudadStatus', 'wpsReady'],
+        exceptions: ['lateEmployees', 'earlyDepartureCases', 'absentWithoutLeave', 'noBankAccountCount'],
         trends: ['periods', 'otHours'],
     },
     FINANCE: {
         summary: ['period', 'headcount', 'grossTotal', 'deductionsTotal', 'gosiTotal', 'netTotal', 'wpsStatus', 'isLocked'],
-        health: ['gosiConfig', 'payrollCalculated', 'payrollLocked'],
-        exceptions: ['adjustedPayslips', 'highVarianceEmployees'],
+        health: ['gosiConfig', 'payrollCalculated', 'payrollLocked', 'wpsReady'],
+        exceptions: ['adjustedPayslips', 'highVarianceEmployees', 'noBankAccountCount', 'gosiSkippedCount'],
         trends: ['periods', 'gross', 'net', 'gosi'],
     },
     EMPLOYEE: {
