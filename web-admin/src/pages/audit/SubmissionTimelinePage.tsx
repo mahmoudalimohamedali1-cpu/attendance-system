@@ -22,7 +22,7 @@ const statusColors: Record<string, 'success' | 'error' | 'warning' | 'info' | 'd
     REJECTED: 'error',
     SUBMITTED: 'info',
     PREPARED: 'warning',
-    PENDING: 'default',
+    PENDING: 'grey',
     RESUBMIT_REQUIRED: 'error',
     PROCESSED: 'success',
     FAILED: 'error',
