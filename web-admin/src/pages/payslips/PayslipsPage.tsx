@@ -158,6 +158,27 @@ export default function PayslipsPage() {
                         عرض وتحميل قسائم رواتب الموظفين
                     </Typography>
                 </Box>
+                {selectedRun && payslips && payslips.length > 0 && (
+                    <Button
+                        variant="contained"
+                        startIcon={<Download />}
+                        onClick={async () => {
+                            try {
+                                const response = await api.get(`/payroll-runs/${selectedRun}/export/excel`, { responseType: 'blob' });
+                                const blob = new Blob([response as any], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                                const url = window.URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = `payslips-${selectedRun}.xlsx`;
+                                link.click();
+                            } catch (error) {
+                                console.error('Failed to export:', error);
+                            }
+                        }}
+                    >
+                        تصدير الكل Excel
+                    </Button>
+                )}
             </Box>
 
             {/* Filters */}
