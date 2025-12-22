@@ -66,21 +66,31 @@ interface MenuGroup {
 }
 
 const allMenuItems: MenuItem[] = [
-  { text: 'لوحة التحكم', icon: <Dashboard />, path: '/dashboard' },
+  // Dashboard Group
+  { text: 'نظرة عامة', icon: <Dashboard />, path: '/dashboard' },
+  { text: 'لوحة الرواتب', icon: <Dashboard />, path: '/payroll-dashboard', requiredRole: 'ADMIN' },
+  { text: 'نظرة الالتزام', icon: <Dashboard />, path: '/compliance', requiredRole: 'ADMIN' },
+
+  // HR Management
   { text: 'المستخدمين', icon: <People />, path: '/users', requiredRole: 'ADMIN', requiredPermission: ['EMPLOYEES_VIEW', 'EMPLOYEES_EDIT'] },
   { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance', requiredPermission: ['ATTENDANCE_VIEW', 'ATTENDANCE_EDIT'] },
-  { text: 'الفروع والأقسام', icon: <Business />, path: '/branches', requiredRole: 'ADMIN' },
-  { text: 'الدرجات الوظيفية', icon: <Business />, path: '/job-titles', requiredRole: 'ADMIN' },
-  { text: 'العقود', icon: <Description />, path: '/contracts', requiredRole: 'ADMIN' },
-  { text: 'الأجهزة', icon: <Business />, path: '/devices', requiredRole: 'ADMIN' },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
+
+  // Financial
   { text: 'السلف', icon: <MonetizationOn />, path: '/advances', requiredPermission: ['ADVANCES_VIEW', 'ADVANCES_APPROVE_MANAGER', 'ADVANCES_APPROVE_HR'] },
   { text: 'طلبات التحديث', icon: <SyncIcon />, path: '/data-updates', badge: true, requiredRole: 'ADMIN' },
+
+  // Reports & Audit
   { text: 'التقارير', icon: <Assessment />, path: '/reports' },
+  { text: 'سجلات التدقيق', icon: <Security />, path: '/audit', requiredRole: 'ADMIN' },
+
+  // Settings
+  { text: 'الفروع والأقسام', icon: <Business />, path: '/branches', requiredRole: 'ADMIN' },
+  { text: 'الدرجات الوظيفية', icon: <Business />, path: '/job-titles', requiredRole: 'ADMIN' },
+  { text: 'الأجهزة', icon: <Business />, path: '/devices', requiredRole: 'ADMIN' },
   { text: 'الصلاحيات', icon: <Security />, path: '/permissions', requiredRole: 'ADMIN' },
   { text: 'السياسات', icon: <Security />, path: '/policies', requiredRole: 'ADMIN' },
-  { text: 'سجلات التدقيق', icon: <Security />, path: '/audit', requiredRole: 'ADMIN' },
   { text: 'الإعدادات', icon: <Settings />, path: '/settings', requiredRole: 'ADMIN' },
 ];
 
@@ -90,16 +100,27 @@ const payrollGroup: MenuGroup = {
   icon: <Payments />,
   requiredRole: 'ADMIN',
   children: [
-    { text: 'لوحة تحكم الرواتب', icon: <Dashboard />, path: '/payroll-dashboard' },
-    { text: 'إدارة الرواتب', icon: <MonetizationOn />, path: '/salary' },
+    { text: 'دورات الرواتب', icon: <MonetizationOn />, path: '/salary' },
+    { text: 'قسائم الرواتب', icon: <Description />, path: '/payslips' },
     { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises' },
     { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay' },
     { text: 'أقساط السلف', icon: <MonetizationOn />, path: '/loan-payments' },
     { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos' },
-    { text: 'تصدير WPS', icon: <MonetizationOn />, path: '/wps-export' },
     { text: 'الحسابات البنكية', icon: <MonetizationOn />, path: '/bank-accounts' },
     { text: 'مركز الاستثناءات', icon: <Security />, path: '/exceptions' },
-    { text: 'الشركات', icon: <Business />, path: '/companies' },
+  ],
+};
+
+// Compliance submenu group
+const complianceGroup: MenuGroup = {
+  text: 'الالتزام الحكومي',
+  icon: <Business />,
+  requiredRole: 'ADMIN',
+  children: [
+    { text: 'تصدير WPS', icon: <MonetizationOn />, path: '/wps-export' },
+    { text: 'متابعة WPS', icon: <MonetizationOn />, path: '/wps-tracking' },
+    { text: 'عقود قوى', icon: <Description />, path: '/contracts' },
+    { text: 'سجل الإرسالات', icon: <Security />, path: '/audit/submissions' },
   ],
 };
 
@@ -121,6 +142,7 @@ export const MainLayout = () => {
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [notificationCount, setNotificationCount] = useState(0);
   const [payrollOpen, setPayrollOpen] = useState(false);
+  const [complianceOpen, setComplianceOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
@@ -300,8 +322,55 @@ export const MainLayout = () => {
               </>
             )}
 
-            {/* Remaining items after payroll */}
-            {visibleMenuItems.slice(5).map((item) => (
+            {/* Compliance Submenu */}
+            {user?.role === 'ADMIN' && (
+              <>
+                <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                  <ListItemButton
+                    onClick={() => setComplianceOpen(!complianceOpen)}
+                    sx={{
+                      borderRadius: 2,
+                      bgcolor: complianceOpen ? 'action.selected' : 'transparent',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>{complianceGroup.icon}</ListItemIcon>
+                    <ListItemText primary={complianceGroup.text} />
+                    {complianceOpen ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={complianceOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {complianceGroup.children.map((item) => (
+                      <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
+                        <ListItemButton
+                          selected={location.pathname === item.path}
+                          onClick={() => {
+                            navigate(item.path);
+                            setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': { bgcolor: 'primary.dark' },
+                              '& .MuiListItemIcon-root': { color: 'white' },
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 30, '& svg': { fontSize: 18 } }}>{item.icon}</ListItemIcon>
+                          <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            )}
+
+            {/* Remaining items after submenus */}
+            {visibleMenuItems.slice(11).map((item) => (
               <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
                 <ListItemButton
                   selected={location.pathname === item.path}
