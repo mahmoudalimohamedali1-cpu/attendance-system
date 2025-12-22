@@ -49,9 +49,20 @@ import {
     ContentCopy,
     Warning,
     Search,
+    Add,
+    ArrowForward,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api.service';
 import { format } from 'date-fns';
+
+// PayrollRun type for selection
+interface PayrollRun {
+    id: string;
+    month: number;
+    year: number;
+    status: string;
+}
 
 // Types
 interface MudadSubmission {
@@ -141,11 +152,14 @@ const allowedTransitions: Record<string, string[]> = {
 };
 
 export default function MudadPage() {
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [selectedSubmission, setSelectedSubmission] = useState<MudadSubmission | null>(null);
     const [statusDialogOpen, setStatusDialogOpen] = useState(false);
     const [attachDialogOpen, setAttachDialogOpen] = useState(false);
     const [logsDrawerOpen, setLogsDrawerOpen] = useState(false);
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [selectedRunId, setSelectedRunId] = useState('');
     const [newStatus, setNewStatus] = useState('');
     const [reason, setReason] = useState('');
     const [fileUrl, setFileUrl] = useState('');
@@ -183,6 +197,28 @@ export default function MudadPage() {
             return (response as any)?.data || response || [];
         },
         enabled: !!selectedSubmission && logsDrawerOpen,
+    });
+
+    // Fetch payroll runs for create dialog
+    const { data: payrollRuns } = useQuery<PayrollRun[]>({
+        queryKey: ['payroll-runs-for-mudad'],
+        queryFn: async () => {
+            const response = await api.get('/payroll-runs?status=LOCKED');
+            return (response as any)?.data || response || [];
+        },
+    });
+
+    // Create submission mutation
+    const createMutation = useMutation({
+        mutationFn: async (data: { payrollRunId: string; month: number; year: number }) => {
+            return api.post('/mudad', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mudad'] });
+            queryClient.invalidateQueries({ queryKey: ['mudad-stats'] });
+            setCreateDialogOpen(false);
+            setSelectedRunId('');
+        },
     });
 
     // Update status mutation
@@ -270,13 +306,22 @@ export default function MudadPage() {
                         إدارة تقديمات بيانات الموظفين لوزارة الموارد البشرية
                     </Typography>
                 </Box>
-                <Button
-                    variant="outlined"
-                    startIcon={<Refresh />}
-                    onClick={() => queryClient.invalidateQueries({ queryKey: ['mudad'] })}
-                >
-                    تحديث
-                </Button>
+                <Box display="flex" gap={2}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Refresh />}
+                        onClick={() => queryClient.invalidateQueries({ queryKey: ['mudad'] })}
+                    >
+                        تحديث
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={() => setCreateDialogOpen(true)}
+                    >
+                        إنشاء تقديم جديد
+                    </Button>
+                </Box>
             </Box>
 
             {isLoading && <LinearProgress sx={{ mb: 3 }} />}
@@ -466,8 +511,36 @@ export default function MudadPage() {
                         {filteredSubmissions?.length === 0 && !isLoading && (
                             <TableRow>
                                 <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
-                                    <CloudUpload sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
-                                    <Typography color="text.secondary">لا توجد تقديمات</Typography>
+                                    <CloudUpload sx={{ fontSize: 64, color: 'grey.400', mb: 2 }} />
+                                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                                        لا توجد تقديمات لهذه الفترة
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}>
+                                        ابدأ بإنشاء دورة رواتب وتصدير WPS أولاً، ثم أنشئ تقديم مُدد لربطه بالملف.
+                                    </Typography>
+                                    <Box display="flex" gap={2} justifyContent="center">
+                                        <Button
+                                            variant="outlined"
+                                            endIcon={<ArrowForward />}
+                                            onClick={() => navigate('/payroll-dashboard')}
+                                        >
+                                            لوحة الرواتب
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            endIcon={<ArrowForward />}
+                                            onClick={() => navigate('/wps-tracking')}
+                                        >
+                                            متابعة WPS
+                                        </Button>
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<Add />}
+                                            onClick={() => setCreateDialogOpen(true)}
+                                        >
+                                            إنشاء تقديم
+                                        </Button>
+                                    </Box>
                                 </TableCell>
                             </TableRow>
                         )}
@@ -575,6 +648,71 @@ export default function MudadPage() {
                         }}
                     >
                         إرفاق
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Create Submission Dialog */}
+            <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <Add color="primary" />
+                        إنشاء تقديم مُدد جديد
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Alert severity="info" sx={{ mb: 3 }}>
+                        اختر دورة الرواتب المغلقة (LOCKED) لإنشاء تقديم مُدد مرتبط بها.
+                        <br />
+                        تأكد من تصدير ملف WPS قبل البدء.
+                    </Alert>
+                    <FormControl fullWidth>
+                        <InputLabel>دورة الرواتب</InputLabel>
+                        <Select
+                            value={selectedRunId}
+                            onChange={(e) => setSelectedRunId(e.target.value)}
+                            label="دورة الرواتب"
+                        >
+                            {payrollRuns?.length === 0 && (
+                                <MenuItem disabled>لا توجد دورات رواتب مغلقة</MenuItem>
+                            )}
+                            {payrollRuns?.map((run) => (
+                                <MenuItem key={run.id} value={run.id}>
+                                    {getMonthName(run.month)} {run.year} - {run.status === 'LOCKED' ? '🔒 مغلقة' : run.status}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    {!payrollRuns?.length && (
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                            لا توجد دورات رواتب مغلقة. يجب إنشاء دورة رواتب وإغلاقها أولاً.
+                            <Button
+                                size="small"
+                                sx={{ mt: 1 }}
+                                onClick={() => { setCreateDialogOpen(false); navigate('/payroll-dashboard'); }}
+                            >
+                                الذهاب للوحة الرواتب
+                            </Button>
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setCreateDialogOpen(false)}>إلغاء</Button>
+                    <Button
+                        variant="contained"
+                        disabled={!selectedRunId || createMutation.isPending}
+                        onClick={() => {
+                            const selectedRun = payrollRuns?.find(r => r.id === selectedRunId);
+                            if (selectedRun) {
+                                createMutation.mutate({
+                                    payrollRunId: selectedRun.id,
+                                    month: selectedRun.month,
+                                    year: selectedRun.year,
+                                });
+                            }
+                        }}
+                    >
+                        {createMutation.isPending ? 'جارٍ الإنشاء...' : 'إنشاء التقديم'}
                     </Button>
                 </DialogActions>
             </Dialog>
