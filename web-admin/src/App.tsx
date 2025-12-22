@@ -32,15 +32,20 @@ import BankAccountsPage from './pages/bank-accounts/BankAccountsPage';
 import DevicesPage from './pages/devices/DevicesPage';
 import LoanPaymentsPage from './pages/loan-payments/LoanPaymentsPage';
 import CompaniesPage from './pages/companies/CompaniesPage';
+import { Box, CircularProgress } from '@mui/material';
 import { PayrollDashboardPage } from './pages/payroll/PayrollDashboardPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, checkAuth } = useAuthStore();
+  const { isAuthenticated, isLoading } = useAuthStore();
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -102,7 +107,7 @@ function App() {
         <Route path="payroll-dashboard" element={<PayrollDashboardPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/settings" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

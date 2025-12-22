@@ -37,9 +37,28 @@ interface AuthState {
   clearError: () => void;
 }
 
+// Helper to get initial state
+const getInitialState = () => {
+  const token = localStorage.getItem('access_token');
+  const userStr = localStorage.getItem('user');
+
+  if (token && userStr) {
+    try {
+      return {
+        user: JSON.parse(userStr),
+        isAuthenticated: true
+      };
+    } catch {
+      return { user: null, isAuthenticated: false };
+    }
+  }
+  return { user: null, isAuthenticated: false };
+};
+
+const initialState = getInitialState();
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
+  ...initialState,
   isLoading: false,
   error: null,
 
