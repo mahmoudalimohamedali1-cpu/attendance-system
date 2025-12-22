@@ -36,7 +36,7 @@ async function seedPayroll() {
                 nameAr: 'الراتب الأساسي',
                 nameEn: 'Basic Salary',
                 type: 'EARNING',
-                isFixed: true,
+                nature: 'FIXED',
                 isActive: true,
                 companyId: company.id,
             }
@@ -50,7 +50,7 @@ async function seedPayroll() {
                 nameAr: 'بدل السكن',
                 nameEn: 'Housing Allowance',
                 type: 'EARNING',
-                isFixed: true,
+                nature: 'FIXED',
                 isActive: true,
                 companyId: company.id,
             }
@@ -64,7 +64,7 @@ async function seedPayroll() {
                 nameAr: 'بدل المواصلات',
                 nameEn: 'Transport Allowance',
                 type: 'EARNING',
-                isFixed: true,
+                nature: 'FIXED',
                 isActive: true,
                 companyId: company.id,
             }
@@ -78,7 +78,7 @@ async function seedPayroll() {
                 nameAr: 'حصة الموظف من التأمينات',
                 nameEn: 'GOSI Employee Share',
                 type: 'DEDUCTION',
-                isFixed: false,
+                nature: 'VARIABLE',
                 isActive: true,
                 companyId: company.id,
             }
