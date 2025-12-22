@@ -38,6 +38,7 @@ import ComplianceOverviewPage from './pages/compliance/ComplianceOverviewPage';
 import PayslipsPage from './pages/payslips/PayslipsPage';
 import WpsTrackingPage from './pages/wps-tracking/WpsTrackingPage';
 import MudadPage from './pages/mudad/MudadPage';
+import GosiPage from './pages/gosi/GosiPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -113,6 +114,7 @@ function App() {
         <Route path="payslips" element={<PayslipsPage />} />
         <Route path="wps-tracking" element={<WpsTrackingPage />} />
         <Route path="mudad" element={<MudadPage />} />
+        <Route path="gosi" element={<GosiPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

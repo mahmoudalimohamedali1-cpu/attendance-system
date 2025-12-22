@@ -120,6 +120,7 @@ const complianceGroup: MenuGroup = {
     { text: 'تصدير WPS', icon: <MonetizationOn />, path: '/wps-export' },
     { text: 'متابعة WPS', icon: <MonetizationOn />, path: '/wps-tracking' },
     { text: 'مُدد', icon: <Business />, path: '/mudad' },
+    { text: 'التأمينات GOSI', icon: <Business />, path: '/gosi' },
     { text: 'عقود قوى', icon: <Description />, path: '/contracts' },
     { text: 'سجل الإرسالات', icon: <Security />, path: '/audit/submissions' },
   ],
