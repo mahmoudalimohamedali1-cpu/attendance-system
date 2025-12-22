@@ -41,7 +41,6 @@ import {
     CheckCircle,
     Error as ErrorIcon,
     Schedule,
-    Visibility,
     Refresh,
     History,
     AttachFile,
