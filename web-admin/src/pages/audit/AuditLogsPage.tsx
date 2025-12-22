@@ -45,6 +45,11 @@ const entityLabels: Record<string, string> = {
     PERMISSION: 'الصلاحيات',
     POLICY: 'السياسات',
     SETTINGS: 'الإعدادات',
+    WPS: 'نظام حماية الأجور',
+    MUDAD: 'مُدد',
+    GOSI: 'التأمينات',
+    QIWA: 'قوى',
+    CONTRACT: 'العقود',
 };
 
 export const AuditLogsPage = () => {
