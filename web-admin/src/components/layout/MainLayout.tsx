@@ -44,6 +44,7 @@ import {
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
+import { useSidebarBadges } from '@/contexts/SidebarBadgesContext';
 
 const drawerWidth = 250;
 
@@ -148,6 +149,7 @@ export const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const { badges } = useSidebarBadges();
 
   // Fetch user permissions on mount
   useEffect(() => {
@@ -337,6 +339,9 @@ export const MainLayout = () => {
                   >
                     <ListItemIcon sx={{ minWidth: 36 }}>{complianceGroup.icon}</ListItemIcon>
                     <ListItemText primary={complianceGroup.text} />
+                    {badges.complianceActions > 0 && (
+                      <Badge badgeContent={badges.complianceActions} color="error" sx={{ mr: 1 }} />
+                    )}
                     {complianceOpen ? <ExpandLess /> : <ExpandMore />}
                   </ListItemButton>
                 </ListItem>
