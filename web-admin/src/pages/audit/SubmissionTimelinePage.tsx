@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Card, Typography, Grid, TextField, Button, MenuItem,
     CircularProgress, Chip, FormControl, InputLabel, Select,
-    Stack, Divider,
+    Divider,
 } from '@mui/material';
 import {
     Timeline,
@@ -203,8 +203,8 @@ const SubmissionTimelinePage = () => {
                                                 p: 2,
                                                 borderRadius: 3,
                                                 background: 'linear-gradient(to bottom right, #ffffff, #f8f9fa)',
-                                                borderLeft: isOdd ? 'none' : `5px solid ${statusColors[log.toStatus] ? 'primary.main' : '#ccc'}`,
-                                                borderRight: isOdd ? `5px solid ${statusColors[log.toStatus] ? 'primary.main' : '#ccc'}` : 'none',
+                                                borderLeft: isOdd ? 'none' : `5px solid #1976d2`,
+                                                borderRight: isOdd ? `5px solid #1976d2` : 'none',
                                                 boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                                                 textAlign: isOdd ? 'left' : 'right'
                                             }}
@@ -245,7 +245,7 @@ const SubmissionTimelinePage = () => {
 
                                             {meta && meta.oldHash && (
                                                 <Box sx={{ mt: 2, p: 1.5, bgcolor: '#fff5f5', border: '1px dashed #feb2b2', borderRadius: 2 }}>
-                                                    <Box display="flex" alignItems="center" gap={1, mb : 0.5}>
+                                                    <Box display="flex" alignItems="center" gap={1} mb={0.5}>
                                                         <Error color="error" fontSize="small" />
                                                         <Typography variant="caption" color="error.dark" fontWeight="bold">رصد تغيير في بصمة الملف (Security Alert)</Typography>
                                                     </Box>
@@ -258,32 +258,29 @@ const SubmissionTimelinePage = () => {
                                                 </Box>
                                             )}
 
-                                        {log.changedByName && (
                                             <Divider sx={{ my: 1.5, opacity: 0.5 }} />
-                                        )}
 
-                                        {log.changedByName && (
-                                            <Box display="flex" alignItems="center" gap={1} justifyContent={isOdd ? 'flex-end' : 'flex-start'}>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    بواسطة: <strong>{log.changedByName}</strong>
-                                                </Typography>
-                                            </Box>
-                                        )}
-                                    </Card>
-                                </TimelineContent>
+                                            {log.changedByName && (
+                                                <Box display="flex" alignItems="center" gap={1} justifyContent={isOdd ? 'flex-end' : 'flex-start'}>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        بواسطة: <strong>{log.changedByName}</strong>
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Card>
+                                    </TimelineContent>
                                 </TimelineItem>
-                    );
+                            );
                         })}
-                </Timeline>
+                    </Timeline>
                 </Box>
-    ) : (
-        <Card sx={{ p: 5, textAlign: 'center', borderRadius: 4 }}>
-            <History sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary">لا توجد سجلات مطابقة للبحث</Typography>
-        </Card>
-    )
-}
-        </Box >
+            ) : (
+                <Card sx={{ p: 5, textAlign: 'center', borderRadius: 4 }}>
+                    <History sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary">لا توجد سجلات مطابقة للبحث</Typography>
+                </Card>
+            )}
+        </Box>
     );
 };
 
