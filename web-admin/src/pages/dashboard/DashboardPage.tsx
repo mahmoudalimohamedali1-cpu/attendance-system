@@ -613,6 +613,101 @@ export const DashboardPage = () => {
         ))}
       </Grid>
 
+      {/* Compliance Snapshot */}
+      {user?.role === 'ADMIN' && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SecurityIcon color="info" /> الالتزام الحكومي
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  border: '2px solid',
+                  borderColor: 'success.light',
+                  '&:hover': { boxShadow: 4 }
+                }}
+                onClick={() => navigate('/gosi')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <CloudUpload sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                  <Typography variant="h6" fontWeight="bold">التأمينات GOSI</Typography>
+                  <Chip label="مفعّل ✓" color="success" size="small" sx={{ mt: 1 }} />
+                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                    انقر لإدارة الإعدادات
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  border: '2px solid',
+                  borderColor: 'warning.light',
+                  '&:hover': { boxShadow: 4 }
+                }}
+                onClick={() => navigate('/wps-tracking')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <CloudUpload sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                  <Typography variant="h6" fontWeight="bold">متابعة WPS</Typography>
+                  <Chip label="تتبع الملفات" color="warning" size="small" sx={{ mt: 1 }} />
+                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                    انقر لعرض الحالة
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  border: '2px solid',
+                  borderColor: 'primary.light',
+                  '&:hover': { boxShadow: 4 }
+                }}
+                onClick={() => navigate('/mudad')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <History sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                  <Typography variant="h6" fontWeight="bold">مُدد</Typography>
+                  <Chip label="منصة الأجور" color="primary" size="small" sx={{ mt: 1 }} />
+                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                    انقر لإدارة التقديمات
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card
+                sx={{
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  border: '2px solid',
+                  borderColor: 'secondary.light',
+                  '&:hover': { boxShadow: 4 }
+                }}
+                onClick={() => navigate('/contracts')}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 3 }}>
+                  <Description sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
+                  <Typography variant="h6" fontWeight="bold">قوى - العقود</Typography>
+                  <Chip label="عقود العمل" color="secondary" size="small" sx={{ mt: 1 }} />
+                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                    انقر لإدارة العقود
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+
       {/* Security & Compliance Alerts */}
       {dashboardStats.compliance && (
         <Box sx={{ mb: 4 }}>
