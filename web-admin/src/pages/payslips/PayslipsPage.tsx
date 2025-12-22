@@ -80,9 +80,11 @@ interface Payslip {
 
 interface PayrollRun {
     id: string;
-    month: number;
-    year: number;
     status: string;
+    period: {
+        month: number;
+        year: number;
+    };
 }
 
 export default function PayslipsPage() {
@@ -197,7 +199,7 @@ export default function PayslipsPage() {
                                 </MenuItem>
                                 {payrollRuns?.map((run) => (
                                     <MenuItem key={run.id} value={run.id}>
-                                        {getMonthName(run.month)} {run.year} - {run.status === 'LOCKED' ? '🔒' : '📝'}
+                                        {getMonthName(run.period?.month)} {run.period?.year} - {run.status === 'LOCKED' ? '🔒' : '📝'}
                                     </MenuItem>
                                 ))}
                             </Select>
