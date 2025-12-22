@@ -14,7 +14,7 @@ async function seedPayroll() {
 
     // Get active users
     const users = await prisma.user.findMany({
-        where: { companyId: company.id, isActive: true },
+        where: { companyId: company.id },
         take: 10,
     });
 
@@ -23,7 +23,69 @@ async function seedPayroll() {
         return;
     }
 
-    console.log(`📊 Found ${users.length} users to create payslips for`);
+    console.log(`📊 Found ${users.length} users`);
+
+    // Ensure basic salary components exist
+    const components = {
+        BASIC: await prisma.salaryComponent.upsert({
+            where: { id: 'seed-basic' },
+            update: {},
+            create: {
+                id: 'seed-basic',
+                code: 'BASIC',
+                nameAr: 'الراتب الأساسي',
+                nameEn: 'Basic Salary',
+                type: 'EARNING',
+                isFixed: true,
+                isActive: true,
+                companyId: company.id,
+            }
+        }),
+        HOUSING: await prisma.salaryComponent.upsert({
+            where: { id: 'seed-housing' },
+            update: {},
+            create: {
+                id: 'seed-housing',
+                code: 'HOUSING',
+                nameAr: 'بدل السكن',
+                nameEn: 'Housing Allowance',
+                type: 'EARNING',
+                isFixed: true,
+                isActive: true,
+                companyId: company.id,
+            }
+        }),
+        TRANSPORT: await prisma.salaryComponent.upsert({
+            where: { id: 'seed-transport' },
+            update: {},
+            create: {
+                id: 'seed-transport',
+                code: 'TRANSPORT',
+                nameAr: 'بدل المواصلات',
+                nameEn: 'Transport Allowance',
+                type: 'EARNING',
+                isFixed: true,
+                isActive: true,
+                companyId: company.id,
+            }
+        }),
+        GOSI: await prisma.salaryComponent.upsert({
+            where: { id: 'seed-gosi' },
+            update: {},
+            create: {
+                id: 'seed-gosi',
+                code: 'GOSI_EMP',
+                nameAr: 'حصة الموظف من التأمينات',
+                nameEn: 'GOSI Employee Share',
+                type: 'DEDUCTION',
+                isFixed: false,
+                isActive: true,
+                companyId: company.id,
+            }
+        }),
+    };
+
+    console.log('✅ Salary components ready');
 
     // Create Payroll Periods and Runs for last 3 months
     const months = [
@@ -60,7 +122,7 @@ async function seedPayroll() {
             });
             console.log(`✅ Created period: ${m.month}/${m.year}`);
         } else {
-            console.log(`⏭️ Period ${m.month}/${m.year} already exists`);
+            console.log(`⏭️ Period ${m.month}/${m.year} exists`);
         }
 
         // Check if run exists
@@ -69,7 +131,7 @@ async function seedPayroll() {
         });
 
         if (existingRun) {
-            console.log(`⏭️ Skipping run for ${m.month}/${m.year} - already exists`);
+            console.log(`⏭️ Run for ${m.month}/${m.year} exists`);
             continue;
         }
 
@@ -83,30 +145,19 @@ async function seedPayroll() {
             }
         });
 
-        console.log(`✅ Created payroll run: ${m.month}/${m.year} (${m.status})`);
+        console.log(`✅ Created run: ${m.month}/${m.year}`);
 
         // Create payslips for each user
         for (const user of users) {
-            // Random salary between 5000 and 20000
             const basicSalary = Math.floor(Math.random() * 15000) + 5000;
             const housingAllowance = Math.floor(basicSalary * 0.25);
             const transportAllowance = Math.floor(basicSalary * 0.10);
+            const gosiEmployee = Math.floor((basicSalary + housingAllowance) * 0.0975);
 
-            // Calculate GOSI (Saudi only)
-            const isSaudi = Math.random() > 0.3; // 70% chance Saudi
-            const gosiBase = basicSalary + housingAllowance;
-            const gosiEmployee = isSaudi ? Math.floor(gosiBase * 0.0975) : 0;
-
-            // Random deductions
-            const lateDeduction = Math.random() > 0.7 ? Math.floor(Math.random() * 200) : 0;
-            const loanDeduction = Math.random() > 0.8 ? Math.floor(Math.random() * 300) + 100 : 0;
-
-            // Calculate totals
             const grossSalary = basicSalary + housingAllowance + transportAllowance;
-            const totalDeductions = gosiEmployee + lateDeduction + loanDeduction;
+            const totalDeductions = gosiEmployee;
             const netSalary = grossSalary - totalDeductions;
 
-            // Create payslip
             await prisma.payslip.create({
                 data: {
                     employeeId: user.id,
@@ -121,48 +172,36 @@ async function seedPayroll() {
                     lines: {
                         create: [
                             {
-                                componentCode: 'BASIC',
-                                componentName: 'الراتب الأساسي',
-                                type: 'EARNING',
+                                componentId: components.BASIC.id,
+                                sign: 'EARNING',
                                 amount: basicSalary,
+                                sourceType: 'STRUCTURE',
                             },
                             {
-                                componentCode: 'HOUSING',
-                                componentName: 'بدل السكن',
-                                type: 'EARNING',
+                                componentId: components.HOUSING.id,
+                                sign: 'EARNING',
                                 amount: housingAllowance,
+                                sourceType: 'STRUCTURE',
                             },
                             {
-                                componentCode: 'TRANSPORT',
-                                componentName: 'بدل المواصلات',
-                                type: 'EARNING',
+                                componentId: components.TRANSPORT.id,
+                                sign: 'EARNING',
                                 amount: transportAllowance,
+                                sourceType: 'STRUCTURE',
                             },
-                            ...(gosiEmployee > 0 ? [{
-                                componentCode: 'GOSI_EMP',
-                                componentName: 'حصة الموظف من التأمينات',
-                                type: 'DEDUCTION' as const,
+                            {
+                                componentId: components.GOSI.id,
+                                sign: 'DEDUCTION',
                                 amount: gosiEmployee,
-                            }] : []),
-                            ...(lateDeduction > 0 ? [{
-                                componentCode: 'LATE_DED',
-                                componentName: 'خصم التأخير',
-                                type: 'DEDUCTION' as const,
-                                amount: lateDeduction,
-                            }] : []),
-                            ...(loanDeduction > 0 ? [{
-                                componentCode: 'LOAN_DED',
-                                componentName: 'قسط سلفة',
-                                type: 'DEDUCTION' as const,
-                                amount: loanDeduction,
-                            }] : []),
+                                sourceType: 'STATUTORY',
+                            },
                         ]
                     }
                 }
             });
         }
 
-        console.log(`   📊 Created ${users.length} payslips for ${m.month}/${m.year}`);
+        console.log(`   📊 Created ${users.length} payslips`);
     }
 
     // Create GOSI Config if not exists
@@ -174,23 +213,19 @@ async function seedPayroll() {
         await prisma.gosiConfig.create({
             data: {
                 companyId: company.id,
-                saudiEmployeeRate: 9.75,
-                saudiEmployerRate: 11.75,
-                nonSaudiEmployerRate: 2.0,
-                contributionCap: 45000,
-                includeHousing: true,
+                employeeRate: 9.75,
+                employerRate: 11.75,
+                sanedRate: 0.75,
+                hazardRate: 2.0,
+                maxCapAmount: 45000,
                 isActive: true,
-                effectiveFrom: new Date('2024-01-01'),
+                effectiveDate: new Date('2024-01-01'),
             }
         });
         console.log('✅ Created GOSI configuration');
     }
 
     console.log('\n🎉 Payroll seed completed!');
-    console.log('📝 Summary:');
-    console.log('   - Payroll Periods: 4 months (Oct 2024 - Jan 2025)');
-    console.log(`   - Payslips: ${users.length} per month`);
-    console.log('   - GOSI Config: Active');
 }
 
 seedPayroll()
