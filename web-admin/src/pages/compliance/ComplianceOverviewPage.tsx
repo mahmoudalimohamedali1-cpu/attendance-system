@@ -17,7 +17,6 @@ import {
     ListItemIcon,
     ListItemText,
     ListItemSecondaryAction,
-    IconButton,
     Divider,
     Avatar,
 } from '@mui/material';
@@ -34,7 +33,6 @@ import {
     Refresh,
     Download,
     TrendingUp,
-    AssignmentTurnedIn,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 
@@ -429,7 +427,7 @@ export default function ComplianceOverviewPage() {
                     </Typography>
                     <Divider sx={{ my: 2 }} />
                     <List disablePadding>
-                        {actionItems.map((item, index) => (
+                        {actionItems.map((item) => (
                             <ListItem
                                 key={item.id}
                                 sx={{

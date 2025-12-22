@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
     Box,
     Grid,
-    Card,
-    CardContent,
     Typography,
     TextField,
     Button,
@@ -28,7 +26,6 @@ import {
     MenuItem,
     LinearProgress,
     Avatar,
-    Divider,
     List,
     ListItem,
     ListItemText,
@@ -40,14 +37,11 @@ import {
     Visibility,
     Close,
     Person,
-    AttachMoney,
     Receipt,
     CalendarMonth,
     Print,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
 
 interface PayslipLine {
     id: string;
