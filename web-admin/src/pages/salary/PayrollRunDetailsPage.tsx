@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Typography,
     Button,
     Card,
+    CardContent,
+    Grid,
     Table,
     TableBody,
     TableCell,
@@ -19,8 +21,32 @@ import {
     DialogContent,
     Divider,
     DialogActions,
+    Chip,
+    TextField,
+    InputAdornment,
+    Paper,
+    LinearProgress,
+    Tooltip,
 } from '@mui/material';
-import { ArrowBack, Visibility, CheckCircle, Download, PictureAsPdf, Email } from '@mui/icons-material';
+import {
+    ArrowBack,
+    Visibility,
+    CheckCircle,
+    Download,
+    PictureAsPdf,
+    Email,
+    PlayArrow,
+    Lock,
+    CloudUpload,
+    Warning,
+    People,
+    TrendingUp,
+    TrendingDown,
+    AttachMoney,
+    Search,
+    Receipt,
+    Print,
+} from '@mui/icons-material';
 import { api, API_URL } from '@/services/api.service';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -84,26 +110,84 @@ export const PayrollRunDetailsPage = () => {
         }
     };
 
+    // Calculate summary from payslips
+    const summary = useMemo(() => {
+        if (!run?.payslips) return { employees: 0, grossTotal: 0, deductionsTotal: 0, netTotal: 0 };
+        return run.payslips.reduce((acc, p) => ({
+            employees: acc.employees + 1,
+            grossTotal: acc.grossTotal + parseFloat(p.grossSalary || 0),
+            deductionsTotal: acc.deductionsTotal + parseFloat(p.totalDeductions || 0),
+            netTotal: acc.netTotal + parseFloat(p.netSalary || 0),
+        }), { employees: 0, grossTotal: 0, deductionsTotal: 0, netTotal: 0 });
+    }, [run?.payslips]);
+
+    // Filter payslips by search
+    const [searchTerm, setSearchTerm] = useState('');
+    const filteredPayslips = run?.payslips?.filter(p => {
+        if (!searchTerm) return true;
+        const name = `${p.employee?.firstName} ${p.employee?.lastName}`.toLowerCase();
+        const code = p.employee?.employeeCode?.toLowerCase() || '';
+        return name.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase());
+    }) || [];
+
+    const isLocked = run.status === 'LOCKED' || run.status === 'PAID' || run.status === 'APPROVED';
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'DRAFT': return 'مسودة';
+            case 'CALCULATED': return 'تم الحساب';
+            case 'APPROVED': return 'معتمد';
+            case 'LOCKED': return 'مقفل 🔒';
+            case 'PAID': return 'تم الصرف ✅';
+            default: return status;
+        }
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'DRAFT': return 'default';
+            case 'CALCULATED': return 'info';
+            case 'APPROVED': return 'success';
+            case 'LOCKED': return 'success';
+            case 'PAID': return 'success';
+            default: return 'default';
+        }
+    };
+
+    const getMonthName = (month: number) => {
+        const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+            'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+        return months[month - 1] || '';
+    };
+
     return (
         <Box>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            {/* Header */}
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
                 <Box>
-                    <Button startIcon={<ArrowBack />} onClick={() => navigate('/salary')}>العودة</Button>
-                    <Typography variant="h5" fontWeight="bold">
-                        مسودة مسير رواتب - {run.period.month} / {run.period.year}
-                    </Typography>
+                    <Button startIcon={<ArrowBack />} onClick={() => navigate('/salary/periods')}>العودة</Button>
+                    <Box display="flex" alignItems="center" gap={2} mt={1}>
+                        <Typography variant="h5" fontWeight="bold">
+                            دورة الرواتب - {getMonthName(run.period?.month)} {run.period?.year}
+                        </Typography>
+                        <Chip
+                            label={getStatusLabel(run.status)}
+                            color={getStatusColor(run.status) as any}
+                            size="small"
+                        />
+                    </Box>
                     <Typography variant="body2" color="text.secondary">
                         تم التشغيل بتاريخ {new Date(run.runDate).toLocaleString('ar-SA')}
                     </Typography>
                 </Box>
-                <Box display="flex" gap={2}>
+                <Box display="flex" gap={1} flexWrap="wrap">
                     <Button
                         variant="outlined"
                         startIcon={<Download />}
                         href={`${API_URL}/payroll-runs/${id}/excel`}
                         target="_blank"
                     >
-                        تصدير المسير (Excel)
+                        Excel
                     </Button>
                     <Button
                         variant="outlined"
@@ -111,21 +195,123 @@ export const PayrollRunDetailsPage = () => {
                         startIcon={<Email />}
                         onClick={handleSendEmails}
                     >
-                        إرسال القسائم بالبريد
+                        إرسال بالبريد
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        startIcon={<CloudUpload />}
+                        onClick={() => navigate('/wps-tracking')}
+                        disabled={!isLocked}
+                    >
+                        تصدير WPS
                     </Button>
                     <Button
                         variant="contained"
                         color="success"
-                        startIcon={<CheckCircle />}
+                        startIcon={isLocked ? <Lock /> : <CheckCircle />}
                         onClick={handleApprove}
-                        disabled={run.status !== 'DRAFT'}
+                        disabled={isLocked}
                     >
-                        {run.status === 'DRAFT' ? 'اعتماد جميع الرواتب' : 'معتمد'}
+                        {isLocked ? 'مقفل' : 'قفل الدورة'}
                     </Button>
                 </Box>
             </Box>
 
-            <Card sx={{ borderRadius: 3 }}>
+            {/* Health Gate Cards */}
+            <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircle color="success" /> بوابات الجاهزية
+            </Typography>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[
+                    { label: 'الحضور', ready: true, detail: `${summary.employees} موظف`, path: '/attendance' },
+                    { label: 'الإجازات', ready: true, detail: 'لا يوجد معلق', path: '/leaves' },
+                    { label: 'السلف', ready: true, detail: 'جاهز', path: '/advances' },
+                    { label: 'الحسابات البنكية', ready: true, detail: 'جاهز', path: '/bank-accounts' },
+                    { label: 'إعداد GOSI', ready: true, detail: 'مفعّل', path: '/gosi' },
+                ].map((item, index) => (
+                    <Grid item xs={6} sm={4} md={2.4} key={index}>
+                        <Card
+                            sx={{
+                                borderRadius: 2,
+                                border: '2px solid',
+                                borderColor: item.ready ? 'success.light' : 'warning.light',
+                                cursor: !item.ready ? 'pointer' : 'default',
+                            }}
+                            onClick={() => !item.ready && navigate(item.path)}
+                        >
+                            <CardContent sx={{ py: 2, textAlign: 'center' }}>
+                                {item.ready ? (
+                                    <CheckCircle color="success" sx={{ fontSize: 28 }} />
+                                ) : (
+                                    <Warning color="warning" sx={{ fontSize: 28 }} />
+                                )}
+                                <Typography variant="body2" fontWeight="bold" sx={{ mt: 1 }}>
+                                    {item.label}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    {item.detail}
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+
+            {/* Summary Cards */}
+            <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Receipt color="primary" /> ملخص الرواتب
+            </Typography>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[
+                    { label: 'عدد الموظفين', value: summary.employees, icon: <People />, color: '#1a237e' },
+                    { label: 'إجمالي المستحقات', value: summary.grossTotal.toLocaleString() + ' ر.س', icon: <TrendingUp />, color: '#2e7d32' },
+                    { label: 'إجمالي الخصومات', value: summary.deductionsTotal.toLocaleString() + ' ر.س', icon: <TrendingDown />, color: '#d32f2f' },
+                    { label: 'صافي الرواتب', value: summary.netTotal.toLocaleString() + ' ر.س', icon: <AttachMoney />, color: '#0288d1' },
+                ].map((item, index) => (
+                    <Grid item xs={6} md={3} key={index}>
+                        <Card sx={{ borderRadius: 3 }}>
+                            <CardContent>
+                                <Box display="flex" alignItems="center" gap={2}>
+                                    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${item.color}15`, color: item.color }}>
+                                        {item.icon}
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="h6" fontWeight="bold" color={item.color}>
+                                            {item.value}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {item.label}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                ))}
+            </Grid>
+
+            {/* Employees Table */}
+            <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+                <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h6" fontWeight="bold">
+                        قسائم الموظفين ({filteredPayslips.length})
+                    </Typography>
+                    <TextField
+                        size="small"
+                        placeholder="بحث بالاسم أو الكود..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search />
+                                </InputAdornment>
+                            ),
+                        }}
+                        sx={{ width: 280 }}
+                    />
+                </Box>
+                <Divider />
                 <TableContainer>
                     <Table>
                         <TableHead sx={{ bgcolor: 'grey.50' }}>
@@ -139,7 +325,7 @@ export const PayrollRunDetailsPage = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {run.payslips.map((payslip) => (
+                            {filteredPayslips.map((payslip) => (
                                 <TableRow key={payslip.id} hover>
                                     <TableCell>
                                         <Box display="flex" alignItems="center" gap={1}>
@@ -172,7 +358,7 @@ export const PayrollRunDetailsPage = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
-            </Card>
+            </Paper>
 
             <Dialog open={!!selectedPayslip} onClose={() => setSelectedPayslip(null)} maxWidth="md" fullWidth>
                 <DialogTitle>تفاصيل قسيمة الراتب</DialogTitle>
