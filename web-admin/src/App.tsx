@@ -37,6 +37,7 @@ import { PayrollDashboardPage } from './pages/payroll/PayrollDashboardPage';
 import ComplianceOverviewPage from './pages/compliance/ComplianceOverviewPage';
 import PayslipsPage from './pages/payslips/PayslipsPage';
 import WpsTrackingPage from './pages/wps-tracking/WpsTrackingPage';
+import MudadPage from './pages/mudad/MudadPage';
 import { MainLayout } from '@/components/layout/MainLayout';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -111,6 +112,7 @@ function App() {
         <Route path="compliance" element={<ComplianceOverviewPage />} />
         <Route path="payslips" element={<PayslipsPage />} />
         <Route path="wps-tracking" element={<WpsTrackingPage />} />
+        <Route path="mudad" element={<MudadPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
