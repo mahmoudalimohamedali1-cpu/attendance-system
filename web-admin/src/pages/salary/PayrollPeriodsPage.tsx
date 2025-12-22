@@ -181,7 +181,11 @@ export const PayrollPeriodsPage = () => {
                                         >
                                             تشغيل
                                         </Button>
-                                        <IconButton onClick={() => navigate(`/salary/periods/${period.id}`)} size="small">
+                                        <IconButton
+                                            onClick={() => navigate(`/payslips?periodId=${period.id}`)}
+                                            size="small"
+                                            title="عرض القسائم"
+                                        >
                                             <Visibility fontSize="small" />
                                         </IconButton>
                                     </TableCell>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import {
     Box,
     Grid,
@@ -81,13 +82,16 @@ interface Payslip {
 interface PayrollRun {
     id: string;
     status: string;
+    periodId: string;
     period: {
+        id: string;
         month: number;
         year: number;
     };
 }
 
 export default function PayslipsPage() {
+    const [searchParams] = useSearchParams();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRun, setSelectedRun] = useState<string>('');
     const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null);
@@ -101,6 +105,17 @@ export default function PayslipsPage() {
             return (response as any)?.data || response || [];
         },
     });
+
+    // Auto-select run based on periodId URL param
+    useEffect(() => {
+        const periodId = searchParams.get('periodId');
+        if (periodId && payrollRuns && !selectedRun) {
+            const matchingRun = payrollRuns.find(run => run.periodId === periodId || run.period?.id === periodId);
+            if (matchingRun) {
+                setSelectedRun(matchingRun.id);
+            }
+        }
+    }, [searchParams, payrollRuns, selectedRun]);
 
     // Fetch payslips
     const { data: payslips, isLoading } = useQuery<Payslip[]>({
