@@ -191,8 +191,34 @@ export default function ComplianceOverviewPage() {
             priority: 'MEDIUM',
             title: 'إرسال بيانات مدد',
             description: 'يجب إرسال بيانات الموظفين لمنصة مدد',
-            action: 'إرسال الآن',
-            path: '/audit/submissions',
+            action: 'إنشاء تقديم',
+            path: '/mudad',
+        });
+    }
+
+    // GOSI action item
+    if (compliance?.gosi.configMissing) {
+        actionItems.push({
+            id: 'gosi-config',
+            type: 'GOSI',
+            priority: 'HIGH',
+            title: 'إعداد التأمينات GOSI',
+            description: 'يجب تفعيل إعدادات التأمينات الاجتماعية',
+            action: 'إعداد الآن',
+            path: '/gosi',
+        });
+    }
+
+    // WPS Tracking action item
+    if (compliance?.wps.status === 'READY' || compliance?.wps.status === 'EXPORTED') {
+        actionItems.push({
+            id: 'wps-track',
+            type: 'WPS',
+            priority: 'MEDIUM',
+            title: 'متابعة ملف WPS',
+            description: 'تتبع حالة ملف WPS المُصدَّر',
+            action: 'متابعة',
+            path: '/wps-tracking',
         });
     }
 
