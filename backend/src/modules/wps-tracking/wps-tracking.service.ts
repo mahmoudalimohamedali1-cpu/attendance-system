@@ -16,6 +16,7 @@ interface UpdateWpsStatusDto {
     status: WpsStatus;
     bankName?: string;
     bankRef?: string;
+    attachmentUrl?: string;
     notes?: string;
     reason?: string;
 }
@@ -98,15 +99,18 @@ export class WpsTrackingService {
             notes: dto.notes,
             bankName: dto.bankName,
             bankRef: dto.bankRef,
+            attachmentUrl: dto.attachmentUrl,
         };
 
-        // تحديث التواريخ حسب الحالة
+        // تحديث التواريخ والمستخدمين حسب الحالة
         switch (dto.status) {
             case 'DOWNLOADED':
                 updateData.downloadedAt = new Date();
+                if (userId) updateData.downloadedBy = userId;
                 break;
             case 'SUBMITTED':
                 updateData.submittedAt = new Date();
+                if (userId) updateData.submittedBy = userId;
                 break;
             case 'PROCESSED':
                 updateData.processedAt = new Date();

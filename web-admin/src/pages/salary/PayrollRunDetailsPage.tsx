@@ -195,11 +195,23 @@ export const PayrollRunDetailsPage = () => {
                     </Button>
                     <Button
                         variant="outlined"
+                        color="info"
                         startIcon={<CloudUpload />}
-                        onClick={() => navigate('/wps-tracking')}
+                        href={`${API_URL}/wps-export/${id}/csv`}
+                        target="_blank"
                         disabled={!isLocked}
                     >
-                        تصدير WPS
+                        تصدير WPS CSV
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<CloudUpload />}
+                        href={`${API_URL}/wps-export/${id}/sarie`}
+                        target="_blank"
+                        disabled={!isLocked}
+                    >
+                        تصدير SARIE
                     </Button>
                     <Button
                         variant="contained"
@@ -208,7 +220,7 @@ export const PayrollRunDetailsPage = () => {
                         onClick={handleApprove}
                         disabled={isLocked}
                     >
-                        {isLocked ? 'مقفل' : 'قفل الدورة'}
+                        {isLocked ? 'مقفل' : 'قفل واعتماد الدورة'}
                     </Button>
                 </Box>
             </Box>

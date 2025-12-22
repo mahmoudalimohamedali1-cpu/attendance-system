@@ -53,7 +53,7 @@ export class PdfService {
             doc.fontSize(12).text('الاستحقاقات (Earnings)', 50, doc.y);
             doc.moveDown(0.5);
 
-            const earnings = payslip.lines.filter(l => l.component.type === 'EARNING');
+            const earnings = payslip.lines.filter(l => l.sign === 'EARNING');
             let earningsTotal = 0;
             for (const line of earnings) {
                 const amount = Number(line.amount);
@@ -69,7 +69,7 @@ export class PdfService {
             doc.fontSize(12).text('الاستقطاعات (Deductions)', 50, doc.y);
             doc.moveDown(0.5);
 
-            const deductions = payslip.lines.filter(l => l.component.type === 'DEDUCTION');
+            const deductions = payslip.lines.filter(l => l.sign === 'DEDUCTION');
             let deductionsTotal = 0;
             for (const line of deductions) {
                 const amount = Number(line.amount);

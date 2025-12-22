@@ -3,11 +3,12 @@ import { AdvancesController } from './advances.controller';
 import { AdvancesService } from './advances.service';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { UploadModule } from '../../common/upload/upload.module';
+import { ApprovalWorkflowService } from '../../common/services/approval-workflow.service';
 
 @Module({
     imports: [PermissionsModule, UploadModule],
     controllers: [AdvancesController],
-    providers: [AdvancesService],
+    providers: [AdvancesService, ApprovalWorkflowService],
     exports: [AdvancesService],
 })
 export class AdvancesModule { }

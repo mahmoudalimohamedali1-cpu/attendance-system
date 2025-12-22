@@ -2,9 +2,21 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateRaiseRequestDto, RaiseTypeDto } from './dto/create-raise-request.dto';
 import { ManagerDecisionDto, HRDecisionDto, DecisionType } from './dto/raise-decision.dto';
-import { RaiseStatus, ApprovalStep, ApprovalDecision, NotificationType, Role } from '@prisma/client';
+import { RaiseStatus, ApprovalStep, ApprovalDecision, NotificationType, Role, ApprovalRequestType } from '@prisma/client';
 import { PermissionsService } from '../permissions/permissions.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ApprovalWorkflowService } from '../../common/services/approval-workflow.service';
+
+// DTOs for Finance and CEO decisions
+export class FinanceDecisionDto {
+    decision: DecisionType;
+    notes?: string;
+}
+
+export class CEODecisionDto {
+    decision: DecisionType;
+    notes?: string;
+}
 
 @Injectable()
 export class RaisesService {
@@ -12,6 +24,7 @@ export class RaisesService {
         private readonly prisma: PrismaService,
         private readonly permissionsService: PermissionsService,
         private readonly notificationsService: NotificationsService,
+        private readonly approvalWorkflowService: ApprovalWorkflowService,
     ) { }
 
     // ============ Helper Methods ============
@@ -352,14 +365,22 @@ export class RaisesService {
         }
 
         const decision = this.mapDecisionToEnum(dto.decision);
+        const chain = (request.approvalChain as ApprovalStep[]) || [ApprovalStep.MANAGER, ApprovalStep.HR, ApprovalStep.FINANCE, ApprovalStep.CEO];
+        const nextStep = this.approvalWorkflowService.getNextStep(chain, ApprovalStep.HR);
+
         let newStatus: RaiseStatus;
+        let newCurrentStep: ApprovalStep;
 
         if (decision === ApprovalDecision.APPROVED) {
-            newStatus = RaiseStatus.APPROVED;
+            // If next step is COMPLETED, this is final approval
+            newStatus = nextStep === ApprovalStep.COMPLETED ? RaiseStatus.APPROVED : RaiseStatus.MGR_APPROVED;
+            newCurrentStep = nextStep;
         } else if (decision === ApprovalDecision.REJECTED) {
             newStatus = RaiseStatus.REJECTED;
+            newCurrentStep = ApprovalStep.COMPLETED;
         } else {
             newStatus = RaiseStatus.DELAYED;
+            newCurrentStep = ApprovalStep.HR;
         }
 
         const updated = await this.prisma.raiseRequest.update({
@@ -371,7 +392,7 @@ export class RaisesService {
                 hrDecisionNotes: dto.notes,
                 hrAttachments: dto.attachments,
                 status: newStatus,
-                currentStep: ApprovalStep.COMPLETED,
+                currentStep: newCurrentStep,
             },
             include: {
                 user: {
@@ -451,5 +472,285 @@ export class RaisesService {
         ]);
 
         return { pending, approved, rejected, total: pending + approved + rejected };
+    }
+
+    // ============ Finance Manager Inbox & Decision ============
+
+    async getFinanceInbox(financeUserId: string, companyId: string) {
+        const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+            financeUserId,
+            companyId,
+            'RAISES_APPROVE_FINANCE',
+        );
+
+        if (accessibleEmployeeIds.length === 0) return [];
+
+        return this.prisma.raiseRequest.findMany({
+            where: {
+                userId: { in: accessibleEmployeeIds },
+                companyId,
+                currentStep: ApprovalStep.FINANCE,
+                financeDecision: ApprovalDecision.PENDING,
+            },
+            orderBy: { createdAt: 'asc' },
+            include: {
+                user: {
+                    select: {
+                        id: true, firstName: true, lastName: true, email: true, employeeCode: true,
+                        department: { select: { name: true } },
+                        branch: { select: { name: true } },
+                        salary: true, hireDate: true,
+                    },
+                },
+                managerApprover: { select: { id: true, firstName: true, lastName: true } },
+                hrApprover: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+    }
+
+    async financeDecision(requestId: string, companyId: string, financeUserId: string, dto: FinanceDecisionDto) {
+        const request = await this.prisma.raiseRequest.findFirst({
+            where: { id: requestId, companyId },
+            include: { user: true },
+        });
+
+        if (!request) throw new NotFoundException('طلب الزيادة غير موجود');
+        if (request.currentStep !== ApprovalStep.FINANCE) {
+            throw new BadRequestException('هذا الطلب ليس في مرحلة موافقة المدير المالي');
+        }
+
+        const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+            financeUserId, companyId, 'RAISES_APPROVE_FINANCE',
+        );
+        if (!accessibleEmployeeIds.includes(request.userId)) {
+            throw new ForbiddenException('لا يمكنك الموافقة على هذا الطلب');
+        }
+
+        const decision = this.mapDecisionToEnum(dto.decision);
+        const chain = (request.approvalChain as ApprovalStep[]) || [ApprovalStep.MANAGER, ApprovalStep.HR, ApprovalStep.FINANCE, ApprovalStep.CEO];
+        const nextStep = this.approvalWorkflowService.getNextStep(chain, ApprovalStep.FINANCE);
+
+        let newStatus: RaiseStatus;
+        let newCurrentStep: ApprovalStep;
+
+        if (decision === ApprovalDecision.APPROVED) {
+            newStatus = nextStep === ApprovalStep.COMPLETED ? RaiseStatus.APPROVED : RaiseStatus.MGR_APPROVED;
+            newCurrentStep = nextStep;
+        } else if (decision === ApprovalDecision.REJECTED) {
+            newStatus = RaiseStatus.REJECTED;
+            newCurrentStep = ApprovalStep.COMPLETED;
+        } else {
+            newStatus = RaiseStatus.DELAYED;
+            newCurrentStep = ApprovalStep.FINANCE;
+        }
+
+        const updated = await this.prisma.raiseRequest.update({
+            where: { id: requestId, companyId },
+            data: {
+                financeApproverId: financeUserId,
+                financeDecision: decision,
+                financeDecisionAt: new Date(),
+                financeDecisionNotes: dto.notes,
+                status: newStatus,
+                currentStep: newCurrentStep,
+            },
+            include: { user: { select: { id: true, firstName: true, lastName: true } } },
+        });
+
+        await this.prisma.approvalLog.create({
+            data: {
+                companyId, requestType: 'RAISE', requestId,
+                step: 'FINANCE', decision: dto.decision,
+                notes: dto.notes, byUserId: financeUserId,
+            },
+        });
+
+        // If approved and this is final step, apply to salary
+        if (decision === ApprovalDecision.APPROVED && newCurrentStep === ApprovalStep.COMPLETED) {
+            await this.applyRaiseToSalary(requestId, companyId);
+        }
+
+        // Notify employee
+        await this.notificationsService.sendNotification(
+            request.userId, NotificationType.GENERAL,
+            decision === ApprovalDecision.APPROVED ? 'موافقة المدير المالي على طلب الزيادة' : 'رفض طلب الزيادة',
+            decision === ApprovalDecision.APPROVED
+                ? `وافق المدير المالي على طلب الزيادة${nextStep !== ApprovalStep.COMPLETED ? ' - في انتظار موافقة المدير العام' : ''}`
+                : `تم رفض طلب الزيادة${dto.notes ? ': ' + dto.notes : ''}`,
+            { raiseRequestId: requestId },
+        );
+
+        // If approved and next step is CEO, notify CEO users
+        if (decision === ApprovalDecision.APPROVED && nextStep === ApprovalStep.CEO) {
+            const ceoUsers = await this.prisma.user.findMany({
+                where: {
+                    companyId, status: 'ACTIVE',
+                    OR: [
+                        { role: Role.ADMIN },
+                        { userPermissions: { some: { permission: { code: 'RAISES_APPROVE_CEO' }, companyId } } },
+                    ],
+                },
+                select: { id: true },
+            });
+            for (const ceo of ceoUsers) {
+                await this.notificationsService.sendNotification(
+                    ceo.id, NotificationType.GENERAL,
+                    'طلب زيادة ينتظر موافقة المدير العام',
+                    `طلب زيادة من ${updated.user.firstName} ${updated.user.lastName} ينتظر موافقتك`,
+                    { raiseRequestId: requestId },
+                );
+            }
+        }
+
+        return updated;
+    }
+
+    // ============ CEO Inbox & Decision ============
+
+    async getCEOInbox(ceoUserId: string, companyId: string) {
+        const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+            ceoUserId, companyId, 'RAISES_APPROVE_CEO',
+        );
+
+        if (accessibleEmployeeIds.length === 0) return [];
+
+        return this.prisma.raiseRequest.findMany({
+            where: {
+                userId: { in: accessibleEmployeeIds },
+                companyId,
+                currentStep: ApprovalStep.CEO,
+                ceoDecision: ApprovalDecision.PENDING,
+            },
+            orderBy: { createdAt: 'asc' },
+            include: {
+                user: {
+                    select: {
+                        id: true, firstName: true, lastName: true, email: true, employeeCode: true,
+                        department: { select: { name: true } },
+                        branch: { select: { name: true } },
+                        salary: true, hireDate: true,
+                    },
+                },
+                managerApprover: { select: { id: true, firstName: true, lastName: true } },
+                hrApprover: { select: { id: true, firstName: true, lastName: true } },
+                financeApprover: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+    }
+
+    async ceoDecision(requestId: string, companyId: string, ceoUserId: string, dto: CEODecisionDto) {
+        const request = await this.prisma.raiseRequest.findFirst({
+            where: { id: requestId, companyId },
+            include: { user: true },
+        });
+
+        if (!request) throw new NotFoundException('طلب الزيادة غير موجود');
+        if (request.currentStep !== ApprovalStep.CEO) {
+            throw new BadRequestException('هذا الطلب ليس في مرحلة موافقة المدير العام');
+        }
+
+        const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+            ceoUserId, companyId, 'RAISES_APPROVE_CEO',
+        );
+        if (!accessibleEmployeeIds.includes(request.userId)) {
+            throw new ForbiddenException('لا يمكنك الموافقة على هذا الطلب');
+        }
+
+        const decision = this.mapDecisionToEnum(dto.decision);
+        let newStatus: RaiseStatus;
+
+        if (decision === ApprovalDecision.APPROVED) {
+            newStatus = RaiseStatus.APPROVED;
+        } else if (decision === ApprovalDecision.REJECTED) {
+            newStatus = RaiseStatus.REJECTED;
+        } else {
+            newStatus = RaiseStatus.DELAYED;
+        }
+
+        const updated = await this.prisma.raiseRequest.update({
+            where: { id: requestId, companyId },
+            data: {
+                ceoApproverId: ceoUserId,
+                ceoDecision: decision,
+                ceoDecisionAt: new Date(),
+                ceoDecisionNotes: dto.notes,
+                status: newStatus,
+                currentStep: decision === ApprovalDecision.DELAYED ? ApprovalStep.CEO : ApprovalStep.COMPLETED,
+            },
+            include: { user: { select: { id: true, firstName: true, lastName: true } } },
+        });
+
+        await this.prisma.approvalLog.create({
+            data: {
+                companyId, requestType: 'RAISE', requestId,
+                step: 'CEO', decision: dto.decision,
+                notes: dto.notes, byUserId: ceoUserId,
+            },
+        });
+
+        // If approved, apply raise to salary automatically
+        if (decision === ApprovalDecision.APPROVED) {
+            await this.applyRaiseToSalary(requestId, companyId);
+        }
+
+        // Notify employee
+        await this.notificationsService.sendNotification(
+            request.userId, NotificationType.GENERAL,
+            decision === ApprovalDecision.APPROVED ? 'الموافقة النهائية على طلب الزيادة 🎉' : 'رفض طلب الزيادة',
+            decision === ApprovalDecision.APPROVED
+                ? 'تمت الموافقة النهائية على طلب الزيادة وتم تطبيقها على راتبك'
+                : `تم رفض طلب الزيادة من قبل المدير العام${dto.notes ? ': ' + dto.notes : ''}`,
+            { raiseRequestId: requestId },
+        );
+
+        return updated;
+    }
+
+    // ============ Apply Raise to Salary ============
+
+    async applyRaiseToSalary(requestId: string, companyId: string) {
+        const request = await this.prisma.raiseRequest.findFirst({
+            where: { id: requestId, companyId, appliedToSalary: false },
+            include: { user: { include: { salaryAssignments: { where: { isActive: true } } } } },
+        });
+
+        if (!request || request.appliedToSalary) return;
+
+        const assignment = request.user.salaryAssignments[0];
+        if (!assignment) return;
+
+        // Apply raise based on type
+        const currentBaseSalary = Number(assignment.baseSalary);
+        const raiseAmount = Number(request.amount);
+        let newBaseSalary = currentBaseSalary;
+
+        // All raise types add the amount to salary
+        // Type determines what it's called (SALARY_INCREASE, BONUS, ALLOWANCE, etc.)
+        newBaseSalary = currentBaseSalary + raiseAmount;
+
+        // Update salary assignment
+        await this.prisma.employeeSalaryAssignment.update({
+            where: { id: assignment.id },
+            data: { baseSalary: newBaseSalary },
+        });
+
+        // Mark raise as applied
+        await this.prisma.raiseRequest.update({
+            where: { id: requestId },
+            data: { appliedToSalary: true },
+        });
+
+        // Create audit log
+        await this.prisma.auditLog.create({
+            data: {
+                companyId,
+                userId: request.userId,
+                action: 'UPDATE',
+                entity: 'SalaryAssignment',
+                entityId: assignment.id,
+                oldValue: { baseSalary: currentBaseSalary },
+                newValue: { baseSalary: newBaseSalary, raiseRequestId: requestId },
+            },
+        });
     }
 }

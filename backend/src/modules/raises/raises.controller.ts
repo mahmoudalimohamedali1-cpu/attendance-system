@@ -151,6 +151,54 @@ export class RaisesController {
         return this.raisesService.hrDecision(id, companyId, hrUserId, dto);
     }
 
+    // ============ Finance Endpoints ============
+
+    @Get('inbox/finance')
+    @ApiOperation({ summary: 'صندوق وارد المدير المالي' })
+    @Roles(Role.MANAGER, Role.ADMIN)
+    async getFinanceInbox(
+        @CurrentUser('id') financeUserId: string,
+        @TenantId() companyId: string,
+    ) {
+        return this.raisesService.getFinanceInbox(financeUserId, companyId);
+    }
+
+    @Post(':id/finance-decision')
+    @ApiOperation({ summary: 'قرار المدير المالي على طلب الزيادة' })
+    @Roles(Role.MANAGER, Role.ADMIN)
+    async financeDecision(
+        @Param('id') id: string,
+        @CurrentUser('id') financeUserId: string,
+        @TenantId() companyId: string,
+        @Body() dto: any,
+    ) {
+        return this.raisesService.financeDecision(id, companyId, financeUserId, dto);
+    }
+
+    // ============ CEO Endpoints ============
+
+    @Get('inbox/ceo')
+    @ApiOperation({ summary: 'صندوق وارد المدير العام' })
+    @Roles(Role.ADMIN)
+    async getCEOInbox(
+        @CurrentUser('id') ceoUserId: string,
+        @TenantId() companyId: string,
+    ) {
+        return this.raisesService.getCEOInbox(ceoUserId, companyId);
+    }
+
+    @Post(':id/ceo-decision')
+    @ApiOperation({ summary: 'قرار المدير العام على طلب الزيادة' })
+    @Roles(Role.ADMIN)
+    async ceoDecision(
+        @Param('id') id: string,
+        @CurrentUser('id') ceoUserId: string,
+        @TenantId() companyId: string,
+        @Body() dto: any,
+    ) {
+        return this.raisesService.ceoDecision(id, companyId, ceoUserId, dto);
+    }
+
     // ============ Admin Endpoints ============
 
     @Get()
@@ -163,3 +211,4 @@ export class RaisesController {
         return this.raisesService.getAllRaiseRequests(companyId, status as any);
     }
 }
+

@@ -4,11 +4,12 @@ import { RaisesService } from './raises.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { UploadModule } from '../../common/upload/upload.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { ApprovalWorkflowService } from '../../common/services/approval-workflow.service';
 
 @Module({
     imports: [PrismaModule, UploadModule, PermissionsModule],
     controllers: [RaisesController],
-    providers: [RaisesService],
+    providers: [RaisesService, ApprovalWorkflowService],
     exports: [RaisesService],
 })
 export class RaisesModule { }

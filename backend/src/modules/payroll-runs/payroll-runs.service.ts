@@ -2,9 +2,10 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PayslipLineSource } from '@prisma/client';
+import { PayslipLineSource, AuditAction } from '@prisma/client';
 
 import { PayrollCalculationService } from '../payroll-calculation/payroll-calculation.service';
+import { AuditService } from '../audit/audit.service';
 
 
 @Injectable()
@@ -12,6 +13,7 @@ export class PayrollRunsService {
     constructor(
         private prisma: PrismaService,
         private calculationService: PayrollCalculationService,
+        private auditService: AuditService,
     ) { }
 
     async create(dto: CreatePayrollRunDto, companyId: string, userId: string) {
@@ -74,7 +76,7 @@ export class PayrollRunsService {
 
         if (employees.length === 0) throw new BadRequestException('لا يوجد موظفين نشطين لديهم تعيينات رواتب للفلتر المختار');
 
-        return this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(async (tx) => {
             const run = await tx.payrollRun.create({
                 data: {
                     companyId,
@@ -200,6 +202,18 @@ export class PayrollRunsService {
 
             return run;
         });
+
+        // Log the payroll run creation
+        await this.auditService.logPayrollChange(
+            userId,
+            result.id,
+            AuditAction.CREATE,
+            null,
+            { runId: result.id, periodId: dto.periodId, employeeCount: employees.length },
+            `إنشاء دورة رواتب جديدة لـ ${employees.length} موظف`,
+        );
+
+        return result;
     }
 
     async findAll(companyId: string) {

@@ -114,6 +114,54 @@ export class AdvancesController {
         return this.advancesService.hrDecision(id, req['tenantId'], req.user.id, dto);
     }
 
+    // ==================== صندوق المدير المالي ====================
+
+    @Get('inbox/finance')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'MANAGER')
+    @ApiOperation({ summary: 'صندوق الوارد للمدير المالي' })
+    @ApiResponse({ status: 200, description: 'قائمة الطلبات المعلقة' })
+    async getFinanceInbox(@Request() req: any) {
+        return this.advancesService.getFinanceInbox(req.user.id, req.user.companyId);
+    }
+
+    @Post(':id/finance-decision')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'MANAGER')
+    @ApiOperation({ summary: 'قرار المدير المالي' })
+    @ApiResponse({ status: 200, description: 'تم تسجيل القرار' })
+    async financeDecision(
+        @Param('id') id: string,
+        @Request() req: any,
+        @Body() dto: any,
+    ) {
+        return this.advancesService.financeDecision(id, req['tenantId'], req.user.id, dto);
+    }
+
+    // ==================== صندوق المدير العام ====================
+
+    @Get('inbox/ceo')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'صندوق الوارد للمدير العام' })
+    @ApiResponse({ status: 200, description: 'قائمة الطلبات المعلقة' })
+    async getCEOInbox(@Request() req: any) {
+        return this.advancesService.getCEOInbox(req.user.id, req.user.companyId);
+    }
+
+    @Post(':id/ceo-decision')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'قرار المدير العام' })
+    @ApiResponse({ status: 200, description: 'تم تسجيل القرار' })
+    async ceoDecision(
+        @Param('id') id: string,
+        @Request() req: any,
+        @Body() dto: any,
+    ) {
+        return this.advancesService.ceoDecision(id, req['tenantId'], req.user.id, dto);
+    }
+
     // ==================== تفاصيل الطلب ====================
 
     @Get(':id')
@@ -134,3 +182,4 @@ export class AdvancesController {
         return this.advancesService.getEmployeePreviousAdvances(employeeId, req['tenantId']);
     }
 }
+

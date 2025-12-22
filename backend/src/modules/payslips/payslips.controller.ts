@@ -45,7 +45,7 @@ export class PayslipsController {
             };
         }
 
-        return this.prisma.payslip.findMany({
+        const payslips = await this.prisma.payslip.findMany({
             where,
             include: {
                 employee: {
@@ -86,6 +86,41 @@ export class PayslipsController {
                 { employee: { firstName: 'asc' } },
             ],
         });
+
+        // Map employee to user for frontend compatibility and convert Decimal to number
+        return payslips.map(payslip => {
+            // Calculate GOSI from lines
+            const gosiEmployeeLines = payslip.lines.filter(l =>
+                l.component?.code === 'GOSI_EMP' || l.component?.code === 'GOSI_DED'
+            );
+            const gosiEmployee = gosiEmployeeLines.reduce((sum, l) => sum + Number(l.amount), 0);
+
+            // GOSI Employer (if exists in lines)
+            const gosiEmployerLines = payslip.lines.filter(l =>
+                l.component?.code === 'GOSI_EMPLOYER' || l.component?.code === 'GOSI_CO'
+            );
+            const gosiEmployer = gosiEmployerLines.reduce((sum, l) => sum + Number(l.amount), 0);
+
+            return {
+                ...payslip,
+                user: payslip.employee,
+                baseSalary: Number(payslip.baseSalary),
+                grossSalary: Number(payslip.grossSalary),
+                totalDeductions: Number(payslip.totalDeductions),
+                netSalary: Number(payslip.netSalary),
+                gosiEmployee,
+                gosiEmployer,
+                lines: payslip.lines.map(line => ({
+                    ...line,
+                    amount: Number(line.amount),
+                    units: line.units ? Number(line.units) : null,
+                    rate: line.rate ? Number(line.rate) : null,
+                    type: line.sign === 'EARNING' ? 'EARNING' : 'DEDUCTION',
+                    componentCode: line.component?.code,
+                    componentName: line.component?.nameAr || line.component?.nameEn,
+                })),
+            };
+        });
     }
 
     @Get(':id')
@@ -94,7 +129,7 @@ export class PayslipsController {
         @Param('id') id: string,
         @CurrentUser('companyId') companyId: string,
     ) {
-        return this.prisma.payslip.findFirst({
+        const payslip = await this.prisma.payslip.findFirst({
             where: { id, companyId },
             include: {
                 employee: {
@@ -126,6 +161,39 @@ export class PayslipsController {
                 },
             },
         });
+
+        if (!payslip) return null;
+
+        // Calculate GOSI from lines
+        const gosiEmployeeLines = payslip.lines.filter(l =>
+            l.component?.code === 'GOSI_EMP' || l.component?.code === 'GOSI_DED'
+        );
+        const gosiEmployee = gosiEmployeeLines.reduce((sum, l) => sum + Number(l.amount), 0);
+
+        const gosiEmployerLines = payslip.lines.filter(l =>
+            l.component?.code === 'GOSI_EMPLOYER' || l.component?.code === 'GOSI_CO'
+        );
+        const gosiEmployer = gosiEmployerLines.reduce((sum, l) => sum + Number(l.amount), 0);
+
+        return {
+            ...payslip,
+            user: payslip.employee,
+            baseSalary: Number(payslip.baseSalary),
+            grossSalary: Number(payslip.grossSalary),
+            totalDeductions: Number(payslip.totalDeductions),
+            netSalary: Number(payslip.netSalary),
+            gosiEmployee,
+            gosiEmployer,
+            lines: payslip.lines.map(line => ({
+                ...line,
+                amount: Number(line.amount),
+                units: line.units ? Number(line.units) : null,
+                rate: line.rate ? Number(line.rate) : null,
+                type: line.sign === 'EARNING' ? 'EARNING' : 'DEDUCTION',
+                componentCode: line.component?.code,
+                componentName: line.component?.nameAr || line.component?.nameEn,
+            })),
+        };
     }
 
     @Get(':id/pdf')

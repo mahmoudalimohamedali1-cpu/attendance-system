@@ -5,12 +5,14 @@ import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PayrollCalculationModule } from '../payroll-calculation/payroll-calculation.module';
 import { PayslipsModule } from '../payslips/payslips.module';
 import { AdjustmentRunService } from './adjustment-run.service';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
     imports: [
         PrismaModule,
         PayrollCalculationModule,
         PayslipsModule,
+        AuditModule,
     ],
     controllers: [PayrollRunsController],
     providers: [PayrollRunsService, AdjustmentRunService],

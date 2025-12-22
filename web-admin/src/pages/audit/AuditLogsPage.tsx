@@ -35,21 +35,26 @@ const actionLabels: Record<string, { label: string; color: any }> = {
 };
 
 const entityLabels: Record<string, string> = {
-    USER: 'الموظف',
+    // Main entities matching AuditService usage
+    User: 'الموظف',
     PAYROLL: 'الرواتب',
-    PAYSLIP: 'قسيمة الراتب',
+    Payslip: 'قسيمة الراتب',
+    PayrollRun: 'دورة الرواتب',
     BANK_ACCOUNT: 'الحساب البنكي',
-    LEAVE: 'الإجازة',
-    ATTENDANCE: 'الحضور',
+    Leave: 'الإجازة',
+    Attendance: 'الحضور',
     AUTH: 'المصادقة',
-    PERMISSION: 'الصلاحيات',
-    POLICY: 'السياسات',
-    SETTINGS: 'الإعدادات',
+    Permission: 'الصلاحيات',
+    Policy: 'السياسات',
+    Settings: 'الإعدادات',
     WPS: 'نظام حماية الأجور',
     MUDAD: 'مُدد',
     GOSI: 'التأمينات',
     QIWA: 'قوى',
-    CONTRACT: 'العقود',
+    Contract: 'العقود',
+    SalaryAssignment: 'تعيين الراتب',
+    RaiseRequest: 'طلب زيادة',
+    AdvanceRequest: 'طلب سلفة',
 };
 
 export const AuditLogsPage = () => {
@@ -73,7 +78,7 @@ export const AuditLogsPage = () => {
 
     const { data, isLoading } = useQuery({
         queryKey: ['audit-logs', page, limit, filters],
-        queryFn: () => api.get(`/audit?${queryString}`) as Promise<{
+        queryFn: () => api.get(`/audit/logs?${queryString}`) as Promise<{
             data: AuditLog[];
             pagination: { page: number; limit: number; total: number; totalPages: number };
         }>,

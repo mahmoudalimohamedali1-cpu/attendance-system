@@ -23,37 +23,38 @@ model Company {
   website  String?
 
   // روابط العلاقات
-  users               User[]
-  branches            Branch[]
-  jobTitles           JobTitle[]
-  costCenters         CostCenter[]
-  salaryComponents    SalaryComponent[]
-  salaryStructures    SalaryStructure[]
-  policies            Policy[]
-  payrollPeriods      PayrollPeriod[]
-  payrollRuns         PayrollRun[]
-  holidays            Holiday[]
-  gosiConfigs         GosiConfig[]
-  departments         Department[]
-  workSchedules       WorkSchedule[]
-  attendances         Attendance[]
-  leaveRequests       LeaveRequest[]
-  letterRequests      LetterRequest[]
-  notifications       Notification[]
-  auditLogs           AuditLog[]
-  advanceRequests     AdvanceRequest[]
-  retroPays           RetroPay[]
-  suspiciousAttempts  SuspiciousAttempt[]
-  workFromHomes       WorkFromHome[]
-  approvalLogs        ApprovalLog[]
-  payslips            Payslip[]
-  systemSettings      SystemSetting[]
-  permissionAuditLogs PermissionAuditLog[]
-  raiseRequests       RaiseRequest[]
-  userPermissions     UserPermission[]
-  mudadSubmissions       MudadSubmission[]
-  wpsSubmissions         WpsSubmission[]
-  submissionStatusLogs   SubmissionStatusLog[]
+  users                User[]
+  branches             Branch[]
+  jobTitles            JobTitle[]
+  costCenters          CostCenter[]
+  salaryComponents     SalaryComponent[]
+  salaryStructures     SalaryStructure[]
+  policies             Policy[]
+  payrollPeriods       PayrollPeriod[]
+  payrollRuns          PayrollRun[]
+  holidays             Holiday[]
+  gosiConfigs          GosiConfig[]
+  departments          Department[]
+  workSchedules        WorkSchedule[]
+  attendances          Attendance[]
+  leaveRequests        LeaveRequest[]
+  letterRequests       LetterRequest[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  advanceRequests      AdvanceRequest[]
+  retroPays            RetroPay[]
+  suspiciousAttempts   SuspiciousAttempt[]
+  workFromHomes        WorkFromHome[]
+  approvalLogs         ApprovalLog[]
+  payslips             Payslip[]
+  systemSettings       SystemSetting[]
+  permissionAuditLogs  PermissionAuditLog[]
+  raiseRequests        RaiseRequest[]
+  userPermissions      UserPermission[]
+  mudadSubmissions     MudadSubmission[]
+  wpsSubmissions       WpsSubmission[]
+  submissionStatusLogs SubmissionStatusLog[]
+  approvalChainConfigs ApprovalChainConfig[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -150,9 +151,13 @@ model User {
   raiseRequests           RaiseRequest[]   @relation("EmployeeRaiseRequests")
   managerApprovedRaises   RaiseRequest[]   @relation("ManagerApproverRaiseRequests")
   hrApprovedRaises        RaiseRequest[]   @relation("HRApproverRaiseRequests")
+  financeApprovedRaises   RaiseRequest[]   @relation("FinanceApproverRaiseRequests")
+  ceoApprovedRaises       RaiseRequest[]   @relation("CEOApproverRaiseRequests")
   advanceRequests         AdvanceRequest[] @relation("EmployeeAdvanceRequests")
   managerApprovedAdvances AdvanceRequest[] @relation("ManagerApproverAdvanceRequests")
   hrApprovedAdvances      AdvanceRequest[] @relation("HRApproverAdvanceRequests")
+  financeApprovedAdvances AdvanceRequest[] @relation("FinanceApproverAdvanceRequests")
+  ceoApprovedAdvances     AdvanceRequest[] @relation("CEOApproverAdvanceRequests")
   notifications           Notification[]
   refreshTokens           RefreshToken[]
   auditLogs               AuditLog[]
@@ -636,6 +641,8 @@ enum LeaveStatus {
 enum ApprovalStep {
   MANAGER
   HR
+  FINANCE
+  CEO
   COMPLETED
 }
 
@@ -1116,6 +1123,24 @@ model RaiseRequest {
   hrDecisionNotes String?          @map("hr_decision_notes") @db.VarChar(500)
   hrAttachments   Json?            @map("hr_attachments")
 
+  // موافقة المدير المالي (Finance)
+  financeApproverId    String?          @map("finance_approver_id")
+  financeApprover      User?            @relation("FinanceApproverRaiseRequests", fields: [financeApproverId], references: [id])
+  financeDecision      ApprovalDecision @default(PENDING) @map("finance_decision")
+  financeDecisionAt    DateTime?        @map("finance_decision_at")
+  financeDecisionNotes String?          @map("finance_decision_notes") @db.VarChar(500)
+
+  // موافقة المدير العام (CEO)
+  ceoApproverId    String?          @map("ceo_approver_id")
+  ceoApprover      User?            @relation("CEOApproverRaiseRequests", fields: [ceoApproverId], references: [id])
+  ceoDecision      ApprovalDecision @default(PENDING) @map("ceo_decision")
+  ceoDecisionAt    DateTime?        @map("ceo_decision_at")
+  ceoDecisionNotes String?          @map("ceo_decision_notes") @db.VarChar(500)
+
+  // Flexible approval chain
+  approvalChain   Json?   @map("approval_chain") // ["MANAGER", "HR", "FINANCE", "CEO"]
+  appliedToSalary Boolean @default(false) @map("applied_to_salary")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1167,6 +1192,23 @@ model AdvanceRequest {
   hrDecisionNotes          String?          @map("hr_decision_notes") @db.VarChar(500)
   approvedAmount           Decimal?         @map("approved_amount") @db.Decimal(10, 2) // المبلغ المعتمد (قد يختلف عن المطلوب)
   approvedMonthlyDeduction Decimal?         @map("approved_monthly_deduction") @db.Decimal(10, 2) // الاستقطاع المعتمد
+
+  // موافقة المدير المالي (Finance)
+  financeApproverId    String?          @map("finance_approver_id")
+  financeApprover      User?            @relation("FinanceApproverAdvanceRequests", fields: [financeApproverId], references: [id])
+  financeDecision      ApprovalDecision @default(PENDING) @map("finance_decision")
+  financeDecisionAt    DateTime?        @map("finance_decision_at")
+  financeDecisionNotes String?          @map("finance_decision_notes") @db.VarChar(500)
+
+  // موافقة المدير العام (CEO)
+  ceoApproverId    String?          @map("ceo_approver_id")
+  ceoApprover      User?            @relation("CEOApproverAdvanceRequests", fields: [ceoApproverId], references: [id])
+  ceoDecision      ApprovalDecision @default(PENDING) @map("ceo_decision")
+  ceoDecisionAt    DateTime?        @map("ceo_decision_at")
+  ceoDecisionNotes String?          @map("ceo_decision_notes") @db.VarChar(500)
+
+  // Flexible approval chain
+  approvalChain Json? @map("approval_chain") // ["MANAGER", "HR", "FINANCE", "CEO"]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1504,7 +1546,7 @@ model PayrollRun {
   lockedBy          String?   @map("locked_by")
   paidAt            DateTime? @map("paid_at")
 
-  payslips Payslip[]
+  payslips         Payslip[]
   mudadSubmissions MudadSubmission[]
   wpsSubmissions   WpsSubmission[]
 
@@ -1734,8 +1776,8 @@ model PolicyRule {
 
 // مُدد - Mudad Salary Protection Submissions
 model MudadSubmission {
-  id        String @id @default(uuid())
-  companyId String @map("company_id")
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
   company   Company @relation(fields: [companyId], references: [id])
 
   // Reference to payroll run
@@ -1745,32 +1787,32 @@ model MudadSubmission {
   // Submission Details
   period         String // YYYY-MM format
   submissionType String @default("SALARY") @map("submission_type") // SALARY, BONUS, EOS
-  
+
   // Status Tracking
-  status        MudadStatus @default(PENDING)
-  wpsFileUrl    String?     @map("wps_file_url") // رابط ملف WPS المرفوع
-  mudadRef      String?     @map("mudad_ref") // رقم مرجع مُدد (من المنصة)
-  
+  status     MudadStatus @default(PENDING)
+  wpsFileUrl String?     @map("wps_file_url") // رابط ملف WPS المرفوع
+  mudadRef   String?     @map("mudad_ref") // رقم مرجع مُدد (من المنصة)
+
   // Amounts
-  totalAmount   Decimal     @map("total_amount") @db.Decimal(12, 2)
-  employeeCount Int         @map("employee_count")
-  
+  totalAmount   Decimal @map("total_amount") @db.Decimal(12, 2)
+  employeeCount Int     @map("employee_count")
+
   // Submission Workflow
-  preparedAt    DateTime?   @map("prepared_at")
-  preparedBy    String?     @map("prepared_by")
-  submittedAt   DateTime?   @map("submitted_at")
-  submittedBy   String?     @map("submitted_by")
-  acceptedAt    DateTime?   @map("accepted_at")
-  rejectedAt    DateTime?   @map("rejected_at")
-  rejectionNote String?     @map("rejection_note")
-  
+  preparedAt    DateTime? @map("prepared_at")
+  preparedBy    String?   @map("prepared_by")
+  submittedAt   DateTime? @map("submitted_at")
+  submittedBy   String?   @map("submitted_by")
+  acceptedAt    DateTime? @map("accepted_at")
+  rejectedAt    DateTime? @map("rejected_at")
+  rejectionNote String?   @map("rejection_note")
+
   // File Integrity (للتدقيق)
-  fileHashSha256    String?  @db.VarChar(64) @map("file_hash_sha256")
-  fileSize          Int?     @map("file_size")
-  generatorVersion  String?  @map("generator_version")
-  
+  fileHashSha256   String? @map("file_hash_sha256") @db.VarChar(64)
+  fileSize         Int?    @map("file_size")
+  generatorVersion String? @map("generator_version")
+
   // Notes
-  notes         String?     @db.Text
+  notes String? @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1782,19 +1824,19 @@ model MudadSubmission {
 }
 
 enum MudadStatus {
-  PENDING            // في انتظار التحضير
-  PREPARED           // تم تحضير الملف
-  SUBMITTED          // تم الرفع على مُدد
-  ACCEPTED           // مقبول
-  REJECTED           // مرفوض
-  RESUBMITTED        // تم إعادة الرفع
-  RESUBMIT_REQUIRED  // يتطلب إعادة رفع (تغير الملف)
+  PENDING // في انتظار التحضير
+  PREPARED // تم تحضير الملف
+  SUBMITTED // تم الرفع على مُدد
+  ACCEPTED // مقبول
+  REJECTED // مرفوض
+  RESUBMITTED // تم إعادة الرفع
+  RESUBMIT_REQUIRED // يتطلب إعادة رفع (تغير الملف)
 }
 
 // WPS File Submissions (تتبع ملفات WPS المرفوعة)
 model WpsSubmission {
-  id        String @id @default(uuid())
-  companyId String @map("company_id")
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
   company   Company @relation(fields: [companyId], references: [id])
 
   // Reference
@@ -1802,33 +1844,38 @@ model WpsSubmission {
   payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
 
   // File Details
-  filename     String
-  fileFormat   String @default("WPS") @map("file_format") // WPS, SARIE
-  fileUrl      String? @map("file_url")
-  
+  filename   String
+  fileFormat String  @default("WPS") @map("file_format") // WPS, SARIE
+  fileUrl    String? @map("file_url")
+
   // Amounts
   totalAmount   Decimal @map("total_amount") @db.Decimal(12, 2)
   employeeCount Int     @map("employee_count")
-  
+
   // Status
-  status       WpsStatus @default(GENERATED)
-  bankName     String?   @map("bank_name") // البنك المستلم
-  bankRef      String?   @map("bank_ref") // رقم مرجع البنك
-  
+  status   WpsStatus @default(GENERATED)
+  bankName String?   @map("bank_name") // البنك المستلم
+  bankRef  String?   @map("bank_ref") // رقم مرجع البنك
+
   // Workflow
   generatedAt  DateTime  @default(now()) @map("generated_at")
   generatedBy  String?   @map("generated_by")
   downloadedAt DateTime? @map("downloaded_at")
+  downloadedBy String?   @map("downloaded_by")
   submittedAt  DateTime? @map("submitted_at") // تم الرفع للبنك
+  submittedBy  String?   @map("submitted_by") // من قام بالرفع
   processedAt  DateTime? @map("processed_at") // تم التحويل
 
+  // Attachments (receipts from bank)
+  attachmentUrl String? @map("attachment_url") // إيصال البنك أو مستند التأكيد
+
   // File Integrity (للتدقيق)
-  fileHashSha256    String?  @db.VarChar(64) @map("file_hash_sha256")
-  generatorVersion  String?  @map("generator_version")
+  fileHashSha256   String? @map("file_hash_sha256") @db.VarChar(64)
+  generatorVersion String? @map("generator_version")
 
   // Notes & Errors
-  notes        String?   @db.Text
-  errors       Json?     // أخطاء التحقق
+  notes  String? @db.Text
+  errors Json? // أخطاء التحقق
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1839,12 +1886,12 @@ model WpsSubmission {
 }
 
 enum WpsStatus {
-  GENERATED    // تم إنشاء الملف
-  DOWNLOADED   // تم تحميل الملف
-  SUBMITTED    // تم الرفع للبنك
-  PROCESSING   // قيد المعالجة
-  PROCESSED    // تم التحويل
-  FAILED       // فشل
+  GENERATED // تم إنشاء الملف
+  DOWNLOADED // تم تحميل الملف
+  SUBMITTED // تم الرفع للبنك
+  PROCESSING // قيد المعالجة
+  PROCESSED // تم التحويل
+  FAILED // فشل
 }
 
 // ==================== Module enum for Audit ====================
@@ -1880,8 +1927,8 @@ enum SubmissionEntityType {
 
 // سجل تغيير الحالة (Audit Trail) - لكل تغيير status
 model SubmissionStatusLog {
-  id        String @id @default(uuid())
-  companyId String @map("company_id")
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
   company   Company @relation(fields: [companyId], references: [id])
 
   // Reference to entity
@@ -1897,13 +1944,53 @@ model SubmissionStatusLog {
   changedAt       DateTime @default(now()) @map("changed_at")
 
   // Context
-  reason          String?  // سبب التغيير (اختياري)
-  externalRef     String?  @map("external_ref") // مرجع خارجي إن وجد
-  meta            Json?    // بيانات إضافية
+  reason      String? // سبب التغيير (اختياري)
+  externalRef String? @map("external_ref") // مرجع خارجي إن وجد
+  meta        Json? // بيانات إضافية
 
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([companyId, entityType, entityId])
   @@index([changedAt])
   @@map("submission_status_logs")
+}
+
+// ==================== إعدادات سلاسل الموافقات ====================
+
+enum ApprovalRequestType {
+  LEAVE
+  ADVANCE
+  RAISE
+  PAYROLL
+  WPS
+}
+
+model ApprovalChainConfig {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // نوع الطلب
+  requestType ApprovalRequestType @map("request_type")
+
+  // شروط التطبيق (Threshold)
+  minAmount Decimal? @map("min_amount") @db.Decimal(12, 2) // الحد الأدنى للمبلغ
+  maxAmount Decimal? @map("max_amount") @db.Decimal(12, 2) // الحد الأقصى للمبلغ
+  minDays   Int?     @map("min_days") // الحد الأدنى للأيام (للإجازات)
+  maxDays   Int?     @map("max_days") // الحد الأقصى للأيام
+
+  // سلسلة الموافقات (مرتبة)
+  chain Json // ["MANAGER", "HR", "FINANCE", "CEO"]
+
+  // الإعدادات
+  name        String  @db.VarChar(100) // اسم السلسلة
+  description String? @db.VarChar(500)
+  priority    Int     @default(0) // الأولوية (الأعلى أولاً)
+  isActive    Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, requestType, isActive])
+  @@map("approval_chain_configs")
 }

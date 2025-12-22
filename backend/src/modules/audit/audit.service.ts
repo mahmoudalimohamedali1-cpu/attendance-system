@@ -56,7 +56,7 @@ export class AuditService {
     const where: any = {};
 
     if (userId) where.userId = userId;
-    if (entity) where.entity = entity;
+    if (entity) where.entity = { equals: entity, mode: 'insensitive' };
     if (entityId) where.entityId = entityId;
     if (action) where.action = action;
     if (startDate) {
