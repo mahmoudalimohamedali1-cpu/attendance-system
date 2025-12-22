@@ -56,6 +56,9 @@ import {
   CloudUpload,
   Delete,
   AttachFile,
+  Security as SecurityIcon,
+  TrendingUp as TrendIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import {
   PieChart,
@@ -86,6 +89,13 @@ interface DashboardStats {
   };
   pendingLeaves: number;
   pendingLetters?: number;
+  pendingRaises?: number;
+  pendingAdvances?: number;
+  pendingDataUpdates?: number;
+  compliance?: {
+    missingFace: number;
+    suspiciousToday: number;
+  };
 }
 
 interface EmployeeDashboard {
@@ -99,6 +109,9 @@ interface EmployeeDashboard {
   } | null;
   myPendingLeaves: number;
   myPendingLetters: number;
+  myPendingRaises?: number;
+  myPendingAdvances?: number;
+  myPendingDataUpdates?: number;
   myApprovedLeaves: number;
   remainingLeaveDays?: number;
   annualLeaveDays?: number;
@@ -328,7 +341,7 @@ export const DashboardPage = () => {
       subtitle: `${dashboardStats.employees.active} نشط`,
       icon: <People />,
       color: '#1a237e',
-      bgColor: '#e8eaf6',
+      type: 'ops'
     },
     {
       title: 'الحضور اليوم',
@@ -336,7 +349,7 @@ export const DashboardPage = () => {
       subtitle: 'موظف حاضر',
       icon: <CheckCircle />,
       color: '#2e7d32',
-      bgColor: '#e8f5e9',
+      type: 'ops'
     },
     {
       title: 'المتأخرين',
@@ -344,7 +357,7 @@ export const DashboardPage = () => {
       subtitle: 'موظف متأخر',
       icon: <Schedule />,
       color: '#ed6c02',
-      bgColor: '#fff3e0',
+      type: 'ops'
     },
     {
       title: 'الغياب',
@@ -352,7 +365,7 @@ export const DashboardPage = () => {
       subtitle: 'موظف غائب',
       icon: <PersonOff />,
       color: '#d32f2f',
-      bgColor: '#ffebee',
+      type: 'ops'
     },
     {
       title: 'عمل من المنزل',
@@ -360,25 +373,53 @@ export const DashboardPage = () => {
       subtitle: 'موظف',
       icon: <HomeWork />,
       color: '#7b1fa2',
-      bgColor: '#f3e5f5',
+      type: 'ops'
     },
+    // Requests
     {
-      title: 'طلبات معلقة',
+      title: 'إجازات معلقة',
       value: dashboardStats.pendingLeaves,
-      subtitle: 'إجازة قيد المراجعة',
-      icon: <Warning />,
+      subtitle: 'قيد المراجعة',
+      icon: <BeachAccess />,
       color: '#0288d1',
-      bgColor: '#e1f5fe',
+      type: 'req'
     },
     {
       title: 'خطابات معلقة',
       value: dashboardStats.pendingLetters || 0,
-      subtitle: 'خطاب قيد المراجعة',
+      subtitle: 'قيد المراجعة',
       icon: <Description />,
-      color: '#7b1fa2',
-      bgColor: '#f3e5f5',
+      color: '#ef5350',
+      type: 'req'
+    },
+    {
+      title: 'زيادات معلقة',
+      value: dashboardStats.pendingRaises || 0,
+      subtitle: 'قيد المراجعة',
+      icon: <TrendIcon />,
+      color: '#66bb6a',
+      type: 'req'
+    },
+    {
+      title: 'سلف معلقة',
+      value: dashboardStats.pendingAdvances || 0,
+      subtitle: 'قيد المراجعة',
+      icon: <MonetizationOn />,
+      color: '#ffa726',
+      type: 'req'
+    },
+    {
+      title: 'تحديث بيانات',
+      value: dashboardStats.pendingDataUpdates || 0,
+      subtitle: 'قيد المراجعة',
+      icon: <RefreshIcon />,
+      color: '#26c6da',
+      type: 'req'
     },
   ];
+
+  const opsCards = statCards.filter(c => c.type === 'ops');
+  const reqCards = statCards.filter(c => c.type === 'req');
 
   const attendanceRate = dashboardStats.employees.total > 0
     ? Math.round((dashboardStats.today.present / dashboardStats.employees.total) * 100)
@@ -484,32 +525,35 @@ export const DashboardPage = () => {
         </Paper>
       )}
 
-      {/* Stats Cards */}
+      {/* Operations Summary */}
+      <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <CheckCircle color="success" /> ملخص العمليات اليوم
+      </Typography>
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statCards.map((card, index) => (
-          <Grid item xs={12} sm={6} md={4} lg={2} key={index}>
-            <Card sx={{ height: '100%', position: 'relative', overflow: 'visible' }}>
+        {opsCards.map((card, index) => (
+          <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
+            <Card sx={{ height: '100%', position: 'relative', overflow: 'visible', borderRadius: 3, border: `1px solid ${card.color}20` }}>
               <CardContent>
                 <Box
                   sx={{
                     position: 'absolute',
                     top: -20,
                     right: 16,
-                    width: 56,
-                    height: 56,
+                    width: 48,
+                    height: 48,
                     borderRadius: 2,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     bgcolor: card.color,
                     color: 'white',
-                    boxShadow: 3,
+                    boxShadow: `0 4px 20px 0 ${card.color}40`,
                   }}
                 >
                   {card.icon}
                 </Box>
-                <Box sx={{ pt: 4 }}>
-                  <Typography variant="h3" fontWeight="bold" color={card.color}>
+                <Box sx={{ pt: 3 }}>
+                  <Typography variant="h4" fontWeight="bold" color={card.color}>
                     {card.value}
                   </Typography>
                   <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>
@@ -524,6 +568,95 @@ export const DashboardPage = () => {
           </Grid>
         ))}
       </Grid>
+
+      {/* Requests & Follow-ups */}
+      <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Description color="primary" /> الطلبات والمراجعات المعلقة
+      </Typography>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {reqCards.map((card, index) => (
+          <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
+            <Card sx={{ height: '100%', position: 'relative', overflow: 'visible', borderRadius: 3, border: `1px solid ${card.color}20`, bgcolor: `${card.color}05` }}>
+              <CardContent>
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: -20,
+                    right: 16,
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: card.color,
+                    color: 'white',
+                    boxShadow: `0 4px 20px 0 ${card.color}40`,
+                  }}
+                >
+                  {card.icon}
+                </Box>
+                <Box sx={{ pt: 3 }}>
+                  <Typography variant="h4" fontWeight="bold" color={card.color}>
+                    {card.value}
+                  </Typography>
+                  <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>
+                    {card.title}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {card.subtitle}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Security & Compliance Alerts */}
+      {dashboardStats.compliance && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SecurityIcon color="error" /> تنبيهات الأمن والالتزام
+          </Typography>
+          <Grid container spacing={2}>
+            {dashboardStats.compliance.missingFace > 0 && (
+              <Grid item xs={12} md={6}>
+                <Alert
+                  severity="warning"
+                  variant="outlined"
+                  icon={<Face />}
+                  action={
+                    <Button color="inherit" size="small" onClick={() => navigate('/users?filter=no-face')}>
+                      تحسين الهوية
+                    </Button>
+                  }
+                  sx={{ borderRadius: 2 }}
+                >
+                  يوجد <strong>{dashboardStats.compliance.missingFace}</strong> موظف لم يسجلوا بصمة الوجه بعد.
+                </Alert>
+              </Grid>
+            )}
+            {dashboardStats.compliance.suspiciousToday > 0 && (
+              <Grid item xs={12} md={6}>
+                <Alert
+                  severity="error"
+                  variant="outlined"
+                  icon={<Warning />}
+                  action={
+                    <Button color="inherit" size="small" onClick={() => navigate('/exceptions')}>
+                      مراجعة الآن
+                    </Button>
+                  }
+                  sx={{ borderRadius: 2 }}
+                >
+                  تم رصد <strong>{dashboardStats.compliance.suspiciousToday}</strong> محاولة مشبوهة اليوم (موقع وهمي أو خارج النطاق).
+                </Alert>
+              </Grid>
+            )}
+          </Grid>
+        </Box>
+      )}
 
       <Grid container spacing={3}>
         {/* Attendance Rate */}
@@ -1610,23 +1743,35 @@ function EmployeeDashboardView({ data }: { data: EmployeeDashboard }) {
                 <EventBusy color="primary" />
                 ملخص طلباتي
               </Typography>
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={4}>
-                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50' }}>
-                    <Typography variant="h4" fontWeight="bold" color="warning.main">{data.myPendingLeaves}</Typography>
-                    <Typography variant="caption" color="text.secondary">إجازات معلقة</Typography>
+              <Grid container spacing={1} sx={{ mt: 1 }}>
+                <Grid item xs={2.4}>
+                  <Paper variant="outlined" sx={{ p: 1, textAlign: 'center', bgcolor: 'warning.50', minHeight: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="h5" fontWeight="bold" color="warning.main">{data.myPendingLeaves}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>إجازات</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={4}>
-                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'info.50' }}>
-                    <Typography variant="h4" fontWeight="bold" color="info.main">{data.myPendingLetters}</Typography>
-                    <Typography variant="caption" color="text.secondary">خطابات معلقة</Typography>
+                <Grid item xs={2.4}>
+                  <Paper variant="outlined" sx={{ p: 1, textAlign: 'center', bgcolor: 'info.50', minHeight: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="h5" fontWeight="bold" color="info.main">{data.myPendingLetters}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>خطابات</Typography>
                   </Paper>
                 </Grid>
-                <Grid item xs={4}>
-                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}>
-                    <Typography variant="h4" fontWeight="bold" color="success.main">{data.myApprovedLeaves}</Typography>
-                    <Typography variant="caption" color="text.secondary">موافق عليها</Typography>
+                <Grid item xs={2.4}>
+                  <Paper variant="outlined" sx={{ p: 1, textAlign: 'center', bgcolor: 'success.50', minHeight: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="h5" fontWeight="bold" color="success.main">{data.myPendingRaises || 0}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>زيادات</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={2.4}>
+                  <Paper variant="outlined" sx={{ p: 1, textAlign: 'center', bgcolor: 'secondary.50', minHeight: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="h5" fontWeight="bold" color="secondary.main">{data.myPendingAdvances || 0}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>سلف</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={2.4}>
+                  <Paper variant="outlined" sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.50', minHeight: 80, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="h5" fontWeight="bold" color="primary.main">{data.myPendingDataUpdates || 0}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>تحديثات</Typography>
                   </Paper>
                 </Grid>
               </Grid>

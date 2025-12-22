@@ -46,6 +46,11 @@ export class ReportsService {
         todayAttendance,
         pendingLeaves,
         pendingLetters,
+        pendingRaises,
+        pendingAdvances,
+        pendingDataUpdates,
+        missingFaceRegistration,
+        suspiciousAttemptsToday,
       ] = await Promise.all([
         this.prisma.user.count({ where: { role: 'EMPLOYEE', ...employeeFilter } }),
         this.prisma.user.count({ where: { role: 'EMPLOYEE', status: 'ACTIVE', ...employeeFilter } }),
@@ -54,6 +59,16 @@ export class ReportsService {
         }),
         this.prisma.leaveRequest.count({ where: leaveFilter }),
         this.prisma.letterRequest.count({ where: letterFilter }),
+        this.prisma.raiseRequest.count({ where: { status: 'PENDING' } }),
+        this.prisma.advanceRequest.count({ where: { status: 'PENDING' } }),
+        this.prisma.dataUpdateRequest.count({ where: { status: 'PENDING' } }),
+        this.prisma.user.count({ where: { role: 'EMPLOYEE', status: 'ACTIVE', faceRegistered: false, ...employeeFilter } }),
+        this.prisma.suspiciousAttempt.count({
+          where: {
+            createdAt: { gte: today },
+            ...(userRole !== 'ADMIN' ? { userId: { in: accessibleEmployeeIds } } : {})
+          }
+        }),
       ]);
 
       const presentToday = todayAttendance.filter((a) => a.checkInTime).length;
@@ -75,6 +90,13 @@ export class ReportsService {
         },
         pendingLeaves,
         pendingLetters,
+        pendingRaises,
+        pendingAdvances,
+        pendingDataUpdates,
+        compliance: {
+          missingFace: missingFaceRegistration,
+          suspiciousToday: suspiciousAttemptsToday,
+        }
       };
     }
 
@@ -84,6 +106,9 @@ export class ReportsService {
       myPendingLeaves,
       myPendingLetters,
       myApprovedLeaves,
+      myPendingRaises,
+      myPendingAdvances,
+      myPendingDataUpdates,
       myUserData,
     ] = await Promise.all([
       this.prisma.attendance.findFirst({
@@ -92,6 +117,9 @@ export class ReportsService {
       this.prisma.leaveRequest.count({ where: { userId, status: 'PENDING' } }),
       this.prisma.letterRequest.count({ where: { userId, status: 'PENDING' } }),
       this.prisma.leaveRequest.count({ where: { userId, status: 'APPROVED' } }),
+      this.prisma.raiseRequest.count({ where: { userId, status: 'PENDING' } }),
+      this.prisma.advanceRequest.count({ where: { userId, status: 'PENDING' } }),
+      this.prisma.dataUpdateRequest.count({ where: { userId, status: 'PENDING' } }),
       this.prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -113,6 +141,9 @@ export class ReportsService {
       } : null,
       myPendingLeaves,
       myPendingLetters,
+      myPendingRaises,
+      myPendingAdvances,
+      myPendingDataUpdates,
       myApprovedLeaves,
       remainingLeaveDays: myUserData?.remainingLeaveDays ?? 0,
       annualLeaveDays: myUserData?.annualLeaveDays ?? 0,
