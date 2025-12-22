@@ -14,6 +14,7 @@
     "@emotion/styled": "^11.11.5",
     "@hookform/resolvers": "^3.3.4",
     "@mui/icons-material": "^5.15.10",
+    "@mui/lab": "^5.0.0-alpha.166",
     "@mui/material": "^5.15.10",
     "@mui/x-date-pickers": "^8.22.0",
     "@tanstack/react-query": "^5.20.1",
