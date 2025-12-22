@@ -345,9 +345,9 @@ export default function ComplianceOverviewPage() {
                                 variant="outlined"
                                 size="small"
                                 endIcon={<ArrowForward />}
-                                onClick={() => navigate('/audit/submissions')}
+                                onClick={() => navigate('/mudad')}
                             >
-                                سجل الإرسالات
+                                فتح مُدد
                             </Button>
                         </CardContent>
                     </Card>
@@ -409,9 +409,9 @@ export default function ComplianceOverviewPage() {
                                 variant="outlined"
                                 size="small"
                                 endIcon={<ArrowForward />}
-                                onClick={() => navigate('/salary')}
+                                onClick={() => navigate('/gosi')}
                             >
-                                تقرير GOSI
+                                إدارة التأمينات
                             </Button>
                         </CardContent>
                     </Card>
