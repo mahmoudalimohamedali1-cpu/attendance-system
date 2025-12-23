@@ -191,23 +191,31 @@ export const PayrollWizardPage = () => {
 
     const runHealthCheck = useCallback(async () => {
         setHealthLoading(true);
+        setError(null);
+        const checks: HealthCheck[] = [];
+
         try {
-            // Check multiple health indicators
-            const checks: HealthCheck[] = [];
-
             // Get employees count
-            const users = await api.get('/users?status=ACTIVE') as any[];
-            const employeeCount = Array.isArray(users) ? users.length : 0;
+            let users: any[] = [];
+            try {
+                const response = await api.get('/users') as any;
+                // Handle both array and { data: [] } response formats
+                users = Array.isArray(response) ? response : (response?.data || response?.users || []);
+                if (!Array.isArray(users)) users = [];
+            } catch (e) {
+                console.error('Failed to fetch users', e);
+            }
 
+            const employeeCount = users.length;
             checks.push({
                 label: 'الموظفون النشطون',
-                status: employeeCount > 0 ? 'success' : 'error',
-                detail: `${employeeCount} موظف`,
+                status: employeeCount > 0 ? 'success' : 'warning',
+                detail: employeeCount > 0 ? `${employeeCount} موظف` : 'لا يوجد موظفين',
                 count: employeeCount,
             });
 
             // Check bank accounts
-            const noBankCount = users.filter((u: any) => !u.bankAccountId).length;
+            const noBankCount = users.filter((u: any) => !u.bankAccountId && !u.bankAccount).length;
             checks.push({
                 label: 'الحسابات البنكية',
                 status: noBankCount === 0 ? 'success' : noBankCount < employeeCount / 2 ? 'warning' : 'error',
@@ -218,7 +226,7 @@ export const PayrollWizardPage = () => {
             });
 
             // Check salary assignments
-            const noSalaryCount = users.filter((u: any) => !u.salaryStructureId).length;
+            const noSalaryCount = users.filter((u: any) => !u.salaryStructureId && !u.salaryStructure && !u.baseSalary).length;
             checks.push({
                 label: 'هياكل الراتب',
                 status: noSalaryCount === 0 ? 'success' : noSalaryCount < employeeCount / 2 ? 'warning' : 'error',
@@ -241,14 +249,15 @@ export const PayrollWizardPage = () => {
                 checks.push({
                     label: 'إعدادات التأمينات (GOSI)',
                     status: 'warning',
-                    detail: 'لم يتم الإعداد',
+                    detail: 'لم يتم الإعداد بعد',
                     path: '/gosi',
                 });
             }
 
             // Check pending leaves
             try {
-                const leaves = await api.get('/leaves?status=PENDING') as any[];
+                const leavesResponse = await api.get('/leaves?status=PENDING') as any;
+                const leaves = Array.isArray(leavesResponse) ? leavesResponse : (leavesResponse?.data || []);
                 const pendingCount = Array.isArray(leaves) ? leaves.length : 0;
                 checks.push({
                     label: 'الإجازات المعلقة',
@@ -267,8 +276,9 @@ export const PayrollWizardPage = () => {
 
             // Check pending advances
             try {
-                const advances = await api.get('/advances?status=PENDING_HR') as any[];
-                const pendingAdvances = Array.isArray(advances) ? advances.length : 0;
+                const advancesResponse = await api.get('/advances') as any;
+                const advances = Array.isArray(advancesResponse) ? advancesResponse : (advancesResponse?.data || []);
+                const pendingAdvances = advances.filter((a: any) => a.status === 'PENDING_HR' || a.status === 'PENDING_MANAGER').length;
                 checks.push({
                     label: 'السلف المعلقة',
                     status: pendingAdvances === 0 ? 'success' : 'warning',
@@ -286,7 +296,10 @@ export const PayrollWizardPage = () => {
 
             setHealthChecks(checks);
         } catch (err: any) {
+            console.error('Health check error:', err);
             setError(err.message || 'فشل فحص الجاهزية');
+            // Still show partial results
+            setHealthChecks(checks);
         } finally {
             setHealthLoading(false);
         }
@@ -294,21 +307,28 @@ export const PayrollWizardPage = () => {
 
     const fetchPreview = useCallback(async () => {
         setPreviewLoading(true);
+        setError(null);
         try {
             // Get employees for preview
-            let url = '/users?status=ACTIVE';
-            if (selectedBranchId) url += `&branchId=${selectedBranchId}`;
-            if (selectedDepartmentId) url += `&departmentId=${selectedDepartmentId}`;
+            let url = '/users';
+            const params: string[] = [];
+            if (selectedBranchId) params.push(`branchId=${selectedBranchId}`);
+            if (selectedDepartmentId) params.push(`departmentId=${selectedDepartmentId}`);
+            if (params.length > 0) url += '?' + params.join('&');
 
-            const users = await api.get(url) as any[];
-            const employeeCount = Array.isArray(users) ? users.length : 0;
+            const response = await api.get(url) as any;
+            // Handle both array and { data: [] } response formats
+            let users = Array.isArray(response) ? response : (response?.data || response?.users || []);
+            if (!Array.isArray(users)) users = [];
+
+            const employeeCount = users.length;
 
             // Estimate totals based on basic salaries
             let estimatedGross = 0;
             let estimatedDeductions = 0;
 
             users.forEach((user: any) => {
-                const baseSalary = user.baseSalary || 0;
+                const baseSalary = Number(user.baseSalary) || 0;
                 // Rough estimate: gross = base * 1.3, deductions = gross * 0.12
                 estimatedGross += baseSalary * 1.3;
                 estimatedDeductions += baseSalary * 0.12;
@@ -319,10 +339,10 @@ export const PayrollWizardPage = () => {
             const branchMap = new Map<string, { count: number; total: number }>();
 
             users.forEach((user: any) => {
-                const branchName = user.branch?.name || 'غير محدد';
+                const branchName = user.branch?.name || user.branchName || 'غير محدد';
                 const existing = branchMap.get(branchName) || { count: 0, total: 0 };
                 existing.count++;
-                existing.total += user.baseSalary || 0;
+                existing.total += Number(user.baseSalary) || 0;
                 branchMap.set(branchName, existing);
             });
 
@@ -352,7 +372,16 @@ export const PayrollWizardPage = () => {
                 previousMonth,
             });
         } catch (err: any) {
+            console.error('Preview error:', err);
             setError(err.message || 'فشل تحميل المعاينة');
+            // Set empty preview data
+            setPreviewData({
+                totalEmployees: 0,
+                estimatedGross: 0,
+                estimatedDeductions: 0,
+                estimatedNet: 0,
+                byBranch: [],
+            });
         } finally {
             setPreviewLoading(false);
         }
@@ -457,16 +486,24 @@ export const PayrollWizardPage = () => {
 
         setError(null);
 
-        if (activeStep === 2) {
-            // Run health check when moving to step 3
+        // When moving FROM step 1 TO step 2 (health check), run the check
+        if (activeStep === 1) {
+            setActiveStep(2);
             await runHealthCheck();
-        } else if (activeStep === 3) {
-            // Fetch preview when moving to step 4
+            return;
+        }
+
+        // When moving FROM step 2 TO step 3 (preview), fetch preview
+        if (activeStep === 2) {
+            setActiveStep(3);
             await fetchPreview();
-        } else if (activeStep === 4) {
-            // Run payroll
+            return;
+        }
+
+        // When on step 4, run payroll
+        if (activeStep === 4) {
             await runPayroll();
-            return; // Don't increment step here, it's done in runPayroll
+            return;
         }
 
         setActiveStep(prev => prev + 1);
