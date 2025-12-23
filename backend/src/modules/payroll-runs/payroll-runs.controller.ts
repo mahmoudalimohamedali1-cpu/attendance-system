@@ -25,11 +25,27 @@ export class PayrollRunsController {
         private readonly prisma: PrismaService,
     ) { }
 
+    // ==========================================
+    // STATIC ROUTES MUST COME BEFORE DYNAMIC :id
+    // ==========================================
+
     @Post('preview')
     @Roles('ADMIN', 'HR')
     @ApiOperation({ summary: 'معاينة مسير الرواتب قبل التشغيل' })
     preview(@Body() dto: CreatePayrollRunDto, @CurrentUser('companyId') companyId: string) {
         return this.service.preview(dto, companyId);
+    }
+
+    @Get('payslip/:payslipId/pdf')
+    @ApiOperation({ summary: 'تحميل قسيمة الراتب PDF' })
+    @Header('Content-Type', 'application/pdf')
+    async downloadPayslipPdf(@Param('payslipId') payslipId: string, @Res() res: Response) {
+        const buffer = await this.pdfService.generatePayslipPdf(payslipId);
+        res.set({
+            'Content-Disposition': `attachment; filename="payslip-${payslipId}.pdf"`,
+            'Content-Length': buffer.length,
+        });
+        res.end(buffer);
     }
 
     @Post()
@@ -44,6 +60,10 @@ export class PayrollRunsController {
     findAll(@CurrentUser('companyId') companyId: string) {
         return this.service.findAll(companyId);
     }
+
+    // ==========================================
+    // DYNAMIC :id ROUTES COME AFTER STATIC ONES
+    // ==========================================
 
     @Get(':id')
     @ApiOperation({ summary: 'تفاصيل تشغيل معين والمسودات الناتجة' })
@@ -63,18 +83,6 @@ export class PayrollRunsController {
     @ApiOperation({ summary: 'تأكيد صرف الرواتب' })
     pay(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
         return this.service.pay(id, companyId);
-    }
-
-    @Get('payslip/:payslipId/pdf')
-    @ApiOperation({ summary: 'تحميل قسيمة الراتب PDF' })
-    @Header('Content-Type', 'application/pdf')
-    async downloadPayslipPdf(@Param('payslipId') payslipId: string, @Res() res: Response) {
-        const buffer = await this.pdfService.generatePayslipPdf(payslipId);
-        res.set({
-            'Content-Disposition': `attachment; filename="payslip-${payslipId}.pdf"`,
-            'Content-Length': buffer.length,
-        });
-        res.end(buffer);
     }
 
     @Get(':id/excel')

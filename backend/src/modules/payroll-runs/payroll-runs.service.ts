@@ -200,17 +200,29 @@ export class PayrollRunsService {
                 });
             }
 
-            return run;
+            // Fetch run with payslips count
+            const runWithPayslips = await tx.payrollRun.findUnique({
+                where: { id: run.id },
+                include: {
+                    payslips: { select: { id: true } },
+                    period: true
+                }
+            });
+
+            return {
+                ...runWithPayslips,
+                payslipsCount: runWithPayslips?.payslips?.length || employees.length
+            };
         });
 
         // Log the payroll run creation
         await this.auditService.logPayrollChange(
             userId,
-            result.id,
+            result.id!,
             AuditAction.CREATE,
             null,
-            { runId: result.id, periodId: dto.periodId, employeeCount: employees.length },
-            `إنشاء دورة رواتب جديدة لـ ${employees.length} موظف`,
+            { runId: result.id, periodId: dto.periodId, employeeCount: result.payslipsCount },
+            `إنشاء دورة رواتب جديدة لـ ${result.payslipsCount} موظف`,
         );
 
         return result;

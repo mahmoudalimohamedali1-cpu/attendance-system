@@ -506,7 +506,8 @@ export const PayrollWizardPage = () => {
             clearInterval(progressInterval);
             setRunProgress(100);
             setRunStatus('تم بنجاح! ✅');
-            setRunLogs(prev => [...prev, `✅ تم إنشاء ${result.payslips?.length || 0} قسيمة راتب بنجاح!`]);
+            const payslipsCount = (result as any).payslipsCount || result.payslips?.length || 0;
+            setRunLogs(prev => [...prev, `✅ تم إنشاء ${payslipsCount} قسيمة راتب بنجاح!`]);
             setRunResult(result);
 
             // Move to results step
