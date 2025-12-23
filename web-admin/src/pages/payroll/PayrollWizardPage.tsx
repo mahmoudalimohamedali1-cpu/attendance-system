@@ -82,17 +82,44 @@ interface HealthCheck {
     path?: string;
 }
 
+interface EmployeePreview {
+    id: string;
+    employeeCode: string;
+    name: string;
+    firstName: string;
+    lastName: string;
+    branch: string;
+    department: string;
+    jobTitle?: string;
+    isSaudi: boolean;
+    baseSalary: number;
+    gross: number;
+    deductions: number;
+    gosi: number;
+    gosiEmployer: number;
+    advances: number;
+    net: number;
+    earnings: { name: string; code: string; amount: number }[];
+    deductionItems: { name: string; code: string; amount: number }[];
+    advanceDetails: { id: string; amount: number }[];
+    adjustments: any[];
+    excluded: boolean;
+}
+
 interface PreviewData {
     totalEmployees: number;
     estimatedGross: number;
     estimatedDeductions: number;
     estimatedNet: number;
     byBranch: { name: string; count: number; total: number }[];
+    byDepartment?: { name: string; count: number; gross: number; net: number }[];
+    employees?: EmployeePreview[];
     previousMonth?: {
         gross: number;
         net: number;
         headcount: number;
     };
+    gosiEnabled?: boolean;
 }
 
 interface PayrollRun {
@@ -138,6 +165,10 @@ export const PayrollWizardPage = () => {
     // Step 4: Preview
     const [previewData, setPreviewData] = useState<PreviewData | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
+
+    // Editing state for preview
+    const [excludedEmployees, setExcludedEmployees] = useState<Set<string>>(new Set());
+    const [adjustments, setAdjustments] = useState<Record<string, { type: 'bonus' | 'deduction'; amount: number; reason: string }[]>>({});
 
     // Step 5: Running
     const [runProgress, setRunProgress] = useState(0);
@@ -332,8 +363,14 @@ export const PayrollWizardPage = () => {
                         count: b.count,
                         total: b.gross || 0,
                     })),
+                    byDepartment: previewResponse.byDepartment || [],
+                    employees: previewResponse.employees || [],
                     previousMonth: previewResponse.comparison?.previousMonth || undefined,
+                    gosiEnabled: previewResponse.gosiEnabled,
                 });
+                // Reset adjustments when new preview loaded
+                setExcludedEmployees(new Set());
+                setAdjustments({});
                 setPreviewLoading(false);
                 return;
             }
@@ -985,18 +1022,36 @@ export const PayrollWizardPage = () => {
                                 {/* Employee Table Header */}
                                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                                     <Typography variant="subtitle1" fontWeight="bold">
-                                        👥 تفاصيل الموظفين ({previewData.totalEmployees})
+                                        👥 تفاصيل الموظفين ({previewData.employees?.filter(e => !excludedEmployees.has(e.id)).length || previewData.totalEmployees})
+                                        {excludedEmployees.size > 0 && (
+                                            <Chip
+                                                label={`${excludedEmployees.size} مستثنى`}
+                                                color="warning"
+                                                size="small"
+                                                sx={{ ml: 1 }}
+                                            />
+                                        )}
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        اضغط على الموظف لعرض التفاصيل
-                                    </Typography>
+                                    <Box display="flex" gap={1}>
+                                        {excludedEmployees.size > 0 && (
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                color="warning"
+                                                onClick={() => setExcludedEmployees(new Set())}
+                                            >
+                                                إلغاء كل الاستثناءات
+                                            </Button>
+                                        )}
+                                    </Box>
                                 </Box>
 
-                                {/* Employee Preview Table - Simplified */}
-                                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+                                {/* Employee Preview Table - With Real Data */}
+                                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 450 }}>
                                     <Table size="small" stickyHeader>
                                         <TableHead>
                                             <TableRow sx={{ bgcolor: 'grey.100' }}>
+                                                <TableCell sx={{ fontWeight: 'bold', width: 40 }}></TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', width: 50 }}>#</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }}>الموظف</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }}>الفرع</TableCell>
@@ -1004,64 +1059,187 @@ export const PayrollWizardPage = () => {
                                                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>الإجمالي</TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>الخصومات</TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>الصافي</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', width: 100 }}>إجراءات</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {previewData.byBranch.length === 0 ? (
+                                            {!previewData.employees || previewData.employees.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={7} align="center">
+                                                    <TableCell colSpan={9} align="center">
                                                         <Typography color="text.secondary">لا يوجد موظفين للعرض</Typography>
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                // Show placeholder rows based on employee count
-                                                Array.from({ length: Math.min(previewData.totalEmployees, 10) }, (_, idx) => (
-                                                    <TableRow key={idx} hover>
-                                                        <TableCell>{idx + 1}</TableCell>
-                                                        <TableCell>
-                                                            <Typography variant="body2">
-                                                                موظف {idx + 1}
-                                                            </Typography>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Chip
-                                                                label={previewData.byBranch[idx % previewData.byBranch.length]?.name || 'غير محدد'}
-                                                                size="small"
-                                                                variant="outlined"
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell align="right">
-                                                            {formatMoney(Math.round(previewData.estimatedGross / previewData.totalEmployees * 0.7))}
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                                                            {formatMoney(Math.round(previewData.estimatedGross / previewData.totalEmployees))}
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ color: 'error.main' }}>
-                                                            {formatMoney(Math.round(previewData.estimatedDeductions / previewData.totalEmployees))}
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main' }}>
-                                                            {formatMoney(Math.round(previewData.estimatedNet / previewData.totalEmployees))}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                            {previewData.totalEmployees > 10 && (
-                                                <TableRow>
-                                                    <TableCell colSpan={7} align="center">
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            ... و {previewData.totalEmployees - 10} موظف آخر
-                                                        </Typography>
-                                                    </TableCell>
-                                                </TableRow>
+                                                previewData.employees.map((emp, idx) => {
+                                                    const isExcluded = excludedEmployees.has(emp.id);
+                                                    const empAdjustments = adjustments[emp.id] || [];
+                                                    const adjustmentTotal = empAdjustments.reduce((sum, adj) =>
+                                                        sum + (adj.type === 'bonus' ? adj.amount : -adj.amount), 0
+                                                    );
+                                                    const adjustedNet = emp.net + adjustmentTotal;
+
+                                                    return (
+                                                        <TableRow
+                                                            key={emp.id}
+                                                            hover
+                                                            sx={{
+                                                                opacity: isExcluded ? 0.4 : 1,
+                                                                bgcolor: isExcluded ? 'grey.50' : empAdjustments.length > 0 ? 'warning.50' : 'inherit',
+                                                                textDecoration: isExcluded ? 'line-through' : 'none',
+                                                            }}
+                                                        >
+                                                            <TableCell>
+                                                                <input
+
+                                                                    type="checkbox"
+                                                                    checked={!isExcluded}
+                                                                    onChange={() => {
+                                                                        const newExcluded = new Set(excludedEmployees);
+                                                                        if (isExcluded) {
+                                                                            newExcluded.delete(emp.id);
+                                                                        } else {
+                                                                            newExcluded.add(emp.id);
+                                                                        }
+                                                                        setExcludedEmployees(newExcluded);
+                                                                    }}
+                                                                    title={isExcluded ? 'إعادة تضمين' : 'استثناء من المسير'}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell>{idx + 1}</TableCell>
+                                                            <TableCell>
+                                                                <Box>
+                                                                    <Typography variant="body2" fontWeight={500}>
+                                                                        {emp.name}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {emp.employeeCode} {emp.isSaudi && '🇸🇦'}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Chip
+                                                                    label={emp.branch}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                {formatMoney(emp.baseSalary)}
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                                                                {formatMoney(emp.gross + (empAdjustments.filter(a => a.type === 'bonus').reduce((s, a) => s + a.amount, 0)))}
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ color: 'error.main' }}>
+                                                                {formatMoney(emp.deductions + (empAdjustments.filter(a => a.type === 'deduction').reduce((s, a) => s + a.amount, 0)))}
+                                                                {emp.gosi > 0 && (
+                                                                    <Typography variant="caption" display="block" color="text.secondary">
+                                                                        GOSI: {formatMoney(emp.gosi)}
+                                                                    </Typography>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                                                                {formatMoney(adjustedNet)}
+                                                                {adjustmentTotal !== 0 && (
+                                                                    <Typography variant="caption" display="block" color={adjustmentTotal > 0 ? 'success.main' : 'error.main'}>
+                                                                        ({adjustmentTotal > 0 ? '+' : ''}{formatMoney(adjustmentTotal)})
+                                                                    </Typography>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Box display="flex" gap={0.5}>
+                                                                    <Button
+                                                                        size="small"
+                                                                        variant="outlined"
+                                                                        color="success"
+                                                                        disabled={isExcluded}
+                                                                        onClick={() => {
+                                                                            const amount = prompt('أدخل مبلغ المكافأة:');
+                                                                            if (amount && !isNaN(Number(amount))) {
+                                                                                const reason = prompt('سبب المكافأة:') || 'مكافأة';
+                                                                                setAdjustments(prev => ({
+                                                                                    ...prev,
+                                                                                    [emp.id]: [...(prev[emp.id] || []), { type: 'bonus', amount: Number(amount), reason }]
+                                                                                }));
+                                                                            }
+                                                                        }}
+                                                                        sx={{ minWidth: 30, p: 0.5 }}
+                                                                        title="إضافة مكافأة"
+                                                                    >
+                                                                        +
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="small"
+                                                                        variant="outlined"
+                                                                        color="error"
+                                                                        disabled={isExcluded}
+                                                                        onClick={() => {
+                                                                            const amount = prompt('أدخل مبلغ الخصم:');
+                                                                            if (amount && !isNaN(Number(amount))) {
+                                                                                const reason = prompt('سبب الخصم:') || 'خصم';
+                                                                                setAdjustments(prev => ({
+                                                                                    ...prev,
+                                                                                    [emp.id]: [...(prev[emp.id] || []), { type: 'deduction', amount: Number(amount), reason }]
+                                                                                }));
+                                                                            }
+                                                                        }}
+                                                                        sx={{ minWidth: 30, p: 0.5 }}
+                                                                        title="إضافة خصم"
+                                                                    >
+                                                                        -
+                                                                    </Button>
+                                                                    {empAdjustments.length > 0 && (
+                                                                        <Button
+                                                                            size="small"
+                                                                            variant="text"
+                                                                            color="warning"
+                                                                            onClick={() => {
+                                                                                setAdjustments(prev => {
+                                                                                    const newAdj = { ...prev };
+                                                                                    delete newAdj[emp.id];
+                                                                                    return newAdj;
+                                                                                });
+                                                                            }}
+                                                                            sx={{ minWidth: 30, p: 0.5 }}
+                                                                            title="مسح التعديلات"
+                                                                        >
+                                                                            ✕
+                                                                        </Button>
+                                                                    )}
+                                                                </Box>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })
                                             )}
                                         </TableBody>
                                     </Table>
                                 </TableContainer>
 
+                                {/* Adjustments Summary */}
+                                {(excludedEmployees.size > 0 || Object.keys(adjustments).length > 0) && (
+                                    <Alert severity="warning" sx={{ mt: 2 }}>
+                                        <AlertTitle>⚠️ تعديلات مُعلقة</AlertTitle>
+                                        <Box>
+                                            {excludedEmployees.size > 0 && (
+                                                <Typography variant="body2">
+                                                    • {excludedEmployees.size} موظف مستثنى من هذا المسير
+                                                </Typography>
+                                            )}
+                                            {Object.keys(adjustments).length > 0 && (
+                                                <Typography variant="body2">
+                                                    • {Object.keys(adjustments).length} موظف لديه تعديلات (مكافآت/خصومات)
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                    </Alert>
+                                )}
+
                                 {/* Info Alert */}
                                 <Alert severity="success" sx={{ mt: 2 }}>
                                     <AlertTitle>✅ المعاينة جاهزة</AlertTitle>
-                                    تم حساب الرواتب بناءً على هياكل الرواتب وخصومات GOSI والسلف المعتمدة. اضغط التالي للمتابعة.
+                                    تم حساب الرواتب بناءً على هياكل الرواتب وخصومات GOSI والسلف المعتمدة.
+                                    {previewData.gosiEnabled && ' التأمينات الاجتماعية مفعلة.'}
+                                    {' '}اضغط التالي للمتابعة.
                                 </Alert>
                             </>
                         )}
