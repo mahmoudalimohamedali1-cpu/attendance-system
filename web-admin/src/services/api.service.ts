@@ -11,6 +11,7 @@ export const API_URL = API_BASE_URL;
 class ApiService {
   private client: AxiosInstance;
   private isRefreshing = false;
+  private isRedirecting = false;
   private failedQueue: Array<{
     resolve: (value?: unknown) => void;
     reject: (error?: unknown) => void;
@@ -97,7 +98,12 @@ class ApiService {
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+
+            // Prevent infinite redirect loop
+            if (!this.isRedirecting && window.location.pathname !== '/login') {
+              this.isRedirecting = true;
+              window.location.href = '/login';
+            }
             return Promise.reject(refreshError);
           }
         }
