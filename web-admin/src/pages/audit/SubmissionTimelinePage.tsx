@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Box, Card, Typography, Grid, Button, MenuItem,
     CircularProgress, Chip, FormControl, InputLabel, Select,
     Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from '@mui/material';
-import { History, CheckCircle, Error as ErrorIcon, Pending, Refresh } from '@mui/icons-material';
+import { History, Refresh } from '@mui/icons-material';
 import { auditService, StatusLog } from '@/services/audit.service';
 
 // Status colors and labels
