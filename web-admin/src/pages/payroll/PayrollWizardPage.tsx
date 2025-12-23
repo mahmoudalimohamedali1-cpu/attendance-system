@@ -936,7 +936,7 @@ export const PayrollWizardPage = () => {
                                         <Card sx={{ bgcolor: 'grey.100', height: '100%' }}>
                                             <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
                                                 <Typography variant="h6" fontWeight="bold" color="text.secondary">
-                                                    {formatMoney(previewData.estimatedGross - previewData.estimatedDeductions - previewData.estimatedNet > 0 ? previewData.estimatedGross - previewData.estimatedDeductions - previewData.estimatedNet : 0)}
+                                                    {formatMoney(previewData.employees?.reduce((sum, emp) => sum + (Number(emp.baseSalary) || 0), 0) || 0)}
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">الراتب الأساسي</Typography>
                                             </CardContent>
