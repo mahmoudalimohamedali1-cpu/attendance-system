@@ -270,7 +270,7 @@ export const PayrollDashboardPage: React.FC = () => {
                             variant="contained"
                             size="large"
                             startIcon={<AddIcon />}
-                            onClick={() => navigate('/salary/runs/new')}
+                            onClick={() => navigate('/salary/wizard')}
                         >
                             إنشاء مسيرة رواتب جديدة
                         </Button>

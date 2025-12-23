@@ -176,7 +176,7 @@ export const PayrollPeriodsPage = () => {
                                         <Button
                                             size="small"
                                             startIcon={<PlayArrow />}
-                                            onClick={() => navigate(`/salary/runs/new?periodId=${period.id}`)}
+                                            onClick={() => navigate(`/salary/wizard?periodId=${period.id}`)}
                                             disabled={period.status === 'PAID'}
                                         >
                                             تشغيل
