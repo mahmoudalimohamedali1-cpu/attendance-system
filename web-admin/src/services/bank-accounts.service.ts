@@ -102,6 +102,16 @@ class BankAccountsService {
     async delete(id: string): Promise<void> {
         await api.delete(`${this.basePath}/${id}`);
     }
+
+    async verify(id: string): Promise<BankAccount> {
+        const response = await api.patch(`${this.basePath}/${id}/verify`, {}) as BankAccount | { data: BankAccount };
+        return (response as any).data || response;
+    }
+
+    async unverify(id: string): Promise<BankAccount> {
+        const response = await api.patch(`${this.basePath}/${id}/unverify`, {}) as BankAccount | { data: BankAccount };
+        return (response as any).data || response;
+    }
 }
 
 export const bankAccountsService = new BankAccountsService();

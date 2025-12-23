@@ -296,6 +296,21 @@ export default function BankAccountsPage() {
         }
     };
 
+    const handleVerifyEmployee = async (id: string, isVerified: boolean) => {
+        try {
+            if (isVerified) {
+                await bankAccountsService.unverify(id);
+                setSuccess('تم إلغاء التحقق من الحساب');
+            } else {
+                await bankAccountsService.verify(id);
+                setSuccess('تم التحقق من الحساب البنكي بنجاح ✓');
+            }
+            fetchData();
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'حدث خطأ');
+        }
+    };
+
     // ==================== Delete ====================
 
     const handleOpenDelete = (type: 'company' | 'employee', item: any) => {
@@ -586,11 +601,17 @@ export default function BankAccountsPage() {
                                                 </Tooltip>
                                             </TableCell>
                                             <TableCell align="center">
-                                                {account.isVerified ? (
-                                                    <Chip icon={<VerifiedIcon />} label="متحقق" size="small" color="success" />
-                                                ) : (
-                                                    <Chip label="غير متحقق" size="small" variant="outlined" />
-                                                )}
+                                                <Tooltip title={account.isVerified ? 'اضغط لإلغاء التحقق' : 'اضغط للتحقق من الحساب'}>
+                                                    <Chip
+                                                        icon={account.isVerified ? <VerifiedIcon /> : undefined}
+                                                        label={account.isVerified ? 'متحقق ✓' : 'تحقق'}
+                                                        size="small"
+                                                        color={account.isVerified ? 'success' : 'default'}
+                                                        variant={account.isVerified ? 'filled' : 'outlined'}
+                                                        onClick={() => handleVerifyEmployee(account.id, account.isVerified)}
+                                                        sx={{ cursor: 'pointer' }}
+                                                    />
+                                                </Tooltip>
                                             </TableCell>
                                             <TableCell align="center">
                                                 <Tooltip title="حذف">

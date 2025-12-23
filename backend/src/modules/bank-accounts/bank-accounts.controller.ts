@@ -46,4 +46,18 @@ export class BankAccountsController {
     remove(@Param('id') id: string) {
         return this.service.remove(id);
     }
+
+    @Patch(':id/verify')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'التحقق من الحساب البنكي' })
+    verify(@Param('id') id: string, @CurrentUser() user: any) {
+        return this.service.verify(id, user.id);
+    }
+
+    @Patch(':id/unverify')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'إلغاء التحقق من الحساب البنكي' })
+    unverify(@Param('id') id: string) {
+        return this.service.unverify(id);
+    }
 }
