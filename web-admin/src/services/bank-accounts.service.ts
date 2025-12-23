@@ -80,27 +80,8 @@ class BankAccountsService {
     private readonly basePath = '/bank-accounts';
 
     async getAll(): Promise<BankAccount[]> {
-        // Get all users and their bank accounts
-        const usersResponse = await api.get('/users') as any[];
-        const users = (usersResponse as any).data || usersResponse;
-
-        const accounts: BankAccount[] = [];
-        for (const user of users) {
-            if (user.bankAccounts && user.bankAccounts.length > 0) {
-                for (const acc of user.bankAccounts) {
-                    accounts.push({
-                        ...acc,
-                        user: {
-                            id: user.id,
-                            firstName: user.firstName,
-                            lastName: user.lastName,
-                            employeeCode: user.employeeCode,
-                        },
-                    });
-                }
-            }
-        }
-        return accounts;
+        const response = await api.get(this.basePath) as BankAccount[] | { data: BankAccount[] };
+        return (response as any).data || response;
     }
 
     async getByUser(userId: string): Promise<BankAccount[]> {

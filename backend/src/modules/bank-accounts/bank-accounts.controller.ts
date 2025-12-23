@@ -5,6 +5,7 @@ import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Bank Accounts')
 @ApiBearerAuth()
@@ -12,6 +13,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @Controller('bank-accounts')
 export class BankAccountsController {
     constructor(private readonly service: BankAccountsService) { }
+
+    @Get()
+    @ApiOperation({ summary: 'جلب كل الحسابات البنكية للموظفين' })
+    findAll(@CurrentUser() user: any) {
+        return this.service.findAll(user.companyId);
+    }
 
     @Post()
     @Roles('ADMIN')

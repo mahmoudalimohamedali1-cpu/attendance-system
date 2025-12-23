@@ -69,6 +69,28 @@ export class BankAccountsService {
         });
     }
 
+    async findAll(companyId: string) {
+        return this.prisma.employeeBankAccount.findMany({
+            where: {
+                user: { companyId }
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                    }
+                }
+            },
+            orderBy: [
+                { isPrimary: 'desc' },
+                { createdAt: 'desc' }
+            ]
+        });
+    }
+
     async findByUser(userId: string) {
         return this.prisma.employeeBankAccount.findMany({
             where: { userId },
