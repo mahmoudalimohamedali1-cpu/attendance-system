@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CalculateEosDto, EosBreakdown, EosReason } from './dto/calculate-eos.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import { LeaveCalculationService } from '../leaves/leave-calculation.service';
 
 @Injectable()
 export class EosService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private leaveCalculationService: LeaveCalculationService,
+    ) { }
 
     async calculateEos(userId: string, dto: CalculateEosDto): Promise<EosBreakdown> {
         const employee = await this.prisma.user.findUnique({
@@ -13,6 +17,7 @@ export class EosService {
             include: {
                 salaryAssignments: { where: { isActive: true }, take: 1 },
                 advanceRequests: { where: { status: 'APPROVED' } },
+                leaveRequests: { where: { status: 'APPROVED' } },
             }
         });
 
@@ -76,9 +81,19 @@ export class EosService {
         const adjustedEos = totalEos * eosAdjustmentFactor;
 
         // ========================================
-        // تعويض الإجازات المتبقية
+        // تعويض الإجازات المتبقية (حساب ديناميكي)
         // ========================================
-        const remainingLeaveDays = employee.remainingLeaveDays || 0;
+        // حساب الإجازات المستحقة من تاريخ التعيين حتى آخر يوم عمل
+        const earnedLeaveDays = this.leaveCalculationService.calculateEarnedLeaveDays(hireDate, lastWorkingDay);
+
+        // حساب الإجازات المستخدمة من الطلبات المعتمدة
+        let usedLeaveDays = 0;
+        for (const leave of employee.leaveRequests) {
+            usedLeaveDays += Number(leave.requestedDays) || 0;
+        }
+
+        // الرصيد المتبقي = المستحق - المستخدم
+        const remainingLeaveDays = Math.max(0, Math.floor(earnedLeaveDays - usedLeaveDays));
         const dailySalary = baseSalary / 30;
         const leavePayout = remainingLeaveDays * dailySalary;
 
