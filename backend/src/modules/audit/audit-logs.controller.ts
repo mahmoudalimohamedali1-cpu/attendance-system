@@ -2,20 +2,20 @@ import { Controller, Get, Param, Query, UseGuards, Request, Res } from '@nestjs/
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiProduces } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionGuard } from '../auth/guards/permission.guard';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { StatusLogService } from '../../common/services/status-log.service';
 import { SubmissionEntityType } from '@prisma/client';
 
 @ApiTags('Audit - سجل التدقيق')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('audit')
-export class AuditController {
+export class AuditLogsController {
     constructor(private readonly statusLogService: StatusLogService) { }
 
     @Get('submissions/:entityType/:entityId/logs')
-    @RequirePermission('AUDIT_VIEW')
+    @Roles('ADMIN')
     @ApiOperation({ summary: 'جلب سجل تغييرات الحالة لكيان معين' })
     @ApiParam({ name: 'entityType', enum: ['MUDAD', 'WPS', 'QIWA'] })
     @ApiParam({ name: 'entityId', description: 'UUID of the entity' })
@@ -32,7 +32,7 @@ export class AuditController {
     }
 
     @Get('submissions/logs')
-    @RequirePermission('AUDIT_VIEW')
+    @Roles('ADMIN')
     @ApiOperation({ summary: 'جلب جميع سجلات التدقيق لفترة محددة' })
     @ApiQuery({ name: 'startDate', required: false, description: 'ISO date string' })
     @ApiQuery({ name: 'endDate', required: false, description: 'ISO date string' })
@@ -48,7 +48,7 @@ export class AuditController {
     }
 
     @Get('submissions/by-user/:userId')
-    @RequirePermission('AUDIT_VIEW')
+    @Roles('ADMIN')
     @ApiOperation({ summary: 'جلب سجلات مستخدم معين (لمراجعة الصلاحيات)' })
     @ApiParam({ name: 'userId', description: 'UUID of the user' })
     async getLogsByUser(
@@ -59,7 +59,7 @@ export class AuditController {
     }
 
     @Get('submissions/export/csv')
-    @RequirePermission('AUDIT_EXPORT')
+    @Roles('ADMIN')
     @ApiOperation({ summary: 'تصدير سجلات التدقيق بصيغة CSV' })
     @ApiProduces('text/csv')
     @ApiQuery({ name: 'startDate', required: false, description: 'ISO date string' })
@@ -101,7 +101,7 @@ export class AuditController {
     }
 
     @Get('submissions/stuck-stats')
-    @RequirePermission('AUDIT_VIEW')
+    @Roles('ADMIN')
     @ApiOperation({ summary: 'إحصائيات التقديمات المعلقة (> 3 أيام)' })
     async getStuckStats(@Request() req: any) {
         const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
