@@ -306,10 +306,39 @@ export const PayrollWizardPage = () => {
     }, []);
 
     const fetchPreview = useCallback(async () => {
+        if (!selectedPeriodId) {
+            setError('يرجى اختيار فترة الراتب أولاً');
+            return;
+        }
+
         setPreviewLoading(true);
         setError(null);
         try {
-            // Get employees for preview
+            // Use the new backend preview API for accurate calculations
+            const previewResponse = await api.post('/payroll-runs/preview', {
+                periodId: selectedPeriodId,
+                branchId: selectedBranchId || undefined,
+            }) as any;
+
+            // Map backend response to existing PreviewData interface
+            if (previewResponse?.summary) {
+                setPreviewData({
+                    totalEmployees: previewResponse.summary.totalEmployees || 0,
+                    estimatedGross: previewResponse.summary.totalGross || 0,
+                    estimatedDeductions: previewResponse.summary.totalDeductions || 0,
+                    estimatedNet: previewResponse.summary.totalNet || 0,
+                    byBranch: (previewResponse.byBranch || []).map((b: any) => ({
+                        name: b.name,
+                        count: b.count,
+                        total: b.gross || 0,
+                    })),
+                    previousMonth: previewResponse.comparison?.previousMonth || undefined,
+                });
+                setPreviewLoading(false);
+                return;
+            }
+
+            // Fallback: Get employees for preview
             let url = '/users';
             const params: string[] = [];
             if (selectedBranchId) params.push(`branchId=${selectedBranchId}`);
@@ -385,7 +414,7 @@ export const PayrollWizardPage = () => {
         } finally {
             setPreviewLoading(false);
         }
-    }, [selectedBranchId, selectedDepartmentId]);
+    }, [selectedPeriodId, selectedBranchId, selectedDepartmentId]);
 
     const runPayroll = async () => {
         setRunProgress(0);

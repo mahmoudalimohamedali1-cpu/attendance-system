@@ -216,6 +216,216 @@ export class PayrollRunsService {
         return result;
     }
 
+    /**
+     * معاينة مسير الرواتب قبل التشغيل - حساب تقديري بدون حفظ
+     */
+    async preview(dto: CreatePayrollRunDto, companyId: string) {
+        const period = await this.prisma.payrollPeriod.findFirst({ where: { id: dto.periodId, companyId } });
+        if (!period) throw new NotFoundException('فترة الرواتب غير موجودة');
+
+        // جلب إعدادات GOSI
+        const gosiConfig = await this.prisma.gosiConfig.findFirst({
+            where: { isActive: true, companyId },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        const employees = await this.prisma.user.findMany({
+            where: {
+                companyId,
+                branchId: dto.branchId || undefined,
+                status: 'ACTIVE',
+                salaryAssignments: { some: { isActive: true } }
+            },
+            include: {
+                branch: true,
+                department: true,
+                salaryAssignments: {
+                    where: { isActive: true },
+                    include: {
+                        structure: {
+                            include: {
+                                lines: { include: { component: true }, orderBy: { priority: 'asc' } }
+                            }
+                        }
+                    }
+                },
+                advanceRequests: {
+                    where: {
+                        status: 'APPROVED',
+                        startDate: { lte: period.endDate },
+                        endDate: { gte: period.startDate }
+                    }
+                }
+            }
+        });
+
+        // حساب الإجماليات
+        let totalGross = new Decimal(0);
+        let totalDeductions = new Decimal(0);
+        let totalNet = new Decimal(0);
+        let totalGosi = new Decimal(0);
+        let totalAdvances = new Decimal(0);
+        let totalBaseSalary = new Decimal(0);
+
+        // توزيع حسب الفرع
+        const byBranch: Record<string, { count: number; gross: number; net: number }> = {};
+        // توزيع حسب القسم
+        const byDepartment: Record<string, { count: number; gross: number; net: number }> = {};
+
+        const employeePreviews: any[] = [];
+
+        for (const employee of employees) {
+            const assignment = employee.salaryAssignments[0];
+            if (!assignment) continue;
+
+            const structure = assignment.structure;
+            const baseSalary = assignment.baseSalary;
+            totalBaseSalary = totalBaseSalary.add(baseSalary);
+
+            let grossSalary = new Decimal(baseSalary.toString());
+            let deductions = new Decimal(0);
+            let gosiBaseSalary = new Decimal(baseSalary.toString());
+
+            // حساب المكونات من الهيكل
+            for (const line of structure.lines) {
+                let lineAmount = new Decimal(0);
+
+                if (line.component.nature === 'FIXED') {
+                    lineAmount = new Decimal(line.amount.toString());
+                } else if (line.percentage) {
+                    lineAmount = baseSalary.mul(line.percentage.toString()).div(100);
+                }
+
+                if (line.component.type === 'EARNING') {
+                    grossSalary = grossSalary.add(lineAmount);
+                    if (line.component.gosiEligible) {
+                        gosiBaseSalary = gosiBaseSalary.add(lineAmount);
+                    }
+                } else {
+                    deductions = deductions.add(lineAmount);
+                }
+            }
+
+            // خصومات السلف
+            let advanceDeduction = new Decimal(0);
+            for (const advance of employee.advanceRequests) {
+                const ded = advance.approvedMonthlyDeduction || advance.monthlyDeduction;
+                advanceDeduction = advanceDeduction.add(ded);
+            }
+            deductions = deductions.add(advanceDeduction);
+            totalAdvances = totalAdvances.add(advanceDeduction);
+
+            // حساب GOSI للسعوديين
+            let gosiDeduction = new Decimal(0);
+            if (gosiConfig && (employee as any).isSaudi) {
+                const cappedGosiBase = Decimal.min(gosiBaseSalary, gosiConfig.maxCapAmount);
+                const totalGosiRate = new Decimal(gosiConfig.employeeRate.toString()).add(gosiConfig.sanedRate.toString());
+                gosiDeduction = cappedGosiBase.mul(totalGosiRate).div(100);
+                deductions = deductions.add(gosiDeduction);
+            }
+            totalGosi = totalGosi.add(gosiDeduction);
+
+            const netSalary = grossSalary.sub(deductions);
+
+            totalGross = totalGross.add(grossSalary);
+            totalDeductions = totalDeductions.add(deductions);
+            totalNet = totalNet.add(netSalary);
+
+            // تجميع حسب الفرع
+            const branchName = employee.branch?.name || 'غير محدد';
+            if (!byBranch[branchName]) {
+                byBranch[branchName] = { count: 0, gross: 0, net: 0 };
+            }
+            byBranch[branchName].count++;
+            byBranch[branchName].gross += Number(grossSalary);
+            byBranch[branchName].net += Number(netSalary);
+
+            // تجميع حسب القسم
+            const deptName = employee.department?.name || 'غير محدد';
+            if (!byDepartment[deptName]) {
+                byDepartment[deptName] = { count: 0, gross: 0, net: 0 };
+            }
+            byDepartment[deptName].count++;
+            byDepartment[deptName].gross += Number(grossSalary);
+            byDepartment[deptName].net += Number(netSalary);
+
+            employeePreviews.push({
+                id: employee.id,
+                employeeCode: employee.employeeCode,
+                name: `${employee.firstName} ${employee.lastName}`,
+                branch: branchName,
+                department: deptName,
+                baseSalary: Number(baseSalary),
+                gross: Number(grossSalary),
+                deductions: Number(deductions),
+                gosi: Number(gosiDeduction),
+                advances: Number(advanceDeduction),
+                net: Number(netSalary),
+            });
+        }
+
+        // Get previous month data for comparison
+        let previousMonth = null;
+        try {
+            const prevPeriod = await this.prisma.payrollPeriod.findFirst({
+                where: {
+                    companyId,
+                    year: period.month === 1 ? period.year - 1 : period.year,
+                    month: period.month === 1 ? 12 : period.month - 1,
+                },
+            });
+            if (prevPeriod) {
+                const prevRun = await this.prisma.payrollRun.findFirst({
+                    where: { periodId: prevPeriod.id, companyId },
+                    include: { payslips: true, _count: { select: { payslips: true } } },
+                });
+                if (prevRun) {
+                    const prevTotals = prevRun.payslips.reduce((acc, p) => ({
+                        gross: acc.gross + Number(p.grossSalary),
+                        net: acc.net + Number(p.netSalary),
+                        deductions: acc.deductions + Number(p.totalDeductions),
+                    }), { gross: 0, net: 0, deductions: 0 });
+                    previousMonth = {
+                        headcount: prevRun._count.payslips,
+                        gross: prevTotals.gross,
+                        net: prevTotals.net,
+                        deductions: prevTotals.deductions,
+                    };
+                }
+            }
+        } catch { }
+
+        return {
+            period: {
+                id: period.id,
+                month: period.month,
+                year: period.year,
+                name: `${period.month}/${period.year}`,
+            },
+            summary: {
+                totalEmployees: employees.length,
+                totalBaseSalary: Number(totalBaseSalary),
+                totalGross: Number(totalGross),
+                totalDeductions: Number(totalDeductions),
+                totalNet: Number(totalNet),
+                totalGosi: Number(totalGosi),
+                totalAdvances: Number(totalAdvances),
+            },
+            comparison: previousMonth ? {
+                previousMonth,
+                grossChange: Number(totalGross) - previousMonth.gross,
+                grossChangePercent: previousMonth.gross > 0 ? ((Number(totalGross) - previousMonth.gross) / previousMonth.gross * 100) : 0,
+                netChange: Number(totalNet) - previousMonth.net,
+                netChangePercent: previousMonth.net > 0 ? ((Number(totalNet) - previousMonth.net) / previousMonth.net * 100) : 0,
+                headcountChange: employees.length - previousMonth.headcount,
+            } : null,
+            byBranch: Object.entries(byBranch).map(([name, data]) => ({ name, ...data })),
+            byDepartment: Object.entries(byDepartment).map(([name, data]) => ({ name, ...data })),
+            employees: employeePreviews,
+            gosiEnabled: !!gosiConfig,
+        };
+    }
+
     async findAll(companyId: string) {
         return this.prisma.payrollRun.findMany({
             where: { companyId },

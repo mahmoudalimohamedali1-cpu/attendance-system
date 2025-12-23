@@ -25,6 +25,13 @@ export class PayrollRunsController {
         private readonly prisma: PrismaService,
     ) { }
 
+    @Post('preview')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'معاينة مسير الرواتب قبل التشغيل' })
+    preview(@Body() dto: CreatePayrollRunDto, @CurrentUser('companyId') companyId: string) {
+        return this.service.preview(dto, companyId);
+    }
+
     @Post()
     @Roles('ADMIN')
     @ApiOperation({ summary: 'تشغيل احتساب مسير الرواتب' })
