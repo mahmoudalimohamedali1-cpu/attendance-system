@@ -61,6 +61,29 @@ export const PayrollRunDetailsPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedPayslip, setSelectedPayslip] = useState<any | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Calculate summary from payslips - must be before any conditional returns
+    const summary = useMemo(() => {
+        if (!run?.payslips) return { employees: 0, grossTotal: 0, deductionsTotal: 0, netTotal: 0 };
+        return run.payslips.reduce((acc, p) => ({
+            employees: acc.employees + 1,
+            grossTotal: acc.grossTotal + parseFloat(p.grossSalary || 0),
+            deductionsTotal: acc.deductionsTotal + parseFloat(p.totalDeductions || 0),
+            netTotal: acc.netTotal + parseFloat(p.netSalary || 0),
+        }), { employees: 0, grossTotal: 0, deductionsTotal: 0, netTotal: 0 });
+    }, [run?.payslips]);
+
+    // Filter payslips by search - must be before any conditional returns
+    const filteredPayslips = useMemo(() => {
+        if (!run?.payslips) return [];
+        if (!searchTerm) return run.payslips;
+        return run.payslips.filter(p => {
+            const name = `${p.employee?.firstName} ${p.employee?.lastName}`.toLowerCase();
+            const code = p.employee?.employeeCode?.toLowerCase() || '';
+            return name.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase());
+        });
+    }, [run?.payslips, searchTerm]);
 
     useEffect(() => {
         const fetchRun = async () => {
@@ -106,25 +129,7 @@ export const PayrollRunDetailsPage = () => {
         }
     };
 
-    // Calculate summary from payslips
-    const summary = useMemo(() => {
-        if (!run?.payslips) return { employees: 0, grossTotal: 0, deductionsTotal: 0, netTotal: 0 };
-        return run.payslips.reduce((acc, p) => ({
-            employees: acc.employees + 1,
-            grossTotal: acc.grossTotal + parseFloat(p.grossSalary || 0),
-            deductionsTotal: acc.deductionsTotal + parseFloat(p.totalDeductions || 0),
-            netTotal: acc.netTotal + parseFloat(p.netSalary || 0),
-        }), { employees: 0, grossTotal: 0, deductionsTotal: 0, netTotal: 0 });
-    }, [run?.payslips]);
-
-    // Filter payslips by search
-    const [searchTerm, setSearchTerm] = useState('');
-    const filteredPayslips = run?.payslips?.filter(p => {
-        if (!searchTerm) return true;
-        const name = `${p.employee?.firstName} ${p.employee?.lastName}`.toLowerCase();
-        const code = p.employee?.employeeCode?.toLowerCase() || '';
-        return name.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase());
-    }) || [];
+    // Note: hooks moved above loading check to comply with Rules of Hooks
 
     const isLocked = run.status === 'LOCKED' || run.status === 'PAID' || run.status === 'APPROVED';
 
