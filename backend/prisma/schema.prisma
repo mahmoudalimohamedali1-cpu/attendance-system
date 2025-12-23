@@ -55,6 +55,7 @@ model Company {
   wpsSubmissions       WpsSubmission[]
   submissionStatusLogs SubmissionStatusLog[]
   approvalChainConfigs ApprovalChainConfig[]
+  companyBankAccounts  CompanyBankAccount[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -687,7 +688,7 @@ model LeaveRequest {
   endDate   DateTime  @map("end_date") @db.Date
 
   // عدد الأيام
-  requestedDays Int  @map("requested_days") // الأيام المطلوبة
+  requestedDays Int  @default(1) @map("requested_days") // الأيام المطلوبة
   approvedDays  Int? @map("approved_days") // الأيام المعتمدة (قد تختلف)
 
   reason      String      @db.Text // السبب
@@ -1294,6 +1295,42 @@ model EmployeeBankAccount {
   @@unique([userId, iban])
   @@index([userId, isPrimary])
   @@map("employee_bank_accounts")
+}
+
+// ==================== حسابات الشركة البنكية ====================
+
+model CompanyBankAccount {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // بيانات البنك
+  bankName    String  @map("bank_name")
+  bankCode    String  @map("bank_code")  // SABB, RJHI, NCB, etc
+  iban        String
+  accountName String  @map("account_name")
+  swiftCode   String? @map("swift_code")
+  
+  // الحالة
+  isPrimary   Boolean @default(false) @map("is_primary")
+  isActive    Boolean @default(true)  @map("is_active")
+  
+  // بيانات WPS/MOL
+  molId           String? @map("mol_id")           // رقم المنشأة في وزارة العمل
+  wpsParticipant  String? @map("wps_participant")  // رقم المشارك في WPS
+  
+  // معلومات إضافية
+  accountType     String  @default("CURRENT") @map("account_type") // CURRENT, SAVINGS
+  currency        String  @default("SAR")
+  notes           String?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, iban])
+  @@index([companyId, isPrimary])
+  @@index([companyId, isActive])
+  @@map("company_bank_accounts")
 }
 
 model Contract {

@@ -33,6 +33,7 @@ import { SalaryAssignmentsModule } from './modules/salary-assignments/salary-ass
 import { PayrollPeriodsModule } from './modules/payroll-periods/payroll-periods.module';
 import { PayrollRunsModule } from './modules/payroll-runs/payroll-runs.module';
 import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module';
+import { CompanyBankAccountsModule } from './modules/company-bank-accounts/company-bank-accounts.module';
 import { GosiModule } from './modules/gosi/gosi.module';
 import { EosModule } from './modules/eos/eos.module';
 import { PdfModule } from './common/pdf/pdf.module';
@@ -95,6 +96,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     PayrollPeriodsModule,   // فترات الرواتب
     PayrollRunsModule,      // مسيرات الرواتب
     BankAccountsModule,     // الحسابات البنكية للموظفين
+    CompanyBankAccountsModule, // الحسابات البنكية للشركات
     GosiModule,             // التأمينات الاجتماعية
     EosModule,              // مكافأة نهاية الخدمة
     PdfModule,              // توليد PDF

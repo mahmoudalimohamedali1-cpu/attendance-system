@@ -66,6 +66,15 @@ export class WpsExportService {
             throw new NotFoundException('الشركة غير موجودة');
         }
 
+        // 2.5. جلب الحساب البنكي الرئيسي للشركة
+        const companyBankAccount = await this.prisma.companyBankAccount.findFirst({
+            where: { companyId, isPrimary: true, isActive: true },
+        });
+
+        if (!companyBankAccount) {
+            throw new BadRequestException('لا يوجد حساب بنكي رئيسي للشركة. الرجاء إضافة حساب بنكي من إدارة الحسابات البنكية.');
+        }
+
         // 3. بناء سجلات WPS
         const wpsRecords: WpsRecord[] = [];
 
