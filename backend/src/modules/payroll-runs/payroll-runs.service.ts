@@ -286,6 +286,13 @@ export class PayrollRunsService {
             let deductions = new Decimal(0);
             let gosiBaseSalary = new Decimal(baseSalary.toString());
 
+            // تفاصيل المكونات
+            const earnings: { name: string; code: string; amount: number }[] = [];
+            const deductionItems: { name: string; code: string; amount: number }[] = [];
+
+            // إضافة الراتب الأساسي كأول عنصر
+            earnings.push({ name: 'الراتب الأساسي', code: 'BASIC', amount: Number(baseSalary) });
+
             // حساب المكونات من الهيكل
             for (const line of structure.lines) {
                 let lineAmount = new Decimal(0);
@@ -301,27 +308,58 @@ export class PayrollRunsService {
                     if (line.component.gosiEligible) {
                         gosiBaseSalary = gosiBaseSalary.add(lineAmount);
                     }
+                    earnings.push({
+                        name: line.component.nameAr || line.component.nameEn || line.component.code,
+                        code: line.component.code,
+                        amount: Number(lineAmount),
+                    });
                 } else {
                     deductions = deductions.add(lineAmount);
+                    deductionItems.push({
+                        name: line.component.nameAr || line.component.nameEn || line.component.code,
+                        code: line.component.code,
+                        amount: Number(lineAmount),
+                    });
                 }
             }
 
             // خصومات السلف
             let advanceDeduction = new Decimal(0);
+            const advanceDetails: { id: string; amount: number }[] = [];
             for (const advance of employee.advanceRequests) {
                 const ded = advance.approvedMonthlyDeduction || advance.monthlyDeduction;
                 advanceDeduction = advanceDeduction.add(ded);
+                advanceDetails.push({
+                    id: advance.id,
+                    amount: Number(ded),
+                });
             }
             deductions = deductions.add(advanceDeduction);
             totalAdvances = totalAdvances.add(advanceDeduction);
 
+            if (advanceDeduction.gt(0)) {
+                deductionItems.push({
+                    name: 'خصم سلفة',
+                    code: 'LOAN_DED',
+                    amount: Number(advanceDeduction),
+                });
+            }
+
             // حساب GOSI للسعوديين
             let gosiDeduction = new Decimal(0);
+            let gosiEmployer = new Decimal(0);
             if (gosiConfig && (employee as any).isSaudi) {
                 const cappedGosiBase = Decimal.min(gosiBaseSalary, gosiConfig.maxCapAmount);
                 const totalGosiRate = new Decimal(gosiConfig.employeeRate.toString()).add(gosiConfig.sanedRate.toString());
                 gosiDeduction = cappedGosiBase.mul(totalGosiRate).div(100);
+                gosiEmployer = cappedGosiBase.mul(gosiConfig.employerRate.toString()).add(gosiConfig.hazardRate.toString()).div(100);
                 deductions = deductions.add(gosiDeduction);
+
+                deductionItems.push({
+                    name: 'تأمينات اجتماعية (GOSI)',
+                    code: 'GOSI_DED',
+                    amount: Number(gosiDeduction),
+                });
             }
             totalGosi = totalGosi.add(gosiDeduction);
 
@@ -353,14 +391,26 @@ export class PayrollRunsService {
                 id: employee.id,
                 employeeCode: employee.employeeCode,
                 name: `${employee.firstName} ${employee.lastName}`,
+                firstName: employee.firstName,
+                lastName: employee.lastName,
                 branch: branchName,
                 department: deptName,
+                jobTitle: (employee as any).jobTitle?.name || 'غير محدد',
+                isSaudi: (employee as any).isSaudi || false,
                 baseSalary: Number(baseSalary),
                 gross: Number(grossSalary),
                 deductions: Number(deductions),
                 gosi: Number(gosiDeduction),
+                gosiEmployer: Number(gosiEmployer),
                 advances: Number(advanceDeduction),
                 net: Number(netSalary),
+                // تفاصيل المكونات
+                earnings,
+                deductionItems,
+                advanceDetails,
+                // للتعديل لاحقاً
+                adjustments: [],
+                excluded: false,
             });
         }
 
