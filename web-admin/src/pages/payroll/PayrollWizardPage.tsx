@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -169,6 +169,7 @@ export const PayrollWizardPage = () => {
     // Editing state for preview
     const [excludedEmployees, setExcludedEmployees] = useState<Set<string>>(new Set());
     const [adjustments, setAdjustments] = useState<Record<string, { type: 'bonus' | 'deduction'; amount: number; reason: string }[]>>({});
+    const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
 
     // Step 5: Running
     const [runProgress, setRunProgress] = useState(0);
@@ -1077,137 +1078,233 @@ export const PayrollWizardPage = () => {
                                                         sum + (adj.type === 'bonus' ? adj.amount : -adj.amount), 0
                                                     );
                                                     const adjustedNet = emp.net + adjustmentTotal;
+                                                    const isExpanded = expandedEmployee === emp.id;
 
                                                     return (
-                                                        <TableRow
-                                                            key={emp.id}
-                                                            hover
-                                                            sx={{
-                                                                opacity: isExcluded ? 0.4 : 1,
-                                                                bgcolor: isExcluded ? 'grey.50' : empAdjustments.length > 0 ? 'warning.50' : 'inherit',
-                                                                textDecoration: isExcluded ? 'line-through' : 'none',
-                                                            }}
-                                                        >
-                                                            <TableCell>
-                                                                <input
-
-                                                                    type="checkbox"
-                                                                    checked={!isExcluded}
-                                                                    onChange={() => {
-                                                                        const newExcluded = new Set(excludedEmployees);
-                                                                        if (isExcluded) {
-                                                                            newExcluded.delete(emp.id);
-                                                                        } else {
-                                                                            newExcluded.add(emp.id);
-                                                                        }
-                                                                        setExcludedEmployees(newExcluded);
-                                                                    }}
-                                                                    title={isExcluded ? 'إعادة تضمين' : 'استثناء من المسير'}
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell>{idx + 1}</TableCell>
-                                                            <TableCell>
-                                                                <Box>
-                                                                    <Typography variant="body2" fontWeight={500}>
-                                                                        {emp.name}
-                                                                    </Typography>
-                                                                    <Typography variant="caption" color="text.secondary">
-                                                                        {emp.employeeCode} {emp.isSaudi && '🇸🇦'}
-                                                                    </Typography>
-                                                                </Box>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Chip
-                                                                    label={emp.branch}
-                                                                    size="small"
-                                                                    variant="outlined"
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell align="right">
-                                                                {formatMoney(emp.baseSalary)}
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                                                                {formatMoney(emp.gross + (empAdjustments.filter(a => a.type === 'bonus').reduce((s, a) => s + a.amount, 0)))}
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ color: 'error.main' }}>
-                                                                {formatMoney(emp.deductions + (empAdjustments.filter(a => a.type === 'deduction').reduce((s, a) => s + a.amount, 0)))}
-                                                                {emp.gosi > 0 && (
-                                                                    <Typography variant="caption" display="block" color="text.secondary">
-                                                                        GOSI: {formatMoney(emp.gosi)}
-                                                                    </Typography>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main' }}>
-                                                                {formatMoney(adjustedNet)}
-                                                                {adjustmentTotal !== 0 && (
-                                                                    <Typography variant="caption" display="block" color={adjustmentTotal > 0 ? 'success.main' : 'error.main'}>
-                                                                        ({adjustmentTotal > 0 ? '+' : ''}{formatMoney(adjustmentTotal)})
-                                                                    </Typography>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Box display="flex" gap={0.5}>
-                                                                    <Button
+                                                        <React.Fragment key={emp.id}>
+                                                            <TableRow
+                                                                hover
+                                                                onClick={() => setExpandedEmployee(isExpanded ? null : emp.id)}
+                                                                sx={{
+                                                                    opacity: isExcluded ? 0.4 : 1,
+                                                                    bgcolor: isExcluded ? 'grey.50' : empAdjustments.length > 0 ? 'warning.50' : 'inherit',
+                                                                    textDecoration: isExcluded ? 'line-through' : 'none',
+                                                                    cursor: 'pointer',
+                                                                    '&:hover': { bgcolor: 'action.hover' },
+                                                                }}
+                                                            >
+                                                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={!isExcluded}
+                                                                        onChange={() => {
+                                                                            const newExcluded = new Set(excludedEmployees);
+                                                                            if (isExcluded) {
+                                                                                newExcluded.delete(emp.id);
+                                                                            } else {
+                                                                                newExcluded.add(emp.id);
+                                                                            }
+                                                                            setExcludedEmployees(newExcluded);
+                                                                        }}
+                                                                        title={isExcluded ? 'إعادة تضمين' : 'استثناء من المسير'}
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>{idx + 1}</TableCell>
+                                                                <TableCell>
+                                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                                        {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                                                                        <Box>
+                                                                            <Typography variant="body2" fontWeight={500}>
+                                                                                {emp.name}
+                                                                            </Typography>
+                                                                            <Typography variant="caption" color="text.secondary">
+                                                                                {emp.employeeCode} {emp.isSaudi && '🇸🇦'}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    </Box>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <Chip
+                                                                        label={emp.branch}
                                                                         size="small"
                                                                         variant="outlined"
-                                                                        color="success"
-                                                                        disabled={isExcluded}
-                                                                        onClick={() => {
-                                                                            const amount = prompt('أدخل مبلغ المكافأة:');
-                                                                            if (amount && !isNaN(Number(amount))) {
-                                                                                const reason = prompt('سبب المكافأة:') || 'مكافأة';
-                                                                                setAdjustments(prev => ({
-                                                                                    ...prev,
-                                                                                    [emp.id]: [...(prev[emp.id] || []), { type: 'bonus', amount: Number(amount), reason }]
-                                                                                }));
-                                                                            }
-                                                                        }}
-                                                                        sx={{ minWidth: 30, p: 0.5 }}
-                                                                        title="إضافة مكافأة"
-                                                                    >
-                                                                        +
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="small"
-                                                                        variant="outlined"
-                                                                        color="error"
-                                                                        disabled={isExcluded}
-                                                                        onClick={() => {
-                                                                            const amount = prompt('أدخل مبلغ الخصم:');
-                                                                            if (amount && !isNaN(Number(amount))) {
-                                                                                const reason = prompt('سبب الخصم:') || 'خصم';
-                                                                                setAdjustments(prev => ({
-                                                                                    ...prev,
-                                                                                    [emp.id]: [...(prev[emp.id] || []), { type: 'deduction', amount: Number(amount), reason }]
-                                                                                }));
-                                                                            }
-                                                                        }}
-                                                                        sx={{ minWidth: 30, p: 0.5 }}
-                                                                        title="إضافة خصم"
-                                                                    >
-                                                                        -
-                                                                    </Button>
-                                                                    {empAdjustments.length > 0 && (
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell align="right">
+                                                                    {formatMoney(emp.baseSalary)}
+                                                                </TableCell>
+                                                                <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                                                                    {formatMoney(emp.gross + (empAdjustments.filter(a => a.type === 'bonus').reduce((s, a) => s + a.amount, 0)))}
+                                                                </TableCell>
+                                                                <TableCell align="right" sx={{ color: 'error.main' }}>
+                                                                    {formatMoney(emp.deductions + (empAdjustments.filter(a => a.type === 'deduction').reduce((s, a) => s + a.amount, 0)))}
+                                                                    {emp.gosi > 0 && (
+                                                                        <Typography variant="caption" display="block" color="text.secondary">
+                                                                            GOSI: {formatMoney(emp.gosi)}
+                                                                        </Typography>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                                                                    {formatMoney(adjustedNet)}
+                                                                    {adjustmentTotal !== 0 && (
+                                                                        <Typography variant="caption" display="block" color={adjustmentTotal > 0 ? 'success.main' : 'error.main'}>
+                                                                            ({adjustmentTotal > 0 ? '+' : ''}{formatMoney(adjustmentTotal)})
+                                                                        </Typography>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                                                    <Box display="flex" gap={0.5}>
                                                                         <Button
                                                                             size="small"
-                                                                            variant="text"
-                                                                            color="warning"
+                                                                            variant="outlined"
+                                                                            color="success"
+                                                                            disabled={isExcluded}
                                                                             onClick={() => {
-                                                                                setAdjustments(prev => {
-                                                                                    const newAdj = { ...prev };
-                                                                                    delete newAdj[emp.id];
-                                                                                    return newAdj;
-                                                                                });
+                                                                                const amount = prompt('أدخل مبلغ المكافأة:');
+                                                                                if (amount && !isNaN(Number(amount))) {
+                                                                                    const reason = prompt('سبب المكافأة:') || 'مكافأة';
+                                                                                    setAdjustments(prev => ({
+                                                                                        ...prev,
+                                                                                        [emp.id]: [...(prev[emp.id] || []), { type: 'bonus', amount: Number(amount), reason }]
+                                                                                    }));
+                                                                                }
                                                                             }}
                                                                             sx={{ minWidth: 30, p: 0.5 }}
-                                                                            title="مسح التعديلات"
+                                                                            title="إضافة مكافأة"
                                                                         >
-                                                                            ✕
+                                                                            +
                                                                         </Button>
-                                                                    )}
-                                                                </Box>
-                                                            </TableCell>
-                                                        </TableRow>
+                                                                        <Button
+                                                                            size="small"
+                                                                            variant="outlined"
+                                                                            color="error"
+                                                                            disabled={isExcluded}
+                                                                            onClick={() => {
+                                                                                const amount = prompt('أدخل مبلغ الخصم:');
+                                                                                if (amount && !isNaN(Number(amount))) {
+                                                                                    const reason = prompt('سبب الخصم:') || 'خصم';
+                                                                                    setAdjustments(prev => ({
+                                                                                        ...prev,
+                                                                                        [emp.id]: [...(prev[emp.id] || []), { type: 'deduction', amount: Number(amount), reason }]
+                                                                                    }));
+                                                                                }
+                                                                            }}
+                                                                            sx={{ minWidth: 30, p: 0.5 }}
+                                                                            title="إضافة خصم"
+                                                                        >
+                                                                            -
+                                                                        </Button>
+                                                                        {empAdjustments.length > 0 && (
+                                                                            <Button
+                                                                                size="small"
+                                                                                variant="text"
+                                                                                color="warning"
+                                                                                onClick={() => {
+                                                                                    setAdjustments(prev => {
+                                                                                        const newAdj = { ...prev };
+                                                                                        delete newAdj[emp.id];
+                                                                                        return newAdj;
+                                                                                    });
+                                                                                }}
+                                                                                sx={{ minWidth: 30, p: 0.5 }}
+                                                                                title="مسح التعديلات"
+                                                                            >
+                                                                                ✕
+                                                                            </Button>
+                                                                        )}
+                                                                    </Box>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                            {/* Expanded Details Row */}
+                                                            <TableRow>
+                                                                <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                                                                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                                                                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+                                                                            <Grid container spacing={2}>
+                                                                                {/* Earnings */}
+                                                                                <Grid item xs={12} md={4}>
+                                                                                    <Typography variant="subtitle2" fontWeight="bold" color="success.main" gutterBottom>
+                                                                                        💰 المستحقات
+                                                                                    </Typography>
+                                                                                    {emp.earnings && emp.earnings.length > 0 ? (
+                                                                                        emp.earnings.map((e, i) => (
+                                                                                            <Box key={i} display="flex" justifyContent="space-between">
+                                                                                                <Typography variant="body2">{e.name}</Typography>
+                                                                                                <Typography variant="body2" fontWeight={500}>{formatMoney(e.amount)}</Typography>
+                                                                                            </Box>
+                                                                                        ))
+                                                                                    ) : (
+                                                                                        <Typography variant="body2" color="text.secondary">الراتب الأساسي: {formatMoney(emp.baseSalary)}</Typography>
+                                                                                    )}
+                                                                                    {empAdjustments.filter(a => a.type === 'bonus').map((adj, i) => (
+                                                                                        <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'success.main' }}>
+                                                                                            <Typography variant="body2">+ {adj.reason}</Typography>
+                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
+                                                                                        </Box>
+                                                                                    ))}
+                                                                                </Grid>
+                                                                                {/* Deductions */}
+                                                                                <Grid item xs={12} md={4}>
+                                                                                    <Typography variant="subtitle2" fontWeight="bold" color="error.main" gutterBottom>
+                                                                                        📉 الخصومات
+                                                                                    </Typography>
+                                                                                    {emp.deductionItems && emp.deductionItems.length > 0 ? (
+                                                                                        emp.deductionItems.map((d, i) => (
+                                                                                            <Box key={i} display="flex" justifyContent="space-between">
+                                                                                                <Typography variant="body2">{d.name}</Typography>
+                                                                                                <Typography variant="body2" fontWeight={500}>{formatMoney(d.amount)}</Typography>
+                                                                                            </Box>
+                                                                                        ))
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            {emp.gosi > 0 && (
+                                                                                                <Box display="flex" justifyContent="space-between">
+                                                                                                    <Typography variant="body2">GOSI (موظف)</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosi)}</Typography>
+                                                                                                </Box>
+                                                                                            )}
+                                                                                            {emp.advances > 0 && (
+                                                                                                <Box display="flex" justifyContent="space-between">
+                                                                                                    <Typography variant="body2">سلف</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(emp.advances)}</Typography>
+                                                                                                </Box>
+                                                                                            )}
+                                                                                        </>
+                                                                                    )}
+                                                                                    {empAdjustments.filter(a => a.type === 'deduction').map((adj, i) => (
+                                                                                        <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'error.main' }}>
+                                                                                            <Typography variant="body2">- {adj.reason}</Typography>
+                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
+                                                                                        </Box>
+                                                                                    ))}
+                                                                                </Grid>
+                                                                                {/* Summary */}
+                                                                                <Grid item xs={12} md={4}>
+                                                                                    <Typography variant="subtitle2" fontWeight="bold" color="info.main" gutterBottom>
+                                                                                        📊 الملخص
+                                                                                    </Typography>
+                                                                                    <Box display="flex" justifyContent="space-between">
+                                                                                        <Typography variant="body2">القسم</Typography>
+                                                                                        <Typography variant="body2" fontWeight={500}>{emp.department || 'غير محدد'}</Typography>
+                                                                                    </Box>
+                                                                                    {emp.gosiEmployer > 0 && (
+                                                                                        <Box display="flex" justifyContent="space-between">
+                                                                                            <Typography variant="body2">GOSI (صاحب العمل)</Typography>
+                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosiEmployer)}</Typography>
+                                                                                        </Box>
+                                                                                    )}
+                                                                                    <Divider sx={{ my: 1 }} />
+                                                                                    <Box display="flex" justifyContent="space-between">
+                                                                                        <Typography variant="body2" fontWeight="bold">الصافي النهائي</Typography>
+                                                                                        <Typography variant="body2" fontWeight="bold" color="info.main">{formatMoney(adjustedNet)}</Typography>
+                                                                                    </Box>
+                                                                                </Grid>
+                                                                            </Grid>
+                                                                        </Box>
+                                                                    </Collapse>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        </React.Fragment>
                                                     );
                                                 })
                                             )}
