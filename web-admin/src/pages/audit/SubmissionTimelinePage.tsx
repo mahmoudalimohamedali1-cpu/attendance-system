@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Card, Typography, Grid, TextField, Button, MenuItem,
     CircularProgress, Chip, FormControl, InputLabel, Select,
-    Divider,
+    Divider, Alert,
 } from '@mui/material';
 import {
     Timeline,
@@ -57,6 +57,7 @@ const reasonLabels: Record<string, string> = {
 const SubmissionTimelinePage = () => {
     const [logs, setLogs] = useState<StatusLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState({
         entityType: '',
         status: '',
@@ -68,11 +69,14 @@ const SubmissionTimelinePage = () => {
 
     const fetchLogs = async () => {
         setIsLoading(true);
+        setError(null);
         try {
             const data = await auditService.getLogsByPeriod();
-            setLogs(data);
-        } catch (error) {
-            console.error('Failed to fetch audit logs:', error);
+            setLogs(Array.isArray(data) ? data : []);
+        } catch (err: any) {
+            console.error('Failed to fetch audit logs:', err);
+            setError(err?.response?.data?.message || err?.message || 'حدث خطأ في تحميل السجلات');
+            setLogs([]);
         } finally {
             setIsLoading(false);
         }
@@ -114,6 +118,13 @@ const SubmissionTimelinePage = () => {
                     تحديث السجل
                 </Button>
             </Box>
+
+            {/* Error Alert */}
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+                    {error}
+                </Alert>
+            )}
 
             {/* Filters */}
             <Card sx={{ p: 3, mb: 4, borderRadius: 2 }}>
