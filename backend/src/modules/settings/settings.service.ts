@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class SettingsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) { }
 
   async getAllSettings(companyId: string) {
     return this.prisma.systemSetting.findMany({
@@ -17,22 +21,52 @@ export class SettingsService {
     });
   }
 
-  async setSetting(key: string, value: string, companyId: string, description?: string) {
-    return this.prisma.systemSetting.upsert({
+  async setSetting(key: string, value: string, companyId: string, description?: string, userId?: string) {
+    const oldSetting = await this.getSetting(key, companyId);
+
+    const setting = await this.prisma.systemSetting.upsert({
       where: {
         key_companyId: { key, companyId }
       },
       create: { key, value, companyId, description },
       update: { value, description },
     });
+
+    // Log audit
+    await this.auditService.log(
+      oldSetting ? 'UPDATE' : 'CREATE',
+      'Settings',
+      key,
+      userId,
+      oldSetting ? { value: oldSetting.value } : null,
+      { value },
+      `تعديل إعداد: ${key}`,
+    );
+
+    return setting;
   }
 
-  async deleteSetting(key: string, companyId: string) {
-    return this.prisma.systemSetting.delete({
+  async deleteSetting(key: string, companyId: string, userId?: string) {
+    const oldSetting = await this.getSetting(key, companyId);
+
+    const result = await this.prisma.systemSetting.delete({
       where: {
         key_companyId: { key, companyId }
       },
     });
+
+    // Log audit
+    await this.auditService.log(
+      'DELETE',
+      'Settings',
+      key,
+      userId,
+      oldSetting ? { value: oldSetting.value } : null,
+      null,
+      `حذف إعداد: ${key}`,
+    );
+
+    return result;
   }
 
   async setMultipleSettings(settings: Array<{ key: string; value: string; description?: string }>, companyId: string) {

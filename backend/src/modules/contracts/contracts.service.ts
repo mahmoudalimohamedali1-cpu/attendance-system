@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { CreateContractDto, UpdateContractDto, TerminateContractDto, RenewContractDto } from './dto/contract.dto';
 
 @Injectable()
 export class ContractsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private auditService: AuditService,
+    ) { }
 
     async findAll(companyId: string) {
         return this.prisma.contract.findMany({
@@ -65,7 +69,7 @@ export class ContractsService {
         // إنشاء رقم عقد فريد
         const contractNumber = dto.contractNumber || `CTR-${Date.now()}`;
 
-        return this.prisma.contract.create({
+        const contract = await this.prisma.contract.create({
             data: {
                 userId: dto.userId,
                 contractNumber,
@@ -88,12 +92,25 @@ export class ContractsService {
                 },
             },
         });
+
+        // Log audit
+        await this.auditService.log(
+            'CREATE',
+            'Contract',
+            contract.id,
+            undefined,
+            null,
+            { contractNumber, type: dto.type, userId: dto.userId },
+            `إنشاء عقد جديد: ${contractNumber}`,
+        );
+
+        return contract;
     }
 
-    async update(id: string, dto: UpdateContractDto, companyId: string) {
-        await this.findOne(id, companyId);
+    async update(id: string, dto: UpdateContractDto, companyId: string, updatedById?: string) {
+        const oldContract = await this.findOne(id, companyId);
 
-        return this.prisma.contract.update({
+        const contract = await this.prisma.contract.update({
             where: { id },
             data: {
                 ...(dto.type && { type: dto.type }),
@@ -115,6 +132,19 @@ export class ContractsService {
                 },
             },
         });
+
+        // Log audit
+        await this.auditService.log(
+            'UPDATE',
+            'Contract',
+            id,
+            updatedById,
+            { type: oldContract.type, status: oldContract.status },
+            { type: contract.type, status: contract.status },
+            `تعديل عقد: ${contract.contractNumber}`,
+        );
+
+        return contract;
     }
 
     async terminate(id: string, dto: TerminateContractDto, companyId: string, userId: string) {
@@ -124,7 +154,7 @@ export class ContractsService {
             throw new BadRequestException('لا يمكن إنهاء عقد غير نشط');
         }
 
-        return this.prisma.contract.update({
+        const terminatedContract = await this.prisma.contract.update({
             where: { id },
             data: {
                 status: 'TERMINATED',
@@ -133,6 +163,19 @@ export class ContractsService {
                 terminatedBy: userId,
             },
         });
+
+        // Log audit
+        await this.auditService.log(
+            'UPDATE',
+            'Contract',
+            id,
+            userId,
+            { status: 'ACTIVE' },
+            { status: 'TERMINATED', terminationReason: dto.terminationReason },
+            `إنهاء عقد: ${contract.contractNumber}`,
+        );
+
+        return terminatedContract;
     }
 
     async renew(id: string, dto: RenewContractDto, companyId: string) {
@@ -170,9 +213,23 @@ export class ContractsService {
         });
     }
 
-    async delete(id: string, companyId: string) {
-        await this.findOne(id, companyId);
-        return this.prisma.contract.delete({ where: { id } });
+    async delete(id: string, companyId: string, deletedById?: string) {
+        const contract = await this.findOne(id, companyId);
+
+        await this.prisma.contract.delete({ where: { id } });
+
+        // Log audit
+        await this.auditService.log(
+            'DELETE',
+            'Contract',
+            id,
+            deletedById,
+            { contractNumber: contract.contractNumber, type: contract.type },
+            null,
+            `حذف عقد: ${contract.contractNumber}`,
+        );
+
+        return { success: true };
     }
 
     async getExpiring(companyId: string, days: number = 30) {

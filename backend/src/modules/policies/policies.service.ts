@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { CreatePolicyDto, PolicyScope, PolicyType } from './dto/create-policy.dto';
 
 // Deterministic scope rank for ordering
@@ -13,7 +14,10 @@ const SCOPE_RANK: Record<string, number> = {
 
 @Injectable()
 export class PoliciesService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private auditService: AuditService,
+    ) { }
 
     async create(dto: CreatePolicyDto, companyId: string, createdById: string) {
         const { rules, ...policyData } = dto;
@@ -46,7 +50,7 @@ export class PoliciesService {
             employeeId: dto.scope === 'EMPLOYEE' ? dto.employeeId : null,
         };
 
-        return this.prisma.policy.create({
+        const policy = await this.prisma.policy.create({
             data: {
                 ...policyData,
                 ...cleanTargets,
@@ -66,6 +70,19 @@ export class PoliciesService {
             },
             include: { rules: true },
         });
+
+        // Log audit
+        await this.auditService.log(
+            'CREATE',
+            'Policy',
+            policy.id,
+            createdById,
+            null,
+            { code: policy.code, nameAr: policy.nameAr, type: policy.type, scope: policy.scope },
+            `إنشاء سياسة جديدة: ${policy.nameAr}`,
+        );
+
+        return policy;
     }
 
     async findAll(companyId: string, type?: PolicyType) {
@@ -88,12 +105,12 @@ export class PoliciesService {
         return policy;
     }
 
-    async update(id: string, companyId: string, dto: Partial<CreatePolicyDto>) {
+    async update(id: string, companyId: string, dto: Partial<CreatePolicyDto>, updatedById?: string) {
         const { rules, ...policyData } = dto;
 
-        await this.findOne(id, companyId);
+        const oldPolicy = await this.findOne(id, companyId);
 
-        return this.prisma.policy.update({
+        const updatedPolicy = await this.prisma.policy.update({
             where: { id },
             data: {
                 ...policyData,
@@ -102,21 +119,61 @@ export class PoliciesService {
             },
             include: { rules: true },
         });
+
+        // Log audit
+        await this.auditService.log(
+            'UPDATE',
+            'Policy',
+            id,
+            updatedById,
+            { nameAr: oldPolicy.nameAr, settings: oldPolicy.settings },
+            { nameAr: updatedPolicy.nameAr, settings: updatedPolicy.settings },
+            `تعديل سياسة: ${updatedPolicy.nameAr}`,
+        );
+
+        return updatedPolicy;
     }
 
-    async delete(id: string, companyId: string) {
-        await this.findOne(id, companyId);
-        return this.prisma.policy.delete({ where: { id } });
-    }
-
-    async toggleActive(id: string, companyId: string) {
+    async delete(id: string, companyId: string, deletedById?: string) {
         const policy = await this.findOne(id, companyId);
 
-        return this.prisma.policy.update({
+        await this.prisma.policy.delete({ where: { id } });
+
+        // Log audit
+        await this.auditService.log(
+            'DELETE',
+            'Policy',
+            id,
+            deletedById,
+            { code: policy.code, nameAr: policy.nameAr, type: policy.type },
+            null,
+            `حذف سياسة: ${policy.nameAr}`,
+        );
+
+        return { success: true };
+    }
+
+    async toggleActive(id: string, companyId: string, toggledById?: string) {
+        const policy = await this.findOne(id, companyId);
+
+        const updatedPolicy = await this.prisma.policy.update({
             where: { id },
             data: { isActive: !policy.isActive },
             include: { rules: true },
         });
+
+        // Log audit
+        await this.auditService.log(
+            'UPDATE',
+            'Policy',
+            id,
+            toggledById,
+            { isActive: policy.isActive },
+            { isActive: updatedPolicy.isActive },
+            `${updatedPolicy.isActive ? 'تفعيل' : 'إلغاء تفعيل'} سياسة: ${policy.nameAr}`,
+        );
+
+        return updatedPolicy;
     }
 
     /**
