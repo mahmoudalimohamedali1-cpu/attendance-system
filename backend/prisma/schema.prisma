@@ -85,11 +85,24 @@ enum ContractType {
 }
 
 enum ContractStatus {
+  DRAFT // مسودة
+  PENDING_EMPLOYEE // بانتظار توقيع الموظف
+  PENDING_EMPLOYER // بانتظار توقيع صاحب العمل
+  PENDING_QIWA // بانتظار التوثيق في قوى
   ACTIVE // ساري
   EXPIRED // منتهي
   TERMINATED // منهي
   RENEWED // مجدد
   SUSPENDED // موقوف
+  REJECTED // مرفوض من قوى
+}
+
+enum QiwaAuthStatus {
+  NOT_SUBMITTED // لم يرسل لقوى
+  PENDING // بانتظار التوثيق
+  AUTHENTICATED // موثق في قوى
+  REJECTED // مرفوض
+  EXPIRED // منتهي التوثيق
 }
 
 model User {
@@ -110,6 +123,15 @@ model User {
   isSaudi      Boolean    @default(true) @map("is_saudi")
   fcmToken     String?    @map("fcm_token")
   nationalId   String?    @unique @map("national_id") // رقم الهوية أو الإقامة
+
+  // بيانات الإقامة والجواز (للأجانب) - متطلبات قوى
+  iqamaNumber       String?   @map("iqama_number") // رقم الإقامة
+  iqamaExpiryDate   DateTime? @map("iqama_expiry_date") @db.Date
+  borderNumber      String?   @map("border_number") // رقم الحدود
+  passportNumber    String?   @map("passport_number") // رقم الجواز
+  passportExpiryDate DateTime? @map("passport_expiry_date") @db.Date
+  professionCode    String?   @map("profession_code") // كود المهنة في قوى
+  profession        String?   @map("profession") // اسم المهنة
 
   // Super Admin - يتخطى كل الـ guards
   isSuperAdmin Boolean @default(false) @map("is_super_admin")
@@ -1282,7 +1304,7 @@ model Contract {
   // Contract Details
   contractNumber String?        @unique @map("contract_number")
   type           ContractType   @default(PERMANENT)
-  status         ContractStatus @default(ACTIVE)
+  status         ContractStatus @default(DRAFT)
 
   // Dates
   startDate        DateTime  @map("start_date") @db.Date
@@ -1298,17 +1320,50 @@ model Contract {
   renewalCount       Int     @default(0) @map("renewal_count")
   previousContractId String? @map("previous_contract_id")
 
-  // Salary
+  // Salary Cycle
   salaryCycle String @default("MONTHLY") @map("salary_cycle")
+
+  // ===== حقول الراتب - متطلبات قوى =====
+  basicSalary        Decimal?  @map("basic_salary") @db.Decimal(10, 2) // الراتب الأساسي
+  housingAllowance   Decimal?  @map("housing_allowance") @db.Decimal(10, 2) // بدل السكن
+  transportAllowance Decimal?  @map("transport_allowance") @db.Decimal(10, 2) // بدل المواصلات
+  otherAllowances    Decimal?  @map("other_allowances") @db.Decimal(10, 2) // بدلات أخرى
+  totalSalary        Decimal?  @map("total_salary") @db.Decimal(10, 2) // إجمالي الراتب
+
+  // ===== بيانات العمل - متطلبات قوى =====
+  contractJobTitle     String? @map("contract_job_title") // المسمى الوظيفي في العقد
+  workLocation         String? @map("work_location") // مقر العمل
+  workingHoursPerWeek  Int     @default(48) @map("working_hours_per_week") // ساعات العمل الأسبوعية
+  annualLeaveDays      Int     @default(21) @map("annual_leave_days") // أيام الإجازة السنوية
+  noticePeriodDays     Int     @default(30) @map("notice_period_days") // فترة الإشعار
+
+  // ===== التوقيعات الإلكترونية =====
+  employeeSignature  Boolean   @default(false) @map("employee_signature") // توقيع الموظف
+  employeeSignedAt   DateTime? @map("employee_signed_at") // تاريخ توقيع الموظف
+  employerSignature  Boolean   @default(false) @map("employer_signature") // توقيع صاحب العمل
+  employerSignedAt   DateTime? @map("employer_signed_at") // تاريخ توقيع صاحب العمل
+  signedByUserId     String?   @map("signed_by_user_id") // من وقع نيابة عن صاحب العمل
+
+  // ===== تكامل قوى =====
+  qiwaContractId String?        @unique @map("qiwa_contract_id") // رقم العقد في قوى
+  qiwaStatus     QiwaAuthStatus @default(NOT_SUBMITTED) @map("qiwa_status") // حالة التوثيق
+  qiwaAuthDate   DateTime?      @map("qiwa_auth_date") // تاريخ التوثيق في قوى
+  qiwaRejectReason String?      @map("qiwa_reject_reason") // سبب الرفض من قوى
+  qiwaLastSync   DateTime?      @map("qiwa_last_sync") // آخر مزامنة مع قوى
 
   // Documents
   documentUrl String? @map("document_url")
+
+  // ===== ملاحظات وبنود إضافية =====
+  additionalTerms String? @map("additional_terms") @db.Text // بنود إضافية
+  notes           String? @map("notes") @db.Text // ملاحظات داخلية
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId, status])
   @@index([endDate])
+  @@index([qiwaStatus])
   @@map("contracts")
 }
 
