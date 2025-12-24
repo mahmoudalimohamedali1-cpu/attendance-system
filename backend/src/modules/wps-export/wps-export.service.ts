@@ -2,11 +2,29 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 interface WpsRecord {
+    // Employee Identification
     employeeCode: string;
+    nationalId: string;  // هوية/إقامة - مطلوب لنظام مدد
     employeeName: string;
+
+    // Bank Info
     iban: string;
     bankCode: string;
-    amount: number;
+
+    // Salary Components
+    basicSalary: number;
+    housingAllowance: number;
+    transportAllowance: number;
+    otherAllowances: number;
+    totalEarnings: number;
+    deductions: number;
+    netSalary: number;
+
+    // Period Info
+    payPeriodStart: string;
+    payPeriodEnd: string;
+    daysWorked: number;
+
     currency: string;
 }
 
@@ -23,13 +41,13 @@ export class WpsExportService {
     constructor(private prisma: PrismaService) { }
 
     /**
-     * تصدير ملف WPS للفترة المحددة
+     * تصدير ملف WPS متوافق مع نظام مدد
      * WPS = Wage Protection System - نظام حماية الأجور السعودي
      */
     async generateWpsFile(payrollRunId: string, companyId: string): Promise<WpsExportResult> {
         const errors: string[] = [];
 
-        // 1. جلب بيانات تشغيل الرواتب
+        // 1. جلب بيانات تشغيل الرواتب مع سطور القسيمة
         const payrollRun = await this.prisma.payrollRun.findFirst({
             where: { id: payrollRunId, companyId },
             include: {
@@ -42,6 +60,11 @@ export class WpsExportService {
                                     where: { isPrimary: true },
                                     take: 1,
                                 },
+                            },
+                        },
+                        lines: {
+                            include: {
+                                component: true,
                             },
                         },
                     },
@@ -75,12 +98,19 @@ export class WpsExportService {
             throw new BadRequestException('لا يوجد حساب بنكي رئيسي للشركة. الرجاء إضافة حساب بنكي من إدارة الحسابات البنكية.');
         }
 
-        // 3. بناء سجلات WPS
+        // 3. بناء سجلات WPS المتوافقة مع مدد
         const wpsRecords: WpsRecord[] = [];
+        const period = payrollRun.period;
 
         for (const payslip of payrollRun.payslips) {
             const employee = payslip.employee;
             const bankAccount = employee.bankAccounts[0];
+
+            // التحقق من وجود الهوية/الإقامة
+            if (!employee.nationalId) {
+                errors.push(`الموظف ${employee.firstName} ${employee.lastName} (${employee.employeeCode}) ليس لديه رقم هوية/إقامة`);
+                continue;
+            }
 
             // التحقق من وجود حساب بنكي
             if (!bankAccount) {
@@ -101,29 +131,99 @@ export class WpsExportService {
                 continue;
             }
 
+            // حساب البدلات من سطور القسيمة
+            let housingAllowance = 0;
+            let transportAllowance = 0;
+            let otherAllowances = 0;
+            const basicSalary = Number(payslip.baseSalary || 0);
+
+            for (const line of payslip.lines) {
+                const componentCode = line.component?.code?.toUpperCase() || '';
+                const amount = Number(line.amount);
+
+                if (line.sign === 'EARNING') {
+                    if (componentCode.includes('HOUSING') || componentCode.includes('HRA') || componentCode === 'سكن') {
+                        housingAllowance += amount;
+                    } else if (componentCode.includes('TRANSPORT') || componentCode.includes('TRA') || componentCode === 'مواصلات') {
+                        transportAllowance += amount;
+                    } else if (componentCode !== 'BASIC' && !componentCode.includes('BASIC')) {
+                        otherAllowances += amount;
+                    }
+                }
+            }
+
+            // حساب عدد أيام العمل
+            const startDate = new Date(period.startDate);
+            const endDate = new Date(period.endDate);
+            const daysInPeriod = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
             wpsRecords.push({
                 employeeCode: employee.employeeCode || '',
+                nationalId: employee.nationalId,
                 employeeName: `${employee.firstName} ${employee.lastName}`,
                 iban: bankAccount.iban,
                 bankCode: bankAccount.bankCode || this.extractBankCode(bankAccount.iban),
-                amount: netSalary,
+                basicSalary: basicSalary,
+                housingAllowance: housingAllowance,
+                transportAllowance: transportAllowance,
+                otherAllowances: otherAllowances,
+                totalEarnings: Number(payslip.grossSalary || 0),
+                deductions: Number(payslip.totalDeductions || 0),
+                netSalary: netSalary,
+                payPeriodStart: this.formatDate(startDate),
+                payPeriodEnd: this.formatDate(endDate),
+                daysWorked: daysInPeriod,
                 currency: 'SAR',
             });
         }
 
         // 4. حساب الإجمالي
-        const totalAmount = wpsRecords.reduce((sum, r) => sum + r.amount, 0);
+        const totalAmount = wpsRecords.reduce((sum, r) => sum + r.netSalary, 0);
 
-        // 5. بناء محتوى الملف (CSV format)
-        const header = 'Employee Code,Employee Name,IBAN,Bank Code,Amount,Currency';
+        // 5. بناء محتوى الملف بصيغة مدد (CSV format)
+        const header = [
+            'National_ID',          // رقم الهوية/الإقامة
+            'Employee_Code',        // رمز الموظف
+            'Employee_Name',        // اسم الموظف
+            'IBAN',                 // رقم الحساب البنكي
+            'Bank_Code',            // رمز البنك
+            'Basic_Salary',         // الراتب الأساسي
+            'Housing_Allowance',    // بدل السكن
+            'Transport_Allowance',  // بدل المواصلات
+            'Other_Allowances',     // بدلات أخرى
+            'Total_Earnings',       // إجمالي الاستحقاقات
+            'Deductions',           // الاستقطاعات
+            'Net_Salary',           // صافي الراتب
+            'Pay_Start_Date',       // بداية فترة الراتب
+            'Pay_End_Date',         // نهاية فترة الراتب
+            'Days_Worked',          // عدد أيام العمل
+            'Currency',             // العملة
+        ].join(',');
+
         const rows = wpsRecords.map(r =>
-            `${r.employeeCode},"${r.employeeName}",${r.iban},${r.bankCode},${r.amount.toFixed(2)},${r.currency}`
+            [
+                r.nationalId,
+                r.employeeCode,
+                `"${r.employeeName}"`,
+                r.iban,
+                r.bankCode,
+                r.basicSalary.toFixed(2),
+                r.housingAllowance.toFixed(2),
+                r.transportAllowance.toFixed(2),
+                r.otherAllowances.toFixed(2),
+                r.totalEarnings.toFixed(2),
+                r.deductions.toFixed(2),
+                r.netSalary.toFixed(2),
+                r.payPeriodStart,
+                r.payPeriodEnd,
+                r.daysWorked,
+                r.currency,
+            ].join(',')
         );
         const content = [header, ...rows].join('\n');
 
         // 6. اسم الملف
-        const period = payrollRun.period;
-        const filename = `WPS_${company.name?.replace(/\s/g, '_')}_${period.year}_${String(period.month).padStart(2, '0')}.csv`;
+        const filename = `WPS_MUDAD_${company.name?.replace(/\s/g, '_')}_${period.year}_${String(period.month).padStart(2, '0')}.csv`;
 
         return {
             filename,
@@ -136,66 +236,129 @@ export class WpsExportService {
 
     /**
      * تصدير ملف WPS بصيغة SARIE (البنك المركزي السعودي)
+     * صيغة متوافقة مع نظام سريع للتحويلات البنكية
      */
     async generateSarieFile(payrollRunId: string, companyId: string): Promise<WpsExportResult> {
-        const basicResult = await this.generateWpsFile(payrollRunId, companyId);
+        const errors: string[] = [];
 
         const payrollRun = await this.prisma.payrollRun.findFirst({
-            where: { id: payrollRunId },
-            include: { period: true },
+            where: { id: payrollRunId, companyId },
+            include: {
+                period: true,
+                payslips: {
+                    include: {
+                        employee: {
+                            include: {
+                                bankAccounts: {
+                                    where: { isPrimary: true },
+                                    take: 1,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         });
 
+        if (!payrollRun) {
+            throw new NotFoundException('تشغيل الرواتب غير موجود');
+        }
+
         const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+        if (!company) {
+            throw new NotFoundException('الشركة غير موجودة');
+        }
 
-        // SARIE Format (Fixed-width text file)
-        // Header: HSARIE + Company Info
-        // Detail: D + Employee Details
-        // Footer: T + Total
+        // جلب الحساب البنكي الرئيسي للشركة
+        const companyBankAccount = await this.prisma.companyBankAccount.findFirst({
+            where: { companyId, isPrimary: true, isActive: true },
+        });
 
+        if (!companyBankAccount) {
+            throw new BadRequestException('لا يوجد حساب بنكي رئيسي للشركة');
+        }
+
+        // SARIE Format (Pipe-delimited text file)
+        // صيغة ملف سريع للبنك المركزي السعودي
         const lines: string[] = [];
+        let recordCount = 0;
+        let totalAmount = 0;
 
-        // Header
+        // Process employees
+        for (const payslip of payrollRun.payslips) {
+            const employee = payslip.employee;
+            const bankAccount = employee.bankAccounts[0];
+            const netSalary = Number(payslip.netSalary);
+
+            if (!bankAccount) {
+                errors.push(`الموظف ${employee.firstName} ${employee.lastName} (${employee.employeeCode}) ليس لديه حساب بنكي`);
+                continue;
+            }
+            if (!this.validateIBAN(bankAccount.iban)) {
+                errors.push(`IBAN غير صحيح للموظف ${employee.employeeCode}`);
+                continue;
+            }
+            if (netSalary <= 0) {
+                continue;
+            }
+
+            recordCount++;
+            totalAmount += netSalary;
+        }
+
+        // Header Record (HDR)
+        // Format: HDR|CompanyIBAN|CompanyName|FileDate|RecordCount|TotalAmount|Currency
+        const fileDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const header = [
-            'H',                                    // Record Type
-            'SARIE',                                // File Type
-            String(company?.crNumber || '').padEnd(10, '0'),  // Company CR
-            new Date().toISOString().slice(0, 10).replace(/-/g, ''),  // Date YYYYMMDD
-            String(basicResult.recordCount).padStart(6, '0'),         // Record Count
-            String(Math.round(basicResult.totalAmount * 100)).padStart(15, '0'),  // Total in Halalas
-        ].join('');
+            'HDR',
+            companyBankAccount.iban.padEnd(24, ' '),
+            (company.name || 'COMPANY').substring(0, 35).padEnd(35, ' '),
+            fileDate,
+            String(recordCount).padStart(6, '0'),
+            String(Math.round(totalAmount * 100)).padStart(17, '0'),
+            'SAR',
+        ].join('|');
         lines.push(header);
 
-        // Parse CSV to get records
-        const csvLines = basicResult.content.split('\n').slice(1);  // Skip header
-        for (const csvLine of csvLines) {
-            const parts = csvLine.split(',');
-            if (parts.length < 6) continue;
+        // Detail Records (DTL)
+        for (const payslip of payrollRun.payslips) {
+            const employee = payslip.employee;
+            const bankAccount = employee.bankAccounts[0];
+            const netSalary = Number(payslip.netSalary);
 
+            if (!bankAccount || !this.validateIBAN(bankAccount.iban) || netSalary <= 0) {
+                continue;
+            }
+
+            // Format: DTL|EmployeeIBAN|EmployeeName|NationalID|Amount|Reference
             const detail = [
-                'D',                                    // Record Type
-                parts[2],                               // IBAN (24 chars)
-                parts[0].padEnd(10, ' '),              // Employee Code
-                String(Math.round(parseFloat(parts[4]) * 100)).padStart(15, '0'),  // Amount in Halalas
-                'SAR',                                  // Currency
-            ].join('');
+                'DTL',
+                bankAccount.iban.padEnd(24, ' '),
+                `${employee.firstName} ${employee.lastName}`.substring(0, 35).padEnd(35, ' '),
+                (employee.nationalId || '').padEnd(15, ' '),
+                String(Math.round(netSalary * 100)).padStart(17, '0'),
+                `SAL${payrollRun.period.year}${String(payrollRun.period.month).padStart(2, '0')}`,
+            ].join('|');
             lines.push(detail);
         }
 
-        // Footer
-        const footer = [
-            'T',                                        // Record Type
-            String(basicResult.recordCount).padStart(6, '0'),
-            String(Math.round(basicResult.totalAmount * 100)).padStart(15, '0'),
-        ].join('');
-        lines.push(footer);
+        // Trailer Record (TRL)
+        const trailer = [
+            'TRL',
+            String(recordCount).padStart(6, '0'),
+            String(Math.round(totalAmount * 100)).padStart(17, '0'),
+        ].join('|');
+        lines.push(trailer);
 
-        const period = payrollRun?.period;
-        const sarieFilename = `SARIE_${company?.name?.replace(/\s/g, '_')}_${period?.year}_${String(period?.month).padStart(2, '0')}.txt`;
+        const period = payrollRun.period;
+        const sarieFilename = `SARIE_${company.name?.replace(/\s/g, '_')}_${period.year}_${String(period.month).padStart(2, '0')}.txt`;
 
         return {
-            ...basicResult,
             filename: sarieFilename,
-            content: lines.join('\n'),
+            content: lines.join('\r\n'), // Use Windows line endings for bank systems
+            recordCount,
+            totalAmount,
+            errors,
         };
     }
 
@@ -208,6 +371,30 @@ export class WpsExportService {
                 companyId,
                 status: 'ACTIVE',
                 bankAccounts: { none: {} },
+            },
+            select: {
+                id: true,
+                employeeCode: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                nationalId: true,
+            },
+        });
+    }
+
+    /**
+     * الحصول على قائمة الموظفين بدون رقم هوية
+     */
+    async getEmployeesWithoutNationalId(companyId: string): Promise<any[]> {
+        return this.prisma.user.findMany({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                OR: [
+                    { nationalId: null },
+                    { nationalId: '' },
+                ],
             },
             select: {
                 id: true,
@@ -247,9 +434,29 @@ export class WpsExportService {
             return { isReady: false, issues: [{ type: 'NOT_FOUND', message: 'تشغيل الرواتب غير موجود' }] };
         }
 
+        // التحقق من الحساب البنكي للشركة
+        const companyBank = await this.prisma.companyBankAccount.findFirst({
+            where: { companyId, isPrimary: true, isActive: true },
+        });
+        if (!companyBank) {
+            issues.push({
+                type: 'NO_COMPANY_BANK',
+                message: 'لا يوجد حساب بنكي رئيسي للشركة',
+            });
+        }
+
         for (const payslip of payrollRun.payslips) {
             const employee = payslip.employee;
             const bank = employee.bankAccounts[0];
+
+            // التحقق من الهوية
+            if (!employee.nationalId) {
+                issues.push({
+                    type: 'MISSING_ID',
+                    message: `لا يوجد رقم هوية/إقامة: ${employee.firstName} ${employee.lastName}`,
+                    employeeId: employee.id,
+                });
+            }
 
             if (!bank) {
                 issues.push({
@@ -290,9 +497,16 @@ export class WpsExportService {
 
     private extractBankCode(iban: string): string {
         // Saudi IBAN format: SA + 2 check digits + 2 bank code + 18 account
-        if (iban.length >= 6) {
+        if (iban && iban.length >= 6) {
             return iban.substring(4, 6);
         }
         return '';
+    }
+
+    private formatDate(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 }
