@@ -281,55 +281,123 @@ export const SalaryStructuresPage = () => {
 
                         <Grid item xs={12}>
                             <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                                    <Typography variant="subtitle2" fontWeight="bold">مكونات الهيكل وقيمها الافتراضية</Typography>
+                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                    <Box>
+                                        <Typography variant="subtitle2" fontWeight="bold">مكونات الهيكل</Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            اختر مبلغ ثابت أو نسبة من الراتب الأساسي (واحد فقط)
+                                        </Typography>
+                                    </Box>
                                     <Button startIcon={<AddIcon />} size="small" onClick={handleAddLine} variant="outlined">إضافة مكون</Button>
                                 </Box>
 
-                                {formData.lines?.map((line, index) => (
-                                    <Box key={index} sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
-                                        <TextField
-                                            select
-                                            label="المكون"
-                                            sx={{ minWidth: 200 }}
-                                            value={line.componentId}
-                                            onChange={(e) => handleLineChange(index, 'componentId', e.target.value)}
-                                            size="small"
-                                        >
-                                            {components.map(comp => (
-                                                <MenuItem key={comp.id} value={comp.id}>{comp.nameAr} ({comp.code})</MenuItem>
-                                            ))}
-                                        </TextField>
-                                        <TextField
-                                            label="المبلغ"
-                                            type="number"
-                                            sx={{ width: 120 }}
-                                            value={line.amount}
-                                            onChange={(e) => handleLineChange(index, 'amount', e.target.value)}
-                                            size="small"
-                                        />
-                                        <TextField
-                                            label="النسبة %"
-                                            type="number"
-                                            sx={{ width: 100 }}
-                                            value={line.percentage || ''}
-                                            onChange={(e) => handleLineChange(index, 'percentage', e.target.value)}
-                                            placeholder="للمعادلات"
-                                            size="small"
-                                        />
-                                        <TextField
-                                            label="الأولوية"
-                                            type="number"
-                                            sx={{ width: 80 }}
-                                            value={line.priority}
-                                            onChange={(e) => handleLineChange(index, 'priority', e.target.value)}
-                                            size="small"
-                                        />
-                                        <IconButton color="error" onClick={() => handleRemoveLine(index)}>
-                                            <RemoveCircleOutline />
-                                        </IconButton>
+                                {/* Column Headers */}
+                                {formData.lines && formData.lines.length > 0 && (
+                                    <Box sx={{ display: 'flex', gap: 2, mb: 1, alignItems: 'center', px: 1 }}>
+                                        <Typography variant="caption" sx={{ minWidth: 200, fontWeight: 'bold' }}>المكون</Typography>
+                                        <Typography variant="caption" sx={{ width: 120, fontWeight: 'bold' }}>نوع القيمة</Typography>
+                                        <Typography variant="caption" sx={{ width: 120, fontWeight: 'bold' }}>المبلغ / النسبة</Typography>
+                                        <Typography variant="caption" sx={{ width: 80, fontWeight: 'bold' }}>الترتيب</Typography>
+                                        <Box sx={{ width: 40 }} />
                                     </Box>
-                                ))}
+                                )}
+
+                                {formData.lines?.map((line, index) => {
+                                    const isPercentage = !!line.percentage && !line.amount;
+                                    const valueType = line.percentage ? 'percentage' : 'amount';
+
+                                    return (
+                                        <Box key={index} sx={{
+                                            display: 'flex',
+                                            gap: 2,
+                                            mb: 1.5,
+                                            alignItems: 'center',
+                                            p: 1.5,
+                                            bgcolor: 'white',
+                                            borderRadius: 1,
+                                            border: '1px solid',
+                                            borderColor: 'divider'
+                                        }}>
+                                            <TextField
+                                                select
+                                                label="المكون"
+                                                sx={{ minWidth: 200 }}
+                                                value={line.componentId}
+                                                onChange={(e) => handleLineChange(index, 'componentId', e.target.value)}
+                                                size="small"
+                                            >
+                                                {components.map(comp => (
+                                                    <MenuItem key={comp.id} value={comp.id}>
+                                                        {comp.nameAr} ({comp.code})
+                                                    </MenuItem>
+                                                ))}
+                                            </TextField>
+
+                                            <TextField
+                                                select
+                                                label="نوع القيمة"
+                                                sx={{ width: 120 }}
+                                                value={valueType}
+                                                onChange={(e) => {
+                                                    if (e.target.value === 'percentage') {
+                                                        handleLineChange(index, 'amount', 0);
+                                                        handleLineChange(index, 'percentage', line.percentage || 25);
+                                                    } else {
+                                                        handleLineChange(index, 'percentage', null);
+                                                        handleLineChange(index, 'amount', line.amount || 500);
+                                                    }
+                                                }}
+                                                size="small"
+                                            >
+                                                <MenuItem value="amount">مبلغ ثابت</MenuItem>
+                                                <MenuItem value="percentage">نسبة %</MenuItem>
+                                            </TextField>
+
+                                            {valueType === 'percentage' ? (
+                                                <TextField
+                                                    label="النسبة %"
+                                                    type="number"
+                                                    sx={{ width: 120 }}
+                                                    value={line.percentage || ''}
+                                                    onChange={(e) => {
+                                                        handleLineChange(index, 'percentage', e.target.value);
+                                                        handleLineChange(index, 'amount', 0);
+                                                    }}
+                                                    size="small"
+                                                    InputProps={{ inputProps: { min: 0, max: 100 } }}
+                                                    helperText="من الأساسي"
+                                                />
+                                            ) : (
+                                                <TextField
+                                                    label="المبلغ (ريال)"
+                                                    type="number"
+                                                    sx={{ width: 120 }}
+                                                    value={line.amount || ''}
+                                                    onChange={(e) => {
+                                                        handleLineChange(index, 'amount', e.target.value);
+                                                        handleLineChange(index, 'percentage', null);
+                                                    }}
+                                                    size="small"
+                                                    InputProps={{ inputProps: { min: 0 } }}
+                                                />
+                                            )}
+
+                                            <TextField
+                                                label="الترتيب"
+                                                type="number"
+                                                sx={{ width: 80 }}
+                                                value={line.priority}
+                                                onChange={(e) => handleLineChange(index, 'priority', e.target.value)}
+                                                size="small"
+                                                helperText={index === 0 ? 'الأول' : ''}
+                                            />
+
+                                            <IconButton color="error" onClick={() => handleRemoveLine(index)}>
+                                                <RemoveCircleOutline />
+                                            </IconButton>
+                                        </Box>
+                                    );
+                                })}
 
                                 {(!formData.lines || formData.lines.length === 0) && (
                                     <Typography variant="body2" color="text.secondary" textAlign="center" py={2}>

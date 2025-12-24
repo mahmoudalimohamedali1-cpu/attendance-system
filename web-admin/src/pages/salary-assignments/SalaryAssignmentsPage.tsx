@@ -165,7 +165,7 @@ export default function SalaryAssignmentsPage() {
                         <TableRow sx={{ bgcolor: 'grey.100' }}>
                             <TableCell>الموظف</TableCell>
                             <TableCell>هيكل الراتب</TableCell>
-                            <TableCell>الراتب الأساسي</TableCell>
+                            <TableCell>إجمالي الراتب</TableCell>
                             <TableCell>ساري من</TableCell>
                             <TableCell align="center">الحالة</TableCell>
                             <TableCell align="center">الإجراءات</TableCell>

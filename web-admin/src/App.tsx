@@ -1,47 +1,64 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
-import { LoginPage } from '@/pages/auth/LoginPage';
-import { DashboardPage } from '@/pages/dashboard/DashboardPage';
-import { UsersPage } from '@/pages/users/UsersPage';
-import EmployeeImportPage from '@/pages/users/EmployeeImportPage';
-import { AttendancePage } from '@/pages/attendance/AttendancePage';
-import { BranchesPage } from '@/pages/branches/BranchesPage';
-import { LeavesPage } from '@/pages/leaves/LeavesPage';
-import { LettersPage } from '@/pages/letters/LettersPage';
-import RaisesPage from '@/pages/raises/RaisesPage';
-import { ReportsPage } from '@/pages/reports/ReportsPage';
-import { SettingsPage } from './pages/settings/SettingsPage';
-import DataUpdatesPage from '@/pages/data-updates/DataUpdatesPage';
-import PermissionsPage from '@/pages/permissions/PermissionsPage';
-import PermissionAuditPage from '@/pages/permissions/PermissionAuditPage';
-import JobTitlesPage from '@/pages/job-titles/JobTitlesPage';
-import NotificationsPage from '@/pages/notifications/NotificationsPage';
-import AdvancesPage from '@/pages/advances/AdvancesPage';
-import { SalaryPage } from './pages/salary/SalaryPage';
-import { PayrollRunNewPage } from './pages/salary/PayrollRunNewPage';
-import { PayrollRunDetailsPage } from './pages/salary/PayrollRunDetailsPage';
-import { EosCalculatorPage } from './pages/eos/EosCalculatorPage';
-import { RetroPayPage } from './pages/retro-pay/RetroPayPage';
-import { PoliciesPage } from './pages/policies/PoliciesPage';
-import { AuditLogsPage } from './pages/audit/AuditLogsPage';
-import SubmissionTimelinePage from './pages/audit/SubmissionTimelinePage';
-import ContractsPage from './pages/contracts/ContractsPage';
-import WpsExportPage from './pages/wps-export/WpsExportPage';
-import ExceptionsCenterPage from './pages/exceptions/ExceptionsCenterPage';
-import BankAccountsPage from './pages/bank-accounts/BankAccountsPage';
-import DevicesPage from './pages/devices/DevicesPage';
-import LoanPaymentsPage from './pages/loan-payments/LoanPaymentsPage';
-import CompaniesPage from './pages/companies/CompaniesPage';
-import { Box, CircularProgress } from '@mui/material';
-import { PayrollDashboardPage } from './pages/payroll/PayrollDashboardPage';
-import { PayrollWizardPage } from './pages/payroll/PayrollWizardPage';
-import ComplianceOverviewPage from './pages/compliance/ComplianceOverviewPage';
-import PayslipsPage from './pages/payslips/PayslipsPage';
-import WpsTrackingPage from './pages/wps-tracking/WpsTrackingPage';
-import MudadPage from './pages/mudad/MudadPage';
-import GosiPage from './pages/gosi/GosiPage';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import { MainLayout } from '@/components/layout/MainLayout';
+
+// Lazy load all pages for better performance
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage').then(m => ({ default: m.LoginPage })));
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const UsersPage = lazy(() => import('@/pages/users/UsersPage').then(m => ({ default: m.UsersPage })));
+const EmployeeImportPage = lazy(() => import('@/pages/users/EmployeeImportPage'));
+const AttendancePage = lazy(() => import('@/pages/attendance/AttendancePage').then(m => ({ default: m.AttendancePage })));
+const BranchesPage = lazy(() => import('@/pages/branches/BranchesPage').then(m => ({ default: m.BranchesPage })));
+const LeavesPage = lazy(() => import('@/pages/leaves/LeavesPage').then(m => ({ default: m.LeavesPage })));
+const LettersPage = lazy(() => import('@/pages/letters/LettersPage').then(m => ({ default: m.LettersPage })));
+const RaisesPage = lazy(() => import('@/pages/raises/RaisesPage'));
+const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const DataUpdatesPage = lazy(() => import('@/pages/data-updates/DataUpdatesPage'));
+const PermissionsPage = lazy(() => import('@/pages/permissions/PermissionsPage'));
+const PermissionAuditPage = lazy(() => import('@/pages/permissions/PermissionAuditPage'));
+const JobTitlesPage = lazy(() => import('@/pages/job-titles/JobTitlesPage'));
+const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
+const AdvancesPage = lazy(() => import('@/pages/advances/AdvancesPage'));
+const SalaryPage = lazy(() => import('./pages/salary/SalaryPage').then(m => ({ default: m.SalaryPage })));
+const PayrollRunNewPage = lazy(() => import('./pages/salary/PayrollRunNewPage').then(m => ({ default: m.PayrollRunNewPage })));
+const PayrollRunDetailsPage = lazy(() => import('./pages/salary/PayrollRunDetailsPage').then(m => ({ default: m.PayrollRunDetailsPage })));
+const EosCalculatorPage = lazy(() => import('./pages/eos/EosCalculatorPage').then(m => ({ default: m.EosCalculatorPage })));
+const RetroPayPage = lazy(() => import('./pages/retro-pay/RetroPayPage').then(m => ({ default: m.RetroPayPage })));
+const PoliciesPage = lazy(() => import('./pages/policies/PoliciesPage').then(m => ({ default: m.PoliciesPage })));
+const AuditLogsPage = lazy(() => import('./pages/audit/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
+const SubmissionTimelinePage = lazy(() => import('./pages/audit/SubmissionTimelinePage'));
+const ContractsPage = lazy(() => import('./pages/contracts/ContractsPage'));
+const WpsExportPage = lazy(() => import('./pages/wps-export/WpsExportPage'));
+const ExceptionsCenterPage = lazy(() => import('./pages/exceptions/ExceptionsCenterPage'));
+const BankAccountsPage = lazy(() => import('./pages/bank-accounts/BankAccountsPage'));
+const DevicesPage = lazy(() => import('./pages/devices/DevicesPage'));
+const LoanPaymentsPage = lazy(() => import('./pages/loan-payments/LoanPaymentsPage'));
+const CompaniesPage = lazy(() => import('./pages/companies/CompaniesPage'));
+const PayrollDashboardPage = lazy(() => import('./pages/payroll/PayrollDashboardPage').then(m => ({ default: m.PayrollDashboardPage })));
+const PayrollWizardPage = lazy(() => import('./pages/payroll/PayrollWizardPage').then(m => ({ default: m.PayrollWizardPage })));
+const ComplianceOverviewPage = lazy(() => import('./pages/compliance/ComplianceOverviewPage'));
+const PayslipsPage = lazy(() => import('./pages/payslips/PayslipsPage'));
+const WpsTrackingPage = lazy(() => import('./pages/wps-tracking/WpsTrackingPage'));
+const MudadPage = lazy(() => import('./pages/mudad/MudadPage'));
+const GosiPage = lazy(() => import('./pages/gosi/GosiPage'));
+
+// Loading component for Suspense
+const PageLoader = () => (
+  <Box
+    display="flex"
+    flexDirection="column"
+    justifyContent="center"
+    alignItems="center"
+    height="50vh"
+    gap={2}
+  >
+    <CircularProgress size={40} />
+    <Typography color="text.secondary">جاري التحميل...</Typography>
+  </Box>
+);
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -69,60 +86,214 @@ function App() {
   }, [checkAuth]);
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
 
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="users/import" element={<EmployeeImportPage />} />
-        <Route path="attendance" element={<AttendancePage />} />
-        <Route path="branches" element={<BranchesPage />} />
-        <Route path="leaves" element={<LeavesPage />} />
-        <Route path="letters" element={<LettersPage />} />
-        <Route path="raises" element={<RaisesPage />} />
-        <Route path="advances" element={<AdvancesPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="data-updates" element={<DataUpdatesPage />} />
-        <Route path="permissions" element={<PermissionsPage />} />
-        <Route path="permissions/audit" element={<PermissionAuditPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="job-titles" element={<JobTitlesPage />} />
-        <Route path="salary" element={<SalaryPage />} />
-        <Route path="salary/runs/new" element={<PayrollRunNewPage />} />
-        <Route path="salary/runs/:id" element={<PayrollRunDetailsPage />} />
-        <Route path="eos" element={<EosCalculatorPage />} />
-        <Route path="retro-pay" element={<RetroPayPage />} />
-        <Route path="policies" element={<PoliciesPage />} />
-        <Route path="audit" element={<AuditLogsPage />} />
-        <Route path="audit/submissions" element={<SubmissionTimelinePage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="contracts" element={<ContractsPage />} />
-        <Route path="wps-export" element={<WpsExportPage />} />
-        <Route path="exceptions" element={<ExceptionsCenterPage />} />
-        <Route path="bank-accounts" element={<BankAccountsPage />} />
-        <Route path="devices" element={<DevicesPage />} />
-        <Route path="loan-payments" element={<LoanPaymentsPage />} />
-        <Route path="companies" element={<CompaniesPage />} />
-        <Route path="payroll-dashboard" element={<PayrollDashboardPage />} />
-        <Route path="salary/wizard" element={<PayrollWizardPage />} />
-        <Route path="compliance" element={<ComplianceOverviewPage />} />
-        <Route path="payslips" element={<PayslipsPage />} />
-        <Route path="wps-tracking" element={<WpsTrackingPage />} />
-        <Route path="mudad" element={<MudadPage />} />
-        <Route path="gosi" element={<GosiPage />} />
-      </Route>
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={
+            <Suspense fallback={<PageLoader />}>
+              <DashboardPage />
+            </Suspense>
+          } />
+          <Route path="users" element={
+            <Suspense fallback={<PageLoader />}>
+              <UsersPage />
+            </Suspense>
+          } />
+          <Route path="users/import" element={
+            <Suspense fallback={<PageLoader />}>
+              <EmployeeImportPage />
+            </Suspense>
+          } />
+          <Route path="attendance" element={
+            <Suspense fallback={<PageLoader />}>
+              <AttendancePage />
+            </Suspense>
+          } />
+          <Route path="branches" element={
+            <Suspense fallback={<PageLoader />}>
+              <BranchesPage />
+            </Suspense>
+          } />
+          <Route path="leaves" element={
+            <Suspense fallback={<PageLoader />}>
+              <LeavesPage />
+            </Suspense>
+          } />
+          <Route path="letters" element={
+            <Suspense fallback={<PageLoader />}>
+              <LettersPage />
+            </Suspense>
+          } />
+          <Route path="raises" element={
+            <Suspense fallback={<PageLoader />}>
+              <RaisesPage />
+            </Suspense>
+          } />
+          <Route path="advances" element={
+            <Suspense fallback={<PageLoader />}>
+              <AdvancesPage />
+            </Suspense>
+          } />
+          <Route path="reports" element={
+            <Suspense fallback={<PageLoader />}>
+              <ReportsPage />
+            </Suspense>
+          } />
+          <Route path="data-updates" element={
+            <Suspense fallback={<PageLoader />}>
+              <DataUpdatesPage />
+            </Suspense>
+          } />
+          <Route path="permissions" element={
+            <Suspense fallback={<PageLoader />}>
+              <PermissionsPage />
+            </Suspense>
+          } />
+          <Route path="permissions/audit" element={
+            <Suspense fallback={<PageLoader />}>
+              <PermissionAuditPage />
+            </Suspense>
+          } />
+          <Route path="notifications" element={
+            <Suspense fallback={<PageLoader />}>
+              <NotificationsPage />
+            </Suspense>
+          } />
+          <Route path="job-titles" element={
+            <Suspense fallback={<PageLoader />}>
+              <JobTitlesPage />
+            </Suspense>
+          } />
+          <Route path="salary" element={
+            <Suspense fallback={<PageLoader />}>
+              <SalaryPage />
+            </Suspense>
+          } />
+          <Route path="salary/runs/new" element={
+            <Suspense fallback={<PageLoader />}>
+              <PayrollRunNewPage />
+            </Suspense>
+          } />
+          <Route path="salary/runs/:id" element={
+            <Suspense fallback={<PageLoader />}>
+              <PayrollRunDetailsPage />
+            </Suspense>
+          } />
+          <Route path="eos" element={
+            <Suspense fallback={<PageLoader />}>
+              <EosCalculatorPage />
+            </Suspense>
+          } />
+          <Route path="retro-pay" element={
+            <Suspense fallback={<PageLoader />}>
+              <RetroPayPage />
+            </Suspense>
+          } />
+          <Route path="policies" element={
+            <Suspense fallback={<PageLoader />}>
+              <PoliciesPage />
+            </Suspense>
+          } />
+          <Route path="audit" element={
+            <Suspense fallback={<PageLoader />}>
+              <AuditLogsPage />
+            </Suspense>
+          } />
+          <Route path="audit/submissions" element={
+            <Suspense fallback={<PageLoader />}>
+              <SubmissionTimelinePage />
+            </Suspense>
+          } />
+          <Route path="settings" element={
+            <Suspense fallback={<PageLoader />}>
+              <SettingsPage />
+            </Suspense>
+          } />
+          <Route path="contracts" element={
+            <Suspense fallback={<PageLoader />}>
+              <ContractsPage />
+            </Suspense>
+          } />
+          <Route path="wps-export" element={
+            <Suspense fallback={<PageLoader />}>
+              <WpsExportPage />
+            </Suspense>
+          } />
+          <Route path="exceptions" element={
+            <Suspense fallback={<PageLoader />}>
+              <ExceptionsCenterPage />
+            </Suspense>
+          } />
+          <Route path="bank-accounts" element={
+            <Suspense fallback={<PageLoader />}>
+              <BankAccountsPage />
+            </Suspense>
+          } />
+          <Route path="devices" element={
+            <Suspense fallback={<PageLoader />}>
+              <DevicesPage />
+            </Suspense>
+          } />
+          <Route path="loan-payments" element={
+            <Suspense fallback={<PageLoader />}>
+              <LoanPaymentsPage />
+            </Suspense>
+          } />
+          <Route path="companies" element={
+            <Suspense fallback={<PageLoader />}>
+              <CompaniesPage />
+            </Suspense>
+          } />
+          <Route path="payroll-dashboard" element={
+            <Suspense fallback={<PageLoader />}>
+              <PayrollDashboardPage />
+            </Suspense>
+          } />
+          <Route path="salary/wizard" element={
+            <Suspense fallback={<PageLoader />}>
+              <PayrollWizardPage />
+            </Suspense>
+          } />
+          <Route path="compliance" element={
+            <Suspense fallback={<PageLoader />}>
+              <ComplianceOverviewPage />
+            </Suspense>
+          } />
+          <Route path="payslips" element={
+            <Suspense fallback={<PageLoader />}>
+              <PayslipsPage />
+            </Suspense>
+          } />
+          <Route path="wps-tracking" element={
+            <Suspense fallback={<PageLoader />}>
+              <WpsTrackingPage />
+            </Suspense>
+          } />
+          <Route path="mudad" element={
+            <Suspense fallback={<PageLoader />}>
+              <MudadPage />
+            </Suspense>
+          } />
+          <Route path="gosi" element={
+            <Suspense fallback={<PageLoader />}>
+              <GosiPage />
+            </Suspense>
+          } />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

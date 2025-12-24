@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PoliciesService } from '../policies/policies.service';
 import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
+import { FormulaEngineService } from './services/formula-engine.service';
 import { PolicyEvaluationContext } from './dto/policy-context.types';
 import {
     CalculationMethod,
@@ -19,6 +20,7 @@ export class PayrollCalculationService {
         private prisma: PrismaService,
         private policiesService: PoliciesService,
         private policyEvaluator: PolicyRuleEvaluatorService,
+        private formulaEngine: FormulaEngineService,
     ) { }
 
     /**
@@ -154,9 +156,105 @@ export class PayrollCalculationService {
         if (!employee.salaryAssignments[0]) throw new NotFoundException('لا يوجد هيكل راتب للموظف');
 
         const assignment = employee.salaryAssignments[0];
-        const baseSalary = Number(assignment.baseSalary);
 
-        // 2. جلب إعدادات الحساب
+        // ==========================================
+        // 🔥 Total-Based Calculation (الجديد)
+        // الإجمالي = المدخل → يتقسم على المكونات
+        // ==========================================
+
+        // الإجمالي هو المدخل الأساسي (من baseSalary field - سيتم تغيير اسمه لاحقاً)
+        const totalSalary = Number(assignment.baseSalary);
+
+        trace.push({
+            step: 'totalSalary',
+            description: 'إجمالي الراتب (المدخل)',
+            formula: `الراتب الإجمالي = ${totalSalary.toFixed(2)} ريال`,
+            result: totalSalary,
+        });
+
+        // 2. حساب المكونات من الإجمالي
+        // نجمع كل النسب أولاً لمعرفة كيف يتقسم الإجمالي
+        const structureLines = assignment.structure.lines.sort((a, b) => a.priority - b.priority);
+
+        // حساب كل مكون
+        const componentAmounts: { code: string; name: string; amount: number; type: string }[] = [];
+        let totalPercentage = 0;
+        let fixedAmount = 0;
+
+        for (const line of structureLines) {
+            if (line.component.type === 'EARNING') {
+                if (line.percentage && Number(line.percentage) > 0) {
+                    totalPercentage += Number(line.percentage);
+                }
+                if (line.amount && Number(line.amount) > 0) {
+                    fixedAmount += Number(line.amount);
+                }
+            }
+        }
+
+        // الباقي بعد المبالغ الثابتة يتوزع على النسب
+        const amountForPercentages = totalSalary - fixedAmount;
+
+        // حساب كل مكون
+        let calculatedBasic = 0;
+        let totalAllowances = 0;
+
+        for (const line of structureLines) {
+            const component = line.component;
+            let lineAmount = 0;
+
+            if (component.type === 'EARNING') {
+                if (line.percentage && Number(line.percentage) > 0) {
+                    // النسبة من الإجمالي (بعد طرح المبالغ الثابتة)
+                    lineAmount = amountForPercentages * (Number(line.percentage) / 100);
+                } else if (line.amount && Number(line.amount) > 0) {
+                    lineAmount = Number(line.amount);
+                }
+
+                // تحديد إذا كان هذا هو الراتب الأساسي
+                const isBasic = component.code === 'BASIC' ||
+                    component.code === 'BASE' ||
+                    component.nameAr?.includes('أساسي') ||
+                    component.nameEn?.toLowerCase().includes('basic');
+
+                if (isBasic) {
+                    calculatedBasic = lineAmount;
+                } else {
+                    totalAllowances += lineAmount;
+                }
+
+                componentAmounts.push({
+                    code: component.code,
+                    name: component.nameAr || component.nameEn || component.code,
+                    amount: lineAmount,
+                    type: isBasic ? 'BASIC' : 'ALLOWANCE',
+                });
+
+                trace.push({
+                    step: `component_${component.code}`,
+                    description: component.nameAr || component.nameEn || component.code,
+                    formula: line.percentage
+                        ? `${totalSalary} × ${line.percentage}% = ${lineAmount.toFixed(2)}`
+                        : `مبلغ ثابت = ${lineAmount.toFixed(2)}`,
+                    result: lineAmount,
+                });
+            }
+        }
+
+        // إذا لم يتم تحديد الأساسي في الهيكل، نحسبه كالباقي
+        if (calculatedBasic === 0) {
+            calculatedBasic = totalSalary - totalAllowances;
+            trace.push({
+                step: 'basicSalary',
+                description: 'الراتب الأساسي (محسوب)',
+                formula: `${totalSalary} - ${totalAllowances.toFixed(2)} = ${calculatedBasic.toFixed(2)}`,
+                result: calculatedBasic,
+            });
+        }
+
+        const baseSalary = calculatedBasic;
+
+        // 3. جلب إعدادات الحساب
         const settings = await this.getCalculationSettings(employeeId, companyId);
 
         trace.push({
@@ -166,19 +264,19 @@ export class PayrollCalculationService {
             result: 0,
         });
 
-        // 3. حساب أيام الشهر ومعدل اليوم
+        // 4. حساب أيام الشهر ومعدل اليوم
         const daysInMonth = this.getDaysInMonth(year, month, settings.calculationMethod);
         const dailyRate = baseSalary / daysInMonth;
         const hourlyRate = dailyRate / 8;
 
         trace.push({
             step: 'dailyRate',
-            description: 'حساب أجر اليوم',
-            formula: `${baseSalary} / ${daysInMonth} = ${dailyRate.toFixed(2)}`,
+            description: 'حساب أجر اليوم (من الأساسي)',
+            formula: `${baseSalary.toFixed(2)} / ${daysInMonth} = ${dailyRate.toFixed(2)}`,
             result: dailyRate,
         });
 
-        // 4. جلب ملخص الحضور
+        // 5. جلب ملخص الحضور
         const attendanceData = await this.getMonthlyAttendanceData(employeeId, companyId, year, month);
 
         let presentDays = attendanceData.presentDays || daysInMonth;
@@ -186,7 +284,7 @@ export class PayrollCalculationService {
         let lateMinutes = attendanceData.lateMinutes || 0;
         let overtimeHours = attendanceData.overtimeHours || 0;
 
-        // 5. حساب خصم الغياب
+        // 6. حساب خصم الغياب
         let absenceDeduction = 0;
         if (absentDays > 0 && settings.fullDayAbsenceDeduction) {
             absenceDeduction = absentDays * dailyRate;
@@ -198,11 +296,10 @@ export class PayrollCalculationService {
             });
         }
 
-        // 6. حساب خصم التأخير
+        // 7. حساب خصم التأخير
         let lateDeduction = 0;
         const effectiveLateMinutes = Math.max(0, lateMinutes - settings.gracePeriodMinutes);
         if (effectiveLateMinutes > 0) {
-            // نخصم بالدقيقة (دقيقة = ساعة/60)
             const lateHours = effectiveLateMinutes / 60;
             lateDeduction = lateHours * hourlyRate;
             trace.push({
@@ -213,22 +310,13 @@ export class PayrollCalculationService {
             });
         }
 
-        // 7. حساب الوقت الإضافي
+        // 8. حساب الوقت الإضافي
         let overtimeAmount = 0;
         if (overtimeHours > 0) {
-            let otBase = baseSalary;
-            if (settings.overtimeSource === OvertimeSource.BASIC_PLUS_ALLOWANCES) {
-                // نضيف البدلات من الهيكل
-                for (const line of assignment.structure.lines) {
-                    if (line.component.type === 'EARNING') {
-                        if (line.amount) {
-                            otBase += Number(line.amount);
-                        } else if (line.percentage) {
-                            otBase += baseSalary * Number(line.percentage) / 100;
-                        }
-                    }
-                }
-            }
+            // الوقت الإضافي يحسب على أساس الإجمالي أو الأساسي حسب الإعدادات
+            const otBase = settings.overtimeSource === OvertimeSource.BASIC_PLUS_ALLOWANCES
+                ? totalSalary
+                : baseSalary;
 
             const otHourlyRate = (otBase / daysInMonth / 8);
             overtimeAmount = overtimeHours * otHourlyRate * settings.overtimeMultiplier;
@@ -241,26 +329,13 @@ export class PayrollCalculationService {
             });
         }
 
-        // 8. حساب الإجمالي
-        let grossSalary = baseSalary + overtimeAmount;
-
-        // إضافة البدلات من الهيكل
-        for (const line of assignment.structure.lines) {
-            if (line.component.type === 'EARNING') {
-                let lineAmount = 0;
-                if (line.amount) {
-                    lineAmount = Number(line.amount);
-                } else if (line.percentage) {
-                    lineAmount = baseSalary * Number(line.percentage) / 100;
-                }
-                grossSalary += lineAmount;
-            }
-        }
+        // 9. الإجمالي النهائي (الإجمالي المدخل + الإضافي)
+        const grossSalary = totalSalary + overtimeAmount;
 
         trace.push({
             step: 'grossSalary',
             description: 'إجمالي الراتب',
-            formula: `الأساسي + البدلات + الوقت الإضافي = ${grossSalary.toFixed(2)}`,
+            formula: `${totalSalary.toFixed(2)} + ${overtimeAmount.toFixed(2)} = ${grossSalary.toFixed(2)}`,
             result: grossSalary,
         });
 

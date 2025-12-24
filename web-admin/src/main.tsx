@@ -63,7 +63,16 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      // Data stays fresh for 5 minutes
       staleTime: 5 * 60 * 1000,
+      // Cache data for 30 minutes before garbage collection
+      gcTime: 30 * 60 * 1000,
+      // Don't refetch on mount if data is fresh
+      refetchOnMount: false,
+    },
+    mutations: {
+      // Retry mutations once on failure
+      retry: 1,
     },
   },
 });
