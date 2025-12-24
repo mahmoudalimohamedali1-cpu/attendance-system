@@ -364,7 +364,7 @@ export const SalaryStructuresPage = () => {
                                                     }}
                                                     size="small"
                                                     InputProps={{ inputProps: { min: 0, max: 100 } }}
-                                                    helperText="من الأساسي"
+                                                    helperText="من الإجمالي"
                                                 />
                                             ) : (
                                                 <TextField
