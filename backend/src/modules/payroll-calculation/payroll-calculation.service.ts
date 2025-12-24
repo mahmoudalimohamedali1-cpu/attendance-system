@@ -158,11 +158,12 @@ export class PayrollCalculationService {
         const assignment = employee.salaryAssignments[0];
 
         // ==========================================
-        // 🔥 Total-Based Calculation (الجديد)
-        // الإجمالي = المدخل → يتقسم على المكونات
+        // 🌍 Global Payroll Calculation
+        // الأساسي = نسبة من الإجمالي
+        // البدلات = نسب من الأساسي
         // ==========================================
 
-        // الإجمالي هو المدخل الأساسي (من baseSalary field - سيتم تغيير اسمه لاحقاً)
+        // الإجمالي هو المدخل
         const totalSalary = Number(assignment.baseSalary);
 
         trace.push({
@@ -172,87 +173,113 @@ export class PayrollCalculationService {
             result: totalSalary,
         });
 
-        // 2. حساب المكونات من الإجمالي
-        // نجمع كل النسب أولاً لمعرفة كيف يتقسم الإجمالي
+        // ترتيب المكونات حسب الأولوية
         const structureLines = assignment.structure.lines.sort((a, b) => a.priority - b.priority);
 
-        // حساب كل مكون
-        const componentAmounts: { code: string; name: string; amount: number; type: string }[] = [];
-        let totalPercentage = 0;
-        let fixedAmount = 0;
-
-        for (const line of structureLines) {
-            if (line.component.type === 'EARNING') {
-                if (line.percentage && Number(line.percentage) > 0) {
-                    totalPercentage += Number(line.percentage);
-                }
-                if (line.amount && Number(line.amount) > 0) {
-                    fixedAmount += Number(line.amount);
-                }
-            }
-        }
-
-        // الباقي بعد المبالغ الثابتة يتوزع على النسب
-        const amountForPercentages = totalSalary - fixedAmount;
-
-        // حساب كل مكون
+        // ========== المرحلة 1: حساب الراتب الأساسي أولاً ==========
         let calculatedBasic = 0;
-        let totalAllowances = 0;
+        const basicLine = structureLines.find(line => {
+            const c = line.component;
+            return c.code === 'BASIC' || c.code === 'BASE' ||
+                c.nameAr?.includes('أساسي') || c.nameEn?.toLowerCase().includes('basic');
+        });
 
-        for (const line of structureLines) {
-            const component = line.component;
-            let lineAmount = 0;
-
-            if (component.type === 'EARNING') {
-                if (line.percentage && Number(line.percentage) > 0) {
-                    // النسبة من الإجمالي (بعد طرح المبالغ الثابتة)
-                    lineAmount = amountForPercentages * (Number(line.percentage) / 100);
-                } else if (line.amount && Number(line.amount) > 0) {
-                    lineAmount = Number(line.amount);
-                }
-
-                // تحديد إذا كان هذا هو الراتب الأساسي
-                const isBasic = component.code === 'BASIC' ||
-                    component.code === 'BASE' ||
-                    component.nameAr?.includes('أساسي') ||
-                    component.nameEn?.toLowerCase().includes('basic');
-
-                if (isBasic) {
-                    calculatedBasic = lineAmount;
-                } else {
-                    totalAllowances += lineAmount;
-                }
-
-                componentAmounts.push({
-                    code: component.code,
-                    name: component.nameAr || component.nameEn || component.code,
-                    amount: lineAmount,
-                    type: isBasic ? 'BASIC' : 'ALLOWANCE',
-                });
-
+        if (basicLine) {
+            if (basicLine.percentage && Number(basicLine.percentage) > 0) {
+                // الأساسي = نسبة من الإجمالي
+                calculatedBasic = totalSalary * Number(basicLine.percentage) / 100;
                 trace.push({
-                    step: `component_${component.code}`,
-                    description: component.nameAr || component.nameEn || component.code,
-                    formula: line.percentage
-                        ? `${totalSalary} × ${line.percentage}% = ${lineAmount.toFixed(2)}`
-                        : `مبلغ ثابت = ${lineAmount.toFixed(2)}`,
-                    result: lineAmount,
+                    step: 'basicSalary',
+                    description: 'الراتب الأساسي',
+                    formula: `${totalSalary.toFixed(2)} × ${basicLine.percentage}% = ${calculatedBasic.toFixed(2)}`,
+                    result: calculatedBasic,
+                });
+            } else if (basicLine.amount && Number(basicLine.amount) > 0) {
+                calculatedBasic = Number(basicLine.amount);
+                trace.push({
+                    step: 'basicSalary',
+                    description: 'الراتب الأساسي (ثابت)',
+                    formula: `${calculatedBasic.toFixed(2)}`,
+                    result: calculatedBasic,
                 });
             }
         }
 
-        // إذا لم يتم تحديد الأساسي في الهيكل، نحسبه كالباقي
+        // لو مفيش أساسي محدد، يكون 60% افتراضي
         if (calculatedBasic === 0) {
-            calculatedBasic = totalSalary - totalAllowances;
+            calculatedBasic = totalSalary * 0.6;
             trace.push({
                 step: 'basicSalary',
-                description: 'الراتب الأساسي (محسوب)',
-                formula: `${totalSalary} - ${totalAllowances.toFixed(2)} = ${calculatedBasic.toFixed(2)}`,
+                description: 'الراتب الأساسي (افتراضي 60%)',
+                formula: `${totalSalary.toFixed(2)} × 60% = ${calculatedBasic.toFixed(2)}`,
                 result: calculatedBasic,
             });
         }
 
         const baseSalary = calculatedBasic;
+
+        // ========== المرحلة 2: حساب البدلات من الأساسي ==========
+        let totalAllowances = 0;
+        const componentAmounts: { code: string; name: string; amount: number; type: string }[] = [];
+
+        for (const line of structureLines) {
+            const component = line.component;
+            if (component.type !== 'EARNING') continue;
+
+            // تخطي الأساسي (حسبناه فوق)
+            const isBasic = component.code === 'BASIC' || component.code === 'BASE' ||
+                component.nameAr?.includes('أساسي') || component.nameEn?.toLowerCase().includes('basic');
+
+            if (isBasic) {
+                componentAmounts.push({
+                    code: component.code,
+                    name: component.nameAr || component.nameEn || component.code,
+                    amount: baseSalary,
+                    type: 'BASIC',
+                });
+                continue;
+            }
+
+            let lineAmount = 0;
+
+            if (line.percentage && Number(line.percentage) > 0) {
+                // ✨ البدلات = نسبة من الأساسي (مش من الإجمالي)
+                lineAmount = baseSalary * Number(line.percentage) / 100;
+                trace.push({
+                    step: `component_${component.code}`,
+                    description: component.nameAr || component.nameEn || component.code,
+                    formula: `${baseSalary.toFixed(2)} × ${line.percentage}% = ${lineAmount.toFixed(2)}`,
+                    result: lineAmount,
+                });
+            } else if (line.amount && Number(line.amount) > 0) {
+                lineAmount = Number(line.amount);
+                trace.push({
+                    step: `component_${component.code}`,
+                    description: component.nameAr || component.nameEn || component.code,
+                    formula: `مبلغ ثابت = ${lineAmount.toFixed(2)}`,
+                    result: lineAmount,
+                });
+            }
+
+            totalAllowances += lineAmount;
+            componentAmounts.push({
+                code: component.code,
+                name: component.nameAr || component.nameEn || component.code,
+                amount: lineAmount,
+                type: 'ALLOWANCE',
+            });
+        }
+
+        // حساب الفرق (لو المجموع مش = الإجمالي)
+        const calculatedTotal = baseSalary + totalAllowances;
+        if (Math.abs(calculatedTotal - totalSalary) > 1) {
+            trace.push({
+                step: 'adjustment',
+                description: 'ملاحظة: المجموع المحسوب',
+                formula: `الأساسي (${baseSalary.toFixed(2)}) + البدلات (${totalAllowances.toFixed(2)}) = ${calculatedTotal.toFixed(2)}`,
+                result: calculatedTotal,
+            });
+        }
 
         // 3. جلب إعدادات الحساب
         const settings = await this.getCalculationSettings(employeeId, companyId);
