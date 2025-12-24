@@ -26,6 +26,10 @@ import {
     FormControl,
     InputLabel,
     Select,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
+    Tooltip,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -34,6 +38,10 @@ import {
     Category as ComponentIcon,
     TrendingUp as EarningIcon,
     TrendingDown as DeductionIcon,
+    Functions as FormulaIcon,
+    PlayArrow as TestIcon,
+    ExpandMore as ExpandMoreIcon,
+    Info as InfoIcon,
 } from '@mui/icons-material';
 import {
     salaryComponentsService,
@@ -44,6 +52,7 @@ import {
     componentTypeLabels,
     componentNatureLabels,
 } from '@/services/salary-components.service';
+import { api } from '@/services/api.service';
 
 export default function SalaryComponentsPage() {
     const [components, setComponents] = useState<SalaryComponent[]>([]);
@@ -70,9 +79,41 @@ export default function SalaryComponentsPage() {
     const [formData, setFormData] = useState<CreateSalaryComponentDto>(initialFormData);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+    // Formula Tester State
+    const [testFormula, setTestFormula] = useState('BASIC * 0.25');
+    const [testBasicSalary, setTestBasicSalary] = useState(10000);
+    const [formulaResult, setFormulaResult] = useState<{ value: number; error?: string } | null>(null);
+    const [formulaTesting, setFormulaTesting] = useState(false);
+    const [formulaInfo, setFormulaInfo] = useState<{ supportedVariables: string[]; supportedFunctions: string[]; examples: any[] } | null>(null);
+
     useEffect(() => {
         fetchData();
+        fetchFormulaInfo();
     }, []);
+
+    const fetchFormulaInfo = async () => {
+        try {
+            const info = await api.get('/payroll-calculation/formula-info');
+            setFormulaInfo(info as any);
+        } catch (e) {
+            console.warn('Could not fetch formula info');
+        }
+    };
+
+    const handleTestFormula = async () => {
+        setFormulaTesting(true);
+        try {
+            const result = await api.post('/payroll-calculation/test-formula', {
+                formula: testFormula,
+                basicSalary: testBasicSalary,
+            }) as { result: number; error?: string };
+            setFormulaResult({ value: result.result, error: result.error });
+        } catch (e: any) {
+            setFormulaResult({ value: 0, error: e.message });
+        } finally {
+            setFormulaTesting(false);
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -289,6 +330,112 @@ export default function SalaryComponentsPage() {
                     />
                 </Grid>
             </Grid>
+
+            {/* Formula Tester Section */}
+            <Accordion sx={{ mt: 3 }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <FormulaIcon color="secondary" />
+                        <Typography fontWeight="bold">اختبار المعادلات</Typography>
+                        <Chip label="جديد" size="small" color="secondary" />
+                    </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} md={6}>
+                            <TextField
+                                fullWidth
+                                label="المعادلة"
+                                value={testFormula}
+                                onChange={(e) => setTestFormula(e.target.value)}
+                                placeholder="BASIC * 0.25"
+                                helperText="أدخل معادلة للاختبار"
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="الراتب الأساسي"
+                                value={testBasicSalary}
+                                onChange={(e) => setTestBasicSalary(Number(e.target.value))}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                color="secondary"
+                                startIcon={formulaTesting ? <CircularProgress size={20} color="inherit" /> : <TestIcon />}
+                                onClick={handleTestFormula}
+                                disabled={formulaTesting}
+                                sx={{ height: '56px' }}
+                            >
+                                {formulaTesting ? 'جاري...' : 'اختبار'}
+                            </Button>
+                        </Grid>
+
+                        {formulaResult && (
+                            <Grid item xs={12}>
+                                {formulaResult.error ? (
+                                    <Alert severity="error">{formulaResult.error}</Alert>
+                                ) : (
+                                    <Alert severity="success" icon={false}>
+                                        <Typography variant="h5" fontWeight="bold">
+                                            النتيجة: {formulaResult.value.toLocaleString('ar-SA')} ريال
+                                        </Typography>
+                                    </Alert>
+                                )}
+                            </Grid>
+                        )}
+
+                        {formulaInfo && (
+                            <>
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" gutterBottom>أمثلة جاهزة:</Typography>
+                                    <Box display="flex" gap={1} flexWrap="wrap">
+                                        {formulaInfo.examples?.map((ex, i) => (
+                                            <Tooltip key={i} title={ex.description}>
+                                                <Chip
+                                                    label={ex.formula}
+                                                    size="small"
+                                                    onClick={() => setTestFormula(ex.formula)}
+                                                    sx={{ cursor: 'pointer' }}
+                                                />
+                                            </Tooltip>
+                                        ))}
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        <InfoIcon fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                                        المتغيرات المدعومة:
+                                    </Typography>
+                                    <Box display="flex" gap={0.5} flexWrap="wrap">
+                                        {formulaInfo.supportedVariables?.slice(0, 10).map((v) => (
+                                            <Chip key={v} label={v} size="small" variant="outlined" onClick={() => setTestFormula(v)} />
+                                        ))}
+                                        {(formulaInfo.supportedVariables?.length || 0) > 10 && (
+                                            <Chip label={`+${(formulaInfo.supportedVariables?.length || 0) - 10}`} size="small" />
+                                        )}
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        <InfoIcon fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                                        الدوال المدعومة:
+                                    </Typography>
+                                    <Box display="flex" gap={0.5} flexWrap="wrap">
+                                        {formulaInfo.supportedFunctions?.map((f) => (
+                                            <Chip key={f} label={`${f}()`} size="small" color="info" variant="outlined" />
+                                        ))}
+                                    </Box>
+                                </Grid>
+                            </>
+                        )}
+                    </Grid>
+                </AccordionDetails>
+            </Accordion>
 
             {/* Create/Edit Dialog */}
             <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
