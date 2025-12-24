@@ -31,7 +31,7 @@ export class WpsExportController {
         const result = await this.wpsExportService.generateWpsFile(payrollRunId, companyId);
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`);
         res.send('\uFEFF' + result.content); // BOM for Excel Arabic support
     }
 
@@ -45,7 +45,7 @@ export class WpsExportController {
         const result = await this.wpsExportService.generateSarieFile(payrollRunId, companyId);
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`);
         res.send(result.content);
     }
 
