@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { DashboardPage } from '@/pages/dashboard/DashboardPage';
 import { UsersPage } from '@/pages/users/UsersPage';
+import EmployeeImportPage from '@/pages/users/EmployeeImportPage';
 import { AttendancePage } from '@/pages/attendance/AttendancePage';
 import { BranchesPage } from '@/pages/branches/BranchesPage';
 import { LeavesPage } from '@/pages/leaves/LeavesPage';
@@ -82,6 +83,7 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="users/import" element={<EmployeeImportPage />} />
         <Route path="attendance" element={<AttendancePage />} />
         <Route path="branches" element={<BranchesPage />} />
         <Route path="leaves" element={<LeavesPage />} />

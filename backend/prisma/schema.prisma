@@ -134,6 +134,12 @@ model User {
   professionCode    String?   @map("profession_code") // كود المهنة في قوى
   profession        String?   @map("profession") // اسم المهنة
 
+  // بيانات GOSI/HRSD - متطلبات التأمينات ووزارة الموارد البشرية
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date // تاريخ الميلاد
+  gender            String?   // MALE, FEMALE - الجنس
+  gosiNumber        String?   @unique @map("gosi_number") // رقم التأمينات الاجتماعية
+  maritalStatus     String?   @map("marital_status") // SINGLE, MARRIED, DIVORCED, WIDOWED
+
   // Super Admin - يتخطى كل الـ guards
   isSuperAdmin Boolean @default(false) @map("is_super_admin")
 
