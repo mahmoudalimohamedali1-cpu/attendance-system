@@ -22,14 +22,8 @@ import {
     DialogContent,
     DialogActions,
     LinearProgress,
-    Stepper,
-    Step,
-    StepLabel,
+    Tooltip,
     Alert,
-    List,
-    ListItem,
-    ListItemText,
-    ListItemIcon,
 } from '@mui/material';
 import {
     CloudUpload,
@@ -38,10 +32,11 @@ import {
     Schedule,
     Visibility,
     Refresh,
-    History,
-    Description,
+    CloudDownload,
     Lock,
     ArrowForward,
+    Send as SendIcon,
+    Done as DoneIcon,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import { format } from 'date-fns';
@@ -50,55 +45,62 @@ import { ar } from 'date-fns/locale';
 interface WpsSubmission {
     id: string;
     payrollRunId: string;
-    month: number;
-    year: number;
-    status: 'PENDING' | 'EXPORTED' | 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
-    fileHash?: string;
-    fileName?: string;
+    filename: string;
+    fileFormat: string;
+    totalAmount: string | number;
+    employeeCount: number;
+    status: 'GENERATED' | 'DOWNLOADED' | 'SUBMITTED' | 'PROCESSING' | 'PROCESSED' | 'FAILED';
+    bankName?: string;
+    bankRef?: string;
+    fileHashSha256?: string;
+    generatedAt?: string;
+    downloadedAt?: string;
     submittedAt?: string;
-    acceptedAt?: string;
-    rejectedAt?: string;
-    rejectionReason?: string;
+    processedAt?: string;
+    notes?: string;
     createdAt: string;
-    logs: WpsLog[];
+    payrollRun?: {
+        period?: {
+            month: number;
+            year: number;
+        };
+    };
 }
-
-interface WpsLog {
-    id: string;
-    action: string;
-    status: string;
-    meta?: any;
-    createdAt: string;
-    createdBy?: string;
-}
-
-const statusSteps = ['PENDING', 'EXPORTED', 'SUBMITTED', 'ACCEPTED'];
-
-const getStatusStep = (status: string) => {
-    const index = statusSteps.indexOf(status);
-    return index >= 0 ? index : (status === 'REJECTED' ? 2 : 0);
-};
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'ACCEPTED': return 'success';
+        case 'PROCESSED': return 'success';
         case 'SUBMITTED': return 'info';
-        case 'EXPORTED': return 'primary';
-        case 'PENDING': return 'warning';
-        case 'REJECTED': return 'error';
+        case 'PROCESSING': return 'warning';
+        case 'DOWNLOADED': return 'primary';
+        case 'GENERATED': return 'default';
+        case 'FAILED': return 'error';
         default: return 'default';
     }
 };
 
 const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-        'PENDING': 'قيد الانتظار',
-        'EXPORTED': 'تم التصدير',
-        'SUBMITTED': 'تم الإرسال',
-        'ACCEPTED': 'مقبول',
-        'REJECTED': 'مرفوض',
+        'GENERATED': 'تم التوليد',
+        'DOWNLOADED': 'تم التحميل',
+        'SUBMITTED': 'تم الإرسال للبنك',
+        'PROCESSING': 'قيد المعالجة',
+        'PROCESSED': 'تمت المعالجة',
+        'FAILED': 'فشل',
     };
     return labels[status] || status;
+};
+
+const getStatusIcon = (status: string) => {
+    switch (status) {
+        case 'PROCESSED': return <CheckCircle />;
+        case 'SUBMITTED': return <SendIcon />;
+        case 'PROCESSING': return <Schedule />;
+        case 'DOWNLOADED': return <CloudDownload />;
+        case 'GENERATED': return <DoneIcon />;
+        case 'FAILED': return <ErrorIcon />;
+        default: return <Schedule />;
+    }
 };
 
 const getMonthName = (month: number) => {
@@ -107,14 +109,21 @@ const getMonthName = (month: number) => {
     return months[month - 1] || '';
 };
 
+const formatCurrency = (amount: string | number) => {
+    return new Intl.NumberFormat('ar-SA', {
+        style: 'currency',
+        currency: 'SAR',
+    }).format(Number(amount));
+};
+
 export default function WpsTrackingPage() {
     const navigate = useNavigate();
     const [selectedSubmission, setSelectedSubmission] = useState<WpsSubmission | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
 
     // Fetch WPS submissions
-    const { data: submissions, isLoading, refetch } = useQuery<WpsSubmission[]>({
-        queryKey: ['wps-submissions'],
+    const { data: submissions, isLoading, refetch, error } = useQuery<WpsSubmission[]>({
+        queryKey: ['wps-tracking'],
         queryFn: async () => {
             const response = await api.get('/wps-tracking');
             return (response as any)?.data || response || [];
@@ -124,11 +133,12 @@ export default function WpsTrackingPage() {
     // Summary stats
     const stats = {
         total: submissions?.length || 0,
-        pending: submissions?.filter(s => s.status === 'PENDING').length || 0,
-        exported: submissions?.filter(s => s.status === 'EXPORTED').length || 0,
+        generated: submissions?.filter(s => s.status === 'GENERATED').length || 0,
+        downloaded: submissions?.filter(s => s.status === 'DOWNLOADED').length || 0,
         submitted: submissions?.filter(s => s.status === 'SUBMITTED').length || 0,
-        accepted: submissions?.filter(s => s.status === 'ACCEPTED').length || 0,
-        rejected: submissions?.filter(s => s.status === 'REJECTED').length || 0,
+        processing: submissions?.filter(s => s.status === 'PROCESSING').length || 0,
+        processed: submissions?.filter(s => s.status === 'PROCESSED').length || 0,
+        failed: submissions?.filter(s => s.status === 'FAILED').length || 0,
     };
 
     const handleViewDetails = (submission: WpsSubmission) => {
@@ -137,15 +147,15 @@ export default function WpsTrackingPage() {
     };
 
     return (
-        <Box>
+        <Box p={3}>
             {/* Header */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
                 <Box>
                     <Typography variant="h4" fontWeight="bold" gutterBottom>
-                        متابعة WPS
+                        متابعة ملفات WPS
                     </Typography>
                     <Typography variant="body1" color="text.secondary">
-                        تتبع حالة إرسالات نظام حماية الأجور
+                        تتبع حالة ملفات نظام حماية الأجور والتحويلات البنكية
                     </Typography>
                 </Box>
                 <Box display="flex" gap={2}>
@@ -168,35 +178,41 @@ export default function WpsTrackingPage() {
 
             {isLoading && <LinearProgress sx={{ mb: 3 }} />}
 
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    حدث خطأ في جلب البيانات. تأكد من الصلاحيات.
+                </Alert>
+            )}
+
             {/* Stats Cards */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid container spacing={2} sx={{ mb: 4 }}>
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{ textAlign: 'center', borderRadius: 2 }}>
-                        <CardContent>
-                            <Typography variant="h4" fontWeight="bold" color="text.primary">{stats.total}</Typography>
+                        <CardContent sx={{ py: 2 }}>
+                            <Typography variant="h4" fontWeight="bold">{stats.total}</Typography>
                             <Typography variant="body2" color="text.secondary">الإجمالي</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
-                    <Card sx={{ textAlign: 'center', borderRadius: 2, bgcolor: 'warning.50' }}>
-                        <CardContent>
-                            <Typography variant="h4" fontWeight="bold" color="warning.main">{stats.pending}</Typography>
-                            <Typography variant="body2" color="text.secondary">قيد الانتظار</Typography>
+                    <Card sx={{ textAlign: 'center', borderRadius: 2, bgcolor: 'grey.50' }}>
+                        <CardContent sx={{ py: 2 }}>
+                            <Typography variant="h4" fontWeight="bold" color="text.secondary">{stats.generated}</Typography>
+                            <Typography variant="body2" color="text.secondary">تم التوليد</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{ textAlign: 'center', borderRadius: 2, bgcolor: 'primary.50' }}>
-                        <CardContent>
-                            <Typography variant="h4" fontWeight="bold" color="primary.main">{stats.exported}</Typography>
-                            <Typography variant="body2" color="text.secondary">تم التصدير</Typography>
+                        <CardContent sx={{ py: 2 }}>
+                            <Typography variant="h4" fontWeight="bold" color="primary.main">{stats.downloaded}</Typography>
+                            <Typography variant="body2" color="text.secondary">تم التحميل</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{ textAlign: 'center', borderRadius: 2, bgcolor: 'info.50' }}>
-                        <CardContent>
+                        <CardContent sx={{ py: 2 }}>
                             <Typography variant="h4" fontWeight="bold" color="info.main">{stats.submitted}</Typography>
                             <Typography variant="body2" color="text.secondary">تم الإرسال</Typography>
                         </CardContent>
@@ -204,17 +220,17 @@ export default function WpsTrackingPage() {
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{ textAlign: 'center', borderRadius: 2, bgcolor: 'success.50' }}>
-                        <CardContent>
-                            <Typography variant="h4" fontWeight="bold" color="success.main">{stats.accepted}</Typography>
-                            <Typography variant="body2" color="text.secondary">مقبول</Typography>
+                        <CardContent sx={{ py: 2 }}>
+                            <Typography variant="h4" fontWeight="bold" color="success.main">{stats.processed}</Typography>
+                            <Typography variant="body2" color="text.secondary">تمت المعالجة</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={4} md={2}>
                     <Card sx={{ textAlign: 'center', borderRadius: 2, bgcolor: 'error.50' }}>
-                        <CardContent>
-                            <Typography variant="h4" fontWeight="bold" color="error.main">{stats.rejected}</Typography>
-                            <Typography variant="body2" color="text.secondary">مرفوض</Typography>
+                        <CardContent sx={{ py: 2 }}>
+                            <Typography variant="h4" fontWeight="bold" color="error.main">{stats.failed}</Typography>
+                            <Typography variant="body2" color="text.secondary">فشل</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
@@ -227,11 +243,12 @@ export default function WpsTrackingPage() {
                         <TableHead sx={{ bgcolor: 'grey.100' }}>
                             <TableRow>
                                 <TableCell>الفترة</TableCell>
+                                <TableCell>الملف</TableCell>
+                                <TableCell>الصيغة</TableCell>
                                 <TableCell>الحالة</TableCell>
-                                <TableCell>تاريخ التصدير</TableCell>
-                                <TableCell>تاريخ الإرسال</TableCell>
-                                <TableCell>ملف Hash</TableCell>
-                                <TableCell align="center">الإجراءات</TableCell>
+                                <TableCell>تاريخ التوليد</TableCell>
+                                <TableCell>Hash</TableCell>
+                                <TableCell align="center">عرض</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -239,20 +256,33 @@ export default function WpsTrackingPage() {
                                 <TableRow key={submission.id} hover>
                                     <TableCell>
                                         <Typography fontWeight="bold">
-                                            {getMonthName(submission.month)} {submission.year}
+                                            {submission.payrollRun?.period ?
+                                                `${getMonthName(submission.payrollRun.period.month)} ${submission.payrollRun.period.year}` :
+                                                '-'
+                                            }
                                         </Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Tooltip title={submission.filename}>
+                                            <Typography noWrap sx={{ maxWidth: 200 }}>
+                                                {submission.filename}
+                                            </Typography>
+                                        </Tooltip>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            label={submission.fileFormat}
+                                            size="small"
+                                            variant="outlined"
+                                            color={submission.fileFormat === 'SARIE' ? 'secondary' : 'primary'}
+                                        />
                                     </TableCell>
                                     <TableCell>
                                         <Chip
                                             label={getStatusLabel(submission.status)}
                                             color={getStatusColor(submission.status) as any}
                                             size="small"
-                                            icon={
-                                                submission.status === 'ACCEPTED' ? <CheckCircle /> :
-                                                    submission.status === 'REJECTED' ? <ErrorIcon /> :
-                                                        submission.status === 'SUBMITTED' ? <CloudUpload /> :
-                                                            <Schedule />
-                                            }
+                                            icon={getStatusIcon(submission.status)}
                                         />
                                     </TableCell>
                                     <TableCell>
@@ -262,19 +292,15 @@ export default function WpsTrackingPage() {
                                         }
                                     </TableCell>
                                     <TableCell>
-                                        {submission.submittedAt ?
-                                            format(new Date(submission.submittedAt), 'dd/MM/yyyy HH:mm', { locale: ar }) :
-                                            '-'
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        {submission.fileHash ? (
-                                            <Chip
-                                                label={submission.fileHash.substring(0, 12) + '...'}
-                                                size="small"
-                                                variant="outlined"
-                                                icon={<Lock fontSize="small" />}
-                                            />
+                                        {submission.fileHashSha256 ? (
+                                            <Tooltip title={submission.fileHashSha256}>
+                                                <Chip
+                                                    label={submission.fileHashSha256.substring(0, 10) + '...'}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    icon={<Lock fontSize="small" />}
+                                                />
+                                            </Tooltip>
                                         ) : '-'}
                                     </TableCell>
                                     <TableCell align="center">
@@ -284,13 +310,6 @@ export default function WpsTrackingPage() {
                                             onClick={() => handleViewDetails(submission)}
                                         >
                                             <Visibility />
-                                        </IconButton>
-                                        <IconButton
-                                            size="small"
-                                            color="secondary"
-                                            onClick={() => navigate('/audit/submissions')}
-                                        >
-                                            <History />
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>
@@ -302,7 +321,10 @@ export default function WpsTrackingPage() {
                 <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 3 }}>
                     <CloudUpload sx={{ fontSize: 64, color: 'grey.400', mb: 2 }} />
                     <Typography variant="h6" color="text.secondary" gutterBottom>
-                        لا توجد إرسالات WPS
+                        لا توجد ملفات WPS حتى الآن
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" mb={3}>
+                        قم بتصدير ملف WPS من صفحة التصدير لبدء التتبع
                     </Typography>
                     <Button
                         variant="contained"
@@ -318,7 +340,7 @@ export default function WpsTrackingPage() {
             <Dialog
                 open={dialogOpen}
                 onClose={() => setDialogOpen(false)}
-                maxWidth="md"
+                maxWidth="sm"
                 fullWidth
             >
                 {selectedSubmission && (
@@ -326,7 +348,7 @@ export default function WpsTrackingPage() {
                         <DialogTitle>
                             <Box display="flex" justifyContent="space-between" alignItems="center">
                                 <Typography variant="h6">
-                                    تفاصيل إرسال WPS - {getMonthName(selectedSubmission.month)} {selectedSubmission.year}
+                                    تفاصيل ملف WPS
                                 </Typography>
                                 <Chip
                                     label={getStatusLabel(selectedSubmission.status)}
@@ -335,132 +357,85 @@ export default function WpsTrackingPage() {
                             </Box>
                         </DialogTitle>
                         <DialogContent dividers>
-                            {/* Status Stepper */}
-                            <Stepper
-                                activeStep={getStatusStep(selectedSubmission.status)}
-                                alternativeLabel
-                                sx={{ mb: 4 }}
-                            >
-                                <Step>
-                                    <StepLabel>قيد الانتظار</StepLabel>
-                                </Step>
-                                <Step>
-                                    <StepLabel>تم التصدير</StepLabel>
-                                </Step>
-                                <Step>
-                                    <StepLabel>تم الإرسال</StepLabel>
-                                </Step>
-                                <Step>
-                                    <StepLabel
-                                        error={selectedSubmission.status === 'REJECTED'}
-                                    >
-                                        {selectedSubmission.status === 'REJECTED' ? 'مرفوض' : 'مقبول'}
-                                    </StepLabel>
-                                </Step>
-                            </Stepper>
-
-                            {/* Rejection Alert */}
-                            {selectedSubmission.status === 'REJECTED' && selectedSubmission.rejectionReason && (
-                                <Alert severity="error" sx={{ mb: 3 }}>
-                                    <Typography fontWeight="bold">سبب الرفض:</Typography>
-                                    {selectedSubmission.rejectionReason}
-                                </Alert>
-                            )}
-
-                            {/* Details */}
-                            <Grid container spacing={3}>
-                                <Grid item xs={12} md={6}>
-                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                            معلومات الملف
-                                        </Typography>
-                                        <List disablePadding dense>
-                                            <ListItem>
-                                                <ListItemIcon><Description /></ListItemIcon>
-                                                <ListItemText
-                                                    primary="اسم الملف"
-                                                    secondary={selectedSubmission.fileName || 'غير محدد'}
-                                                />
-                                            </ListItem>
-                                            <ListItem>
-                                                <ListItemIcon><Lock /></ListItemIcon>
-                                                <ListItemText
-                                                    primary="File Hash"
-                                                    secondary={selectedSubmission.fileHash || 'غير محدد'}
-                                                />
-                                            </ListItem>
-                                        </List>
-                                    </Paper>
-                                </Grid>
-                                <Grid item xs={12} md={6}>
-                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                            التواريخ
-                                        </Typography>
-                                        <List disablePadding dense>
-                                            <ListItem>
-                                                <ListItemText
-                                                    primary="تاريخ الإنشاء"
-                                                    secondary={format(new Date(selectedSubmission.createdAt), 'dd/MM/yyyy HH:mm')}
-                                                />
-                                            </ListItem>
-                                            {selectedSubmission.submittedAt && (
-                                                <ListItem>
-                                                    <ListItemText
-                                                        primary="تاريخ الإرسال"
-                                                        secondary={format(new Date(selectedSubmission.submittedAt), 'dd/MM/yyyy HH:mm')}
-                                                    />
-                                                </ListItem>
-                                            )}
-                                            {selectedSubmission.acceptedAt && (
-                                                <ListItem>
-                                                    <ListItemText
-                                                        primary="تاريخ القبول"
-                                                        secondary={format(new Date(selectedSubmission.acceptedAt), 'dd/MM/yyyy HH:mm')}
-                                                    />
-                                                </ListItem>
-                                            )}
-                                        </List>
-                                    </Paper>
-                                </Grid>
-                            </Grid>
-
-                            {/* Activity Log */}
-                            {selectedSubmission.logs && selectedSubmission.logs.length > 0 && (
-                                <Box mt={3}>
-                                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                                        سجل النشاط
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">الفترة</Typography>
+                                    <Typography fontWeight="bold">
+                                        {selectedSubmission.payrollRun?.period ?
+                                            `${getMonthName(selectedSubmission.payrollRun.period.month)} ${selectedSubmission.payrollRun.period.year}` :
+                                            '-'
+                                        }
                                     </Typography>
-                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                                        <List disablePadding>
-                                            {selectedSubmission.logs.map((log, index) => (
-                                                <ListItem key={log.id || index} divider={index < selectedSubmission.logs.length - 1}>
-                                                    <ListItemIcon>
-                                                        <CheckCircle color="primary" fontSize="small" />
-                                                    </ListItemIcon>
-                                                    <ListItemText
-                                                        primary={log.action}
-                                                        secondary={format(new Date(log.createdAt), 'dd/MM/yyyy HH:mm')}
-                                                    />
-                                                </ListItem>
-                                            ))}
-                                        </List>
-                                    </Paper>
-                                </Box>
-                            )}
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">الصيغة</Typography>
+                                    <Typography fontWeight="bold">{selectedSubmission.fileFormat}</Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="caption" color="text.secondary">اسم الملف</Typography>
+                                    <Typography fontWeight="bold" sx={{ wordBreak: 'break-all' }}>
+                                        {selectedSubmission.filename}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">عدد الموظفين</Typography>
+                                    <Typography fontWeight="bold">{selectedSubmission.employeeCount}</Typography>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">المبلغ الإجمالي</Typography>
+                                    <Typography fontWeight="bold" color="success.main">
+                                        {formatCurrency(selectedSubmission.totalAmount)}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="caption" color="text.secondary">تاريخ التوليد</Typography>
+                                    <Typography>
+                                        {selectedSubmission.createdAt ?
+                                            format(new Date(selectedSubmission.createdAt), 'dd MMMM yyyy - HH:mm', { locale: ar }) :
+                                            '-'
+                                        }
+                                    </Typography>
+                                </Grid>
+                                {selectedSubmission.fileHashSha256 && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="caption" color="text.secondary">SHA-256 Hash</Typography>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                fontFamily: 'monospace',
+                                                bgcolor: 'grey.100',
+                                                p: 1,
+                                                borderRadius: 1,
+                                                wordBreak: 'break-all',
+                                                fontSize: '0.75rem'
+                                            }}
+                                        >
+                                            {selectedSubmission.fileHashSha256}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                                {selectedSubmission.bankName && (
+                                    <Grid item xs={6}>
+                                        <Typography variant="caption" color="text.secondary">اسم البنك</Typography>
+                                        <Typography>{selectedSubmission.bankName}</Typography>
+                                    </Grid>
+                                )}
+                                {selectedSubmission.bankRef && (
+                                    <Grid item xs={6}>
+                                        <Typography variant="caption" color="text.secondary">مرجع البنك</Typography>
+                                        <Typography>{selectedSubmission.bankRef}</Typography>
+                                    </Grid>
+                                )}
+                                {selectedSubmission.notes && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="caption" color="text.secondary">ملاحظات</Typography>
+                                        <Typography>{selectedSubmission.notes}</Typography>
+                                    </Grid>
+                                )}
+                            </Grid>
                         </DialogContent>
                         <DialogActions>
                             <Button onClick={() => setDialogOpen(false)}>إغلاق</Button>
-                            <Button
-                                variant="contained"
-                                startIcon={<History />}
-                                onClick={() => {
-                                    setDialogOpen(false);
-                                    navigate('/audit/submissions');
-                                }}
-                            >
-                                سجل التدقيق الكامل
-                            </Button>
                         </DialogActions>
                     </>
                 )}
