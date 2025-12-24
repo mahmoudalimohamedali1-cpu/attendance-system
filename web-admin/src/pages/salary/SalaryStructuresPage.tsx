@@ -303,7 +303,6 @@ export const SalaryStructuresPage = () => {
                                 )}
 
                                 {formData.lines?.map((line, index) => {
-                                    const isPercentage = !!line.percentage && !line.amount;
                                     const valueType = line.percentage ? 'percentage' : 'amount';
 
                                     return (
