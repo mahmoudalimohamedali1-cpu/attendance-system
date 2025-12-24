@@ -151,16 +151,6 @@ export class UsersController {
   ) {
     return this.usersService.resetFace(id, companyId);
   }
-
-  @Post('import')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'استيراد موظفين من ملف' })
-  @ApiResponse({ status: 201, description: 'نتائج الاستيراد' })
-  async importUsers(
-    @Body() importUsersDto: ImportUsersDto,
-    @CurrentUser('companyId') companyId: string,
-  ) {
-    return this.usersService.importUsers(importUsersDto, companyId);
-  }
+  // Note: Import functionality moved to EmployeeImportController
 }
 
