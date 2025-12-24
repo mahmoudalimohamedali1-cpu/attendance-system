@@ -179,9 +179,26 @@ export class WpsExportService {
 
         // 4. حساب الإجمالي
         const totalAmount = wpsRecords.reduce((sum, r) => sum + r.netSalary, 0);
+        const fileDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const fileTime = new Date().toISOString().slice(11, 16).replace(':', '');
 
         // 5. بناء محتوى الملف بصيغة مدد (CSV format)
-        const header = [
+        // سجل الرأس (Header Record) - معلومات الشركة
+        const headerRecord = [
+            'H',                                    // نوع السجل
+            company.crNumber || '',                 // السجل التجاري
+            `"${company.name}"`,                    // اسم الشركة
+            companyBankAccount?.iban || '',         // IBAN الشركة
+            fileDate,                               // تاريخ الملف YYYYMMDD
+            fileTime,                               // وقت الملف HHmm
+            wpsRecords.length,                      // عدد الموظفين
+            totalAmount.toFixed(2),                 // إجمالي الرواتب
+            'SAR',                                  // العملة
+        ].join(',');
+
+        // رأس الأعمدة (Column Headers)
+        const columnHeaders = [
+            'Record_Type',          // نوع السجل (D = Data)
             'National_ID',          // رقم الهوية/الإقامة
             'Employee_Code',        // رمز الموظف
             'Employee_Name',        // اسم الموظف
@@ -189,8 +206,7 @@ export class WpsExportService {
             'Bank_Code',            // رمز البنك
             'Basic_Salary',         // الراتب الأساسي
             'Housing_Allowance',    // بدل السكن
-            'Transport_Allowance',  // بدل المواصلات
-            'Other_Allowances',     // بدلات أخرى
+            'Other_Allowances',     // بدلات أخرى (شامل المواصلات)
             'Total_Earnings',       // إجمالي الاستحقاقات
             'Deductions',           // الاستقطاعات
             'Net_Salary',           // صافي الراتب
@@ -200,17 +216,18 @@ export class WpsExportService {
             'Currency',             // العملة
         ].join(',');
 
+        // سجلات الموظفين (Data Records)
         const rows = wpsRecords.map(r =>
             [
-                r.nationalId,
+                'D',                                // نوع السجل
+                r.nationalId.padStart(10, '0'),     // رقم الهوية مع التبطين
                 r.employeeCode,
                 `"${r.employeeName}"`,
                 r.iban,
                 r.bankCode,
                 r.basicSalary.toFixed(2),
                 r.housingAllowance.toFixed(2),
-                r.transportAllowance.toFixed(2),
-                r.otherAllowances.toFixed(2),
+                (r.transportAllowance + r.otherAllowances).toFixed(2), // دمج البدلات
                 r.totalEarnings.toFixed(2),
                 r.deductions.toFixed(2),
                 r.netSalary.toFixed(2),
@@ -220,10 +237,20 @@ export class WpsExportService {
                 r.currency,
             ].join(',')
         );
-        const content = [header, ...rows].join('\n');
+
+        // سجل الذيل (Trailer Record) - الإجماليات
+        const trailerRecord = [
+            'T',                                    // نوع السجل
+            wpsRecords.length,                      // عدد السجلات
+            totalAmount.toFixed(2),                 // إجمالي المبالغ
+            'SAR',                                  // العملة
+        ].join(',');
+
+        // تجميع الملف
+        const content = [headerRecord, columnHeaders, ...rows, trailerRecord].join('\n');
 
         // 6. اسم الملف
-        const filename = `WPS_MUDAD_${company.name?.replace(/\s/g, '_')}_${period.year}_${String(period.month).padStart(2, '0')}.csv`;
+        const filename = `WPS_MUDAD_${company.crNumber || 'COMPANY'}_${period.year}${String(period.month).padStart(2, '0')}_${fileDate}.csv`;
 
         return {
             filename,
