@@ -285,7 +285,7 @@ export const SalaryStructuresPage = () => {
                                     <Box>
                                         <Typography variant="subtitle2" fontWeight="bold">مكونات الهيكل</Typography>
                                         <Typography variant="caption" color="text.secondary">
-                                            اختر مبلغ ثابت أو نسبة من الراتب الأساسي (واحد فقط)
+                                            اختر مبلغ ثابت أو نسبة من إجمالي الراتب (واحد فقط)
                                         </Typography>
                                     </Box>
                                     <Button startIcon={<AddIcon />} size="small" onClick={handleAddLine} variant="outlined">إضافة مكون</Button>

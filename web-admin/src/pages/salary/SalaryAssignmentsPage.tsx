@@ -139,7 +139,7 @@ export const SalaryAssignmentsPage = () => {
                 <Box>
                     <Typography variant="h5" fontWeight="bold">تعيينات الرواتب</Typography>
                     <Typography variant="body2" color="text.secondary">
-                        ربط الموظفين بهياكل الرواتب المحددة وتحديد الراتب الأساسي
+                        ربط الموظفين بهياكل الرواتب وتحديد إجمالي الراتب الشهري
                     </Typography>
                 </Box>
                 <Button
@@ -161,7 +161,7 @@ export const SalaryAssignmentsPage = () => {
                             <TableRow>
                                 <TableCell sx={{ fontWeight: 'bold' }}>الموظف</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>هيكل الراتب</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>الراتب الأساسي</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>إجمالي الراتب</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>تاريخ النفاذ</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>الحالة</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }} align="center">الإجراءات</TableCell>
@@ -256,7 +256,7 @@ export const SalaryAssignmentsPage = () => {
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
-                                label="الراتب الأساسي"
+                                label="إجمالي الراتب الشهري"
                                 type="number"
                                 value={formData.baseSalary}
                                 onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}

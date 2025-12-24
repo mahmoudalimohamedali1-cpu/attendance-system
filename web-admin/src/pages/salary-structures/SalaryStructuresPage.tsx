@@ -142,7 +142,7 @@ export default function SalaryStructuresPage() {
                         <TableRow sx={{ bgcolor: 'grey.100' }}>
                             <TableCell>الاسم</TableCell>
                             <TableCell>الوصف</TableCell>
-                            <TableCell>الراتب الأساسي</TableCell>
+                            <TableCell>إجمالي الراتب</TableCell>
                             <TableCell align="center">الحالة</TableCell>
                             <TableCell align="center">الإجراءات</TableCell>
                         </TableRow>
@@ -210,7 +210,7 @@ export default function SalaryStructuresPage() {
                             <TextField
                                 fullWidth
                                 type="number"
-                                label="الراتب الأساسي (ريال)"
+                                label="إجمالي الراتب (ريال)"
                                 value={formData.baseSalary}
                                 onChange={(e) => setFormData({ ...formData, baseSalary: parseFloat(e.target.value) })}
                             />
