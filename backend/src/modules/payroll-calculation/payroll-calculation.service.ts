@@ -241,14 +241,40 @@ export class PayrollCalculationService {
             }
 
             let lineAmount = 0;
+            let formulaUsed = '';
 
-            if (line.percentage && Number(line.percentage) > 0) {
-                // ✨ البدلات = نسبة من الأساسي (مش من الإجمالي)
-                lineAmount = baseSalary * Number(line.percentage) / 100;
+            // ✨ أولوية: formula > percentage > amount
+            // بناء context للمعادلات
+            const formulaContext = this.formulaEngine.buildVariableContext({
+                basicSalary: baseSalary,
+                totalSalary: totalSalary,
+                daysInMonth: 30,
+            });
+            formulaContext.TOTAL = totalSalary;
+            formulaContext.BASIC = baseSalary;
+
+            if (component.formula && component.formula.trim()) {
+                // استخدام المعادلة
+                const result = this.formulaEngine.evaluate(component.formula, formulaContext);
+                if (!result.error) {
+                    lineAmount = result.value;
+                    formulaUsed = `${component.formula} = ${lineAmount.toFixed(2)}`;
+                } else {
+                    formulaUsed = `خطأ: ${result.error}`;
+                }
                 trace.push({
                     step: `component_${component.code}`,
                     description: component.nameAr || component.nameEn || component.code,
-                    formula: `${baseSalary.toFixed(2)} × ${line.percentage}% = ${lineAmount.toFixed(2)}`,
+                    formula: formulaUsed,
+                    result: lineAmount,
+                });
+            } else if (line.percentage && Number(line.percentage) > 0) {
+                // النسبة من TOTAL
+                lineAmount = totalSalary * Number(line.percentage) / 100;
+                trace.push({
+                    step: `component_${component.code}`,
+                    description: component.nameAr || component.nameEn || component.code,
+                    formula: `TOTAL × ${line.percentage}% = ${lineAmount.toFixed(2)}`,
                     result: lineAmount,
                 });
             } else if (line.amount && Number(line.amount) > 0) {
