@@ -22,6 +22,7 @@ export interface SalaryAssignment {
     };
     effectiveFrom: string;
     effectiveTo?: string;
+    baseSalary: number;
     isActive: boolean;
     createdAt: string;
 }
@@ -29,6 +30,7 @@ export interface SalaryAssignment {
 export interface CreateSalaryAssignmentDto {
     userId: string;
     salaryStructureId: string;
+    baseSalary: number;
     effectiveFrom: string;
     effectiveTo?: string;
 }

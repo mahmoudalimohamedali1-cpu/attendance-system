@@ -372,4 +372,71 @@ export class DashboardService {
 
         return { periods, gross, net, gosi, otHours };
     }
+
+    /**
+     * Quick Stats for Users Page
+     */
+    async getUsersQuickStats(companyId: string): Promise<{
+        totalActive: number;
+        newThisMonth: number;
+        onLeaveToday: number;
+        pendingApprovals: number;
+    }> {
+        const cacheKey = `dashboard:users-stats:${companyId}`;
+        return this.cached(cacheKey, 60, () => this._getUsersQuickStatsImpl(companyId));
+    }
+
+    private async _getUsersQuickStatsImpl(companyId: string) {
+        const today = new Date();
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+        // Total active employees
+        const totalActive = await this.prisma.user.count({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                role: { in: ['EMPLOYEE', 'MANAGER'] }
+            }
+        });
+
+        // New hires this month
+        const newThisMonth = await this.prisma.user.count({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                hireDate: { gte: startOfMonth }
+            }
+        });
+
+        // Employees on leave today
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const todayEnd = new Date(todayStart);
+        todayEnd.setDate(todayEnd.getDate() + 1);
+
+        const onLeaveToday = await this.prisma.leaveRequest.count({
+            where: {
+                companyId,
+                status: 'APPROVED',
+                startDate: { lte: today },
+                endDate: { gte: today }
+            }
+        });
+
+        // Pending approvals (leaves + advances)
+        const [pendingLeaves, pendingAdvances] = await Promise.all([
+            this.prisma.leaveRequest.count({
+                where: { companyId, status: 'PENDING' }
+            }),
+            this.prisma.advanceRequest.count({
+                where: { companyId, status: 'PENDING' }
+            }),
+        ]);
+
+        return {
+            totalActive,
+            newThisMonth,
+            onLeaveToday,
+            pendingApprovals: pendingLeaves + pendingAdvances
+        };
+    }
 }

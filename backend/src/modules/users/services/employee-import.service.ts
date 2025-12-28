@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { ColumnMapperService, SmartMappingResult, ColumnMapping } from './column-mapper.service';
 import * as bcrypt from 'bcrypt';
 
 export interface ImportRow {
@@ -26,6 +27,7 @@ export interface ImportRow {
     role?: string;
     marital_status?: string;
     password?: string;
+    [key: string]: string | undefined; // للحقول الإضافية
 }
 
 interface ImportResult {
@@ -35,11 +37,15 @@ interface ImportResult {
     updated: number;
     skipped: number;
     errors: { row: number; field: string; message: string }[];
+    customFieldsAdded?: number;
 }
 
 @Injectable()
 export class EmployeeImportService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private columnMapper: ColumnMapperService,
+    ) { }
 
     /**
      * Get import template headers
@@ -346,5 +352,270 @@ export class EmployeeImportService {
             warnings,
             errors,
         };
+    }
+
+    // ============================================
+    // دوال الاستيراد الذكي (Smart Import)
+    // ============================================
+
+    /**
+     * تحليل ملف CSV بشكل ذكي مع اقتراح المطابقات
+     */
+    smartAnalyzeCSV(content: string): {
+        headers: string[];
+        mappings: SmartMappingResult;
+        preview: any[];
+    } {
+        const lines = content.split(/\r?\n/).filter(line => line.trim());
+        if (lines.length < 1) {
+            throw new BadRequestException('الملف فارغ');
+        }
+
+        // استخراج الأعمدة الأصلية
+        const headers = lines[0].split(',').map(h => h.trim().replace(/['\"]/g, ''));
+
+        // تحليل المطابقات
+        const mappings = this.columnMapper.analyzeColumns(headers);
+
+        // استخراج معاينة (أول 5 صفوف)
+        const preview: any[] = [];
+        for (let i = 1; i < Math.min(lines.length, 6); i++) {
+            const values = this.parseCSVLine(lines[i]);
+            const row: any = {};
+            headers.forEach((header, index) => {
+                row[header] = values[index]?.trim().replace(/^['\"]/g, '').replace(/['\""]$/g, '') || '';
+            });
+            preview.push(row);
+        }
+
+        return { headers, mappings, preview };
+    }
+
+    /**
+     * استيراد ذكي مع مطابقة مخصصة وحفظ الحقول الجديدة
+     */
+    async smartImportEmployees(
+        content: string,
+        companyId: string,
+        customMappings: Record<string, string | null> // sourceColumn -> targetField (null = custom field)
+    ): Promise<ImportResult & { customFieldsAdded: number }> {
+        const result: ImportResult & { customFieldsAdded: number } = {
+            success: false,
+            totalRows: 0,
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            errors: [],
+            customFieldsAdded: 0,
+        };
+
+        const lines = content.split(/\r?\n/).filter(line => line.trim());
+        if (lines.length < 2) {
+            throw new BadRequestException('الملف فارغ أو لا يحتوي على بيانات');
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/['\"]/g, ''));
+        result.totalRows = lines.length - 1;
+
+        // Pre-fetch branches and departments
+        const branches = await this.prisma.branch.findMany({ where: { companyId } });
+        const departments = await this.prisma.department.findMany({
+            where: { branch: { companyId } },
+        });
+
+        // تحديد الحقول المعروفة والحقول المخصصة
+        const knownFields = this.getTemplateHeaders();
+        const customFields: string[] = [];
+
+        for (const [source, target] of Object.entries(customMappings)) {
+            if (target === null || !knownFields.includes(target)) {
+                customFields.push(source);
+            }
+        }
+
+        // معالجة كل صف
+        for (let i = 1; i < lines.length; i++) {
+            const values = this.parseCSVLine(lines[i]);
+            const rowNum = i + 1;
+
+            if (values.length === 0) continue;
+
+            try {
+                // بناء كائن الصف المطابق
+                const row: Partial<ImportRow> = {};
+                const customData: Record<string, string> = {};
+
+                headers.forEach((header, index) => {
+                    const value = values[index]?.trim().replace(/^['\"]/g, '').replace(/['\""]$/g, '') || '';
+                    const targetField = customMappings[header];
+
+                    if (targetField && knownFields.includes(targetField)) {
+                        // حقل معروف
+                        row[targetField] = value;
+                    } else {
+                        // حقل مخصص
+                        customData[header] = value;
+                    }
+                });
+
+                // التحقق من الحقول المطلوبة
+                if (!row.first_name && !row.email) {
+                    result.errors.push({ row: rowNum, field: 'first_name/email', message: 'يجب توفير الاسم الأول أو البريد الإلكتروني' });
+                    result.skipped++;
+                    continue;
+                }
+
+                // البحث عن المستخدم
+                let existingUser = await this.prisma.user.findFirst({
+                    where: {
+                        companyId,
+                        OR: [
+                            ...(row.email ? [{ email: row.email }] : []),
+                            ...(row.national_id ? [{ nationalId: row.national_id }] : []),
+                        ],
+                    },
+                });
+
+                // تحضير بيانات المستخدم
+                const branchId = row.branch_code
+                    ? branches.find(b => b.name === row.branch_code || b.nameEn === row.branch_code)?.id
+                    : undefined;
+                const departmentId = row.department_code
+                    ? departments.find(d => d.name === row.department_code || d.nameEn === row.department_code)?.id
+                    : undefined;
+
+                const userData: any = {
+                    firstName: row.first_name || 'غير محدد',
+                    lastName: row.last_name || '',
+                    email: row.email || `temp_${Date.now()}_${rowNum}@temp.com`,
+                    phone: row.phone || null,
+                    employeeCode: row.employee_code || null,
+                    nationalId: row.national_id || null,
+                    iqamaNumber: row.iqama_number || null,
+                    gosiNumber: row.gosi_number || null,
+                    dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
+                    gender: row.gender?.toUpperCase() || null,
+                    nationality: row.nationality || null,
+                    isSaudi: row.is_saudi?.toLowerCase() === 'true',
+                    passportNumber: row.passport_number || null,
+                    passportExpiryDate: row.passport_expiry ? new Date(row.passport_expiry) : null,
+                    iqamaExpiryDate: row.iqama_expiry ? new Date(row.iqama_expiry) : null,
+                    hireDate: row.hire_date ? new Date(row.hire_date) : null,
+                    salary: row.salary ? parseFloat(row.salary) : null,
+                    jobTitle: row.job_title || null,
+                    role: this.parseRole(row.role),
+                    maritalStatus: row.marital_status?.toUpperCase() || null,
+                    status: 'ACTIVE',
+                    branchId: branchId || null,
+                    departmentId: departmentId || null,
+                    companyId,
+                };
+
+                let userId: string;
+
+                if (existingUser) {
+                    await this.prisma.user.update({
+                        where: { id: existingUser.id },
+                        data: userData,
+                    });
+                    userId = existingUser.id;
+                    result.updated++;
+                } else {
+                    const password = row.password || 'Temp@123';
+                    const hashedPassword = await bcrypt.hash(password, 10);
+
+                    const newUser = await this.prisma.user.create({
+                        data: {
+                            ...userData,
+                            password: hashedPassword,
+                            annualLeaveDays: 21,
+                            remainingLeaveDays: 21,
+                        },
+                    });
+                    userId = newUser.id;
+                    result.created++;
+                }
+
+                // حفظ الحقول المخصصة
+                const customFieldsCount = await this.saveCustomFields(userId, customData, headers);
+                result.customFieldsAdded += customFieldsCount;
+
+            } catch (error: any) {
+                result.errors.push({
+                    row: rowNum,
+                    field: 'general',
+                    message: error.message || 'خطأ غير معروف',
+                });
+                result.skipped++;
+            }
+        }
+
+        result.success = result.errors.length === 0;
+        return result;
+    }
+
+    /**
+     * حفظ الحقول المخصصة للمستخدم
+     */
+    private async saveCustomFields(
+        userId: string,
+        customData: Record<string, string>,
+        sourceHeaders: string[]
+    ): Promise<number> {
+        let count = 0;
+
+        for (const [fieldName, fieldValue] of Object.entries(customData)) {
+            if (!fieldValue) continue; // تخطي القيم الفارغة
+
+            // تحديد نوع الحقل
+            let fieldType = 'text';
+            if (!isNaN(Number(fieldValue))) {
+                fieldType = 'number';
+            } else if (!isNaN(Date.parse(fieldValue))) {
+                fieldType = 'date';
+            }
+
+            await this.prisma.userCustomField.upsert({
+                where: {
+                    userId_fieldName: {
+                        userId,
+                        fieldName,
+                    },
+                },
+                update: {
+                    fieldValue,
+                    fieldType,
+                    sourceHeader: fieldName,
+                },
+                create: {
+                    userId,
+                    fieldName,
+                    fieldValue,
+                    fieldType,
+                    sourceHeader: fieldName,
+                },
+            });
+            count++;
+        }
+
+        return count;
+    }
+
+    /**
+     * الحصول على الحقول المخصصة لمستخدم
+     */
+    async getUserCustomFields(userId: string): Promise<{
+        fieldName: string;
+        fieldValue: string;
+        fieldType: string;
+    }[]> {
+        return this.prisma.userCustomField.findMany({
+            where: { userId },
+            select: {
+                fieldName: true,
+                fieldValue: true,
+                fieldType: true,
+            },
+        });
     }
 }

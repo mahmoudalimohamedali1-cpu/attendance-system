@@ -82,6 +82,13 @@ export const NotificationsPage: React.FC = () => {
                 navigate('/attendance');
             } else if (typeStr.includes('data_update')) {
                 navigate('/data-updates');
+            } else if (typeStr.includes('disc') || typeStr.includes('disciplinary')) {
+                const caseId = (notification.data?.entityId as string) || (notification.data?.caseId as string);
+                if (caseId) {
+                    navigate(`/disciplinary/cases/${caseId}`);
+                } else {
+                    navigate('/disciplinary');
+                }
             }
         }
     };

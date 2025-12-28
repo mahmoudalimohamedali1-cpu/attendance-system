@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PoliciesService } from '../policies/policies.service';
 import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
@@ -16,6 +16,8 @@ import {
 
 @Injectable()
 export class PayrollCalculationService {
+    private readonly logger = new Logger(PayrollCalculationService.name);
+
     constructor(
         private prisma: PrismaService,
         private policiesService: PoliciesService,
@@ -33,7 +35,6 @@ export class PayrollCalculationService {
             case CalculationMethod.CALENDAR_DAYS:
                 return new Date(year, month, 0).getDate();
             case CalculationMethod.WORKING_DAYS:
-                // نفترض 5 أيام عمل في الأسبوع
                 return this.getWorkingDaysInMonth(year, month);
             default:
                 return 30;
@@ -50,8 +51,6 @@ export class PayrollCalculationService {
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(year, month - 1, day);
             const dayOfWeek = date.getDay();
-            // 0 = الأحد، 5 = الجمعة، 6 = السبت
-            // في السعودية: الأحد-الخميس أيام عمل
             if (dayOfWeek >= 0 && dayOfWeek <= 4) {
                 workingDays++;
             }
@@ -60,15 +59,9 @@ export class PayrollCalculationService {
         return workingDays;
     }
 
-    /**
-     * جلب إعدادات الحساب من السياسة
-     * يستخدم Policy Engine للحصول على السياسة المناسبة للموظف بناءً على التسلسل الهرمي
-     */
     private async getCalculationSettings(employeeId: string, companyId: string): Promise<CalculationSettings> {
         try {
-            // استخدام Policy Engine للحصول على السياسة المناسبة
             const policy = await this.policiesService.resolvePolicy('ATTENDANCE' as any, employeeId, companyId);
-
             if (policy?.settings && typeof policy.settings === 'object') {
                 return {
                     ...DEFAULT_CALCULATION_SETTINGS,
@@ -76,31 +69,23 @@ export class PayrollCalculationService {
                 };
             }
         } catch (e) {
-            // لو مفيش سياسة، نستخدم الافتراضي
-            console.warn('No attendance policy found for employee:', employeeId);
+            this.logger.warn('No attendance policy found for employee:', employeeId);
         }
         return DEFAULT_CALCULATION_SETTINGS;
     }
 
-    /**
-     * تجميع بيانات الحضور للموظف للشهر
-     */
     private async getMonthlyAttendanceData(employeeId: string, companyId: string, year: number, month: number) {
         const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0); // آخر يوم في الشهر
+        const endDate = new Date(year, month, 0);
 
         const attendances = await this.prisma.attendance.findMany({
             where: {
                 userId: employeeId,
                 companyId,
-                date: {
-                    gte: startDate,
-                    lte: endDate,
-                },
+                date: { gte: startDate, lte: endDate },
             },
         });
 
-        // تجميع البيانات
         let presentDays = 0;
         let absentDays = 0;
         let totalLateMinutes = 0;
@@ -125,9 +110,6 @@ export class PayrollCalculationService {
         };
     }
 
-    /**
-     * الحساب الكامل للموظف
-     */
     async calculateForEmployee(
         employeeId: string,
         companyId: string,
@@ -136,7 +118,6 @@ export class PayrollCalculationService {
     ): Promise<EmployeePayrollCalculation> {
         const trace: CalculationTraceItem[] = [];
 
-        // 1. جلب بيانات الموظف والراتب
         const employee = await this.prisma.user.findFirst({
             where: { id: employeeId, companyId },
             include: {
@@ -153,266 +134,106 @@ export class PayrollCalculationService {
         });
 
         if (!employee) throw new NotFoundException('الموظف غير موجود');
-        if (!employee.salaryAssignments[0]) throw new NotFoundException('لا يوجد هيكل راتب للموظف');
-
         const assignment = employee.salaryAssignments[0];
+        if (!assignment) throw new NotFoundException('لا يوجد هيكل راتب للموظف');
 
-        // ==========================================
-        // 🌍 Global Payroll Calculation
-        // الأساسي = نسبة من الإجمالي
-        // البدلات = نسب من الأساسي
-        // ==========================================
-
-        // الإجمالي هو المدخل
+        const ctx: Record<string, number> = {};
         const totalSalary = Number(assignment.baseSalary);
+        ctx.TOTAL = totalSalary;
 
         trace.push({
-            step: 'totalSalary',
-            description: 'إجمالي الراتب (المدخل)',
-            formula: `الراتب الإجمالي = ${totalSalary.toFixed(2)} ريال`,
+            step: 'TOTAL',
+            description: 'إجمالي الراتب (المسند)',
+            formula: `الراتب الكلي من التخصيص = ${totalSalary.toFixed(2)}`,
             result: totalSalary,
         });
 
-        // ترتيب المكونات حسب الأولوية
-        const structureLines = assignment.structure.lines.sort((a, b) => a.priority - b.priority);
+        let calculatedLines: { id: string; code: string; name: string; amount: number; type: string; gosiEligible: boolean }[] = [];
 
-        // ========== المرحلة 1: حساب الراتب الأساسي أولاً ==========
-        let calculatedBasic = 0;
-        const basicLine = structureLines.find(line => {
-            const c = line.component;
-            return c.code === 'BASIC' || c.code === 'BASE' ||
-                c.nameAr?.includes('أساسي') || c.nameEn?.toLowerCase().includes('basic');
-        });
-
-        if (basicLine) {
-            if (basicLine.percentage && Number(basicLine.percentage) > 0) {
-                // الأساسي = نسبة من الإجمالي
-                calculatedBasic = totalSalary * Number(basicLine.percentage) / 100;
-                trace.push({
-                    step: 'basicSalary',
-                    description: 'الراتب الأساسي',
-                    formula: `${totalSalary.toFixed(2)} × ${basicLine.percentage}% = ${calculatedBasic.toFixed(2)}`,
-                    result: calculatedBasic,
-                });
-            } else if (basicLine.amount && Number(basicLine.amount) > 0) {
-                calculatedBasic = Number(basicLine.amount);
-                trace.push({
-                    step: 'basicSalary',
-                    description: 'الراتب الأساسي (ثابت)',
-                    formula: `${calculatedBasic.toFixed(2)}`,
-                    result: calculatedBasic,
-                });
-            }
-        }
-
-        // لو مفيش أساسي محدد، يكون 60% افتراضي
-        if (calculatedBasic === 0) {
-            calculatedBasic = totalSalary * 0.6;
-            trace.push({
-                step: 'basicSalary',
-                description: 'الراتب الأساسي (افتراضي 60%)',
-                formula: `${totalSalary.toFixed(2)} × 60% = ${calculatedBasic.toFixed(2)}`,
-                result: calculatedBasic,
+        if (!assignment.structure) {
+            calculatedLines.push({
+                id: 'BASIC-FALLBACK',
+                code: 'BASIC',
+                name: 'الراتب الأساسي',
+                amount: totalSalary,
+                type: 'BASIC',
+                gosiEligible: true,
             });
-        }
+            ctx.BASIC = totalSalary;
+        } else {
+            const structureLines = assignment.structure.lines;
+            const sortedLines = this.topologicalSort(structureLines);
 
-        const baseSalary = calculatedBasic;
+            for (const line of sortedLines) {
+                const component = line.component;
+                let lineAmount = 0;
+                let formulaUsed = '';
 
-        // ========== المرحلة 2: حساب البدلات من الأساسي ==========
-        let totalAllowances = 0;
-        const componentAmounts: { code: string; name: string; amount: number; type: string }[] = [];
-
-        for (const line of structureLines) {
-            const component = line.component;
-            if (component.type !== 'EARNING') continue;
-
-            // تخطي الأساسي (حسبناه فوق)
-            const isBasic = component.code === 'BASIC' || component.code === 'BASE' ||
-                component.nameAr?.includes('أساسي') || component.nameEn?.toLowerCase().includes('basic');
-
-            if (isBasic) {
-                componentAmounts.push({
-                    code: component.code,
-                    name: component.nameAr || component.nameEn || component.code,
-                    amount: baseSalary,
-                    type: 'BASIC',
+                const formulaContext = this.formulaEngine.buildVariableContext({
+                    basicSalary: ctx.BASIC || totalSalary,
+                    totalSalary: totalSalary,
+                    ...ctx
                 });
-                continue;
-            }
 
-            let lineAmount = 0;
-            let formulaUsed = '';
-
-            // ✨ أولوية: formula > percentage > amount
-            // بناء context للمعادلات
-            const formulaContext = this.formulaEngine.buildVariableContext({
-                basicSalary: baseSalary,
-                totalSalary: totalSalary,
-                daysInMonth: 30,
-            });
-            formulaContext.TOTAL = totalSalary;
-            formulaContext.BASIC = baseSalary;
-
-            if (component.formula && component.formula.trim()) {
-                // استخدام المعادلة
-                const result = this.formulaEngine.evaluate(component.formula, formulaContext);
-                if (!result.error) {
+                if (component.nature === 'FORMULA' && component.formula) {
+                    const result = this.formulaEngine.evaluate(component.formula, formulaContext);
                     lineAmount = result.value;
                     formulaUsed = `${component.formula} = ${lineAmount.toFixed(2)}`;
-                } else {
-                    formulaUsed = `خطأ: ${result.error}`;
+                } else if (line.percentage && Number(line.percentage) > 0) {
+                    lineAmount = totalSalary * Number(line.percentage) / 100;
+                    formulaUsed = `TOTAL × ${line.percentage}% = ${lineAmount.toFixed(2)}`;
+                } else if (line.amount && Number(line.amount) > 0) {
+                    lineAmount = Number(line.amount);
+                    formulaUsed = `مبلغ ثابت = ${lineAmount.toFixed(2)}`;
                 }
+
+                ctx[component.code] = lineAmount;
+                if (component.code === 'BASIC' || component.code === 'BASE') ctx.BASIC = lineAmount;
+
+                calculatedLines.push({
+                    id: component.id,
+                    code: component.code,
+                    name: component.nameAr || component.nameEn || component.code,
+                    amount: lineAmount,
+                    type: (component.code === 'BASIC' || component.code === 'BASE') ? 'BASIC' : 'ALLOWANCE',
+                    gosiEligible: !!component.gosiEligible,
+                });
+
                 trace.push({
-                    step: `component_${component.code}`,
-                    description: component.nameAr || component.nameEn || component.code,
+                    step: component.code,
+                    description: component.nameAr || component.code,
                     formula: formulaUsed,
                     result: lineAmount,
                 });
-            } else if (line.percentage && Number(line.percentage) > 0) {
-                // النسبة من TOTAL
-                lineAmount = totalSalary * Number(line.percentage) / 100;
-                trace.push({
-                    step: `component_${component.code}`,
-                    description: component.nameAr || component.nameEn || component.code,
-                    formula: `TOTAL × ${line.percentage}% = ${lineAmount.toFixed(2)}`,
-                    result: lineAmount,
-                });
-            } else if (line.amount && Number(line.amount) > 0) {
-                lineAmount = Number(line.amount);
-                trace.push({
-                    step: `component_${component.code}`,
-                    description: component.nameAr || component.nameEn || component.code,
-                    formula: `مبلغ ثابت = ${lineAmount.toFixed(2)}`,
-                    result: lineAmount,
-                });
             }
-
-            totalAllowances += lineAmount;
-            componentAmounts.push({
-                code: component.code,
-                name: component.nameAr || component.nameEn || component.code,
-                amount: lineAmount,
-                type: 'ALLOWANCE',
-            });
         }
 
-        // حساب الفرق (لو المجموع مش = الإجمالي)
-        const calculatedTotal = baseSalary + totalAllowances;
-        if (Math.abs(calculatedTotal - totalSalary) > 1) {
-            trace.push({
-                step: 'adjustment',
-                description: 'ملاحظة: المجموع المحسوب',
-                formula: `الأساسي (${baseSalary.toFixed(2)}) + البدلات (${totalAllowances.toFixed(2)}) = ${calculatedTotal.toFixed(2)}`,
-                result: calculatedTotal,
-            });
-        }
-
-        // 3. جلب إعدادات الحساب
+        const baseSalary = ctx.BASIC || totalSalary;
         const settings = await this.getCalculationSettings(employeeId, companyId);
-
-        trace.push({
-            step: 'settings',
-            description: 'إعدادات الحساب',
-            formula: `طريقة الحساب: ${settings.calculationMethod}`,
-            result: 0,
-        });
-
-        // 4. حساب أيام الشهر ومعدل اليوم
         const daysInMonth = this.getDaysInMonth(year, month, settings.calculationMethod);
         const dailyRate = baseSalary / daysInMonth;
         const hourlyRate = dailyRate / 8;
 
-        trace.push({
-            step: 'dailyRate',
-            description: 'حساب أجر اليوم (من الأساسي)',
-            formula: `${baseSalary.toFixed(2)} / ${daysInMonth} = ${dailyRate.toFixed(2)}`,
-            result: dailyRate,
-        });
-
-        // 5. جلب ملخص الحضور
         const attendanceData = await this.getMonthlyAttendanceData(employeeId, companyId, year, month);
-
         let presentDays = attendanceData.presentDays || daysInMonth;
         let absentDays = attendanceData.absentDays || 0;
         let lateMinutes = attendanceData.lateMinutes || 0;
         let overtimeHours = attendanceData.overtimeHours || 0;
 
-        // 6. حساب خصم الغياب
-        let absenceDeduction = 0;
-        if (absentDays > 0 && settings.fullDayAbsenceDeduction) {
-            absenceDeduction = absentDays * dailyRate;
-            trace.push({
-                step: 'absenceDeduction',
-                description: 'خصم الغياب',
-                formula: `${absentDays} يوم × ${dailyRate.toFixed(2)} = ${absenceDeduction.toFixed(2)}`,
-                result: absenceDeduction,
-            });
-        }
+        let absenceDeduction = absentDays > 0 ? absentDays * dailyRate : 0;
+        let effectiveLateMinutes = Math.max(0, lateMinutes - settings.gracePeriodMinutes);
+        let lateDeduction = effectiveLateMinutes > 0 ? (effectiveLateMinutes / 60) * hourlyRate : 0;
 
-        // 7. حساب خصم التأخير
-        let lateDeduction = 0;
-        const effectiveLateMinutes = Math.max(0, lateMinutes - settings.gracePeriodMinutes);
-        if (effectiveLateMinutes > 0) {
-            const lateHours = effectiveLateMinutes / 60;
-            lateDeduction = lateHours * hourlyRate;
-            trace.push({
-                step: 'lateDeduction',
-                description: 'خصم التأخير',
-                formula: `${effectiveLateMinutes} دقيقة × (${hourlyRate.toFixed(2)}/60) = ${lateDeduction.toFixed(2)}`,
-                result: lateDeduction,
-            });
-        }
+        const otBase = settings.overtimeSource === OvertimeSource.BASIC_PLUS_ALLOWANCES ? totalSalary : baseSalary;
+        const otHourlyRate = (otBase / daysInMonth / 8);
+        let overtimeAmount = overtimeHours > 0 ? overtimeHours * otHourlyRate * settings.overtimeMultiplier : 0;
 
-        // 8. حساب الوقت الإضافي
-        let overtimeAmount = 0;
-        if (overtimeHours > 0) {
-            // الوقت الإضافي يحسب على أساس الإجمالي أو الأساسي حسب الإعدادات
-            const otBase = settings.overtimeSource === OvertimeSource.BASIC_PLUS_ALLOWANCES
-                ? totalSalary
-                : baseSalary;
-
-            const otHourlyRate = (otBase / daysInMonth / 8);
-            overtimeAmount = overtimeHours * otHourlyRate * settings.overtimeMultiplier;
-
-            trace.push({
-                step: 'overtime',
-                description: 'الوقت الإضافي',
-                formula: `${overtimeHours} ساعة × ${otHourlyRate.toFixed(2)} × ${settings.overtimeMultiplier} = ${overtimeAmount.toFixed(2)}`,
-                result: overtimeAmount,
-            });
-        }
-
-        // 9. الإجمالي النهائي (الإجمالي المدخل + الإضافي)
-        const grossSalary = totalSalary + overtimeAmount;
-
-        trace.push({
-            step: 'grossSalary',
-            description: 'إجمالي الراتب',
-            formula: `${totalSalary.toFixed(2)} + ${overtimeAmount.toFixed(2)} = ${grossSalary.toFixed(2)}`,
-            result: grossSalary,
+        // --- Policy Evaluation ---
+        const gosiConfig = await this.prisma.gosiConfig.findFirst({
+            where: { isActive: true, companyId },
+            orderBy: { createdAt: 'desc' }
         });
 
-        // 9. الخصومات
-        const totalDeductions = absenceDeduction + lateDeduction;
-
-        trace.push({
-            step: 'totalDeductions',
-            description: 'إجمالي الخصومات (الحضور فقط)',
-            formula: `غياب + تأخير = ${totalDeductions.toFixed(2)}`,
-            result: totalDeductions,
-        });
-
-        // 10. الصافي
-        const netSalary = grossSalary - totalDeductions;
-
-        trace.push({
-            step: 'netSalary',
-            description: 'صافي الراتب (قبل GOSI والسلف)',
-            formula: `${grossSalary.toFixed(2)} - ${totalDeductions.toFixed(2)} = ${netSalary.toFixed(2)}`,
-            result: netSalary,
-        });
-
-        // 11. تقييم السياسات للحصول على خطوط إضافية
         const periodStart = new Date(year, month - 1, 1);
         const periodEnd = new Date(year, month, 0);
 
@@ -435,35 +256,213 @@ export class PayrollCalculationService {
             },
             attendance: {
                 otHours: overtimeHours,
-                otHoursWeekday: overtimeHours, // All OT treated as weekday by default
+                otHoursWeekday: overtimeHours,
                 otHoursWeekend: 0,
                 otHoursHoliday: 0,
                 lateMinutes: lateMinutes,
-                lateCount: lateMinutes > 0 ? 1 : 0, // Simple estimate
+                lateCount: lateMinutes > 0 ? 1 : 0,
                 absentDays: absentDays,
                 earlyDepartureMinutes: 0,
                 workingHours: presentDays * 8,
             },
-
         };
 
-        let policyLines: PolicyPayrollLine[] = [];
+        let policyLines: PolicyPayrollLine[] = [
+            ...calculatedLines.map(l => ({
+                componentId: l.id,
+                componentCode: l.code,
+                componentName: l.name,
+                amount: l.amount,
+                sign: 'EARNING' as any,
+                descriptionAr: 'من هيكل الراتب',
+                source: {
+                    policyId: assignment.structureId || 'NONE',
+                    policyCode: 'STRUCTURE',
+                    ruleId: 'STRUCTURE-LINE',
+                    ruleCode: 'STRUCTURE-LINE',
+                },
+                gosiEligible: l.gosiEligible,
+            }))
+        ];
+
         try {
-            policyLines = await this.policyEvaluator.evaluate(evaluationContext);
-            trace.push({
-                step: 'policyLines',
-                description: `تقييم السياسات: ${policyLines.length} سطور`,
-                formula: policyLines.map(l => `${l.componentCode}: ${l.amount}`).join(', ') || 'لا توجد',
-                result: policyLines.reduce((sum, l) => sum + (l.sign === 'EARNING' ? l.amount : -l.amount), 0),
-            });
-        } catch (err) {
-            trace.push({
-                step: 'policyLines',
-                description: 'خطأ في تقييم السياسات',
-                formula: err.message,
-                result: 0,
+            const evaluatedLines = await this.policyEvaluator.evaluate(evaluationContext);
+            for (const el of evaluatedLines) {
+                policyLines.push(el);
+            }
+
+            const otPolicy = evaluatedLines.find(l => l.componentCode === 'OT' || l.componentCode === 'OVERTIME');
+            if (otPolicy) overtimeAmount = otPolicy.amount;
+
+            const latePolicy = evaluatedLines.find(l => l.componentCode === 'LATE');
+            if (latePolicy) lateDeduction = latePolicy.amount;
+
+            const absencePolicy = evaluatedLines.find(l => l.componentCode === 'ABSENCE');
+            if (absencePolicy) absenceDeduction = absencePolicy.amount;
+        } catch (err: any) {
+            this.logger.error(`Error in policy evaluation: ${err.message}`);
+        }
+
+        // --- GOSI Calculation ---
+        // Check eligibility: if isSaudiOnly is true, only Saudi employees get GOSI
+        const isEligibleForGosi = gosiConfig && (
+            !gosiConfig.isSaudiOnly || employee.isSaudi === true
+        );
+
+        if (isEligibleForGosi) {
+            const gosiBase = calculatedLines.filter(l => l.gosiEligible).reduce((sum, l) => sum + l.amount, 0);
+            const cappedBase = Math.min(gosiBase, Number(gosiConfig.maxCapAmount));
+            const empRate = Number(gosiConfig.employeeRate) + Number(gosiConfig.sanedRate);
+            const gosiDeduction = (cappedBase * empRate) / 100;
+
+            if (gosiDeduction > 0) {
+                policyLines.push({
+                    componentId: 'GOSI-STATUTORY',
+                    componentCode: 'GOSI',
+                    componentName: 'التأمينات الاجتماعية',
+                    sign: 'DEDUCTION',
+                    amount: Math.round(gosiDeduction * 100) / 100,
+                    descriptionAr: `حساب وطني (${empRate}%)`,
+                    source: {
+                        policyId: gosiConfig.id,
+                        policyCode: 'GOSI_CONFIG',
+                        ruleId: 'GOSI_EMP',
+                        ruleCode: 'GOSI_EMP',
+                    },
+                    gosiEligible: false,
+                });
+            }
+        }
+
+        // --- Add System-Calculated Attendance Items (if not already from policy) ---
+        const hasOTFromPolicy = policyLines.some(pl => pl.componentCode === 'OT' || pl.componentCode === 'OVERTIME');
+        const hasLateFromPolicy = policyLines.some(pl => pl.componentCode === 'LATE' || pl.componentCode === 'LATE_DED');
+        const hasAbsenceFromPolicy = policyLines.some(pl => pl.componentCode === 'ABSENCE' || pl.componentCode === 'ABSENCE_DED');
+
+        if (overtimeAmount > 0 && !hasOTFromPolicy) {
+            policyLines.push({
+                componentId: 'SYS-OT',
+                componentCode: 'OVERTIME',
+                componentName: 'ساعات إضافية',
+                sign: 'EARNING',
+                amount: Math.round(overtimeAmount * 100) / 100,
+                descriptionAr: `${overtimeHours} ساعة إضافية`,
+                source: {
+                    policyId: 'SYSTEM',
+                    policyCode: 'SYSTEM_OT',
+                    ruleId: 'OT_CALC',
+                    ruleCode: 'OT_CALC',
+                },
+                gosiEligible: false,
             });
         }
+
+        if (lateDeduction > 0 && !hasLateFromPolicy) {
+            policyLines.push({
+                componentId: 'SYS-LATE',
+                componentCode: 'LATE_DED',
+                componentName: 'خصم تأخير',
+                sign: 'DEDUCTION',
+                amount: Math.round(lateDeduction * 100) / 100,
+                descriptionAr: `خصم تأخير ${lateMinutes} دقيقة`,
+                source: {
+                    policyId: 'SYSTEM',
+                    policyCode: 'SYSTEM_LATE',
+                    ruleId: 'LATE_CALC',
+                    ruleCode: 'LATE_CALC',
+                },
+                gosiEligible: false,
+            });
+        }
+
+        if (absenceDeduction > 0 && !hasAbsenceFromPolicy) {
+            policyLines.push({
+                componentId: 'SYS-ABSENCE',
+                componentCode: 'ABSENCE_DED',
+                componentName: 'خصم غياب',
+                sign: 'DEDUCTION',
+                amount: Math.round(absenceDeduction * 100) / 100,
+                descriptionAr: `خصم غياب ${absentDays} يوم`,
+                source: {
+                    policyId: 'SYSTEM',
+                    policyCode: 'SYSTEM_ABSENCE',
+                    ruleId: 'ABSENCE_CALC',
+                    ruleCode: 'ABSENCE_CALC',
+                },
+                gosiEligible: false,
+            });
+        }
+
+        // --- Disciplinary Adjustments ---
+        const payrollPeriod = await this.prisma.payrollPeriod.findFirst({
+            where: { companyId, year, month }
+        });
+
+        if (payrollPeriod) {
+            const disciplinaryAdjustments = await (this.prisma as any).payrollAdjustment.findMany({
+                where: {
+                    employeeId,
+                    companyId,
+                    payrollPeriodId: payrollPeriod.id,
+                    status: { in: ['PENDING', 'POSTED'] }
+                }
+            });
+
+            for (const adj of disciplinaryAdjustments) {
+                let adjAmount = Number(adj.value);
+                let appliedValue = Number(adj.value);
+                let descriptionExtra = '';
+
+                // If unit is DAYS or HOURS, compute amount based on rates
+                if (adj.unit === 'DAYS') {
+                    if (adj.effectiveDate) {
+                        const adjEffectiveDate = new Date(adj.effectiveDate);
+                        const periodStartDate = new Date(payrollPeriod.startDate);
+                        const periodEndDate = new Date(payrollPeriod.endDate);
+
+                        // Calculate cap: days remaining from max(effectiveDate, periodStart) to periodEnd
+                        const capStart = adjEffectiveDate > periodStartDate ? adjEffectiveDate : periodStartDate;
+
+                        if (capStart > periodEndDate) {
+                            appliedValue = 0;
+                            descriptionExtra = ' (خارج الفترة الحالية)';
+                        } else {
+                            const daysRemaining = Math.max(0, Math.floor((periodEndDate.getTime() - capStart.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+                            if (daysRemaining < appliedValue) {
+                                appliedValue = daysRemaining;
+                                descriptionExtra = ` (مخفض من ${Number(adj.value)} أيام بسبب تاريخ الاستحقاق)`;
+                                this.logger.log(`Penalty capped for case ${adj.caseId}: ${Number(adj.value)} -> ${appliedValue} days`);
+                            }
+                        }
+                    }
+                    adjAmount = appliedValue * dailyRate;
+                } else if (adj.unit === 'HOURS') {
+                    adjAmount = Number(adj.value) * hourlyRate;
+                }
+
+                if (appliedValue <= 0 && adj.unit === 'DAYS' && adj.effectiveDate) continue;
+
+                policyLines.push({
+                    componentId: `DISC-${adj.id}`,
+                    componentCode: 'DISC_ADJ',
+                    componentName: adj.description || 'تسوية جزاء إداري',
+                    sign: adj.adjustmentType === 'DEDUCTION' || adj.adjustmentType === 'SUSPENSION_UNPAID' ? 'DEDUCTION' : 'EARNING',
+                    amount: Math.round(adjAmount * 100) / 100,
+                    descriptionAr: (adj.description || 'جزاء إداري') + descriptionExtra,
+                    source: {
+                        policyId: adj.caseId,
+                        policyCode: 'DISCIPLINARY',
+                        ruleId: adj.id,
+                        ruleCode: adj.adjustmentType,
+                    },
+                    gosiEligible: false,
+                });
+            }
+        }
+
+        const grossSalary = Math.round(policyLines.filter(l => l.sign === 'EARNING').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+        const totalDeductions = Math.round(policyLines.filter(l => l.sign === 'DEDUCTION').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+        const netSalary = Math.round((grossSalary - totalDeductions) * 100) / 100;
 
         return {
             employeeId,
@@ -486,10 +485,35 @@ export class PayrollCalculationService {
         };
     }
 
-    /**
-     * حساب للعرض (Preview) بدون حفظ
-     */
     async previewCalculation(employeeId: string, companyId: string, year: number, month: number) {
         return this.calculateForEmployee(employeeId, companyId, year, month);
+    }
+
+    private topologicalSort(lines: any[]): any[] {
+        const sorted: any[] = [];
+        const visited = new Set<string>();
+        const visiting = new Set<string>();
+
+        const visit = (line: any) => {
+            const id = line.component.code;
+            if (visiting.has(id)) throw new Error(`Circular dependency detected in component: ${id}`);
+            if (!visited.has(id)) {
+                visiting.add(id);
+                const formula = line.component.formula;
+                if (formula) {
+                    const deps = this.formulaEngine.extractDependencies(formula);
+                    for (const dep of deps) {
+                        const depLine = lines.find(l => l.component.code === dep);
+                        if (depLine) visit(depLine);
+                    }
+                }
+                visiting.delete(id);
+                visited.add(id);
+                sorted.push(line);
+            }
+        };
+
+        for (const line of lines) visit(line);
+        return sorted;
     }
 }

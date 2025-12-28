@@ -249,7 +249,7 @@ export const ReportsPage = () => {
                 <DatePicker
                   label="من تاريخ"
                   value={startDate}
-                  onChange={(newValue) => setStartDate(newValue)}
+                  onChange={(newValue: any) => setStartDate(newValue)}
                   slotProps={{
                     textField: { fullWidth: true },
                     actionBar: { actions: ['clear', 'today'] }
@@ -261,7 +261,7 @@ export const ReportsPage = () => {
                 <DatePicker
                   label="إلى تاريخ"
                   value={endDate}
-                  onChange={(newValue) => setEndDate(newValue)}
+                  onChange={(newValue: any) => setEndDate(newValue)}
                   slotProps={{
                     textField: { fullWidth: true },
                     actionBar: { actions: ['clear', 'today'] }
@@ -269,6 +269,7 @@ export const ReportsPage = () => {
                   format="YYYY-MM-DD"
                 />
               </Grid>
+
               <Grid item xs={12} md={4}>
                 <Typography variant="body2" color="text.secondary">
                   يتم عرض التقارير حسب صلاحياتك

@@ -21,28 +21,35 @@ export class GosiController {
     @Post('config')
     @Roles('ADMIN')
     @ApiOperation({ summary: 'إضافة إعدادات تأمينات جديدة' })
-    create(@Body() dto: CreateGosiConfigDto) {
-        return this.service.create(dto);
+    create(
+        @Body() dto: CreateGosiConfigDto,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.create(dto, companyId);
     }
 
     @Get('config/active')
     @ApiOperation({ summary: 'الحصول على الإعدادات المفعلة حالياً' })
-    getActiveConfig() {
-        return this.service.getActiveConfig();
+    getActiveConfig(@CurrentUser('companyId') companyId: string) {
+        return this.service.getActiveConfig(companyId);
     }
 
     @Get('configs')
     @Roles('ADMIN')
     @ApiOperation({ summary: 'عرض سجل الإعدادات' })
-    findAll() {
-        return this.service.findAll();
+    findAll(@CurrentUser('companyId') companyId: string) {
+        return this.service.findAll(companyId);
     }
 
     @Patch('config/:id')
     @Roles('ADMIN')
     @ApiOperation({ summary: 'تحديث إعداد معين' })
-    update(@Param('id') id: string, @Body() dto: Partial<CreateGosiConfigDto>) {
-        return this.service.update(id, dto);
+    update(
+        @Param('id') id: string,
+        @Body() dto: Partial<CreateGosiConfigDto>,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.update(id, dto, companyId);
     }
 
     @Get('report/:runId')

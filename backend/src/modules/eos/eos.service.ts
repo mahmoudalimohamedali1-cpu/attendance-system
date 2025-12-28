@@ -11,6 +11,36 @@ export class EosService {
         private leaveCalculationService: LeaveCalculationService,
     ) { }
 
+    /**
+     * Calculate years, months, and days between two dates accurately
+     */
+    private calculateServiceDuration(startDate: Date, endDate: Date): { years: number; months: number; days: number; totalDays: number } {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        let years = end.getFullYear() - start.getFullYear();
+        let months = end.getMonth() - start.getMonth();
+        let days = end.getDate() - start.getDate();
+
+        // Adjust for negative days
+        if (days < 0) {
+            months--;
+            // Get days in previous month
+            const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+            days += prevMonth.getDate();
+        }
+
+        // Adjust for negative months
+        if (months < 0) {
+            years--;
+            months += 12;
+        }
+
+        const totalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+        return { years, months, days, totalDays };
+    }
+
     async calculateEos(userId: string, dto: CalculateEosDto): Promise<EosBreakdown> {
         const employee = await this.prisma.user.findUnique({
             where: { id: userId },
@@ -27,10 +57,12 @@ export class EosService {
         const hireDate = new Date(employee.hireDate);
         const lastWorkingDay = new Date(dto.lastWorkingDay);
 
-        // حساب مدة الخدمة
-        const totalDays = Math.floor((lastWorkingDay.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24));
-        const totalMonths = totalDays / 30.44; // متوسط أيام الشهر
-        const totalYears = totalMonths / 12;
+        // حساب مدة الخدمة بدقة
+        const serviceDuration = this.calculateServiceDuration(hireDate, lastWorkingDay);
+        const { years, months, days, totalDays } = serviceDuration;
+
+        // حساب السنوات الكاملة مع الكسور للمكافأة
+        const totalYears = totalDays / 365.25;
 
         // الراتب الأساسي (من التعيين أو تجاوز)
         const baseSalary = dto.overrideBaseSalary
@@ -81,19 +113,29 @@ export class EosService {
         const adjustedEos = totalEos * eosAdjustmentFactor;
 
         // ========================================
-        // تعويض الإجازات المتبقية (حساب ديناميكي)
+        // تعويض الإجازات المتبقية
         // ========================================
-        // حساب الإجازات المستحقة من تاريخ التعيين حتى آخر يوم عمل
-        const earnedLeaveDays = this.leaveCalculationService.calculateEarnedLeaveDays(hireDate, lastWorkingDay);
+        let remainingLeaveDays: number;
+        let remainingLeaveDaysOverridden = false;
 
-        // حساب الإجازات المستخدمة من الطلبات المعتمدة
-        let usedLeaveDays = 0;
-        for (const leave of employee.leaveRequests) {
-            usedLeaveDays += Number(leave.requestedDays) || 0;
+        if (dto.overrideRemainingLeaveDays !== undefined && dto.overrideRemainingLeaveDays !== null) {
+            // استخدام القيمة المدخلة يدوياً
+            remainingLeaveDays = dto.overrideRemainingLeaveDays;
+            remainingLeaveDaysOverridden = true;
+        } else {
+            // حساب الإجازات المستحقة من تاريخ التعيين حتى آخر يوم عمل
+            const earnedLeaveDays = this.leaveCalculationService.calculateEarnedLeaveDays(hireDate, lastWorkingDay);
+
+            // حساب الإجازات المستخدمة من الطلبات المعتمدة
+            let usedLeaveDays = 0;
+            for (const leave of employee.leaveRequests) {
+                usedLeaveDays += Number(leave.requestedDays) || 0;
+            }
+
+            // الرصيد المتبقي = المستحق - المستخدم
+            remainingLeaveDays = Math.max(0, Math.floor(earnedLeaveDays - usedLeaveDays));
         }
 
-        // الرصيد المتبقي = المستحق - المستخدم
-        const remainingLeaveDays = Math.max(0, Math.floor(earnedLeaveDays - usedLeaveDays));
         const dailySalary = baseSalary / 30;
         const leavePayout = remainingLeaveDays * dailySalary;
 
@@ -117,8 +159,9 @@ export class EosService {
             employeeName: `${employee.firstName} ${employee.lastName}`,
             hireDate,
             lastWorkingDay,
-            yearsOfService: Math.floor(totalYears),
-            monthsOfService: Math.floor(totalMonths % 12),
+            yearsOfService: years,
+            monthsOfService: months,
+            daysOfService: days,
             totalDaysOfService: totalDays,
             baseSalary,
             reason: dto.reason,
@@ -128,9 +171,11 @@ export class EosService {
             eosAdjustmentFactor,
             adjustedEos: Math.round(adjustedEos * 100) / 100,
             remainingLeaveDays,
+            remainingLeaveDaysOverridden,
             leavePayout: Math.round(leavePayout * 100) / 100,
             outstandingLoans: Math.round(outstandingLoans * 100) / 100,
             netSettlement: Math.round(netSettlement * 100) / 100,
         };
     }
 }
+

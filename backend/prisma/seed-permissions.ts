@@ -99,6 +99,30 @@ const enterprisePermissions = [
     // === التدقيق ===
     { code: 'AUDIT_VIEW', name: 'عرض سجل التدقيق', nameEn: 'View Audit Log', category: 'التدقيق' },
     { code: 'AUDIT_EXPORT', name: 'تصدير سجل التدقيق', nameEn: 'Export Audit Log', category: 'التدقيق' },
+
+    // === العهد (Custody) ===
+    { code: 'CUSTODY_VIEW', name: 'عرض العهد', nameEn: 'View Custody', category: 'العهد' },
+    { code: 'CUSTODY_VIEW_SELF', name: 'عرض عهدتي', nameEn: 'View My Custody', category: 'العهد' },
+    { code: 'CUSTODY_MANAGE_CATEGORIES', name: 'إدارة فئات العهد', nameEn: 'Manage Custody Categories', category: 'العهد' },
+    { code: 'CUSTODY_MANAGE_ITEMS', name: 'إدارة العهد', nameEn: 'Manage Custody Items', category: 'العهد' },
+    { code: 'CUSTODY_DELETE', name: 'حذف العهد', nameEn: 'Delete Custody', category: 'العهد' },
+    { code: 'CUSTODY_ASSIGN', name: 'تسليم عهدة', nameEn: 'Assign Custody', category: 'العهد' },
+    { code: 'CUSTODY_RETURN_REQUEST', name: 'طلب إرجاع عهدة', nameEn: 'Request Custody Return', category: 'العهد' },
+    { code: 'CUSTODY_RETURN_REVIEW', name: 'مراجعة طلبات الإرجاع', nameEn: 'Review Custody Returns', category: 'العهد' },
+    { code: 'CUSTODY_TRANSFER_REQUEST', name: 'طلب تحويل عهدة', nameEn: 'Request Custody Transfer', category: 'العهد' },
+    { code: 'CUSTODY_TRANSFER_APPROVE', name: 'موافقة تحويل عهدة', nameEn: 'Approve Custody Transfer', category: 'العهد' },
+    { code: 'CUSTODY_MAINTENANCE', name: 'إدارة صيانة العهد', nameEn: 'Manage Custody Maintenance', category: 'العهد' },
+    { code: 'CUSTODY_REPORTS', name: 'تقارير العهد', nameEn: 'Custody Reports', category: 'العهد' },
+    { code: 'CUSTODY_DASHBOARD', name: 'لوحة تحكم العهد', nameEn: 'Custody Dashboard', category: 'العهد' },
+
+    // === الجزاءات والتحقيقات ===
+    { code: 'DISC_MANAGER_CREATE', name: 'إنشاء تحقيق', nameEn: 'Create Investigation', category: 'الجزاءات' },
+    { code: 'DISC_HR_REVIEW', name: 'مراجعة التحقيق - HR', nameEn: 'Review Investigation - HR', category: 'الجزاءات' },
+    { code: 'DISC_HR_DECISION', name: 'إصدار قرار - HR', nameEn: 'Issue Decision - HR', category: 'الجزاءات' },
+    { code: 'DISC_HR_FINALIZE', name: 'اعتماد نهائي', nameEn: 'Finalize Decision', category: 'الجزاءات' },
+    { code: 'DISC_EMPLOYEE_RESPONSE', name: 'رد على التحقيق', nameEn: 'Respond to Investigation', category: 'الجزاءات' },
+    { code: 'DISC_VIEW_ALL', name: 'عرض كل التحقيقات', nameEn: 'View All Investigations', category: 'الجزاءات' },
+    { code: 'DISC_VIEW_SELF', name: 'عرض تحقيقاتي', nameEn: 'View My Investigations', category: 'الجزاءات' },
 ];
 
 async function seedPermissions() {

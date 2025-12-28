@@ -21,29 +21,13 @@ export class PayrollRunsService {
         if (!period) throw new NotFoundException('فترة الرواتب غير موجودة');
         if (period.status === 'PAID') throw new BadRequestException('لا يمكن تشغيل الرواتب لفترة مدفوعة بالفعل');
 
-        // 1. التأكد من وجود المكونات النظامية
-        const systemComponents = [
-            { code: 'LOAN_DED', nameAr: 'خصم سلفة', type: 'DEDUCTION', nature: 'VARIABLE' },
-            { code: 'GOSI_DED', nameAr: 'تأمينات اجتماعية', type: 'DEDUCTION', nature: 'FORMULA' },
-            { code: 'ABSENCE_DED', nameAr: 'خصم غياب', type: 'DEDUCTION', nature: 'VARIABLE' },
-            { code: 'LATE_DED', nameAr: 'خصم تأخير', type: 'DEDUCTION', nature: 'VARIABLE' },
-            { code: 'OVERTIME_EARN', nameAr: 'ساعات إضافية', type: 'EARNING', nature: 'VARIABLE' },
-        ];
-
-        const components: Record<string, any> = {};
-        for (const sysComp of systemComponents) {
-            let comp = await this.prisma.salaryComponent.findFirst({ where: { code: sysComp.code, companyId } });
-            if (!comp) {
-                comp = await this.prisma.salaryComponent.create({ data: { ...sysComp, companyId } as any });
-            }
-            components[sysComp.code] = comp;
+        // 1. التأكد من وجود المكونات النظامية (لخصم السلف)
+        let loanComp = await this.prisma.salaryComponent.findFirst({ where: { code: 'LOAN_DED', companyId } });
+        if (!loanComp) {
+            loanComp = await this.prisma.salaryComponent.create({
+                data: { code: 'LOAN_DED', nameAr: 'خصم سلفة', type: 'DEDUCTION', nature: 'VARIABLE', companyId } as any
+            });
         }
-
-        // 2. جلب إعدادات GOSI النشطة
-        const gosiConfig = await this.prisma.gosiConfig.findFirst({
-            where: { isActive: true, companyId },
-            orderBy: { createdAt: 'desc' }
-        });
 
         const employees = await this.prisma.user.findMany({
             where: {
@@ -57,11 +41,7 @@ export class PayrollRunsService {
                 salaryAssignments: {
                     where: { isActive: true },
                     include: {
-                        structure: {
-                            include: {
-                                lines: { include: { component: true }, orderBy: { priority: 'asc' } }
-                            }
-                        }
+                        structure: true
                     }
                 },
                 advanceRequests: {
@@ -87,7 +67,7 @@ export class PayrollRunsService {
             });
 
             for (const employee of employees) {
-                // --- استخدام محرك الحساب الجديد ---
+                // محرك الحساب المركزي (Consolidated Breakdown)
                 const calculation = await this.calculationService.calculateForEmployee(
                     employee.id,
                     companyId,
@@ -96,90 +76,39 @@ export class PayrollRunsService {
                 );
 
                 const assignment = employee.salaryAssignments[0];
-                const structure = assignment.structure;
                 const baseSalary = assignment.baseSalary;
-
-                let grossSalary = new Decimal(baseSalary.toString());
-                let totalDeductions = new Decimal(0);
-                let gosiBaseSalary = new Decimal(baseSalary.toString());
-
                 const payslipLines = [];
 
-                // 1. حساب المكونات الثابتة من الهيكل
-                for (const line of structure.lines) {
-                    let lineAmount = new Decimal(0);
-
-                    if (line.component.nature === 'FIXED') {
-                        lineAmount = new Decimal(line.amount.toString());
-                    } else if (line.percentage) {
-                        lineAmount = baseSalary.mul(line.percentage.toString()).div(100);
-                    } else if (line.component.nature === 'FORMULA') {
-                        // دعم المعادلات البسيطة
-                        if (line.component.formula?.includes('BASIC')) {
-                            const factorStr = line.component.formula.split('*')[1]?.trim();
-                            if (factorStr) {
-                                lineAmount = baseSalary.mul(factorStr);
-                            }
-                        }
+                // 1. إضافة الخطوط المحسوبة (من الهيكل، السياسات، والتأمينات)
+                if (calculation.policyLines) {
+                    for (const pl of calculation.policyLines) {
+                        payslipLines.push({
+                            componentId: pl.componentId,
+                            amount: new Decimal(pl.amount.toFixed(2)),
+                            sourceType: pl.componentId === 'GOSI-STATUTORY' ? PayslipLineSource.STATUTORY : PayslipLineSource.STRUCTURE,
+                            sign: pl.sign
+                        });
                     }
+                }
 
-                    if (line.component.type === 'EARNING') {
-                        grossSalary = grossSalary.add(lineAmount);
-                        if (line.component.gosiEligible) {
-                            gosiBaseSalary = gosiBaseSalary.add(lineAmount);
-                        }
-                    } else {
-                        totalDeductions = totalDeductions.add(lineAmount);
-                    }
+                // 2. معالجة السلف (Advances)
+                let advanceDeduction = new Decimal(0);
+                for (const advance of employee.advanceRequests) {
+                    const ded = advance.approvedMonthlyDeduction || advance.monthlyDeduction;
+                    const dedAmount = new Decimal(ded.toString());
+                    advanceDeduction = advanceDeduction.add(dedAmount);
 
                     payslipLines.push({
-                        componentId: line.componentId,
-                        amount: lineAmount,
-                        sourceType: PayslipLineSource.STRUCTURE,
-                        sign: line.component.type === 'EARNING' ? 'EARNING' : 'DEDUCTION'
+                        componentId: loanComp!.id,
+                        amount: dedAmount,
+                        sourceType: PayslipLineSource.POLICY,
+                        sign: 'DEDUCTION'
                     });
                 }
 
-                // 2. تطبيق نتائج الحضور (غياب، تأخير، إضافي)
-                if (calculation.absenceDeduction > 0) {
-                    const amount = new Decimal(calculation.absenceDeduction.toFixed(2));
-                    totalDeductions = totalDeductions.add(amount);
-                    payslipLines.push({ componentId: components['ABSENCE_DED'].id, amount, sourceType: PayslipLineSource.POLICY, sign: 'DEDUCTION' });
-                }
-
-                if (calculation.lateDeduction > 0) {
-                    const amount = new Decimal(calculation.lateDeduction.toFixed(2));
-                    totalDeductions = totalDeductions.add(amount);
-                    payslipLines.push({ componentId: components['LATE_DED'].id, amount, sourceType: PayslipLineSource.POLICY, sign: 'DEDUCTION' });
-                }
-
-                if (calculation.overtimeAmount > 0) {
-                    const amount = new Decimal(calculation.overtimeAmount.toFixed(2));
-                    grossSalary = grossSalary.add(amount);
-                    payslipLines.push({ componentId: components['OVERTIME_EARN'].id, amount, sourceType: PayslipLineSource.POLICY, sign: 'EARNING' });
-                }
-
-                // 3. إضافة خصومات السلف (Advances)
-                for (const advance of employee.advanceRequests) {
-                    const deduction = advance.approvedMonthlyDeduction || advance.monthlyDeduction;
-                    const deductionAmount = new Decimal(deduction.toString());
-                    totalDeductions = totalDeductions.add(deductionAmount);
-                    payslipLines.push({ componentId: components['LOAN_DED'].id, amount: deductionAmount, sourceType: PayslipLineSource.POLICY, sign: 'DEDUCTION' });
-                }
-
-                // 4. حساب GOSI للسعوديين
-                if (gosiConfig && (employee as any).isSaudi) {
-                    const cappedGosiBase = Decimal.min(gosiBaseSalary, gosiConfig.maxCapAmount);
-                    const totalGosiRate = new Decimal(gosiConfig.employeeRate.toString()).add(gosiConfig.sanedRate.toString());
-                    const gosiDeduction = cappedGosiBase.mul(totalGosiRate).div(100);
-
-                    if (gosiDeduction.gt(0)) {
-                        totalDeductions = totalDeductions.add(gosiDeduction);
-                        payslipLines.push({ componentId: components['GOSI_DED'].id, amount: gosiDeduction, sourceType: PayslipLineSource.STATUTORY, sign: 'DEDUCTION' });
-                    }
-                }
-
-                const netSalary = grossSalary.sub(totalDeductions);
+                const finalGross = new Decimal(calculation.grossSalary.toFixed(2));
+                const finalDeductions = new Decimal((calculation.totalDeductions + advanceDeduction.toNumber()).toFixed(2));
+                const finalNet = finalGross.sub(finalDeductions);
 
                 await tx.payslip.create({
                     data: {
@@ -188,9 +117,9 @@ export class PayrollRunsService {
                         periodId: dto.periodId,
                         runId: run.id,
                         baseSalary: baseSalary,
-                        grossSalary: grossSalary,
-                        totalDeductions: totalDeductions,
-                        netSalary: netSalary,
+                        grossSalary: finalGross,
+                        totalDeductions: finalDeductions,
+                        netSalary: finalNet,
                         status: 'DRAFT',
                         calculationTrace: calculation.calculationTrace as any,
                         lines: {
@@ -200,7 +129,6 @@ export class PayrollRunsService {
                 });
             }
 
-            // Fetch run with payslips count
             const runWithPayslips = await tx.payrollRun.findUnique({
                 where: { id: run.id },
                 include: {
@@ -215,7 +143,6 @@ export class PayrollRunsService {
             };
         });
 
-        // Log the payroll run creation
         await this.auditService.logPayrollChange(
             userId,
             result.id!,
@@ -228,14 +155,10 @@ export class PayrollRunsService {
         return result;
     }
 
-    /**
-     * معاينة مسير الرواتب قبل التشغيل - حساب تقديري بدون حفظ
-     */
     async preview(dto: CreatePayrollRunDto, companyId: string) {
         const period = await this.prisma.payrollPeriod.findFirst({ where: { id: dto.periodId, companyId } });
         if (!period) throw new NotFoundException('فترة الرواتب غير موجودة');
 
-        // جلب إعدادات GOSI
         const gosiConfig = await this.prisma.gosiConfig.findFirst({
             where: { isActive: true, companyId },
             orderBy: { createdAt: 'desc' }
@@ -253,13 +176,7 @@ export class PayrollRunsService {
                 department: true,
                 salaryAssignments: {
                     where: { isActive: true },
-                    include: {
-                        structure: {
-                            include: {
-                                lines: { include: { component: true }, orderBy: { priority: 'asc' } }
-                            }
-                        }
-                    }
+                    include: { structure: true }
                 },
                 advanceRequests: {
                     where: {
@@ -271,7 +188,6 @@ export class PayrollRunsService {
             }
         });
 
-        // حساب الإجماليات
         let totalGross = new Decimal(0);
         let totalDeductions = new Decimal(0);
         let totalNet = new Decimal(0);
@@ -279,125 +195,66 @@ export class PayrollRunsService {
         let totalAdvances = new Decimal(0);
         let totalBaseSalary = new Decimal(0);
 
-        // توزيع حسب الفرع
         const byBranch: Record<string, { count: number; gross: number; net: number }> = {};
-        // توزيع حسب القسم
         const byDepartment: Record<string, { count: number; gross: number; net: number }> = {};
-
         const employeePreviews: any[] = [];
 
         for (const employee of employees) {
             const assignment = employee.salaryAssignments[0];
             if (!assignment) continue;
 
-            const structure = assignment.structure;
-            const baseSalary = assignment.baseSalary;
-            totalBaseSalary = totalBaseSalary.add(baseSalary);
+            totalBaseSalary = totalBaseSalary.add(Number(assignment.baseSalary));
 
-            let grossSalary = new Decimal(baseSalary.toString());
-            let deductions = new Decimal(0);
-            let gosiBaseSalary = new Decimal(baseSalary.toString());
+            const calculation = await this.calculationService.calculateForEmployee(
+                employee.id,
+                companyId,
+                period.year,
+                period.month
+            );
 
-            // تفاصيل المكونات
-            const earnings: { name: string; code: string; amount: number }[] = [];
-            const deductionItems: { name: string; code: string; amount: number }[] = [];
+            const earnings = (calculation.policyLines || [])
+                .filter(pl => pl.sign === 'EARNING')
+                .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
 
-            // إضافة الراتب الأساسي كأول عنصر
-            earnings.push({ name: 'الراتب الأساسي', code: 'BASIC', amount: Number(baseSalary) });
+            const deductionItems = (calculation.policyLines || [])
+                .filter(pl => pl.sign === 'DEDUCTION')
+                .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
 
-            // حساب المكونات من الهيكل
-            for (const line of structure.lines) {
-                let lineAmount = new Decimal(0);
-
-                if (line.component.nature === 'FIXED') {
-                    lineAmount = new Decimal(line.amount.toString());
-                } else if (line.percentage) {
-                    lineAmount = baseSalary.mul(line.percentage.toString()).div(100);
-                }
-
-                if (line.component.type === 'EARNING') {
-                    grossSalary = grossSalary.add(lineAmount);
-                    if (line.component.gosiEligible) {
-                        gosiBaseSalary = gosiBaseSalary.add(lineAmount);
-                    }
-                    earnings.push({
-                        name: line.component.nameAr || line.component.nameEn || line.component.code,
-                        code: line.component.code,
-                        amount: Number(lineAmount),
-                    });
-                } else {
-                    deductions = deductions.add(lineAmount);
-                    deductionItems.push({
-                        name: line.component.nameAr || line.component.nameEn || line.component.code,
-                        code: line.component.code,
-                        amount: Number(lineAmount),
-                    });
-                }
-            }
-
-            // خصومات السلف
-            let advanceDeduction = new Decimal(0);
+            // إضافة السلف للمعاينة
+            let employeeAdvanceAmount = 0;
             const advanceDetails: { id: string; amount: number }[] = [];
-            for (const advance of employee.advanceRequests) {
-                const ded = advance.approvedMonthlyDeduction || advance.monthlyDeduction;
-                advanceDeduction = advanceDeduction.add(ded);
-                advanceDetails.push({
-                    id: advance.id,
-                    amount: Number(ded),
-                });
-            }
-            deductions = deductions.add(advanceDeduction);
-            totalAdvances = totalAdvances.add(advanceDeduction);
-
-            if (advanceDeduction.gt(0)) {
-                deductionItems.push({
-                    name: 'خصم سلفة',
-                    code: 'LOAN_DED',
-                    amount: Number(advanceDeduction),
-                });
+            for (const adv of employee.advanceRequests) {
+                const amount = Number(adv.approvedMonthlyDeduction || adv.monthlyDeduction);
+                employeeAdvanceAmount += amount;
+                advanceDetails.push({ id: adv.id, amount });
+                deductionItems.push({ name: 'خصم سلفة', code: 'ADVANCE', amount });
             }
 
-            // حساب GOSI للسعوديين
-            let gosiDeduction = new Decimal(0);
-            let gosiEmployer = new Decimal(0);
-            if (gosiConfig && (employee as any).isSaudi) {
-                const cappedGosiBase = Decimal.min(gosiBaseSalary, gosiConfig.maxCapAmount);
-                const totalGosiRate = new Decimal(gosiConfig.employeeRate.toString()).add(gosiConfig.sanedRate.toString());
-                gosiDeduction = cappedGosiBase.mul(totalGosiRate).div(100);
-                gosiEmployer = cappedGosiBase.mul(gosiConfig.employerRate.toString()).add(gosiConfig.hazardRate.toString()).div(100);
-                deductions = deductions.add(gosiDeduction);
+            const finalGross = calculation.grossSalary;
+            const finalDeductions = calculation.totalDeductions + employeeAdvanceAmount;
+            const finalNet = finalGross - finalDeductions;
 
-                deductionItems.push({
-                    name: 'تأمينات اجتماعية (GOSI)',
-                    code: 'GOSI_DED',
-                    amount: Number(gosiDeduction),
-                });
-            }
-            totalGosi = totalGosi.add(gosiDeduction);
+            totalGross = totalGross.add(finalGross);
+            totalDeductions = totalDeductions.add(finalDeductions);
+            totalNet = totalNet.add(finalNet);
+            totalAdvances = totalAdvances.add(employeeAdvanceAmount);
 
-            const netSalary = grossSalary.sub(deductions);
+            const gosiLine = (calculation.policyLines || []).find(pl => pl.componentCode === 'GOSI');
+            const gosiAmount = gosiLine?.amount || 0;
+            totalGosi = totalGosi.add(gosiAmount);
 
-            totalGross = totalGross.add(grossSalary);
-            totalDeductions = totalDeductions.add(deductions);
-            totalNet = totalNet.add(netSalary);
-
-            // تجميع حسب الفرع
             const branchName = employee.branch?.name || 'غير محدد';
-            if (!byBranch[branchName]) {
-                byBranch[branchName] = { count: 0, gross: 0, net: 0 };
-            }
-            byBranch[branchName].count++;
-            byBranch[branchName].gross += Number(grossSalary);
-            byBranch[branchName].net += Number(netSalary);
-
-            // تجميع حسب القسم
             const deptName = employee.department?.name || 'غير محدد';
-            if (!byDepartment[deptName]) {
-                byDepartment[deptName] = { count: 0, gross: 0, net: 0 };
-            }
+
+            if (!byBranch[branchName]) byBranch[branchName] = { count: 0, gross: 0, net: 0 };
+            byBranch[branchName].count++;
+            byBranch[branchName].gross += finalGross;
+            byBranch[branchName].net += finalNet;
+
+            if (!byDepartment[deptName]) byDepartment[deptName] = { count: 0, gross: 0, net: 0 };
             byDepartment[deptName].count++;
-            byDepartment[deptName].gross += Number(grossSalary);
-            byDepartment[deptName].net += Number(netSalary);
+            byDepartment[deptName].gross += finalGross;
+            byDepartment[deptName].net += finalNet;
 
             employeePreviews.push({
                 id: employee.id,
@@ -409,24 +266,21 @@ export class PayrollRunsService {
                 department: deptName,
                 jobTitle: (employee as any).jobTitle?.name || 'غير محدد',
                 isSaudi: (employee as any).isSaudi || false,
-                baseSalary: Number(baseSalary),
-                gross: Number(grossSalary),
-                deductions: Number(deductions),
-                gosi: Number(gosiDeduction),
-                gosiEmployer: Number(gosiEmployer),
-                advances: Number(advanceDeduction),
-                net: Number(netSalary),
-                // تفاصيل المكونات
+                baseSalary: Number(assignment.baseSalary),
+                gross: finalGross,
+                deductions: finalDeductions,
+                gosi: gosiAmount,
+                advances: employeeAdvanceAmount,
+                net: finalNet,
                 earnings,
                 deductionItems,
                 advanceDetails,
-                // للتعديل لاحقاً
                 adjustments: [],
                 excluded: false,
             });
         }
 
-        // Get previous month data for comparison
+        // Previous month comparison
         let previousMonth = null;
         try {
             const prevPeriod = await this.prisma.payrollPeriod.findFirst({

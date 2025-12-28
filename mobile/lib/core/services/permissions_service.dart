@@ -45,7 +45,8 @@ class PermissionsService {
   }
 
   /// Fetch user's permissions from API and cache them
-  Future<List<String>> fetchMyPermissions() async {
+  /// جلب الصلاحيات من الخادم
+  Future<void> loadPermissions() async {
     try {
       final response = await _apiClient.getMyPermissions();
       final List<dynamic> data = response.data ?? [];
@@ -56,13 +57,14 @@ class PermissionsService {
           .toList();
       
       print('✅ Fetched ${_permissionCodes.length} permissions: $_permissionCodes');
-      return _permissionCodes;
     } catch (e) {
       print('❌ Failed to fetch permissions: $e');
       _permissionCodes = [];
-      return [];
     }
   }
+
+  /// Alias for loadPermissions (للتوافق مع AuthBloc)
+  Future<void> fetchMyPermissions() => loadPermissions();
 
   /// Clear cached permissions (on logout)
   void clearPermissions() {

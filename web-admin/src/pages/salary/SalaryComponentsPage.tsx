@@ -97,6 +97,18 @@ export const SalaryComponentsPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Basic Validation
+        if (!formData.code || !formData.nameAr) {
+            setError('يرجى ملء الكود والاسم العربي');
+            return;
+        }
+
+        if (formData.nature === 'FORMULA' && !formData.formula) {
+            setError('يرجى إدخال المعادلة للمكونات المحسوبة');
+            return;
+        }
+
         try {
             if (editingId) {
                 await api.patch(`/salary-components/${editingId}`, formData);
@@ -228,8 +240,9 @@ export const SalaryComponentsPage = () => {
                                 fullWidth
                                 label="كود المكون (مثال: BASIC)"
                                 value={formData.code || ''}
-                                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/\s/g, '_') })}
                                 required
+                                helperText="يجب أن يكون الكود باللغة الإنجليزية وبأحرف كبيرة وبدون مسافات"
                             />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -281,9 +294,12 @@ export const SalaryComponentsPage = () => {
                                 <TextField
                                     fullWidth
                                     label="المعادلة"
-                                    placeholder="مثال: BASIC * 0.25"
+                                    multiline
+                                    rows={2}
+                                    placeholder="مثال: TOTAL * 0.60"
                                     value={formData.formula || ''}
-                                    onChange={(e) => setFormData({ ...formData, formula: e.target.value })}
+                                    onChange={(e) => setFormData({ ...formData, formula: e.target.value.toUpperCase() })}
+                                    helperText="المتغيرات المتاحة: TOTAL, BASIC, وجميع أكواد المكونات الأخرى. مثال: TOTAL * 0.25"
                                 />
                             </Grid>
                         )}

@@ -7,6 +7,7 @@ import { createTheme } from '@mui/material/styles';
 import { SidebarBadgesProvider } from './contexts/SidebarBadgesContext';
 import App from './App';
 import './index.css';
+import './styles/premium.css';
 
 const theme = createTheme({
   direction: 'rtl',

@@ -938,7 +938,7 @@ export const PayrollWizardPage = () => {
                                                 <Typography variant="h6" fontWeight="bold" color="text.secondary">
                                                     {formatMoney(previewData.employees?.reduce((sum, emp) => sum + (Number(emp.baseSalary) || 0), 0) || 0)}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">الراتب الأساسي</Typography>
+                                                <Typography variant="caption" color="text.secondary">إجمالي الرواتب (TOTAL)</Typography>
                                             </CardContent>
                                         </Card>
                                     </Grid>
@@ -949,7 +949,7 @@ export const PayrollWizardPage = () => {
                                                 <Typography variant="h6" fontWeight="bold" color="success.main">
                                                     {formatMoney(previewData.estimatedGross)}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">إجمالي</Typography>
+                                                <Typography variant="caption" color="text.secondary">المستحقات (Earnings)</Typography>
                                             </CardContent>
                                         </Card>
                                     </Grid>
@@ -1057,7 +1057,7 @@ export const PayrollWizardPage = () => {
                                                 <TableCell sx={{ fontWeight: 'bold', width: 50 }}>#</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }}>الموظف</TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold' }}>الفرع</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>الأساسي</TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>إجمالي العقد (TOTAL)</TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>الإجمالي</TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>الخصومات</TableCell>
                                                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>الصافي</TableCell>
@@ -1227,8 +1227,12 @@ export const PayrollWizardPage = () => {
                                                                                     <Typography variant="subtitle2" fontWeight="bold" color="success.main" gutterBottom>
                                                                                         💰 المستحقات
                                                                                     </Typography>
+                                                                                    <Box display="flex" justifyContent="space-between" sx={{ mb: 1, pb: 0.5, borderBottom: '1px dashed #ccc' }}>
+                                                                                        <Typography variant="body2" fontWeight="bold">إجمالي الراتب (TOTAL)</Typography>
+                                                                                        <Typography variant="body2" fontWeight="bold">{formatMoney(emp.baseSalary)}</Typography>
+                                                                                    </Box>
                                                                                     {emp.earnings && emp.earnings.length > 0 ? (
-                                                                                        emp.earnings.map((e, i) => (
+                                                                                        emp.earnings.filter(e => e.amount > 0).map((e, i) => (
                                                                                             <Box key={i} display="flex" justifyContent="space-between">
                                                                                                 <Typography variant="body2">{e.name}</Typography>
                                                                                                 <Typography variant="body2" fontWeight={500}>{formatMoney(e.amount)}</Typography>
@@ -1250,7 +1254,7 @@ export const PayrollWizardPage = () => {
                                                                                         📉 الخصومات
                                                                                     </Typography>
                                                                                     {emp.deductionItems && emp.deductionItems.length > 0 ? (
-                                                                                        emp.deductionItems.map((d, i) => (
+                                                                                        emp.deductionItems.filter(d => d.amount > 0).map((d, i) => (
                                                                                             <Box key={i} display="flex" justifyContent="space-between">
                                                                                                 <Typography variant="body2">{d.name}</Typography>
                                                                                                 <Typography variant="body2" fontWeight={500}>{formatMoney(d.amount)}</Typography>

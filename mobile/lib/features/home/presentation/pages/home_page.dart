@@ -341,6 +341,28 @@ class _QuickActionsCard extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.gavel,
+                    label: 'الجزاءات',
+                    color: Colors.red,
+                    onTap: () => context.go('/disciplinary'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.history,
+                    label: 'سجل الحضور',
+                    color: Colors.teal,
+                    onTap: () => context.go('/attendance'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

@@ -17,7 +17,7 @@ export class DataUpdateService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   /**
    * إنشاء طلب تحديث بيانات
@@ -58,14 +58,14 @@ export class DataUpdateService {
         userId,
         requestType: data.requestType as any,
         reason: data.reason,
-        
+
         // بيانات الوجه
-        newFaceEmbedding: data.newFaceEmbedding 
-          ? JSON.stringify(data.newFaceEmbedding) 
+        newFaceEmbedding: data.newFaceEmbedding
+          ? JSON.stringify(data.newFaceEmbedding)
           : undefined,
         newFaceImage: data.newFaceImage,
         faceImageQuality: data.faceImageQuality,
-        
+
         // بيانات الجهاز
         newDeviceId: data.newDeviceId,
         newDeviceFingerprint: data.newDeviceFingerprint,
@@ -75,7 +75,7 @@ export class DataUpdateService {
         newDevicePlatform: data.newDevicePlatform as any,
         newDeviceOsVersion: data.newDeviceOsVersion,
         newDeviceAppVersion: data.newDeviceAppVersion,
-        
+
         // الجهاز القديم للمقارنة
         oldDeviceId: mainDevice?.deviceId,
       },
@@ -415,7 +415,7 @@ export class DataUpdateService {
         if (requestType === 'DEVICE_CHANGE' && request.oldDeviceId) {
           await this.prisma.registeredDevice.updateMany({
             where: { userId, deviceId: request.oldDeviceId },
-            data: { 
+            data: {
               status: DeviceStatus.INACTIVE,
               isMainDevice: false,
             },
@@ -504,6 +504,8 @@ export class DataUpdateService {
         return 'تغيير الجهاز (موبايل جديد)';
       case 'BOTH':
         return 'تحديث بيانات الوجه والجهاز';
+      case 'PROFILE_UPDATE':
+        return 'تحديث بيانات الملف الشخصي';
       default:
         return 'تحديث بيانات';
     }

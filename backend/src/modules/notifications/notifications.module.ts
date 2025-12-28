@@ -1,15 +1,15 @@
-import { Module, Global } from '@nestjs/common';
-import { NotificationsController } from './notifications.controller';
+import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationsService } from './notifications.service';
 import { SmartNotificationService } from './smart-notification.service';
-import { FcmService } from './services/fcm.service';
+import { NotificationsController } from './notifications.controller';
+import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 
-@Global()
 @Module({
-  imports: [PermissionsModule],
+  imports: [PrismaModule, PermissionsModule, ScheduleModule.forRoot()],
   controllers: [NotificationsController],
-  providers: [NotificationsService, SmartNotificationService, FcmService],
+  providers: [NotificationsService, SmartNotificationService],
   exports: [NotificationsService, SmartNotificationService],
 })
 export class NotificationsModule { }

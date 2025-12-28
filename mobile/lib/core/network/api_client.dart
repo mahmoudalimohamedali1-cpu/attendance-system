@@ -41,6 +41,10 @@ class ApiClient {
     return await _dio.post('/users/me/change-password', data: data);
   }
 
+  Future<Response> getUsers() async {
+    return await _dio.get('/users');
+  }
+
   // Attendance endpoints
   Future<Response> checkIn(Map<String, dynamic> data) async {
     return await _dio.post('/attendance/check-in', data: data);
@@ -256,6 +260,80 @@ class ApiClient {
     }
     print('📤 Uploading ${filePaths.length} raise attachments');
     return await _dio.post('/raises/upload-attachments', data: formData);
+  }
+
+  // ==================== Disciplinary endpoints ====================
+  
+  /// جلب قضايا الجزاءات حسب الدور
+  Future<Response> getDisciplinaryCases(String role) async {
+    return await _dio.get('/disciplinary/cases', queryParameters: {'role': role});
+  }
+
+  /// جلب تفاصيل قضية
+  Future<Response> getDisciplinaryCaseById(String id) async {
+    return await _dio.get('/disciplinary/cases/$id');
+  }
+
+  /// إنشاء قضية جديدة (للمدير)
+  Future<Response> createDisciplinaryCase(Map<String, dynamic> data) async {
+    return await _dio.post('/disciplinary/cases', data: data);
+  }
+
+  /// الرد على التحقيق غير الرسمي (للموظف)
+  Future<Response> respondDisciplinaryInformal(String caseId, {required bool accept, String? notes}) async {
+    return await _dio.post('/disciplinary/cases/$caseId/employee-informal-response', data: {
+      'accept': accept,
+      'response': notes,
+    });
+  }
+
+  /// الرد على القرار (للموظف)
+  Future<Response> respondDisciplinaryDecision(String caseId, {required bool accept, String? objectionNotes}) async {
+    return await _dio.post('/disciplinary/cases/$caseId/employee-decision-response', data: {
+      'accept': accept,
+      'objectionNotes': objectionNotes,
+    });
+  }
+
+  /// مراجعة HR
+  Future<Response> hrReviewDisciplinary(String caseId, {required bool approve, String? notes}) async {
+    return await _dio.post('/disciplinary/cases/$caseId/hr-review', data: {
+      'approve': approve,
+      'notes': notes,
+    });
+  }
+
+  /// جدولة جلسة استماع
+  Future<Response> scheduleDisciplinaryHearing(String caseId, Map<String, dynamic> data) async {
+    return await _dio.post('/disciplinary/cases/$caseId/schedule-hearing', data: data);
+  }
+
+  /// إضافة محضر الجلسة
+  Future<Response> addDisciplinaryMinutes(String caseId, String notes) async {
+    return await _dio.post('/disciplinary/cases/$caseId/minutes', data: {'notes': notes});
+  }
+
+  /// إصدار قرار
+  Future<Response> issueDisciplinaryDecision(String caseId, Map<String, dynamic> data) async {
+    return await _dio.post('/disciplinary/cases/$caseId/decision', data: data);
+  }
+
+  /// الاعتماد النهائي
+  Future<Response> finalizeDisciplinaryCase(String caseId) async {
+    return await _dio.post('/disciplinary/cases/$caseId/finalize', data: {});
+  }
+
+  /// رفع مرفقات قضية جزائية
+  Future<Response> uploadDisciplinaryAttachments(String caseId, List<String> filePaths) async {
+    final formData = FormData();
+    for (final path in filePaths) {
+      formData.files.add(MapEntry(
+        'files',
+        await MultipartFile.fromFile(path, filename: path.split('/').last),
+      ));
+    }
+    print('📤 Uploading ${filePaths.length} disciplinary attachments for case $caseId');
+    return await _dio.post('/disciplinary/cases/$caseId/upload-files', data: formData);
   }
 }
 

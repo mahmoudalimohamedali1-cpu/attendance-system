@@ -8,6 +8,7 @@ import {
   Body,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -38,9 +39,19 @@ export class NotificationsController {
   @ApiResponse({ status: 200, description: 'قائمة الإشعارات' })
   async getNotifications(
     @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Query('unreadOnly') unreadOnly?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    if (unreadOnly === 'true' || unreadOnly === '1') {
+      return this.notificationsService.getForUser(userId, companyId, {
+        unreadOnly: true,
+        limit: limit ? parseInt(limit) : 20,
+        offset: page ? (parseInt(page) - 1) * (limit ? parseInt(limit) : 20) : 0,
+      });
+    }
+
     return this.notificationsService.getNotifications(
       userId,
       page ? parseInt(page) : 1,
@@ -51,8 +62,8 @@ export class NotificationsController {
   @Get('unread-count')
   @ApiOperation({ summary: 'عدد الإشعارات غير المقروءة' })
   @ApiResponse({ status: 200, description: 'عدد الإشعارات' })
-  async getUnreadCount(@CurrentUser('id') userId: string) {
-    const count = await this.notificationsService.getUnreadCount(userId);
+  async getUnreadCount(@CurrentUser('id') userId: string, @CurrentUser('companyId') companyId: string) {
+    const count = await this.notificationsService.getUnreadCount(userId, companyId);
     return { count };
   }
 
@@ -69,8 +80,8 @@ export class NotificationsController {
   @Patch('read-all')
   @ApiOperation({ summary: 'تعليم جميع الإشعارات كمقروءة' })
   @ApiResponse({ status: 200, description: 'تم التعليم' })
-  async markAllAsRead(@CurrentUser('id') userId: string) {
-    return this.notificationsService.markAllAsRead(userId);
+  async markAllAsRead(@CurrentUser('id') userId: string, @CurrentUser('companyId') companyId: string) {
+    return this.notificationsService.markAllAsRead(userId, companyId);
   }
 
   @Delete(':id')
@@ -106,5 +117,3 @@ export class NotificationsController {
     return this.smartNotificationService.triggerReminderManually();
   }
 }
-
-

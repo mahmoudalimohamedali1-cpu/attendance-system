@@ -135,4 +135,77 @@ export class EmployeeImportController {
             preview: rows.slice(0, 5),
         };
     }
+
+    // ============================================
+    // Endpoints الاستيراد الذكي (Smart Import)
+    // ============================================
+
+    @Post('smart-analyze')
+    @ApiOperation({ summary: 'تحليل ذكي للملف مع اقتراح المطابقات' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                file: { type: 'string', format: 'binary' },
+            },
+        },
+    })
+    @UseInterceptors(FileInterceptor('file'))
+    async smartAnalyze(@UploadedFile() file: Express.Multer.File) {
+        if (!file) {
+            throw new BadRequestException('لم يتم رفع أي ملف');
+        }
+
+        const content = file.buffer.toString('utf-8');
+        const analysis = this.importService.smartAnalyzeCSV(content);
+
+        return {
+            fileName: file.originalname,
+            ...analysis,
+        };
+    }
+
+    @Post('smart-import')
+    @ApiOperation({ summary: 'استيراد ذكي مع مطابقة مخصصة' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                file: { type: 'string', format: 'binary' },
+                mappings: { type: 'string', description: 'JSON object of column mappings' },
+            },
+        },
+    })
+    @UseInterceptors(FileInterceptor('file'))
+    async smartImport(
+        @UploadedFile() file: Express.Multer.File,
+        @Body('mappings') mappingsJson: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        if (!file) {
+            throw new BadRequestException('لم يتم رفع أي ملف');
+        }
+
+        // Parse mappings
+        let mappings: Record<string, string | null> = {};
+        if (mappingsJson) {
+            try {
+                mappings = JSON.parse(mappingsJson);
+            } catch {
+                throw new BadRequestException('صيغة المطابقات غير صحيحة');
+            }
+        }
+
+        const content = file.buffer.toString('utf-8');
+        const result = await this.importService.smartImportEmployees(content, companyId, mappings);
+
+        return {
+            ...result,
+            message: result.success
+                ? `تم استيراد ${result.created} موظف جديد وتحديث ${result.updated} موظف وإضافة ${result.customFieldsAdded} حقل مخصص`
+                : 'تم الاستيراد مع بعض الأخطاء',
+        };
+    }
 }

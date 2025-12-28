@@ -44,6 +44,21 @@ const PayslipsPage = lazy(() => import('./pages/payslips/PayslipsPage'));
 const WpsTrackingPage = lazy(() => import('./pages/wps-tracking/WpsTrackingPage'));
 const MudadPage = lazy(() => import('./pages/mudad/MudadPage'));
 const GosiPage = lazy(() => import('./pages/gosi/GosiPage'));
+const DisciplinaryHRPage = lazy(() => import('./pages/disciplinary/DisciplinaryHRPage').then(m => ({ default: m.DisciplinaryHRPage })));
+const DisciplinaryManagerPage = lazy(() => import('./pages/disciplinary/DisciplinaryManagerPage').then(m => ({ default: m.DisciplinaryManagerPage })));
+const DisciplinaryEmployeePage = lazy(() => import('./pages/disciplinary/DisciplinaryEmployeePage').then(m => ({ default: m.DisciplinaryEmployeePage })));
+const DisciplinaryCaseDetail = lazy(() => import('./pages/disciplinary/DisciplinaryCaseDetail').then(m => ({ default: m.DisciplinaryCaseDetail })));
+const EmployeeProfilePage = lazy(() => import('./pages/employee-profile/EmployeeProfilePage'));
+const CustodyDashboard = lazy(() => import('@/pages/custody/CustodyDashboard'));
+const CustodyItemsList = lazy(() => import('@/pages/custody/CustodyItemsList'));
+const CustodyCategories = lazy(() => import('@/pages/custody/CustodyCategories'));
+const CustodyReturns = lazy(() => import('@/pages/custody/CustodyReturns'));
+const CustodyMaintenance = lazy(() => import('@/pages/custody/CustodyMaintenancePage'));
+const CustodyAssign = lazy(() => import('@/pages/custody/CustodyAssign'));
+const CustodyItemForm = lazy(() => import('@/pages/custody/CustodyItemForm'));
+const CustodyItemDetail = lazy(() => import('@/pages/custody/CustodyItemDetail'));
+const MyPayslipsPage = lazy(() => import('./pages/my-payslips/MyPayslipsPage'));
+const PayrollSettingsPage = lazy(() => import('./pages/payroll-settings/PayrollSettingsPage'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -289,6 +304,90 @@ function App() {
               <GosiPage />
             </Suspense>
           } />
+          <Route path="disciplinary" element={
+            <Suspense fallback={<PageLoader />}>
+              <DisciplinaryHRPage />
+            </Suspense>
+          } />
+          <Route path="disciplinary/manager" element={
+            <Suspense fallback={<PageLoader />}>
+              <DisciplinaryManagerPage />
+            </Suspense>
+          } />
+          <Route path="disciplinary/employee" element={
+            <Suspense fallback={<PageLoader />}>
+              <DisciplinaryEmployeePage />
+            </Suspense>
+          } />
+          <Route path="disciplinary/cases/:id" element={
+            <Suspense fallback={<PageLoader />}>
+              <DisciplinaryCaseDetail />
+            </Suspense>
+          } />
+          <Route path="employee-profile/:id" element={
+            <Suspense fallback={<PageLoader />}>
+              <EmployeeProfilePage />
+            </Suspense>
+          } />
+          <Route path="my-payslips" element={
+            <Suspense fallback={<PageLoader />}>
+              <MyPayslipsPage />
+            </Suspense>
+          } />
+          <Route path="payroll-settings" element={
+            <Suspense fallback={<PageLoader />}>
+              <PayrollSettingsPage />
+            </Suspense>
+          } />
+          <Route path="custody">
+            <Route index element={
+              <Suspense fallback={<PageLoader />}>
+                <CustodyDashboard />
+              </Suspense>
+            } />
+            <Route path="categories" element={
+              <Suspense fallback={<PageLoader />}>
+                <CustodyCategories />
+              </Suspense>
+            } />
+            <Route path="returns" element={
+              <Suspense fallback={<PageLoader />}>
+                <CustodyReturns />
+              </Suspense>
+            } />
+            <Route path="maintenance" element={
+              <Suspense fallback={<PageLoader />}>
+                <CustodyMaintenance />
+              </Suspense>
+            } />
+            <Route path="assign" element={
+              <Suspense fallback={<PageLoader />}>
+                <CustodyAssign />
+              </Suspense>
+            } />
+            <Route path="items">
+              <Route index element={
+                <Suspense fallback={<PageLoader />}>
+                  <CustodyItemsList />
+                </Suspense>
+              } />
+              <Route path="new" element={
+                <Suspense fallback={<PageLoader />}>
+                  <CustodyItemForm />
+                </Suspense>
+              } />
+              <Route path=":id" element={
+                <Suspense fallback={<PageLoader />}>
+                  <CustodyItemDetail />
+                </Suspense>
+              } />
+              <Route path=":id/edit" element={
+                <Suspense fallback={<PageLoader />}>
+                  <CustodyItemForm />
+                </Suspense>
+              } />
+            </Route>
+          </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

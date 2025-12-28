@@ -131,4 +131,13 @@ export class DashboardController {
         const visibility = ROLE_VISIBILITY[role as keyof typeof ROLE_VISIBILITY] || ROLE_VISIBILITY.EMPLOYEE;
         return filterByRole(data, visibility.trends);
     }
+
+    @Get('users-stats')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Quick Users Stats for Users Page' })
+    async getUsersStats(
+        @CurrentUser('companyId') companyId: string,
+    ): Promise<{ totalActive: number; newThisMonth: number; onLeaveToday: number; pendingApprovals: number }> {
+        return this.service.getUsersQuickStats(companyId);
+    }
 }

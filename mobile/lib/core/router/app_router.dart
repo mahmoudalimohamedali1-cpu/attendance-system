@@ -26,6 +26,8 @@ import '../../features/notifications/presentation/pages/notifications_page.dart'
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/change_password_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/disciplinary/presentation/pages/disciplinary_list_page.dart';
+import '../../features/disciplinary/presentation/pages/disciplinary_detail_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -204,6 +206,23 @@ class AppRouter {
                 name: 'new-advance',
                 parentNavigatorKey: _rootNavigatorKey,
                 builder: (context, state) => const CreateAdvanceRequestPage(),
+              ),
+            ],
+          ),
+          // Disciplinary routes
+          GoRoute(
+            path: '/disciplinary',
+            name: 'disciplinary',
+            builder: (context, state) => const DisciplinaryListPage(),
+            routes: [
+              GoRoute(
+                path: 'details/:id',
+                name: 'disciplinary-details',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return DisciplinaryDetailPage(caseId: id);
+                },
               ),
             ],
           ),

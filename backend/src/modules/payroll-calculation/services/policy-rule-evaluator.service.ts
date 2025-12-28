@@ -50,6 +50,10 @@ export class PolicyRuleEvaluatorService {
                 if (!policy || !policy.rules?.length) continue;
 
                 for (const rule of policy.rules) {
+                    if (!rule.outputComponentId) {
+                        this.logger.debug(`Skipping rule ${rule.id} because it has no output component`);
+                        continue;
+                    }
                     const result = await this.evaluateRule(type, rule, context);
                     if (result.success && result.amount !== 0) {
                         lines.push(this.createPayrollLine(policy, rule, result, context));

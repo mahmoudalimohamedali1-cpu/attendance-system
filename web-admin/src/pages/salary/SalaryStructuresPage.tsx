@@ -22,7 +22,7 @@ import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     AccountTree,
-    RemoveCircleOutline,
+    Visibility as PreviewIcon,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 
@@ -31,6 +31,8 @@ interface SalaryComponent {
     code: string;
     nameAr: string;
     type: string;
+    nature: 'FIXED' | 'VARIABLE' | 'FORMULA';
+    formula?: string;
 }
 
 interface SalaryStructureLine {
@@ -64,15 +66,23 @@ export const SalaryStructuresPage = () => {
         lines: [],
     });
 
+    const [employees, setEmployees] = useState<any[]>([]);
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewData, setPreviewData] = useState<any>(null);
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [structuresData, componentsData] = await Promise.all([
+            const [structuresData, componentsData, employeesData] = await Promise.all([
                 api.get('/salary-structures') as Promise<SalaryStructure[]>,
                 api.get('/salary-components') as Promise<SalaryComponent[]>,
+                api.get('/users?role=EMPLOYEE') as Promise<any[]>,
             ]);
             setStructures(structuresData);
             setComponents(componentsData);
+            setEmployees(Array.isArray(employeesData) ? employeesData : (employeesData as any).data || []);
         } catch (err: any) {
             setError(err.message || 'Failed to fetch data');
         } finally {
@@ -157,6 +167,25 @@ export const SalaryStructuresPage = () => {
         }
     };
 
+    const handlePreview = async () => {
+        if (!selectedEmployeeId) {
+            alert('يرجى اختيار موظف للمعاينة');
+            return;
+        }
+
+        try {
+            setPreviewLoading(true);
+            const now = new Date();
+            const data = await api.get(`/payroll-calculation/preview?employeeId=${selectedEmployeeId}&month=${now.getMonth() + 1}&year=${now.getFullYear()}`);
+            setPreviewData(data);
+            setPreviewOpen(true);
+        } catch (err: any) {
+            alert('فشل في جلب المعاينة: ' + (err.message || 'خطأ غير معروف'));
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (window.confirm('هل أنت متأكد من حذف هذا الهيكل؟')) {
             try {
@@ -213,12 +242,12 @@ export const SalaryStructuresPage = () => {
                             </Box>
                             <Divider />
                             <Box sx={{ p: 2, flex: 1 }}>
-                                <Typography variant="body2" fontWeight="bold" gutterBottom>المكونات ({structure.lines.length}):</Typography>
+                                <Typography variant="body2" fontWeight="bold" gutterBottom>المكونات ({(structure.lines || []).length}):</Typography>
                                 <Box display="flex" flexWrap="wrap" gap={1}>
-                                    {structure.lines.map((line, idx) => (
+                                    {(structure.lines || []).map((line, idx) => (
                                         <Chip
                                             key={idx}
-                                            label={`${line.component?.nameAr || 'مكون'}: ${line.amount}${line.percentage ? ` (${line.percentage}%)` : ''}`}
+                                            label={`${line.component?.nameAr || 'مكون'}: ${line.percentage ? `${line.percentage}%` : line.component?.nature === 'FORMULA' ? 'معادلة' : line.amount}`}
                                             size="small"
                                             variant="outlined"
                                         />
@@ -284,9 +313,14 @@ export const SalaryStructuresPage = () => {
                                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                                     <Box>
                                         <Typography variant="subtitle2" fontWeight="bold">مكونات الهيكل</Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            اختر مبلغ ثابت أو نسبة من إجمالي الراتب (واحد فقط)
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                            💡 يتم حساب النسب (٪) بناءً على <strong>إجمالي الراتب (TOTAL)</strong> المعرف في تعيين راتب كل موظف.
                                         </Typography>
+                                        {formData.lines && !formData.lines.some(l => components.find(c => c.id === l.componentId)?.code === 'BASIC') && (
+                                            <Alert severity="warning" sx={{ mb: 2, py: 0 }}>
+                                                يفضل إضافة مكون الراتب الأساسي (BASIC) لضمان دقة العمليات النظامية.
+                                            </Alert>
+                                        )}
                                     </Box>
                                     <Button startIcon={<AddIcon />} size="small" onClick={handleAddLine} variant="outlined">إضافة مكون</Button>
                                 </Box>
@@ -303,97 +337,126 @@ export const SalaryStructuresPage = () => {
                                 )}
 
                                 {formData.lines?.map((line, index) => {
-                                    const valueType = line.percentage ? 'percentage' : 'amount';
+                                    const component = components.find(c => c.id === line.componentId);
+                                    const valueType = line.percentage ? 'percentage' : (component?.nature === 'FORMULA' ? 'formula' : 'amount');
 
                                     return (
                                         <Box key={index} sx={{
                                             display: 'flex',
-                                            gap: 2,
+                                            flexDirection: 'column',
+                                            gap: 1.5,
                                             mb: 1.5,
-                                            alignItems: 'center',
-                                            p: 1.5,
+                                            p: 2,
                                             bgcolor: 'white',
-                                            borderRadius: 1,
+                                            borderRadius: 2,
                                             border: '1px solid',
-                                            borderColor: 'divider'
+                                            borderColor: 'divider',
+                                            position: 'relative'
                                         }}>
-                                            <TextField
-                                                select
-                                                label="المكون"
-                                                sx={{ minWidth: 200 }}
-                                                value={line.componentId}
-                                                onChange={(e) => handleLineChange(index, 'componentId', e.target.value)}
+                                            <IconButton
+                                                color="error"
+                                                onClick={() => handleRemoveLine(index)}
+                                                sx={{ position: 'absolute', top: 4, right: 4 }}
                                                 size="small"
                                             >
-                                                {components.map(comp => (
-                                                    <MenuItem key={comp.id} value={comp.id}>
-                                                        {comp.nameAr} ({comp.code})
-                                                    </MenuItem>
-                                                ))}
-                                            </TextField>
-
-                                            <TextField
-                                                select
-                                                label="نوع القيمة"
-                                                sx={{ width: 120 }}
-                                                value={valueType}
-                                                onChange={(e) => {
-                                                    if (e.target.value === 'percentage') {
-                                                        handleLineChange(index, 'amount', 0);
-                                                        handleLineChange(index, 'percentage', line.percentage || 25);
-                                                    } else {
-                                                        handleLineChange(index, 'percentage', null);
-                                                        handleLineChange(index, 'amount', line.amount || 500);
-                                                    }
-                                                }}
-                                                size="small"
-                                            >
-                                                <MenuItem value="amount">مبلغ ثابت</MenuItem>
-                                                <MenuItem value="percentage">نسبة %</MenuItem>
-                                            </TextField>
-
-                                            {valueType === 'percentage' ? (
-                                                <TextField
-                                                    label="النسبة %"
-                                                    type="number"
-                                                    sx={{ width: 120 }}
-                                                    value={line.percentage || ''}
-                                                    onChange={(e) => {
-                                                        handleLineChange(index, 'percentage', e.target.value);
-                                                        handleLineChange(index, 'amount', 0);
-                                                    }}
-                                                    size="small"
-                                                    InputProps={{ inputProps: { min: 0, max: 100 } }}
-                                                    helperText="من الإجمالي"
-                                                />
-                                            ) : (
-                                                <TextField
-                                                    label="المبلغ (ريال)"
-                                                    type="number"
-                                                    sx={{ width: 120 }}
-                                                    value={line.amount || ''}
-                                                    onChange={(e) => {
-                                                        handleLineChange(index, 'amount', e.target.value);
-                                                        handleLineChange(index, 'percentage', null);
-                                                    }}
-                                                    size="small"
-                                                    InputProps={{ inputProps: { min: 0 } }}
-                                                />
-                                            )}
-
-                                            <TextField
-                                                label="الترتيب"
-                                                type="number"
-                                                sx={{ width: 80 }}
-                                                value={line.priority}
-                                                onChange={(e) => handleLineChange(index, 'priority', e.target.value)}
-                                                size="small"
-                                                helperText={index === 0 ? 'الأول' : ''}
-                                            />
-
-                                            <IconButton color="error" onClick={() => handleRemoveLine(index)}>
-                                                <RemoveCircleOutline />
+                                                <DeleteIcon fontSize="small" />
                                             </IconButton>
+
+                                            <Grid container spacing={2} alignItems="center">
+                                                <Grid item xs={12} sm={4}>
+                                                    <TextField
+                                                        select
+                                                        fullWidth
+                                                        label="المكون"
+                                                        value={line.componentId}
+                                                        onChange={(e) => handleLineChange(index, 'componentId', e.target.value)}
+                                                        size="small"
+                                                    >
+                                                        {components.map(comp => (
+                                                            <MenuItem key={comp.id} value={comp.id}>
+                                                                {comp.nameAr} ({comp.code})
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                </Grid>
+
+                                                <Grid item xs={12} sm={3}>
+                                                    <TextField
+                                                        select
+                                                        fullWidth
+                                                        label="نوع القيمة"
+                                                        value={valueType}
+                                                        onChange={(e) => {
+                                                            if (e.target.value === 'percentage') {
+                                                                handleLineChange(index, 'amount', 0);
+                                                                handleLineChange(index, 'percentage', line.percentage || 25);
+                                                            } else if (e.target.value === 'formula') {
+                                                                handleLineChange(index, 'percentage', null);
+                                                                handleLineChange(index, 'amount', 0);
+                                                            } else {
+                                                                handleLineChange(index, 'percentage', null);
+                                                                handleLineChange(index, 'amount', line.amount || 500);
+                                                            }
+                                                        }}
+                                                        size="small"
+                                                    >
+                                                        <MenuItem value="amount" disabled={component?.nature === 'FORMULA'}>مبلغ ثابت</MenuItem>
+                                                        <MenuItem value="percentage" disabled={component?.nature === 'FORMULA'}>نسبة % من الإجمالي (TOTAL)</MenuItem>
+                                                        <MenuItem value="formula" disabled={component?.nature !== 'FORMULA'}>معادلة محسوبة</MenuItem>
+                                                    </TextField>
+                                                </Grid>
+
+                                                <Grid item xs={12} sm={3}>
+                                                    {valueType === 'percentage' ? (
+                                                        <TextField
+                                                            fullWidth
+                                                            label="النسبة %"
+                                                            type="number"
+                                                            value={line.percentage || ''}
+                                                            onChange={(e) => handleLineChange(index, 'percentage', e.target.value)}
+                                                            size="small"
+                                                            InputProps={{ inputProps: { min: 0, max: 100 } }}
+                                                            helperText="من إجمالي الراتب (TOTAL)"
+                                                        />
+                                                    ) : valueType === 'formula' ? (
+                                                        <TextField
+                                                            fullWidth
+                                                            disabled
+                                                            label="المعادلة (من المكون)"
+                                                            value={component?.formula || ''}
+                                                            size="small"
+                                                            helperText="تعدل من صفحة المكونات"
+                                                        />
+                                                    ) : (
+                                                        <TextField
+                                                            fullWidth
+                                                            label="المبلغ (ريال)"
+                                                            type="number"
+                                                            value={line.amount || ''}
+                                                            onChange={(e) => handleLineChange(index, 'amount', e.target.value)}
+                                                            size="small"
+                                                            InputProps={{ inputProps: { min: 0 } }}
+                                                        />
+                                                    )}
+                                                </Grid>
+
+                                                <Grid item xs={12} sm={2}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="الترتيب"
+                                                        type="number"
+                                                        value={line.priority}
+                                                        onChange={(e) => handleLineChange(index, 'priority', e.target.value)}
+                                                        size="small"
+                                                    />
+                                                </Grid>
+                                            </Grid>
+
+                                            {component?.nature === 'VARIABLE' && (
+                                                <Typography variant="caption" color="warning.main" sx={{ mt: 1 }}>
+                                                    ⚠️ هذا المكوّن متغير ويُحسب من السياسات أو الإدخالات الشهرية.
+                                                </Typography>
+                                            )}
                                         </Box>
                                     );
                                 })}
@@ -407,11 +470,60 @@ export const SalaryStructuresPage = () => {
                         </Grid>
                     </Grid>
                 </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={handleClose} color="inherit">إلغاء</Button>
-                    <Button onClick={handleSubmit} variant="contained" color="primary">
-                        {editingId ? 'تحديث' : 'حفظ'}
-                    </Button>
+                <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+                    <Box display="flex" gap={1} alignItems="center">
+                        <TextField
+                            select
+                            size="small"
+                            label="موظف للمعاينة"
+                            sx={{ width: 200 }}
+                            value={selectedEmployeeId}
+                            onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                        >
+                            {employees?.length > 0 && employees.map(emp => (
+                                <MenuItem key={emp.id} value={emp.id}>{emp.nameAr || emp.nameEn || emp.email}</MenuItem>
+                            ))}
+                        </TextField>
+                        <Button
+                            variant="outlined"
+                            startIcon={previewLoading ? <CircularProgress size={20} /> : <PreviewIcon />}
+                            onClick={handlePreview}
+                            disabled={previewLoading || !selectedEmployeeId}
+                        >
+                            معاينة الحساب
+                        </Button>
+                    </Box>
+                    <Box>
+                        <Button onClick={handleClose} color="inherit" sx={{ mr: 1 }}>إلغاء</Button>
+                        <Button onClick={handleSubmit} variant="contained" color="primary">
+                            {editingId ? 'تحديث' : 'حفظ'}
+                        </Button>
+                    </Box>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>معاينة تفصيلية للحساب</DialogTitle>
+                <DialogContent dividers>
+                    {previewData && (
+                        <Box>
+                            <Typography variant="subtitle2" color="primary" gutterBottom>خطوات الحساب (Trace):</Typography>
+                            {previewData.calculationTrace?.map((t: any, i: number) => (
+                                <Box key={i} sx={{ mb: 1.5, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                    <Box display="flex" justifyContent="space-between">
+                                        <Typography variant="body2" fontWeight="bold">{t.description}</Typography>
+                                        <Typography variant="body2" color="primary">{t.result?.toLocaleString()} ر.س</Typography>
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                        {t.formula}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPreviewOpen(false)}>إغلاق</Button>
                 </DialogActions>
             </Dialog>
         </Box>

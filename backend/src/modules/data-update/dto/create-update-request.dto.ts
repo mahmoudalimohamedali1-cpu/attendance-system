@@ -6,6 +6,7 @@ export enum UpdateRequestType {
   DEVICE_UPDATE = 'DEVICE_UPDATE',
   BOTH = 'BOTH',
   DEVICE_CHANGE = 'DEVICE_CHANGE',
+  PROFILE_UPDATE = 'PROFILE_UPDATE',
 }
 
 export enum DevicePlatform {

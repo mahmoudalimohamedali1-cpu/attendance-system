@@ -53,6 +53,10 @@ import { MudadModule } from './modules/mudad/mudad.module';
 import { QiwaModule } from './modules/qiwa/qiwa.module';
 import { WpsTrackingModule } from './modules/wps-tracking/wps-tracking.module';
 import { AuditLogsModule } from './modules/audit/audit-logs.module';
+import { DisciplinaryModule } from './modules/disciplinary/disciplinary.module';
+import { CustodyModule } from './modules/custody/custody.module';
+import { EmployeeProfileModule } from './modules/employee-profile/employee-profile.module';
+import { PayrollSettingsModule } from './modules/payroll-settings/payroll-settings.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -116,6 +120,10 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     QiwaModule,             // تصدير قوى
     WpsTrackingModule,      // تتبع WPS
     AuditLogsModule,        // سجل التدقيق
+    DisciplinaryModule,     // موديول الجزاءات
+    CustodyModule,          // موديول العهد
+    EmployeeProfileModule,  // بروفايل الموظف الشامل
+    PayrollSettingsModule,  // إعدادات الرواتب
   ],
   controllers: [AppController],
   providers: [

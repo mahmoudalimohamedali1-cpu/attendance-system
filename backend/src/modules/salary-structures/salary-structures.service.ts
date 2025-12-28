@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
@@ -9,6 +9,7 @@ export class SalaryStructuresService {
 
     async create(dto: CreateSalaryStructureDto, companyId: string) {
         const { lines, ...rest } = dto;
+        this.validateUniqueComponents(lines);
 
         return this.prisma.salaryStructure.create({
             data: {
@@ -65,6 +66,7 @@ export class SalaryStructuresService {
 
     async update(id: string, companyId: string, dto: UpdateSalaryStructureDto) {
         const { lines, ...rest } = dto;
+        if (lines) this.validateUniqueComponents(lines);
 
         await this.findOne(id, companyId);
 
@@ -123,5 +125,13 @@ export class SalaryStructuresService {
         return this.prisma.salaryStructure.delete({
             where: { id },
         });
+    }
+
+    private validateUniqueComponents(lines: any[]) {
+        const ids = lines.map(l => l.componentId);
+        const duplicate = ids.find((id, index) => ids.indexOf(id) !== index);
+        if (duplicate) {
+            throw new BadRequestException('لا يمكن تكرار المكون في الهيكل الواحد');
+        }
     }
 }

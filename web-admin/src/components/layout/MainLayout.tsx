@@ -32,7 +32,6 @@ import {
   Assessment,
   Settings,
   Logout,
-  Notifications,
   Person,
   Sync as SyncIcon,
   Description,
@@ -41,10 +40,12 @@ import {
   ExpandLess,
   ExpandMore,
   Payments,
+  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
 import { useSidebarBadges } from '@/contexts/SidebarBadgesContext';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
 const drawerWidth = 250;
 
@@ -67,6 +68,9 @@ interface MenuGroup {
 }
 
 const allMenuItems: MenuItem[] = [
+  // Employee Self-Service (visible to all users)
+  { text: 'كشوفات راتبي', icon: <ReceiptIcon />, path: '/my-payslips' },
+
   // Dashboard Group
   { text: 'نظرة عامة', icon: <Dashboard />, path: '/dashboard' },
   { text: 'لوحة الرواتب', icon: <Dashboard />, path: '/payroll-dashboard', requiredRole: 'ADMIN' },
@@ -77,6 +81,8 @@ const allMenuItems: MenuItem[] = [
   { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance', requiredPermission: ['ATTENDANCE_VIEW', 'ATTENDANCE_EDIT'] },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
+  { text: 'الجزاءات والتحقيقات', icon: <Security />, path: '/disciplinary', requiredPermission: ['DISC_MANAGER_CREATE', 'DISC_HR_REVIEW', 'DISC_HR_DECISION', 'DISC_HR_FINALIZE', 'DISC_EMPLOYEE_RESPONSE'] },
+  { text: 'العهد والأصول', icon: <Business />, path: '/custody', requiredRole: 'ADMIN', requiredPermission: ['CUSTODY_VIEW', 'CUSTODY_ASSIGN', 'CUSTODY_APPROVE', 'CUSTODY_MANAGE_ITEMS', 'CUSTODY_MANAGE_CATEGORIES'] },
 
   // Financial
   { text: 'السلف', icon: <MonetizationOn />, path: '/advances', requiredPermission: ['ADVANCES_VIEW', 'ADVANCES_APPROVE_MANAGER', 'ADVANCES_APPROVE_HR'] },
@@ -101,6 +107,7 @@ const payrollGroup: MenuGroup = {
   icon: <Payments />,
   requiredRole: 'ADMIN',
   children: [
+    { text: 'إعدادات الرواتب', icon: <Settings />, path: '/payroll-settings' },
     { text: 'دورات الرواتب', icon: <MonetizationOn />, path: '/salary' },
     { text: 'قسائم الرواتب', icon: <Description />, path: '/payslips' },
     { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises' },
@@ -143,7 +150,6 @@ export const MainLayout = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
-  const [notificationCount, setNotificationCount] = useState(0);
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [complianceOpen, setComplianceOpen] = useState(false);
   const navigate = useNavigate();
@@ -174,21 +180,7 @@ export const MainLayout = () => {
     }
   }, [user]);
 
-  // Fetch notification count
-  useEffect(() => {
-    const fetchNotificationCount = async () => {
-      try {
-        const response = await api.get('/notifications/unread-count') as { count: number };
-        setNotificationCount(response.count || 0);
-      } catch (error) {
-        console.error('Failed to fetch notification count:', error);
-      }
-    };
-    fetchNotificationCount();
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchNotificationCount, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  // Note: Notification count is now handled by NotificationsBell component with polling
 
   // Filter menu items based on user role and permissions
   const visibleMenuItems = allMenuItems.filter((item) => {
@@ -255,7 +247,7 @@ export const MainLayout = () => {
         ) : (
           <>
             {/* First render items before payroll section */}
-            {visibleMenuItems.slice(0, 5).map((item) => (
+            {visibleMenuItems.slice(0, 13).map((item) => (
               <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
                 <ListItemButton
                   selected={location.pathname === item.path}
@@ -377,7 +369,7 @@ export const MainLayout = () => {
             )}
 
             {/* Remaining items after submenus */}
-            {visibleMenuItems.slice(11).map((item) => (
+            {visibleMenuItems.slice(13).map((item) => (
               <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
                 <ListItemButton
                   selected={location.pathname === item.path}
@@ -500,11 +492,7 @@ export const MainLayout = () => {
               {allMenuItems.find((item) => item.path === location.pathname)?.text || 'لوحة التحكم'}
             </Typography>
 
-            <IconButton sx={{ ml: 1 }} onClick={() => navigate('/notifications')}>
-              <Badge badgeContent={notificationCount} color="error">
-                <Notifications color="action" />
-              </Badge>
-            </IconButton>
+            <NotificationsBell />
 
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
               <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>

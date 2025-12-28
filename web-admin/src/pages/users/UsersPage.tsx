@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box,
@@ -42,10 +43,13 @@ import {
   FileDownload,
   Face,
   AccountBalance,
+  CloudUpload,
+  AccountCircle,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import { User } from '@/store/auth.store';
 import { BankAccountsTab } from './components/BankAccountsTab';
+import { QuickStats } from './components/QuickStats';
 
 interface UsersResponse {
   data: User[];
@@ -92,6 +96,8 @@ interface DirectManagerUser {
 }
 
 export const UsersPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -124,6 +130,32 @@ export const UsersPage = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
 
+  // معالجة معلمة البحث "edit" لفتح نافذة التعديل تلقائياً
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const userIdToEdit = params.get('edit');
+
+    if (userIdToEdit) {
+      // جلب بيانات المستخدم لفتحه في التعديل
+      const fetchAndOpenEdit = async () => {
+        try {
+          const user = await api.get(`/users/${userIdToEdit}`);
+          if (user) {
+            handleOpenDialog(user as User);
+            // مسح المعلمة من الرابط حتى لا تفتح مرة أخرى عند التحديث
+            const newParams = new URLSearchParams(location.search);
+            newParams.delete('edit');
+            navigate({ search: newParams.toString() }, { replace: true });
+          }
+        } catch (err) {
+          console.error('Failed to fetch user for editing:', err);
+        }
+      };
+
+      fetchAndOpenEdit();
+    }
+  }, [location.search]);
+
   // جلب المستخدمين
   const { data, isLoading, error } = useQuery<UsersResponse>({
     queryKey: ['users', page, rowsPerPage, search],
@@ -135,6 +167,18 @@ export const UsersPage = () => {
   const { data: branches } = useQuery<Branch[]>({
     queryKey: ['branches'],
     queryFn: () => api.get('/branches'),
+  });
+
+  // جلب إحصائيات المستخدمين السريعة
+  const { data: quickStats, isLoading: statsLoading } = useQuery<{
+    totalActive: number;
+    newThisMonth: number;
+    onLeaveToday: number;
+    pendingApprovals: number;
+  }>({
+    queryKey: ['users-quick-stats'],
+    queryFn: () => api.get('/dashboard/users-stats'),
+    staleTime: 30000, // Cache for 30 seconds
   });
 
   // جلب الأقسام
@@ -221,7 +265,7 @@ export const UsersPage = () => {
       if (!payload.password) {
         delete payload.password;
       }
-      return api.patch(`/users/${id}`, payload);
+      return api.patch(`/ users / ${id} `, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -240,7 +284,7 @@ export const UsersPage = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/users/${id}`),
+    mutationFn: (id: string) => api.delete(`/ users / ${id} `),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
@@ -248,7 +292,7 @@ export const UsersPage = () => {
 
   // إعادة تعيين الوجه
   const resetFaceMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/users/${id}/reset-face`),
+    mutationFn: (id: string) => api.post(`/ users / ${id}/reset-face`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       alert('تم إعادة تعيين الوجه بنجاح. يمكن للموظف تسجيل وجهه من جديد عند الحضور القادم.');
@@ -409,6 +453,14 @@ export const UsersPage = () => {
             تصدير Excel
           </Button>
           <Button
+            variant="outlined"
+            color="success"
+            startIcon={<CloudUpload />}
+            onClick={() => navigate('/users/import')}
+          >
+            استيراد موظفين
+          </Button>
+          <Button
             variant="contained"
             startIcon={<PersonAdd />}
             onClick={() => handleOpenDialog()}
@@ -417,6 +469,16 @@ export const UsersPage = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Quick Stats Dashboard */}
+      <QuickStats
+        totalActive={quickStats?.totalActive ?? 0}
+        newThisMonth={quickStats?.newThisMonth ?? 0}
+        onLeaveToday={quickStats?.onLeaveToday ?? 0}
+        pendingApprovals={quickStats?.pendingApprovals ?? 0}
+        isLoading={statsLoading}
+      />
+
 
       <Card>
         <CardContent>
@@ -515,7 +577,16 @@ export const UsersPage = () => {
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title="عرض">
+                          <Tooltip title="البروفايل الكامل">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => navigate(`/employee-profile/${user.id}`)}
+                            >
+                              <AccountCircle />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="عرض سريع">
                             <IconButton
                               size="small"
                               onClick={() => {

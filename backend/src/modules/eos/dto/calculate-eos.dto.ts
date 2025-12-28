@@ -22,6 +22,11 @@ export class CalculateEosDto {
     @IsNumber()
     @IsOptional()
     overrideBaseSalary?: number;
+
+    @ApiPropertyOptional({ description: 'تجاوز عدد أيام الإجازة المتبقية (اختياري)', example: 15 })
+    @IsNumber()
+    @IsOptional()
+    overrideRemainingLeaveDays?: number;
 }
 
 export interface EosBreakdown {
@@ -31,6 +36,7 @@ export interface EosBreakdown {
     lastWorkingDay: Date;
     yearsOfService: number;
     monthsOfService: number;
+    daysOfService: number;        // الأيام المتبقية
     totalDaysOfService: number;
 
     baseSalary: number;
@@ -47,6 +53,7 @@ export interface EosBreakdown {
 
     // رصيد الإجازات
     remainingLeaveDays: number;
+    remainingLeaveDaysOverridden: boolean;
     leavePayout: number;
 
     // خصم السلف
@@ -55,3 +62,4 @@ export interface EosBreakdown {
     // المبلغ النهائي
     netSettlement: number;
 }
+

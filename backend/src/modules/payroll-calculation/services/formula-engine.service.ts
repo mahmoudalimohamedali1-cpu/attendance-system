@@ -329,6 +329,24 @@ export class FormulaEngineService {
     }
 
     /**
+     * استخراج المتغيرات المستخدمة في المعادلة
+     */
+    extractDependencies(formula: string): string[] {
+        if (!formula) return [];
+        const expression = formula.toUpperCase();
+        const deps: string[] = [];
+
+        for (const varName of FormulaEngineService.SUPPORTED_VARIABLES) {
+            const regex = new RegExp(`\\b${varName}\\b`, 'g');
+            if (regex.test(expression)) {
+                deps.push(varName);
+            }
+        }
+
+        return deps;
+    }
+
+    /**
      * قائمة المتغيرات المدعومة
      */
     getSupportedVariables(): string[] {

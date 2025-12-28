@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
     Box,
@@ -18,8 +18,11 @@ import {
     TableRow,
     Chip,
     Autocomplete,
+    InputAdornment,
+    Tooltip,
+    IconButton,
 } from '@mui/material';
-import { Calculate, WorkOff, MonetizationOn, Receipt } from '@mui/icons-material';
+import { Calculate, WorkOff, MonetizationOn, Receipt, Edit, Check, Close } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 
 interface User {
@@ -37,6 +40,7 @@ interface EosBreakdown {
     lastWorkingDay: string;
     yearsOfService: number;
     monthsOfService: number;
+    daysOfService: number;
     totalDaysOfService: number;
     baseSalary: number;
     reason: string;
@@ -46,6 +50,7 @@ interface EosBreakdown {
     eosAdjustmentFactor: number;
     adjustedEos: number;
     remainingLeaveDays: number;
+    remainingLeaveDaysOverridden: boolean;
     leavePayout: number;
     outstandingLoans: number;
     netSettlement: number;
@@ -65,6 +70,11 @@ export const EosCalculatorPage = () => {
     const [lastWorkingDay, setLastWorkingDay] = useState(new Date().toISOString().split('T')[0]);
     const [result, setResult] = useState<EosBreakdown | null>(null);
 
+    // Vacation days override
+    const [overrideRemainingLeaveDays, setOverrideRemainingLeaveDays] = useState<number | null>(null);
+    const [isEditingLeave, setIsEditingLeave] = useState(false);
+    const [tempLeaveDays, setTempLeaveDays] = useState<string>('');
+
     const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
         queryKey: ['users-simple'],
         queryFn: async () => {
@@ -76,13 +86,49 @@ export const EosCalculatorPage = () => {
     const calculateMutation = useMutation({
         mutationFn: async () => {
             if (!selectedUser) throw new Error('اختر موظف');
-            return api.post(`/eos/calculate/${selectedUser.id}`, { reason, lastWorkingDay }) as Promise<EosBreakdown>;
+            const payload: any = { reason, lastWorkingDay };
+            if (overrideRemainingLeaveDays !== null) {
+                payload.overrideRemainingLeaveDays = overrideRemainingLeaveDays;
+            }
+            return api.post(`/eos/calculate/${selectedUser.id}`, payload) as Promise<EosBreakdown>;
         },
         onSuccess: (data) => setResult(data),
         onError: (err: any) => alert(err.response?.data?.message || 'حدث خطأ'),
     });
 
+    // Reset override when employee changes
+    useEffect(() => {
+        setOverrideRemainingLeaveDays(null);
+        setResult(null);
+    }, [selectedUser]);
+
     const formatCurrency = (n: number) => n.toLocaleString('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ريال';
+
+    const formatServiceDuration = (years: number, months: number, days: number) => {
+        const parts = [];
+        if (years > 0) parts.push(`${years} سنة`);
+        if (months > 0) parts.push(`${months} شهر`);
+        if (days > 0) parts.push(`${days} يوم`);
+        return parts.join(' و ') || '0 يوم';
+    };
+
+    const handleEditLeave = () => {
+        setTempLeaveDays(result?.remainingLeaveDays?.toString() || '0');
+        setIsEditingLeave(true);
+    };
+
+    const handleConfirmLeave = () => {
+        const days = parseInt(tempLeaveDays) || 0;
+        setOverrideRemainingLeaveDays(days);
+        setIsEditingLeave(false);
+        // Recalculate with new leave days
+        setTimeout(() => calculateMutation.mutate(), 100);
+    };
+
+    const handleCancelLeave = () => {
+        setIsEditingLeave(false);
+        setTempLeaveDays('');
+    };
 
     return (
         <Box>
@@ -186,7 +232,18 @@ export const EosCalculatorPage = () => {
                                             </TableRow>
                                             <TableRow>
                                                 <TableCell>مدة الخدمة</TableCell>
-                                                <TableCell><strong>{result.yearsOfService} سنة و {result.monthsOfService} شهر</strong></TableCell>
+                                                <TableCell>
+                                                    <strong>
+                                                        {formatServiceDuration(
+                                                            result.yearsOfService,
+                                                            result.monthsOfService,
+                                                            result.daysOfService
+                                                        )}
+                                                    </strong>
+                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                        ({result.totalDaysOfService} يوم إجمالاً)
+                                                    </Typography>
+                                                </TableCell>
                                             </TableRow>
                                             <TableRow>
                                                 <TableCell>الراتب الأساسي</TableCell>
@@ -225,7 +282,41 @@ export const EosCalculatorPage = () => {
                                     <Table size="small">
                                         <TableBody>
                                             <TableRow sx={{ bgcolor: 'success.light' }}>
-                                                <TableCell>+ تعويض الإجازات ({result.remainingLeaveDays} يوم)</TableCell>
+                                                <TableCell>
+                                                    + تعويض الإجازات
+                                                    {isEditingLeave ? (
+                                                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, ml: 1 }}>
+                                                            <TextField
+                                                                size="small"
+                                                                type="number"
+                                                                value={tempLeaveDays}
+                                                                onChange={(e) => setTempLeaveDays(e.target.value)}
+                                                                sx={{ width: 80 }}
+                                                                InputProps={{
+                                                                    endAdornment: <InputAdornment position="end">يوم</InputAdornment>,
+                                                                }}
+                                                            />
+                                                            <IconButton size="small" color="primary" onClick={handleConfirmLeave}>
+                                                                <Check fontSize="small" />
+                                                            </IconButton>
+                                                            <IconButton size="small" color="error" onClick={handleCancelLeave}>
+                                                                <Close fontSize="small" />
+                                                            </IconButton>
+                                                        </Box>
+                                                    ) : (
+                                                        <>
+                                                            ({result.remainingLeaveDays} يوم)
+                                                            {result.remainingLeaveDaysOverridden && (
+                                                                <Chip label="معدّل" size="small" color="warning" sx={{ mx: 1 }} />
+                                                            )}
+                                                            <Tooltip title="تعديل عدد أيام الإجازة">
+                                                                <IconButton size="small" onClick={handleEditLeave}>
+                                                                    <Edit fontSize="small" />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell>{formatCurrency(result.leavePayout)}</TableCell>
                                             </TableRow>
                                             <TableRow sx={{ bgcolor: 'error.light' }}>

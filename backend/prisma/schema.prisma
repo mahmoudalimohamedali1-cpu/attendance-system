@@ -56,11 +56,109 @@ model Company {
   submissionStatusLogs SubmissionStatusLog[]
   approvalChainConfigs ApprovalChainConfig[]
   companyBankAccounts  CompanyBankAccount[]
+  disciplinaryCases    DisciplinaryCase[]
+  disciplinaryPolicy   CompanyDisciplinaryPolicy?
+  payrollAdjustments   PayrollAdjustment[]
+  payrollSettings      PayrollSettings?
+
+  // العهد (Custody)
+  custodyCategories   CustodyCategory[]
+  custodyItems        CustodyItem[]
+  custodyAssignments  CustodyAssignment[]
+  custodyReturns      CustodyReturn[]
+  custodyTransfers    CustodyTransfer[]
+  custodyMaintenances CustodyMaintenance[]
+
+  // نظام الإجازات المتقدم
+  leaveTypeConfigs LeaveTypeConfig[]
+  leaveBalances    LeaveBalance[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("companies")
+}
+
+// ==================== إعدادات الرواتب (Payroll Settings) ====================
+
+// قاعدة حساب يوم العمل
+enum WorkDayCalculationBase {
+  CALENDAR_DAYS // حساب على أساس أيام التقويم (30 يوم)
+  ACTUAL_WORKING_DAYS // حساب على أساس أيام العمل الفعلية
+  FIXED_30_DAYS // ثابت 30 يوم
+}
+
+// طريقة حساب التوظيف وإنهاء الخدمات
+enum HireTerminationMethod {
+  EXCLUDE_WEEKENDS // استثناء عطلات نهاية الأسبوع
+  INCLUDE_ALL_DAYS // شمول جميع الأيام
+  PRORATE_BY_CALENDAR // التناسب حسب التقويم
+}
+
+// طريقة حساب الإجازات غير المدفوعة
+enum UnpaidLeaveMethod {
+  BASED_ON_SHIFTS // على أساس مناوبات العمل
+  BASED_ON_CALENDAR // على أساس التقويم
+  BASED_ON_WORKING_DAYS // على أساس أيام العمل فقط
+}
+
+// طريقة حساب العمل الإضافي
+enum OvertimeCalculationMethod {
+  BASED_ON_SHIFTS // على أساس مناوبات العمل
+  BASED_ON_BASIC_ONLY // على أساس الراتب الأساسي فقط
+  BASED_ON_TOTAL // على أساس إجمالي الراتب
+}
+
+// طريقة حساب بدل الإجازة
+enum LeaveAllowanceMethod {
+  BASIC_SALARY // الراتب الأساسي
+  BASIC_PLUS_HOUSING // الراتب الأساسي + بدل السكن
+  TOTAL_SALARY // إجمالي الراتب
+}
+
+model PayrollSettings {
+  id        String  @id @default(uuid())
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // ========== تاريخ إغلاق الرواتب ==========
+  payrollClosingDay Int @default(25) @map("payroll_closing_day") // 0-28
+
+  // ========== حساب التوظيف وإنهاء الخدمات ==========
+  hireTerminationCalcBase WorkDayCalculationBase @default(CALENDAR_DAYS) @map("hire_termination_calc_base")
+  hireTerminationMethod   HireTerminationMethod  @default(EXCLUDE_WEEKENDS) @map("hire_termination_method")
+
+  // ========== حساب الإجازات غير المدفوعة ==========
+  unpaidLeaveCalcBase      WorkDayCalculationBase @default(ACTUAL_WORKING_DAYS) @map("unpaid_leave_calc_base")
+  unpaidLeaveMethod        UnpaidLeaveMethod      @default(BASED_ON_SHIFTS) @map("unpaid_leave_method")
+  splitUnpaidByClosingDate Boolean                @default(false) @map("split_unpaid_by_closing_date") // تقسيم بناءً على تاريخ الإغلاق
+
+  // ========== حساب ساعات العمل الإضافي ==========
+  overtimeCalcBase WorkDayCalculationBase    @default(ACTUAL_WORKING_DAYS) @map("overtime_calc_base")
+  overtimeMethod   OvertimeCalculationMethod @default(BASED_ON_SHIFTS) @map("overtime_method")
+
+  // ========== حساب بدل أيام الإجازة ==========
+  leaveAllowanceCalcBase WorkDayCalculationBase @default(CALENDAR_DAYS) @map("leave_allowance_calc_base")
+  leaveAllowanceMethod   LeaveAllowanceMethod   @default(BASIC_PLUS_HOUSING) @map("leave_allowance_method")
+
+  // ========== إعدادات قسيمة الراتب ==========
+  showCompanyContributions Boolean @default(true) @map("show_company_contributions") // إظهار مساهمات الشركة
+  showClosingDateOnPayslip Boolean @default(true) @map("show_closing_date_on_payslip") // إظهار تاريخ الإغلاق
+  deductAbsenceFromBasic   Boolean @default(true) @map("deduct_absence_from_basic") // اقتطاع الغياب من الأساسي
+  showActualAbsenceDays    Boolean @default(false) @map("show_actual_absence_days") // إظهار حساب أيام الغياب الفعلي
+
+  // ========== أرصدة الرواتب السلبية ==========
+  enableNegativeBalanceCarryover Boolean @default(false) @map("enable_negative_balance_carryover") // ترحيل الرصيد السلبي
+  settleNegativeAsTransaction    Boolean @default(false) @map("settle_negative_as_transaction") // تسوية كحركة خارجية
+
+  // ========== إعدادات إضافية ==========
+  roundSalaryToNearest       Int @default(0) @map("round_salary_to_nearest") // تقريب الراتب (0 = بدون تقريب)
+  defaultWorkingDaysPerMonth Int @default(30) @map("default_working_days_per_month")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("payroll_settings")
 }
 
 // ==================== المستخدمين والأدوار ====================
@@ -69,6 +167,7 @@ enum Role {
   ADMIN
   MANAGER
   EMPLOYEE
+  HR
 }
 
 enum UserStatus {
@@ -126,19 +225,19 @@ model User {
   nationalId   String?    @unique @map("national_id") // رقم الهوية أو الإقامة
 
   // بيانات الإقامة والجواز (للأجانب) - متطلبات قوى
-  iqamaNumber       String?   @map("iqama_number") // رقم الإقامة
-  iqamaExpiryDate   DateTime? @map("iqama_expiry_date") @db.Date
-  borderNumber      String?   @map("border_number") // رقم الحدود
-  passportNumber    String?   @map("passport_number") // رقم الجواز
+  iqamaNumber        String?   @map("iqama_number") // رقم الإقامة
+  iqamaExpiryDate    DateTime? @map("iqama_expiry_date") @db.Date
+  borderNumber       String?   @map("border_number") // رقم الحدود
+  passportNumber     String?   @map("passport_number") // رقم الجواز
   passportExpiryDate DateTime? @map("passport_expiry_date") @db.Date
-  professionCode    String?   @map("profession_code") // كود المهنة في قوى
-  profession        String?   @map("profession") // اسم المهنة
+  professionCode     String?   @map("profession_code") // كود المهنة في قوى
+  profession         String?   @map("profession") // اسم المهنة
 
   // بيانات GOSI/HRSD - متطلبات التأمينات ووزارة الموارد البشرية
-  dateOfBirth       DateTime? @map("date_of_birth") @db.Date // تاريخ الميلاد
-  gender            String?   // MALE, FEMALE - الجنس
-  gosiNumber        String?   @unique @map("gosi_number") // رقم التأمينات الاجتماعية
-  maritalStatus     String?   @map("marital_status") // SINGLE, MARRIED, DIVORCED, WIDOWED
+  dateOfBirth   DateTime? @map("date_of_birth") @db.Date // تاريخ الميلاد
+  gender        String? // MALE, FEMALE - الجنس
+  gosiNumber    String?   @unique @map("gosi_number") // رقم التأمينات الاجتماعية
+  maritalStatus String?   @map("marital_status") // SINGLE, MARRIED, DIVORCED, WIDOWED
 
   // Super Admin - يتخطى كل الـ guards
   isSuperAdmin Boolean @default(false) @map("is_super_admin")
@@ -219,9 +318,60 @@ model User {
   retroPays         RetroPay[]
   policyTargets     Policy[]                   @relation("PolicyTargetEmployee")
 
+  // Disciplinary Relations
+  createdDisciplinaryCases DisciplinaryCase[]           @relation("ManagerCreatedCases")
+  disciplinaryCases        DisciplinaryCase[]           @relation("EmployeeDisciplinaryCases")
+  disciplinaryRecords      EmployeeDisciplinaryRecord[]
+  payrollAdjustments       PayrollAdjustment[]
+
+  // العهد (Custody Relations)
+  custodyAssignments        CustodyAssignment[]  @relation("EmployeeCustody")
+  custodyAssignedBy         CustodyAssignment[]  @relation("CustodyAssigner")
+  custodyApproved           CustodyAssignment[]  @relation("CustodyApprover")
+  custodyReturns            CustodyReturn[]      @relation("CustodyReturner")
+  custodyReturnReviews      CustodyReturn[]      @relation("CustodyReturnReviewer")
+  custodyTransfersFrom      CustodyTransfer[]    @relation("CustodyTransferFrom")
+  custodyTransfersTo        CustodyTransfer[]    @relation("CustodyTransferTo")
+  custodyTransferInitiated  CustodyTransfer[]    @relation("CustodyTransferInitiator")
+  custodyTransferApproved   CustodyTransfer[]    @relation("CustodyTransferApprover")
+  custodyMaintenanceReports CustodyMaintenance[] @relation("MaintenanceReporter")
+
+  // حقول مخصصة (للاستيراد الذكي)
+  customFields UserCustomField[]
+
+  // وثائق الموظف
+  employeeDocuments EmployeeDocument[]
+
+  // أرصدة الإجازات المتقدمة
+  leaveBalances LeaveBalance[]
+
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
   @@map("users")
+}
+
+// ==================== حقول مخصصة للموظفين (Smart Import) ====================
+
+model UserCustomField {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fieldName  String @map("field_name") // اسم الحقل (مثل "راتب_الدوام")
+  fieldValue String @map("field_value") @db.Text // القيمة
+  fieldType  String @default("text") @map("field_type") // text, number, date, etc.
+
+  // مصدر الحقل
+  sourceHeader String?  @map("source_header") // اسم العمود الأصلي في ملف الاستيراد
+  importedAt   DateTime @default(now()) @map("imported_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, fieldName])
+  @@index([userId])
+  @@index([fieldName])
+  @@map("user_custom_fields")
 }
 
 // ==================== الدرجات الوظيفية ====================
@@ -352,6 +502,7 @@ enum UpdateRequestType {
   DEVICE_UPDATE // تحديث بيانات الجهاز فقط
   BOTH // تحديث كليهما
   DEVICE_CHANGE // تغيير جهاز (موبايل جديد)
+  PROFILE_UPDATE // تحديث بيانات الملف الشخصي
 }
 
 model DataUpdateRequest {
@@ -385,6 +536,9 @@ model DataUpdateRequest {
   reviewedAt      DateTime? @map("reviewed_at")
   reviewNote      String?   @map("review_note") // ملاحظة المسؤول
   rejectionReason String?   @map("rejection_reason")
+
+  // ============ بيانات الملف الشخصي الجديدة ============
+  newData Json? @map("new_data")
 
   // ============ معلومات إضافية ============
   oldDeviceId String? @map("old_device_id") // الجهاز القديم للمقارنة
@@ -465,11 +619,12 @@ model Branch {
   // أيام العمل
   workingDays String @default("1,2,3,4,5") @map("working_days") // 0=الأحد, 6=السبت
 
-  users       User[]
-  departments Department[]
-  attendances Attendance[]
-  schedules   WorkSchedule[]
-  policies    Policy[] // سياسات على مستوى الفرع
+  users        User[]
+  departments  Department[]
+  attendances  Attendance[]
+  schedules    WorkSchedule[]
+  policies     Policy[] // سياسات على مستوى الفرع
+  custodyItems CustodyItem[] // العهد في هذا الفرع
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -638,6 +793,145 @@ model SuspiciousAttempt {
   @@map("suspicious_attempts")
 }
 
+// ==================== نظام إدارة الإجازات المتقدم ====================
+
+// تصنيف الإجازات
+enum LeaveCategory {
+  BALANCED // إجازات متوازنة/متراكمة (سنوية)
+  CASUAL // إجازات عارضة (زواج، وفاة)
+  SICK // إجازات مرضية
+  UNPAID // بدون راتب
+}
+
+// إعدادات أنواع الإجازات - Dynamic Leave Type Configuration
+model LeaveTypeConfig {
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  code        String // ANNUAL, SICK, MARRIAGE - للرجوع البرمجي
+  nameAr      String  @map("name_ar")
+  nameEn      String? @map("name_en")
+  description String?
+
+  // تصنيف الإجازة
+  category LeaveCategory @default(BALANCED)
+
+  // إعدادات الاستحقاق
+  isEntitlementBased Boolean @default(true) @map("is_entitlement_based") // هل تعتمد على استحقاق سنوي؟
+  defaultEntitlement Int     @default(0) @map("default_entitlement") // الاستحقاق الافتراضي
+  maxBalanceCap      Int?    @map("max_balance_cap") // الحد الأقصى للتراكم (مثل 60 يوم)
+
+  // إعدادات الترحيل
+  allowCarryForward        Boolean @default(true) @map("allow_carry_forward")
+  maxCarryForwardDays      Int?    @map("max_carry_forward_days")
+  carryForwardExpiryMonths Int?    @map("carry_forward_expiry_months") // صلاحية الأيام المرحلة
+
+  // إعدادات الراتب
+  isPaid            Boolean @default(true) @map("is_paid")
+  paymentPercentage Int     @default(100) @map("payment_percentage") // نسبة الراتب
+
+  // متطلبات
+  requiresAttachment          Boolean @default(false) @map("requires_attachment")
+  attachmentRequiredAfterDays Int?    @map("attachment_required_after_days")
+  minNoticeDays               Int     @default(0) @map("min_notice_days") // فترة الإشعار المسبق
+  minRequestDays              Int     @default(1) @map("min_request_days")
+  maxRequestDays              Int?    @map("max_request_days")
+
+  // قواعد خاصة
+  allowNegativeBalance Boolean @default(false) @map("allow_negative_balance")
+  deductFromAnnual     Boolean @default(false) @map("deduct_from_annual") // خصم من السنوية إذا نفد الرصيد
+  isOneTimeOnly        Boolean @default(false) @map("is_one_time_only") // مرة واحدة فقط (مثل الحج)
+
+  // الحالة
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  // العلاقات
+  entitlementTiers LeaveEntitlementTier[]
+  sickPayTiers     SickPayTier[]
+  leaveBalances    LeaveBalance[]
+  leaveRequests    LeaveRequest[]         @relation("LeaveTypeConfigRequests")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive])
+  @@map("leave_type_configs")
+}
+
+// شرائح الاستحقاق حسب سنوات الخدمة
+model LeaveEntitlementTier {
+  id          String          @id @default(uuid())
+  leaveTypeId String          @map("leave_type_id")
+  leaveType   LeaveTypeConfig @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  minServiceYears Int @map("min_service_years") // من سنة
+  maxServiceYears Int @map("max_service_years") // إلى سنة (999 = غير محدود)
+  entitlementDays Int @map("entitlement_days") // عدد أيام الاستحقاق
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([leaveTypeId, minServiceYears])
+  @@index([leaveTypeId])
+  @@map("leave_entitlement_tiers")
+}
+
+// شرائح أجر الإجازة المرضية (نظام العمل السعودي)
+model SickPayTier {
+  id          String          @id @default(uuid())
+  leaveTypeId String          @map("leave_type_id")
+  leaveType   LeaveTypeConfig @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  fromDay        Int @map("from_day") // من يوم
+  toDay          Int @map("to_day") // إلى يوم
+  paymentPercent Int @map("payment_percent") // نسبة الراتب (100, 75, 0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([leaveTypeId, fromDay])
+  @@index([leaveTypeId])
+  @@map("sick_pay_tiers")
+}
+
+// رصيد الإجازات لكل موظف لكل نوع
+model LeaveBalance {
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  userId      String          @map("user_id")
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveTypeId String          @map("leave_type_id")
+  leaveType   LeaveTypeConfig @relation(fields: [leaveTypeId], references: [id])
+
+  year Int // السنة الميلادية
+
+  // الاستحقاق
+  entitled       Decimal @default(0) @db.Decimal(5, 2) // المستحق للسنة
+  carriedForward Decimal @default(0) @map("carried_forward") @db.Decimal(5, 2) // المرحل من السنة السابقة
+
+  // الاستخدام
+  used    Decimal @default(0) @db.Decimal(5, 2) // المستخدم
+  pending Decimal @default(0) @db.Decimal(5, 2) // المعلق (طلبات قيد الموافقة)
+
+  // للإجازات العارضة (مثل الزواج) - عدد مرات الاستخدام
+  timesUsed Int @default(0) @map("times_used")
+
+  // تاريخ انتهاء صلاحية الأيام المرحلة
+  carryForwardExpiresAt DateTime? @map("carry_forward_expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, leaveTypeId, year])
+  @@index([userId, year])
+  @@index([leaveTypeId])
+  @@index([companyId])
+  @@map("leave_balances")
+}
+
 // ==================== طلبات الإجازات ====================
 
 enum LeaveType {
@@ -727,11 +1021,29 @@ model LeaveRequest {
   approverNotes String?   @map("approver_notes")
   approvedAt    DateTime? @map("approved_at")
 
+  // ========== نظام الإجازات المتقدم ==========
+
+  // ربط مع LeaveTypeConfig (اختياري للتوافق الخلفي)
+  leaveTypeConfigId String?          @map("leave_type_config_id")
+  leaveTypeConfig   LeaveTypeConfig? @relation("LeaveTypeConfigRequests", fields: [leaveTypeConfigId], references: [id])
+
+  // للإجازة المرضية - حساب الأجر المتدرج (نظام العمل السعودي)
+  fullPayDays    Int? @map("full_pay_days") // أيام براتب كامل (100%)
+  partialPayDays Int? @map("partial_pay_days") // أيام براتب جزئي (75%)
+  unpaidDays     Int? @map("unpaid_days") // أيام بدون راتب (0%)
+
+  // للتأثير على الرواتب
+  salaryImpact Decimal? @map("salary_impact") @db.Decimal(10, 2) // قيمة الخصم/الإضافة
+
+  // وقت التقديم بالنسبة للإشعار المسبق
+  noticeDaysProvided Int? @map("notice_days_provided")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([companyId, status])
   @@index([userId, status])
+  @@index([leaveTypeConfigId])
   @@map("leave_requests")
 }
 
@@ -836,6 +1148,15 @@ enum NotificationType {
   LETTER_REJECTED
   SUSPICIOUS_ACTIVITY
   GENERAL
+  // Disciplinary notifications
+  DISC_CASE_SUBMITTED
+  DISC_HR_REJECTED
+  DISC_INFORMAL_SENT
+  DISC_EMP_REJECTED_INFORMAL
+  DISC_HEARING_SCHEDULED
+  DISC_DECISION_ISSUED
+  DISC_EMP_OBJECTED
+  DISC_FINALIZED
 }
 
 model Notification {
@@ -852,6 +1173,10 @@ model Notification {
   bodyEn  String?          @map("body_en")
   data    Json? // بيانات إضافية
 
+  // Entity reference for navigation
+  entityType String? @map("entity_type") // DISCIPLINARY_CASE, LEAVE_REQUEST
+  entityId   String? @map("entity_id")
+
   isRead Boolean   @default(false) @map("is_read")
   readAt DateTime? @map("read_at")
 
@@ -859,6 +1184,7 @@ model Notification {
 
   @@index([companyId])
   @@index([userId, isRead])
+  @@index([userId, isRead, createdAt])
   @@map("notifications")
 }
 
@@ -1306,30 +1632,30 @@ model EmployeeBankAccount {
 // ==================== حسابات الشركة البنكية ====================
 
 model CompanyBankAccount {
-  id        String   @id @default(uuid())
-  companyId String   @map("company_id")
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   // بيانات البنك
   bankName    String  @map("bank_name")
-  bankCode    String  @map("bank_code")  // SABB, RJHI, NCB, etc
+  bankCode    String  @map("bank_code") // SABB, RJHI, NCB, etc
   iban        String
   accountName String  @map("account_name")
   swiftCode   String? @map("swift_code")
-  
+
   // الحالة
-  isPrimary   Boolean @default(false) @map("is_primary")
-  isActive    Boolean @default(true)  @map("is_active")
-  
+  isPrimary Boolean @default(false) @map("is_primary")
+  isActive  Boolean @default(true) @map("is_active")
+
   // بيانات WPS/MOL
-  molId           String? @map("mol_id")           // رقم المنشأة في وزارة العمل
-  wpsParticipant  String? @map("wps_participant")  // رقم المشارك في WPS
-  
+  molId          String? @map("mol_id") // رقم المنشأة في وزارة العمل
+  wpsParticipant String? @map("wps_participant") // رقم المشارك في WPS
+
   // معلومات إضافية
-  accountType     String  @default("CURRENT") @map("account_type") // CURRENT, SAVINGS
-  currency        String  @default("SAR")
-  notes           String?
-  
+  accountType String  @default("CURRENT") @map("account_type") // CURRENT, SAVINGS
+  currency    String  @default("SAR")
+  notes       String?
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1367,32 +1693,32 @@ model Contract {
   salaryCycle String @default("MONTHLY") @map("salary_cycle")
 
   // ===== حقول الراتب - متطلبات قوى =====
-  basicSalary        Decimal?  @map("basic_salary") @db.Decimal(10, 2) // الراتب الأساسي
-  housingAllowance   Decimal?  @map("housing_allowance") @db.Decimal(10, 2) // بدل السكن
-  transportAllowance Decimal?  @map("transport_allowance") @db.Decimal(10, 2) // بدل المواصلات
-  otherAllowances    Decimal?  @map("other_allowances") @db.Decimal(10, 2) // بدلات أخرى
-  totalSalary        Decimal?  @map("total_salary") @db.Decimal(10, 2) // إجمالي الراتب
+  basicSalary        Decimal? @map("basic_salary") @db.Decimal(10, 2) // الراتب الأساسي
+  housingAllowance   Decimal? @map("housing_allowance") @db.Decimal(10, 2) // بدل السكن
+  transportAllowance Decimal? @map("transport_allowance") @db.Decimal(10, 2) // بدل المواصلات
+  otherAllowances    Decimal? @map("other_allowances") @db.Decimal(10, 2) // بدلات أخرى
+  totalSalary        Decimal? @map("total_salary") @db.Decimal(10, 2) // إجمالي الراتب
 
   // ===== بيانات العمل - متطلبات قوى =====
-  contractJobTitle     String? @map("contract_job_title") // المسمى الوظيفي في العقد
-  workLocation         String? @map("work_location") // مقر العمل
-  workingHoursPerWeek  Int     @default(48) @map("working_hours_per_week") // ساعات العمل الأسبوعية
-  annualLeaveDays      Int     @default(21) @map("annual_leave_days") // أيام الإجازة السنوية
-  noticePeriodDays     Int     @default(30) @map("notice_period_days") // فترة الإشعار
+  contractJobTitle    String? @map("contract_job_title") // المسمى الوظيفي في العقد
+  workLocation        String? @map("work_location") // مقر العمل
+  workingHoursPerWeek Int     @default(48) @map("working_hours_per_week") // ساعات العمل الأسبوعية
+  annualLeaveDays     Int     @default(21) @map("annual_leave_days") // أيام الإجازة السنوية
+  noticePeriodDays    Int     @default(30) @map("notice_period_days") // فترة الإشعار
 
   // ===== التوقيعات الإلكترونية =====
-  employeeSignature  Boolean   @default(false) @map("employee_signature") // توقيع الموظف
-  employeeSignedAt   DateTime? @map("employee_signed_at") // تاريخ توقيع الموظف
-  employerSignature  Boolean   @default(false) @map("employer_signature") // توقيع صاحب العمل
-  employerSignedAt   DateTime? @map("employer_signed_at") // تاريخ توقيع صاحب العمل
-  signedByUserId     String?   @map("signed_by_user_id") // من وقع نيابة عن صاحب العمل
+  employeeSignature Boolean   @default(false) @map("employee_signature") // توقيع الموظف
+  employeeSignedAt  DateTime? @map("employee_signed_at") // تاريخ توقيع الموظف
+  employerSignature Boolean   @default(false) @map("employer_signature") // توقيع صاحب العمل
+  employerSignedAt  DateTime? @map("employer_signed_at") // تاريخ توقيع صاحب العمل
+  signedByUserId    String?   @map("signed_by_user_id") // من وقع نيابة عن صاحب العمل
 
   // ===== تكامل قوى =====
-  qiwaContractId String?        @unique @map("qiwa_contract_id") // رقم العقد في قوى
-  qiwaStatus     QiwaAuthStatus @default(NOT_SUBMITTED) @map("qiwa_status") // حالة التوثيق
-  qiwaAuthDate   DateTime?      @map("qiwa_auth_date") // تاريخ التوثيق في قوى
-  qiwaRejectReason String?      @map("qiwa_reject_reason") // سبب الرفض من قوى
-  qiwaLastSync   DateTime?      @map("qiwa_last_sync") // آخر مزامنة مع قوى
+  qiwaContractId   String?        @unique @map("qiwa_contract_id") // رقم العقد في قوى
+  qiwaStatus       QiwaAuthStatus @default(NOT_SUBMITTED) @map("qiwa_status") // حالة التوثيق
+  qiwaAuthDate     DateTime?      @map("qiwa_auth_date") // تاريخ التوثيق في قوى
+  qiwaRejectReason String?        @map("qiwa_reject_reason") // سبب الرفض من قوى
+  qiwaLastSync     DateTime?      @map("qiwa_last_sync") // آخر مزامنة مع قوى
 
   // Documents
   documentUrl String? @map("document_url")
@@ -1603,8 +1929,10 @@ model PayrollPeriod {
   lockedAt       DateTime? @map("locked_at") // تاريخ القفل النهائي
   lockedBy       String?   @map("locked_by") // من قام بالقفل
 
-  runs     PayrollRun[]
-  payslips Payslip[]
+  runs               PayrollRun[]
+  payslips           Payslip[]
+  disciplinaryCases  DisciplinaryCase[]
+  payrollAdjustments PayrollAdjustment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2013,6 +2341,291 @@ enum AuditModule {
   MUDAD // مُدد
   WPS // حماية الأجور
   CONTRACT // العقود
+  DISCIPLINARY // الجزاءات
+}
+
+// ==================== موديول الجزاءات والتحقيقات ====================
+
+enum DisciplinaryStage {
+  MANAGER_REQUEST
+  HR_INITIAL_REVIEW
+  EMPLOYEE_INFORMAL_RESPONSE
+  OFFICIAL_INVESTIGATION
+  DECISION
+  OBJECTION
+  FINAL
+}
+
+enum DisciplinaryStatus {
+  SUBMITTED_TO_HR
+  HR_REJECTED
+  HR_INFORMAL_SENT
+  AWAITING_EMPLOYEE_INFORMAL
+  EMPLOYEE_REJECTED_INFORMAL
+  OFFICIAL_INVESTIGATION_OPENED
+  HEARING_SCHEDULED
+  INVESTIGATION_IN_PROGRESS
+  AWAITING_HR_DECISION
+  DECISION_ISSUED
+  AWAITING_EMPLOYEE_ACK
+  EMPLOYEE_OBJECTED
+  HR_REVIEWING_OBJECTION
+  FINALIZED_APPROVED
+  FINALIZED_CANCELLED
+  FINALIZED_CONTINUE_INVESTIGATION
+}
+
+enum DecisionType {
+  NO_VIOLATION
+  NOTICE
+  WARNING
+  FIRST_WARNING
+  SECOND_WARNING
+  FINAL_WARNING_TERMINATION
+  FINAL_TERMINATION_ART80
+  PROMOTION_DELAY
+  SALARY_DEDUCTION
+  SUSPENSION_WITH_PAY
+  SUSPENSION_WITHOUT_PAY
+}
+
+enum PayrollAdjustmentStatus {
+  PENDING
+  POSTED
+  REVERSED
+  CANCELLED
+}
+
+enum AdjustmentUnit {
+  DAYS
+  HOURS
+  AMOUNT
+}
+
+enum CaseEventType {
+  CASE_CREATED
+  HR_INITIAL_REVIEW
+  INFORMAL_ACTION_SENT
+  EMPLOYEE_INFORMAL_RESPONSE
+  OFFICIAL_INVESTIGATION_OPENED
+  HEARING_SCHEDULED
+  MINUTES_UPLOADED
+  DECISION_ISSUED
+  EMPLOYEE_ACKNOWLEDGED
+  EMPLOYEE_OBJECTED
+  OBJECTION_REVIEWED
+  FINALIZED
+  CANCELLED
+}
+
+enum DeductionBasePolicy {
+  BASIC_ONLY
+  BASIC_FIXED
+  GROSS
+}
+
+model CompanyDisciplinaryPolicy {
+  id        String  @id @default(uuid())
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  incidentMaxAgeDays           Int                 @default(30) @map("incident_max_age_days")
+  decisionDeadlineDays         Int                 @default(30) @map("decision_deadline_days")
+  objectionWindowDays          Int                 @default(15) @map("objection_window_days")
+  allowRetrospectiveIncidents  Boolean             @default(false) @map("allow_retrospective_incidents")
+  autoApplyToOpenPayrollPeriod Boolean             @default(true) @map("auto_apply_to_open_payroll_period")
+  deductionBasePolicy          DeductionBasePolicy @default(BASIC_FIXED) @map("deduction_base_policy")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("company_disciplinary_policies")
+}
+
+model DisciplinaryCase {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+  caseCode  String  @map("case_code") // e.g., INV-2025-001
+
+  employeeId String @map("employee_id")
+  employee   User   @relation("EmployeeDisciplinaryCases", fields: [employeeId], references: [id])
+
+  managerId String @map("manager_id")
+  manager   User   @relation("ManagerCreatedCases", fields: [managerId], references: [id])
+
+  title            String
+  violationType    String?  @map("violation_type") // نوع المخالفة
+  incidentDate     DateTime @map("incident_date")
+  incidentLocation String   @map("incident_location")
+  involvedParties  Json?    @map("involved_parties")
+  description      String   @db.Text
+
+  status DisciplinaryStatus @default(SUBMITTED_TO_HR)
+  stage  DisciplinaryStage  @default(MANAGER_REQUEST)
+
+  // Policy Snapshots
+  incidentMaxAgeDaysSnapshot   Int                 @map("incident_max_age_days_snapshot")
+  decisionDeadlineDaysSnapshot Int                 @map("decision_deadline_days_snapshot")
+  objectionWindowDaysSnapshot  Int                 @map("objection_window_days_snapshot")
+  allowRetrospectiveSnapshot   Boolean             @map("allow_retrospective_snapshot")
+  deductionBasePolicySnapshot  DeductionBasePolicy @map("deduction_base_policy_snapshot")
+
+  // Retrospective metadata
+  isRetrospective     Boolean @default(false) @map("is_retrospective")
+  retrospectiveReason String? @map("retrospective_reason") @db.Text
+
+  // HR Review
+  hrInitialAction String? @map("hr_initial_action")
+  hrInitialReason String? @map("hr_initial_reason") @db.Text
+
+  // Official Investigation
+  officialInvestigationOpenedAt DateTime? @map("official_investigation_opened_at")
+  hearingDatetime               DateTime? @map("hearing_datetime")
+  hearingLocation               String?   @map("hearing_location")
+
+  // Decision
+  decisionType      DecisionType? @map("decision_type")
+  decisionReason    String?       @map("decision_reason") @db.Text
+  decisionCreatedAt DateTime?     @map("decision_created_at")
+
+  // Penalty metadata (for SalDeduction or Suspension)
+  penaltyUnit          AdjustmentUnit? @map("penalty_unit")
+  penaltyValue         Decimal?        @map("penalty_value") @db.Decimal(10, 2)
+  penaltyEffectiveDate DateTime?       @map("penalty_effective_date") @db.Date
+
+  // Payroll Integration
+  payrollPeriodId String?        @map("payroll_period_id")
+  payrollPeriod   PayrollPeriod? @relation(fields: [payrollPeriodId], references: [id])
+
+  // Employee Response
+  employeeAckStatus String?   @map("employee_ack_status") // ACCEPTED, REJECTED
+  employeeAckAt     DateTime? @map("employee_ack_at")
+
+  // Objection
+  objectionText        String?   @map("objection_text") @db.Text
+  objectionSubmittedAt DateTime? @map("objection_submitted_at")
+
+  // HR Post-Objection
+  hrAfterObjectionAction String? @map("hr_after_objection_action")
+  hrAfterObjectionReason String? @map("hr_after_objection_reason") @db.Text
+
+  finalizedAt DateTime? @map("finalized_at")
+  legalHold   Boolean   @default(false) @map("legal_hold")
+
+  // Relationships
+  events      CaseEvent[]
+  attachments CaseAttachment[]
+  minutes     CaseMinute[]
+  records     EmployeeDisciplinaryRecord[]
+  adjustments PayrollAdjustment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, caseCode])
+  @@index([companyId, status])
+  @@index([employeeId])
+  @@index([companyId, employeeId])
+  @@map("disciplinary_cases")
+}
+
+model CaseEvent {
+  id     String           @id @default(uuid())
+  caseId String           @map("case_id")
+  case   DisciplinaryCase @relation(fields: [caseId], references: [id])
+
+  actorUserId String?       @map("actor_user_id")
+  eventType   CaseEventType @map("event_type")
+  message     String?       @db.Text
+  metadata    Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([caseId, createdAt])
+  @@map("case_events")
+}
+
+model CaseAttachment {
+  id     String           @id @default(uuid())
+  caseId String           @map("case_id")
+  case   DisciplinaryCase @relation(fields: [caseId], references: [id])
+
+  uploaderUserId String @map("uploader_user_id")
+  fileUrl        String @map("file_url")
+  fileName       String @map("file_name")
+  fileType       String @map("file_type")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("case_attachments")
+}
+
+model CaseMinute {
+  id     String           @id @default(uuid())
+  caseId String           @map("case_id")
+  case   DisciplinaryCase @relation(fields: [caseId], references: [id])
+
+  sessionNo      Int     @map("session_no")
+  minutesText    String? @map("minutes_text") @db.Text
+  minutesFileUrl String? @map("minutes_file_url")
+
+  createdByHrId String   @map("created_by_hr_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("case_minutes")
+}
+
+model EmployeeDisciplinaryRecord {
+  id         String @id @default(uuid())
+  employeeId String @map("employee_id")
+  employee   User   @relation(fields: [employeeId], references: [id])
+
+  caseId String           @map("case_id")
+  case   DisciplinaryCase @relation(fields: [caseId], references: [id])
+
+  decisionType    DecisionType @map("decision_type")
+  reason          String?      @db.Text
+  effectiveDate   DateTime     @map("effective_date")
+  penaltyMetadata Json?        @map("penalty_metadata")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("employee_disciplinary_records")
+}
+
+model PayrollAdjustment {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  employeeId String @map("employee_id")
+  employee   User   @relation(fields: [employeeId], references: [id])
+
+  caseId String           @map("case_id")
+  case   DisciplinaryCase @relation(fields: [caseId], references: [id])
+
+  payrollPeriodId String        @map("payroll_period_id")
+  payrollPeriod   PayrollPeriod @relation(fields: [payrollPeriodId], references: [id])
+
+  adjustmentType String                  @map("adjustment_type") // DEDUCTION, SUSPENSION_UNPAID
+  unit           AdjustmentUnit
+  value          Decimal                 @db.Decimal(10, 2)
+  amount         Decimal?                @db.Decimal(10, 2) // Optional computed amount
+  status         PayrollAdjustmentStatus @default(PENDING)
+  description    String?
+  effectiveDate  DateTime?               @map("effective_date") @db.Date
+
+  postedAt   DateTime? @map("posted_at")
+  reversedAt DateTime? @map("reversed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@unique([companyId, caseId]) // One adjustment per case
+  @@index([companyId, employeeId, payrollPeriodId, status])
+  @@index([employeeId, payrollPeriodId])
+  @@index([payrollPeriodId, status])
+  @@map("payroll_adjustments")
 }
 
 // ==================== Compliance: Status Change Audit Trail ====================
@@ -2091,4 +2704,397 @@ model ApprovalChainConfig {
 
   @@index([companyId, requestType, isActive])
   @@map("approval_chain_configs")
+}
+
+// ==================== سيستم العهد (Custody Management System) ====================
+
+// ==================== فئات العهد ====================
+model CustodyCategory {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  name        String // اسم الفئة
+  nameEn      String? @map("name_en")
+  description String? // الوصف
+  icon        String? // أيقونة للعرض
+
+  // إعدادات الفئة
+  requiresApproval     Boolean @default(true) @map("requires_approval")
+  requiresSerialNumber Boolean @default(true) @map("requires_serial_number")
+  depreciationYears    Int?    @map("depreciation_years") // سنوات الإهلاك
+
+  isActive Boolean @default(true) @map("is_active")
+
+  items CustodyItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, name])
+  @@map("custody_categories")
+}
+
+// ==================== حالات العهدة ====================
+enum CustodyItemStatus {
+  AVAILABLE // متاحة للتسليم
+  ASSIGNED // مسلمة لموظف
+  IN_MAINTENANCE // في الصيانة
+  LOST // مفقودة
+  DAMAGED // تالفة
+  DISPOSED // مستبعدة
+  RESERVED // محجوزة
+}
+
+// ==================== حالة العهدة ====================
+enum CustodyCondition {
+  NEW // جديدة
+  EXCELLENT // ممتازة
+  GOOD // جيدة
+  FAIR // مقبولة
+  POOR // سيئة
+}
+
+// ==================== العهدة/الأصل ====================
+model CustodyItem {
+  id         String          @id @default(uuid())
+  companyId  String          @map("company_id")
+  company    Company         @relation(fields: [companyId], references: [id])
+  categoryId String          @map("category_id")
+  category   CustodyCategory @relation(fields: [categoryId], references: [id])
+
+  // بيانات العهدة الأساسية
+  code        String // كود العهدة (فريد داخل الشركة)
+  name        String // اسم العهدة
+  nameEn      String? @map("name_en")
+  description String?
+
+  // بيانات التعريف
+  serialNumber String? @map("serial_number")
+  model        String? // الموديل
+  brand        String? // العلامة التجارية
+  barcode      String? // باركود
+  qrCode       String? @map("qr_code") // QR Code URL
+
+  // بيانات الشراء
+  purchaseDate   DateTime? @map("purchase_date")
+  purchasePrice  Decimal?  @map("purchase_price") @db.Decimal(12, 2)
+  warrantyExpiry DateTime? @map("warranty_expiry")
+  vendor         String? // المورد
+  invoiceNumber  String?   @map("invoice_number")
+
+  // الحالة والموقع
+  status          CustodyItemStatus @default(AVAILABLE)
+  condition       CustodyCondition  @default(NEW)
+  currentLocation String?           @map("current_location") // الموقع الحالي
+  notes           String?
+
+  // صورة العهدة
+  imageUrl    String? @map("image_url")
+  attachments Json?   @default("[]") // مرفقات إضافية
+
+  // تتبع الفرع
+  branchId String? @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  // الموظف الحالي (للتتبع السريع)
+  currentAssigneeId String? @map("current_assignee_id")
+
+  // العلاقات
+  assignments  CustodyAssignment[]
+  returns      CustodyReturn[]
+  transfers    CustodyTransfer[]
+  maintenances CustodyMaintenance[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([categoryId])
+  @@index([currentAssigneeId])
+  @@map("custody_items")
+}
+
+// ==================== حالات التسليم ====================
+enum CustodyAssignmentStatus {
+  PENDING // في انتظار الموافقة
+  APPROVED // تمت الموافقة
+  REJECTED // مرفوض
+  DELIVERED // تم التسليم
+  RETURNED // تم الإرجاع
+  TRANSFERRED // تم التحويل
+}
+
+// ==================== تسليم العهدة ====================
+model CustodyAssignment {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // العهدة والموظف
+  custodyItemId String      @map("custody_item_id")
+  custodyItem   CustodyItem @relation(fields: [custodyItemId], references: [id])
+  employeeId    String      @map("employee_id")
+  employee      User        @relation("EmployeeCustody", fields: [employeeId], references: [id])
+
+  // تواريخ التسليم
+  assignedAt     DateTime  @default(now()) @map("assigned_at")
+  expectedReturn DateTime? @map("expected_return") // تاريخ الإرجاع المتوقع
+  actualReturn   DateTime? @map("actual_return") // تاريخ الإرجاع الفعلي
+
+  // الحالة
+  status            CustodyAssignmentStatus @default(PENDING)
+  conditionOnAssign CustodyCondition?       @map("condition_on_assign")
+  conditionOnReturn CustodyCondition?       @map("condition_on_return")
+
+  // الموافقات
+  assignedById String    @map("assigned_by_id") // من قام بالتسليم
+  assignedBy   User      @relation("CustodyAssigner", fields: [assignedById], references: [id])
+  approvedById String?   @map("approved_by_id") // من وافق
+  approvedBy   User?     @relation("CustodyApprover", fields: [approvedById], references: [id])
+  approvedAt   DateTime? @map("approved_at")
+
+  // ملاحظات وتوقيع
+  notes             String?
+  employeeSignature String?   @map("employee_signature") // توقيع الموظف (Base64)
+  signatureDate     DateTime? @map("signature_date")
+
+  // مرفقات (صور التسليم/استلام)
+  attachments Json? @default("[]")
+
+  // Audit
+  approvalChain Json? @map("approval_chain")
+
+  // إرجاع مرتبط
+  returns CustodyReturn[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@index([employeeId])
+  @@index([custodyItemId])
+  @@map("custody_assignments")
+}
+
+// ==================== حالات الإرجاع ====================
+enum CustodyReturnStatus {
+  PENDING // في انتظار المراجعة
+  INSPECTING // جاري الفحص
+  APPROVED // تمت الموافقة
+  REJECTED // مرفوض (الموظف يحتفظ بالعهدة)
+  COMPLETED // تم الإرجاع بنجاح
+}
+
+// ==================== إرجاع العهدة ====================
+model CustodyReturn {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // العهدة
+  custodyItemId String            @map("custody_item_id")
+  custodyItem   CustodyItem       @relation(fields: [custodyItemId], references: [id])
+  assignmentId  String            @map("assignment_id") // التسليم المرتبط
+  assignment    CustodyAssignment @relation(fields: [assignmentId], references: [id])
+
+  // الموظف المرجع
+  returnedById String @map("returned_by_id")
+  returnedBy   User   @relation("CustodyReturner", fields: [returnedById], references: [id])
+
+  // تفاصيل الإرجاع
+  returnDate        DateTime         @default(now()) @map("return_date")
+  returnReason      String?          @map("return_reason") // سبب الإرجاع
+  conditionOnReturn CustodyCondition @map("condition_on_return")
+
+  // الحالة والمراجعة
+  status       CustodyReturnStatus @default(PENDING)
+  reviewedById String?             @map("reviewed_by_id")
+  reviewedBy   User?               @relation("CustodyReturnReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?           @map("reviewed_at")
+  reviewNotes  String?             @map("review_notes")
+
+  // في حالة التلف - ربط مع الرواتب
+  damageDescription  String?  @map("damage_description")
+  estimatedCost      Decimal? @map("estimated_cost") @db.Decimal(12, 2) // تكلفة الإصلاح/التعويض
+  chargeEmployee     Boolean  @default(false) @map("charge_employee") // خصم من الراتب؟
+  chargedToPayroll   Boolean  @default(false) @map("charged_to_payroll") // تم الخصم؟
+  payrollDeductionId String?  @map("payroll_deduction_id") // رقم خصم الراتب
+
+  // مرفقات (صور الحالة)
+  attachments Json? @default("[]")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@map("custody_returns")
+}
+
+// ==================== حالات التحويل ====================
+enum CustodyTransferStatus {
+  PENDING // في انتظار موافقة الموظف الجديد
+  APPROVED // وافق الموظف الجديد
+  REJECTED // رفض التحويل
+  COMPLETED // تم التحويل
+}
+
+// ==================== تحويل العهدة ====================
+model CustodyTransfer {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // العهدة
+  custodyItemId String      @map("custody_item_id")
+  custodyItem   CustodyItem @relation(fields: [custodyItemId], references: [id])
+
+  // من/إلى
+  fromEmployeeId String @map("from_employee_id")
+  fromEmployee   User   @relation("CustodyTransferFrom", fields: [fromEmployeeId], references: [id])
+  toEmployeeId   String @map("to_employee_id")
+  toEmployee     User   @relation("CustodyTransferTo", fields: [toEmployeeId], references: [id])
+
+  // التفاصيل
+  transferDate DateTime              @default(now()) @map("transfer_date")
+  reason       String? // سبب التحويل
+  status       CustodyTransferStatus @default(PENDING)
+
+  // الموافقات
+  initiatedById String    @map("initiated_by_id") // من بدأ الطلب
+  initiatedBy   User      @relation("CustodyTransferInitiator", fields: [initiatedById], references: [id])
+  approvedById  String?   @map("approved_by_id")
+  approvedBy    User?     @relation("CustodyTransferApprover", fields: [approvedById], references: [id])
+  approvedAt    DateTime? @map("approved_at")
+
+  // توقيعات
+  fromSignature String? @map("from_signature")
+  toSignature   String? @map("to_signature")
+
+  notes       String?
+  attachments Json?   @default("[]")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@map("custody_transfers")
+}
+
+// ==================== حالات الصيانة ====================
+enum CustodyMaintenanceStatus {
+  PENDING // في انتظار الصيانة
+  IN_PROGRESS // جاري الصيانة
+  COMPLETED // تمت الصيانة
+  CANNOT_REPAIR // لا يمكن إصلاحها
+}
+
+enum MaintenanceType {
+  PREVENTIVE // صيانة وقائية
+  CORRECTIVE // صيانة علاجية
+  EMERGENCY // صيانة طارئة
+}
+
+// ==================== صيانة العهدة ====================
+model CustodyMaintenance {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // العهدة
+  custodyItemId String      @map("custody_item_id")
+  custodyItem   CustodyItem @relation(fields: [custodyItemId], references: [id])
+
+  // نوع الصيانة
+  type        MaintenanceType
+  description String // وصف المشكلة
+
+  // التواريخ
+  reportedAt   DateTime  @default(now()) @map("reported_at")
+  reportedById String    @map("reported_by_id")
+  reportedBy   User      @relation("MaintenanceReporter", fields: [reportedById], references: [id])
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+
+  // الحالة
+  status CustodyMaintenanceStatus @default(PENDING)
+
+  // التكاليف
+  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(12, 2)
+  actualCost    Decimal? @map("actual_cost") @db.Decimal(12, 2)
+
+  // مزود الصيانة الخارجي
+  vendor        String? // مزود الصيانة
+  vendorContact String? @map("vendor_contact") // رقم التواصل
+  vendorEmail   String? @map("vendor_email")
+  invoiceNumber String? @map("invoice_number")
+
+  // النتيجة
+  result         String? // نتيجة الصيانة
+  conditionAfter CustodyCondition? @map("condition_after")
+
+  // مرفقات
+  attachments Json? @default("[]")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@map("custody_maintenances")
+}
+
+// ==================== وثائق الموظفين ====================
+enum DocumentType {
+  ID_CARD // بطاقة الهوية
+  IQAMA // الإقامة
+  PASSPORT // جواز السفر
+  CONTRACT // العقد
+  CERTIFICATE // شهادة
+  MEDICAL // تقرير طبي
+  BANK_LETTER // خطاب بنكي
+  DRIVING_LICENSE // رخصة قيادة
+  QUALIFICATION // مؤهل علمي
+  OTHER // أخرى
+}
+
+model EmployeeDocument {
+  id        String @id @default(uuid())
+  companyId String @map("company_id")
+  userId    String @map("user_id")
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        DocumentType
+  title       String // عنوان المستند
+  titleAr     String?      @map("title_ar") // العنوان بالعربي
+  description String? // وصف المستند
+
+  // بيانات الملف
+  filePath     String  @map("file_path")
+  fileType     String  @map("file_type") // pdf, jpg, png
+  fileSize     Int     @map("file_size") // بالبايت
+  originalName String? @map("original_name") // اسم الملف الأصلي
+
+  // معلومات إضافية
+  documentNumber   String?   @map("document_number") // رقم المستند
+  issueDate        DateTime? @map("issue_date") @db.Date // تاريخ الإصدار
+  expiryDate       DateTime? @map("expiry_date") @db.Date // تاريخ الانتهاء
+  issuingAuthority String?   @map("issuing_authority") // جهة الإصدار
+
+  // التحقق
+  isVerified   Boolean   @default(false) @map("is_verified")
+  verifiedById String?   @map("verified_by_id")
+  verifiedAt   DateTime? @map("verified_at")
+
+  // من قام بالرفع
+  uploadedById String  @map("uploaded_by_id")
+  notes        String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([companyId, type])
+  @@index([expiryDate])
+  @@map("employee_documents")
 }

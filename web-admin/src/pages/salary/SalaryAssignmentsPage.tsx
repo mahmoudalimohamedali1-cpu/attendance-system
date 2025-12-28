@@ -37,6 +37,7 @@ interface User {
     lastName: string;
     email: string;
     employeeCode?: string;
+    role?: string;
 }
 
 interface SalaryStructure {
@@ -63,7 +64,7 @@ export const SalaryAssignmentsPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [open, setOpen] = useState(false);
-    const [formData, setFormData] = useState<Partial<SalaryAssignment>>({
+    const [formData, setFormData] = useState<any>({
         employeeId: '',
         structureId: '',
         baseSalary: 0,
@@ -139,7 +140,7 @@ export const SalaryAssignmentsPage = () => {
                 <Box>
                     <Typography variant="h5" fontWeight="bold">تعيينات الرواتب</Typography>
                     <Typography variant="body2" color="text.secondary">
-                        ربط الموظفين بهياكل الرواتب وتحديد إجمالي الراتب الشهري
+                        ربط الموظفين بهياكل الرواتب وتحديد إجمالي الراتب التعاقدي (TOTAL)
                     </Typography>
                 </Box>
                 <Button
@@ -161,7 +162,7 @@ export const SalaryAssignmentsPage = () => {
                             <TableRow>
                                 <TableCell sx={{ fontWeight: 'bold' }}>الموظف</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>هيكل الراتب</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>إجمالي الراتب</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>إجمالي العقد (TOTAL)</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>تاريخ النفاذ</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>الحالة</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }} align="center">الإجراءات</TableCell>
@@ -256,7 +257,7 @@ export const SalaryAssignmentsPage = () => {
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
-                                label="إجمالي الراتب الشهري"
+                                label="إجمالي الراتب التعاقدي (TOTAL)"
                                 type="number"
                                 value={formData.baseSalary}
                                 onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}

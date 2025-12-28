@@ -17,6 +17,74 @@ export class PayslipsController {
         private readonly pdfService: PdfService,
     ) { }
 
+    /**
+     * Employee Self-Service: Get my own payslips
+     */
+    @Get('my')
+    @ApiOperation({ summary: 'Get my payslips (Employee Self-Service)' })
+    async getMyPayslips(
+        @CurrentUser('id') userId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        const payslips = await this.prisma.payslip.findMany({
+            where: {
+                employeeId: userId,
+                companyId,
+                status: { in: ['PAID', 'LOCKED', 'FINANCE_APPROVED'] }, // Only show finalized payslips
+            },
+            include: {
+                period: {
+                    select: {
+                        month: true,
+                        year: true,
+                    },
+                },
+                lines: {
+                    include: {
+                        component: {
+                            select: {
+                                code: true,
+                                nameAr: true,
+                                nameEn: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: [
+                { period: { year: 'desc' } },
+                { period: { month: 'desc' } },
+            ],
+        });
+
+        return payslips.map(payslip => {
+            const earnings = payslip.lines.filter(l => l.sign === 'EARNING');
+            const deductions = payslip.lines.filter(l => l.sign === 'DEDUCTION');
+
+            return {
+                id: payslip.id,
+                month: payslip.period.month,
+                year: payslip.period.year,
+                periodLabel: `${payslip.period.month}/${payslip.period.year}`,
+                baseSalary: Number(payslip.baseSalary),
+                grossSalary: Number(payslip.grossSalary),
+                totalDeductions: Number(payslip.totalDeductions),
+                netSalary: Number(payslip.netSalary),
+                status: payslip.status,
+                earnings: earnings.map(l => ({
+                    name: l.component?.nameAr || l.component?.nameEn || l.component?.code,
+                    amount: Number(l.amount),
+                    description: l.descriptionAr,
+                })),
+                deductions: deductions.map(l => ({
+                    name: l.component?.nameAr || l.component?.nameEn || l.component?.code,
+                    amount: Number(l.amount),
+                    description: l.descriptionAr,
+                })),
+            };
+        });
+    }
+
     @Get()
     @ApiOperation({ summary: 'Get payslips with filters' })
     async findAll(

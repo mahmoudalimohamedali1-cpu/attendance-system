@@ -1,0 +1,2 @@
+employee_code,first_name,last_name,email,phone,national_id,iqama_number,gosi_number,date_of_birth,gender,nationality,is_saudi,passport_number,passport_expiry,iqama_expiry,hire_date,salary,branch_code,department_code,job_title,role,marital_status,password,custom_field_test
+EMP999,محمد,احمد,test.import@company.com,0551234567,1234567890,,123456789,1995-03-15,MALE,سعودي,true,,,,,8500,,,مبرمج,EMPLOYEE,SINGLE,Test@123,قيمة_حقل_مخصص
