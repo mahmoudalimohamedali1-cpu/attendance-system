@@ -692,15 +692,15 @@ export class PayrollCalculationService {
         // --- Retroactive Pay (Backpay) ---
         const retroPays = await this.prisma.retroPay.findMany({
             where: {
-                userId: employeeId,
+                employeeId,
                 companyId,
                 status: 'PENDING',
-                effectiveDate: { lte: periodEnd }
+                effectiveFrom: { lte: periodEnd }
             }
         });
 
         for (const retro of retroPays) {
-            const retroAmount = Number(retro.amount);
+            const retroAmount = Number(retro.totalAmount);
             policyLines.push({
                 componentId: `RETRO-${retro.id}`,
                 componentCode: 'RETRO_PAY',
@@ -714,7 +714,7 @@ export class PayrollCalculationService {
                     ruleId: 'RETRO',
                     ruleCode: 'RETRO',
                 },
-                gosiEligible: retro.isGosiEligible,
+                gosiEligible: false, // لا يوجد حقل GOSI في موديل الـ RetroPay حالياً
             });
         }
 
@@ -725,7 +725,7 @@ export class PayrollCalculationService {
 
             try {
                 const eosBreakdown = await this.eosService.calculateEos(employeeId, {
-                    lastWorkingDay: terminationDate,
+                    lastWorkingDay: terminationDate.toISOString(),
                     reason: (activeContract?.terminationReason as any) || EosReason.TERMINATION,
                 });
 
