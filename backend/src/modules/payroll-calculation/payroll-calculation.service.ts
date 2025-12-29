@@ -381,14 +381,14 @@ export class PayrollCalculationService {
                 departmentId: employee.departmentId || undefined,
                 jobTitleId: employee.jobTitleId || undefined,
                 basicSalary: baseSalary,
-                hourlyRate,
+                hourlyRate: hourlyRateGeneral,
             },
             period: {
                 year,
                 month,
                 startDate: periodStart,
                 endDate: periodEnd,
-                workingDays: daysInMonth,
+                workingDays: daysInMonthGeneral,
             },
             attendance: {
                 otHours: overtimeHours,
