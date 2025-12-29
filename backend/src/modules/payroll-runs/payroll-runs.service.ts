@@ -371,52 +371,53 @@ export class PayrollRunsService {
     }
 
     async approve(id: string, companyId: string) {
-        const updated = await tx.payrollRun.update({
-            where: { id, companyId },
-            data: { status: 'FINANCE_APPROVED' },
+        return this.prisma.$transaction(async (tx) => {
+            const updated = await tx.payrollRun.update({
+                where: { id, companyId },
+                data: { status: 'FINANCE_APPROVED' },
+            });
+
+            await tx.payslip.updateMany({
+                where: { runId: id, companyId },
+                data: { status: 'FINANCE_APPROVED' }
+            });
+
+            // 🔥 Generate Ledger (DRAFT)
+            await this.ledgerService.generateLedger(id, companyId);
+
+            return updated;
         });
-
-        await tx.payslip.updateMany({
-            where: { runId: id, companyId },
-            data: { status: 'FINANCE_APPROVED' }
-        });
-
-        // 🔥 Generate Ledger (DRAFT)
-        await this.ledgerService.generateLedger(id, companyId);
-
-        return updated;
-    });
-}
+    }
 
     async pay(id: string, companyId: string) {
-    return this.prisma.$transaction(async (tx) => {
-        const run = await tx.payrollRun.findFirst({
-            where: { id, companyId }
-        });
-        if (!run) throw new NotFoundException('تشغيل الرواتب غير موجود');
+        return this.prisma.$transaction(async (tx) => {
+            const run = await tx.payrollRun.findFirst({
+                where: { id, companyId }
+            });
+            if (!run) throw new NotFoundException('تشغيل الرواتب غير موجود');
 
-        await tx.payrollRun.update({
-            where: { id },
-            data: { status: 'PAID' }
-        });
+            await tx.payrollRun.update({
+                where: { id },
+                data: { status: 'PAID' }
+            });
 
-        await tx.payslip.updateMany({
-            where: { runId: id, companyId },
-            data: { status: 'PAID' }
-        });
+            await tx.payslip.updateMany({
+                where: { runId: id, companyId },
+                data: { status: 'PAID' }
+            });
 
-        await tx.payrollPeriod.updateMany({
-            where: { id: run.periodId, companyId },
-            data: { status: 'PAID' }
-        });
+            await tx.payrollPeriod.updateMany({
+                where: { id: run.periodId, companyId },
+                data: { status: 'PAID' }
+            });
 
-        // 🔥 Post Ledger (Mark as POSTED)
-        await tx.payrollLedger.update({
-            where: { runId: id },
-            data: { status: 'POSTED' }
-        });
+            // 🔥 Post Ledger (Mark as POSTED)
+            await tx.payrollLedger.update({
+                where: { runId: id },
+                data: { status: 'POSTED' }
+            });
 
-        return run;
-    });
-}
+            return run;
+        });
+    }
 }
