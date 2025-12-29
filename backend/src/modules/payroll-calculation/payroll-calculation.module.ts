@@ -10,6 +10,7 @@ import { WpsGeneratorService } from './wps-generator.service';
 import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
 import { PayrollLedgerService } from './payroll-ledger.service';
 import { FormulaEngineService } from './services/formula-engine.service';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
     imports: [PrismaModule, PoliciesModule, PayslipsModule, EosModule, PermissionsModule],
@@ -32,4 +33,3 @@ import { FormulaEngineService } from './services/formula-engine.service';
     ],
 })
 export class PayrollCalculationModule { }
-
