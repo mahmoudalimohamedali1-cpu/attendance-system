@@ -83,8 +83,8 @@ export class ReportsController {
   @Roles('ADMIN')
   @ApiOperation({ summary: 'ملخص الرواتب (للأدمن فقط)' })
   @ApiResponse({ status: 200, description: 'ملخص الرواتب' })
-  async getPayrollSummary(@Query() query: ReportQueryDto) {
-    return this.reportsService.getPayrollSummary(query);
+  async getPayrollSummary(@Request() req: any, @Query() query: ReportQueryDto) {
+    return this.reportsService.getPayrollSummary(query, req.user.companyId);
   }
 
   // Export endpoints

@@ -1,6 +1,6 @@
 import { Controller, Get, Patch, Post, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PayrollSettingsService, UpdatePayrollSettingsDto } from './payroll-settings.service';
 
 @Controller('payroll-settings')

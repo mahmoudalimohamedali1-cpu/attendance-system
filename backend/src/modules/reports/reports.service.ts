@@ -435,15 +435,19 @@ export class ReportsService {
     };
   }
 
-  async getPayrollSummary(query: ReportQueryDto) {
+  async getPayrollSummary(query: ReportQueryDto, companyId: string) {
     const { startDate, endDate, branchId, departmentId } = query;
 
     const where: any = {};
     if (startDate) {
-      where.date = { gte: new Date(startDate) };
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      where.date = { gte: start };
     }
     if (endDate) {
-      where.date = { ...where.date, lte: new Date(endDate) };
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      where.date = { ...where.date, lte: end };
     }
     if (branchId) {
       where.branchId = branchId;
@@ -454,6 +458,7 @@ export class ReportsService {
 
     const employees = await this.prisma.user.findMany({
       where: {
+        companyId,
         role: 'EMPLOYEE',
         status: 'ACTIVE',
         ...(branchId && { branchId }),
@@ -524,7 +529,7 @@ export class ReportsService {
         data = await this.getLateReport(query, companyId, requesterId);
         return this.exportService.exportLateReportToExcel(data.data);
       case 'payroll':
-        data = await this.getPayrollSummary(query);
+        data = await this.getPayrollSummary(query, companyId);
         return this.exportService.exportPayrollToExcel(data);
       default:
         throw new Error('نوع التقرير غير معروف');

@@ -596,6 +596,9 @@ export class PayrollCalculationService {
             }
         }
 
+        const grossSalary = Math.round(policyLines.filter(l => l.sign === 'EARNING').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+        const totalDeductions = Math.round(policyLines.filter(l => l.sign === 'DEDUCTION').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+
         const netSalaryRaw = grossSalary - totalDeductions;
         let netSalary = Math.round(netSalaryRaw * 100) / 100;
 

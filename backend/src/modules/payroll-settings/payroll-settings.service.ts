@@ -44,13 +44,16 @@ export class PayrollSettingsService {
      * جلب إعدادات الرواتب للشركة
      */
     async getSettings(companyId: string) {
-        let settings = await this.prisma.payrollSettings.findUnique({
+        // استخدام any cast لأن Prisma Client قد لا يكون محدثاً
+        const payrollSettings = (this.prisma as any).payrollSettings;
+        
+        let settings = await payrollSettings.findUnique({
             where: { companyId },
         });
 
         // إنشاء إعدادات افتراضية إذا لم تكن موجودة
         if (!settings) {
-            settings = await this.prisma.payrollSettings.create({
+            settings = await payrollSettings.create({
                 data: { companyId },
             });
         }
@@ -69,14 +72,16 @@ export class PayrollSettingsService {
             }
         }
 
+        const payrollSettings = (this.prisma as any).payrollSettings;
+        
         // التأكد من وجود الإعدادات أولاً
-        const existing = await this.prisma.payrollSettings.findUnique({
+        const existing = await payrollSettings.findUnique({
             where: { companyId },
         });
 
         if (!existing) {
             // إنشاء مع البيانات المحدثة
-            return this.prisma.payrollSettings.create({
+            return payrollSettings.create({
                 data: {
                     companyId,
                     ...data,
@@ -85,7 +90,7 @@ export class PayrollSettingsService {
         }
 
         // تحديث الإعدادات الموجودة
-        return this.prisma.payrollSettings.update({
+        return payrollSettings.update({
             where: { companyId },
             data,
         });
@@ -95,18 +100,21 @@ export class PayrollSettingsService {
      * إعادة تعيين الإعدادات للافتراضي
      */
     async resetToDefaults(companyId: string) {
-        const existing = await this.prisma.payrollSettings.findUnique({
+        const payrollSettings = (this.prisma as any).payrollSettings;
+        
+        const existing = await payrollSettings.findUnique({
             where: { companyId },
         });
 
         if (existing) {
-            await this.prisma.payrollSettings.delete({
+            await payrollSettings.delete({
                 where: { companyId },
             });
         }
 
-        return this.prisma.payrollSettings.create({
+        return payrollSettings.create({
             data: { companyId },
         });
     }
 }
+
