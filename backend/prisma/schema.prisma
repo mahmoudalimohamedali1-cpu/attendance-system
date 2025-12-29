@@ -1975,6 +1975,7 @@ model PayrollRun {
   payslips         Payslip[]
   mudadSubmissions MudadSubmission[]
   wpsSubmissions   WpsSubmission[]
+  ledger           PayrollLedger?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3097,4 +3098,45 @@ model EmployeeDocument {
   @@index([companyId, type])
   @@index([expiryDate])
   @@map("employee_documents")
+}
+
+model PayrollLedger {
+  id        String     @id @default(uuid())
+  runId     String     @unique @map("run_id")
+  run       PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  companyId String     @map("company_id")
+
+  totalGross     Decimal @default(0) @map("total_gross") @db.Decimal(12, 2)
+  totalDeduction Decimal @default(0) @map("total_deduction") @db.Decimal(12, 2)
+  totalNet       Decimal @default(0) @map("total_net") @db.Decimal(12, 2)
+  
+  // Employer Cost (Taxes, GOSI, Benefits)
+  totalEmployerContribution Decimal @default(0) @map("total_employer_contribution") @db.Decimal(12, 2)
+  
+  status String @default("DRAFT") // DRAFT, POSTED, REVERSED
+
+  entries JournalEntry[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("payroll_ledgers")
+}
+
+model JournalEntry {
+  id       String        @id @default(uuid())
+  ledgerId String        @map("ledger_id")
+  ledger   PayrollLedger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+
+  accountCode String  @map("account_code") // e.g., 5101 (Basic Salary Account)
+  accountName String  @map("account_name")
+  
+  debit  Decimal @default(0) @db.Decimal(12, 2)
+  credit Decimal @default(0) @db.Decimal(12, 2)
+
+  description String?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("payroll_journal_entries")
 }
