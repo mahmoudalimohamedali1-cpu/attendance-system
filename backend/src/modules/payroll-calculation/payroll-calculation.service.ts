@@ -26,18 +26,25 @@ export class PayrollCalculationService {
     ) { }
 
     /**
-     * حساب عدد أيام الشهر حسب طريقة الحساب
+     * حساب عدد أيام الشهر حسب طريقة الحساب (عن طريق الـ enum القديم)
      */
     private getDaysInMonth(year: number, month: number, method: CalculationMethod): number {
-        switch (method) {
-            case CalculationMethod.FIXED_30:
+        return this.getDaysByBase(year, month, this.mapMethodToBase(method));
+    }
+
+    /**
+     * حساب عدد الأيام بناءً على القاعدة (Base) من الإعدادات
+     */
+    private getDaysByBase(year: number, month: number, base: string): number {
+        switch (base) {
+            case 'FIXED_30_DAYS':
                 return 30;
-            case CalculationMethod.CALENDAR_DAYS:
+            case 'CALENDAR_DAYS':
                 return new Date(year, month, 0).getDate();
-            case CalculationMethod.WORKING_DAYS:
+            case 'ACTUAL_WORKING_DAYS':
                 return this.getWorkingDaysInMonth(year, month);
             default:
-                return 30;
+                return 30; // الافتراضي 30 يوم
         }
     }
 
@@ -51,6 +58,8 @@ export class PayrollCalculationService {
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(year, month - 1, day);
             const dayOfWeek = date.getDay();
+            // نظام العمل السعودي: الأحد (0) إلى الخميس (4)
+            // ملاحظة: السبت هو 6، الجمعة هي 5
             if (dayOfWeek >= 0 && dayOfWeek <= 4) {
                 workingDays++;
             }
@@ -59,19 +68,116 @@ export class PayrollCalculationService {
         return workingDays;
     }
 
+    /**
+     * حساب معامل التناسب (Pro-rata) للموظفين الجدد أو المغادرين
+     */
+    private getProRataFactor(
+        year: number,
+        month: number,
+        hireDate: Date | null,
+        terminationDate: Date | null,
+        calcBase: string,
+        method: string
+    ): number {
+        const monthStart = new Date(year, month - 1, 1);
+        const monthEnd = new Date(year, month, 0);
+        const daysInMonth = monthEnd.getDate();
+
+        // تحديد بداية ونهاية العمل الفعلي في هذا الشهر
+        let effectiveStart = new Date(Math.max(monthStart.getTime(), hireDate ? hireDate.getTime() : 0));
+        let effectiveEnd = new Date(Math.min(monthEnd.getTime(), terminationDate ? terminationDate.getTime() : monthEnd.getTime()));
+
+        if (effectiveStart > monthEnd || effectiveEnd < monthStart) return 0;
+        if (effectiveStart <= monthStart && effectiveEnd >= monthEnd) return 1;
+
+        // حساب عدد الأيام الفعيلة بناءً على المنهجية
+        let workedDays = 0;
+        let totalDays = 0;
+
+        if (method === 'INCLUDE_ALL_DAYS' || method === 'PRORATE_BY_CALENDAR') {
+            workedDays = Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+            totalDays = calcBase === 'FIXED_30_DAYS' ? 30 : daysInMonth;
+        } else if (method === 'EXCLUDE_WEEKENDS') {
+            // حساب أيام العمل فقط (أحد-خميس)
+            for (let d = new Date(effectiveStart); d <= effectiveEnd; d.setDate(d.getDate() + 1)) {
+                if (d.getDay() >= 0 && d.getDay() <= 4) workedDays++;
+            }
+            totalDays = calcBase === 'FIXED_30_DAYS' ? 22 : this.getWorkingDaysInMonth(year, month);
+        }
+
+        return Math.min(1, workedDays / totalDays);
+    }
+
+    private mapMethodToBase(method: CalculationMethod): string {
+        switch (method) {
+            case CalculationMethod.CALENDAR_DAYS: return 'CALENDAR_DAYS';
+            case CalculationMethod.WORKING_DAYS: return 'ACTUAL_WORKING_DAYS';
+            case CalculationMethod.FIXED_30: return 'FIXED_30_DAYS';
+            default: return 'FIXED_30_DAYS';
+        }
+    }
+
     private async getCalculationSettings(employeeId: string, companyId: string): Promise<CalculationSettings> {
+        let mergedSettings = { ...DEFAULT_CALCULATION_SETTINGS };
+
         try {
+            // 1. جلب إعدادات الشركة العامة
+            const companySettings = await (this.prisma as any).payrollSettings.findUnique({
+                where: { companyId },
+            });
+
+            if (companySettings) {
+                // تحويل قيم الـ Prisma لنوع CalculationSettings
+                const mappedSettings: Partial<CalculationSettings> = {
+                    payrollClosingDay: companySettings.payrollClosingDay,
+                    calculationMethod: this.mapWorkDayBaseToMethod(companySettings.unpaidLeaveCalcBase), // دمج المنهجية
+                    hireTerminationCalcBase: companySettings.hireTerminationCalcBase,
+                    hireTerminationMethod: companySettings.hireTerminationMethod,
+                    unpaidLeaveCalcBase: companySettings.unpaidLeaveCalcBase,
+                    unpaidLeaveMethod: companySettings.unpaidLeaveMethod,
+                    splitUnpaidByClosingDate: companySettings.splitUnpaidByClosingDate,
+                    overtimeCalcBase: companySettings.overtimeCalcBase,
+                    overtimeMethod: companySettings.overtimeMethod,
+                    leaveAllowanceCalcBase: companySettings.leaveAllowanceCalcBase,
+                    leaveAllowanceMethod: companySettings.leaveAllowanceMethod,
+                    showCompanyContributions: companySettings.showCompanyContributions,
+                    showClosingDateOnPayslip: companySettings.showClosingDateOnPayslip,
+                    deductAbsenceFromBasic: companySettings.deductAbsenceFromBasic,
+                    showActualAbsenceDays: companySettings.showActualAbsenceDays,
+                    enableNegativeBalanceCarryover: companySettings.enableNegativeBalanceCarryover,
+                    settleNegativeAsTransaction: companySettings.settleNegativeAsTransaction,
+                    roundSalaryToNearest: companySettings.roundSalaryToNearest,
+                    defaultWorkingDaysPerMonth: companySettings.defaultWorkingDaysPerMonth,
+                };
+
+                mergedSettings = { ...mergedSettings, ...mappedSettings };
+            }
+
+            // 2. جلب سياسة الحضور للموظف (Override)
             const policy = await this.policiesService.resolvePolicy('ATTENDANCE' as any, employeeId, companyId);
             if (policy?.settings && typeof policy.settings === 'object') {
-                return {
-                    ...DEFAULT_CALCULATION_SETTINGS,
+                mergedSettings = {
+                    ...mergedSettings,
                     ...(policy.settings as Record<string, any>),
                 };
             }
         } catch (e) {
-            this.logger.warn('No attendance policy found for employee:', employeeId);
+            this.logger.warn('Error fetching payroll or policy settings, using defaults/partial:', e.message);
         }
-        return DEFAULT_CALCULATION_SETTINGS;
+
+        return mergedSettings;
+    }
+
+    /**
+     * تحويل قاعدة حساب يوم العمل إلى enum CalculationMethod
+     */
+    private mapWorkDayBaseToMethod(base: string): CalculationMethod {
+        switch (base) {
+            case 'CALENDAR_DAYS': return CalculationMethod.CALENDAR_DAYS;
+            case 'ACTUAL_WORKING_DAYS': return CalculationMethod.WORKING_DAYS;
+            case 'FIXED_30_DAYS': return CalculationMethod.FIXED_30;
+            default: return CalculationMethod.FIXED_30;
+        }
     }
 
     private async getMonthlyAttendanceData(employeeId: string, companyId: string, year: number, month: number) {
@@ -148,18 +254,28 @@ export class PayrollCalculationService {
             result: totalSalary,
         });
 
+        const settings = await this.getCalculationSettings(employeeId, companyId);
+
+        // حساب معامل التناسب (Pro-rata) للتعيين/الإنهاء
+        const proRataFactor = this.getProRataFactor(
+            year, month, employee.hireDate, null, // سنفترض انتهاء الخدمة من العقد لاحقاً لو وجد
+            settings.hireTerminationCalcBase,
+            settings.hireTerminationMethod
+        );
+
         let calculatedLines: { id: string; code: string; name: string; amount: number; type: string; gosiEligible: boolean }[] = [];
 
         if (!assignment.structure) {
+            const amount = totalSalary * proRataFactor;
             calculatedLines.push({
                 id: 'BASIC-FALLBACK',
                 code: 'BASIC',
                 name: 'الراتب الأساسي',
-                amount: totalSalary,
+                amount: amount,
                 type: 'BASIC',
                 gosiEligible: true,
             });
-            ctx.BASIC = totalSalary;
+            ctx.BASIC = amount;
         } else {
             const structureLines = assignment.structure.lines;
             const sortedLines = this.topologicalSort(structureLines);
@@ -187,6 +303,13 @@ export class PayrollCalculationService {
                     formulaUsed = `مبلغ ثابت = ${lineAmount.toFixed(2)}`;
                 }
 
+                // تطبيق التناسب (Pro-rata)
+                const originalAmount = lineAmount;
+                lineAmount = lineAmount * proRataFactor;
+                if (proRataFactor < 1) {
+                    formulaUsed = `${formulaUsed} (× ${proRataFactor.toFixed(4)} pro-rata)`;
+                }
+
                 ctx[component.code] = lineAmount;
                 if (component.code === 'BASIC' || component.code === 'BASE') ctx.BASIC = lineAmount;
 
@@ -208,24 +331,37 @@ export class PayrollCalculationService {
             }
         }
 
-        const baseSalary = ctx.BASIC || totalSalary;
-        const settings = await this.getCalculationSettings(employeeId, companyId);
-        const daysInMonth = this.getDaysInMonth(year, month, settings.calculationMethod);
-        const dailyRate = baseSalary / daysInMonth;
-        const hourlyRate = dailyRate / 8;
+        const baseSalary = ctx.BASIC || (totalSalary * proRataFactor);
+
+        // 1. حساب عدد أيام الشهر والقيم اليومية حسب قاعدة كل نوع
+        const daysInMonthGeneral = this.getDaysByBase(year, month, settings.calculationMethod as any);
+        const daysInMonthOT = this.getDaysByBase(year, month, settings.overtimeCalcBase);
+        const daysInMonthAbsence = this.getDaysByBase(year, month, settings.unpaidLeaveCalcBase);
+
+        const dailyRateGeneral = baseSalary / daysInMonthGeneral;
+        const hourlyRateGeneral = dailyRateGeneral / 8;
 
         const attendanceData = await this.getMonthlyAttendanceData(employeeId, companyId, year, month);
-        let presentDays = attendanceData.presentDays || daysInMonth;
+        let presentDays = attendanceData.presentDays || daysInMonthGeneral;
         let absentDays = attendanceData.absentDays || 0;
         let lateMinutes = attendanceData.lateMinutes || 0;
         let overtimeHours = attendanceData.overtimeHours || 0;
 
-        let absenceDeduction = absentDays > 0 ? absentDays * dailyRate : 0;
-        let effectiveLateMinutes = Math.max(0, lateMinutes - settings.gracePeriodMinutes);
-        let lateDeduction = effectiveLateMinutes > 0 ? (effectiveLateMinutes / 60) * hourlyRate : 0;
+        // 2. حساب الخصومات (Absence/Late)
+        // ملاحظة: قد نستخدم baseSalary أو totalSalary حسب الإعدادات (deductAbsenceFromBasic)
+        const deductionBase = settings.deductAbsenceFromBasic ? baseSalary : totalSalary;
+        const dailyRateAbsence = deductionBase / daysInMonthAbsence;
+        const hourlyRateLate = dailyRateAbsence / 8;
 
-        const otBase = settings.overtimeSource === OvertimeSource.BASIC_PLUS_ALLOWANCES ? totalSalary : baseSalary;
-        const otHourlyRate = (otBase / daysInMonth / 8);
+        let absenceDeduction = absentDays > 0 ? absentDays * dailyRateAbsence : 0;
+        let effectiveLateMinutes = Math.max(0, lateMinutes - (settings.gracePeriodMinutes || 15));
+        let lateDeduction = effectiveLateMinutes > 0 ? (effectiveLateMinutes / 60) * hourlyRateLate : 0;
+
+        // 3. حساب الوقت الإضافي (Overtime)
+        const otBaseSalary = settings.overtimeMethod === 'BASED_ON_TOTAL' ? totalSalary :
+            (settings.overtimeMethod === 'BASED_ON_BASIC_ONLY' ? baseSalary : baseSalary);
+
+        const otHourlyRate = (otBaseSalary / daysInMonthOT / 8);
         let overtimeAmount = overtimeHours > 0 ? overtimeHours * otHourlyRate * settings.overtimeMultiplier : 0;
 
         // --- Policy Evaluation ---
@@ -460,16 +596,26 @@ export class PayrollCalculationService {
             }
         }
 
-        const grossSalary = Math.round(policyLines.filter(l => l.sign === 'EARNING').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
-        const totalDeductions = Math.round(policyLines.filter(l => l.sign === 'DEDUCTION').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
-        const netSalary = Math.round((grossSalary - totalDeductions) * 100) / 100;
+        const netSalaryRaw = grossSalary - totalDeductions;
+        let netSalary = Math.round(netSalaryRaw * 100) / 100;
+
+        // تطبيق التقريب (Rounding)
+        if (settings.roundSalaryToNearest > 0) {
+            netSalary = Math.round(netSalary / settings.roundSalaryToNearest) * settings.roundSalaryToNearest;
+        }
+
+        // معالجة الراتب السلبي (Negative Balance)
+        if (netSalary < 0 && settings.enableNegativeBalanceCarryover) {
+            this.logger.log(`Negative balance detected for ${employeeId}: ${netSalary}. Carryover enabled.`);
+            // ملاحظة: هنا يجب تسجيل الحركة في جدول التسويات للشهر القادم لو لزم الأمر
+        }
 
         return {
             employeeId,
             baseSalary,
-            dailyRate,
-            hourlyRate,
-            workingDays: daysInMonth,
+            dailyRate: dailyRateGeneral,
+            hourlyRate: hourlyRateGeneral,
+            workingDays: daysInMonthGeneral,
             presentDays,
             absentDays,
             lateMinutes,

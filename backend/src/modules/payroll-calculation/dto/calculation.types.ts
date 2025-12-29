@@ -24,7 +24,7 @@ export enum OvertimeSource {
 }
 
 /**
- * إعدادات الحساب في السياسة
+ * إعدادات الحساب في السياسة أو الشركة
  */
 export interface CalculationSettings {
     // طريقة حساب اليوم
@@ -47,6 +47,40 @@ export interface CalculationSettings {
 
     // هل يتم ترحيل الخصومات لو الراتب مش كافي؟
     carryOverDeductions: boolean;
+
+    // ========== إعدادات مطورة من PayrollSettings ==========
+    payrollClosingDay: number;
+
+    // حساب التوظيف وإنهاء الخدمات
+    hireTerminationCalcBase: string;
+    hireTerminationMethod: string;
+
+    // حساب الإجازات غير المدفوعة
+    unpaidLeaveCalcBase: string;
+    unpaidLeaveMethod: string;
+    splitUnpaidByClosingDate: boolean;
+
+    // حساب ساعات العمل الإضافي
+    overtimeCalcBase: string;
+    overtimeMethod: string;
+
+    // حساب بدل أيام الإجازة
+    leaveAllowanceCalcBase: string;
+    leaveAllowanceMethod: string;
+
+    // إعدادات القسيمة
+    showCompanyContributions: boolean;
+    showClosingDateOnPayslip: boolean;
+    deductAbsenceFromBasic: boolean;
+    showActualAbsenceDays: boolean;
+
+    // أرصدة الرواتب السلبية
+    enableNegativeBalanceCarryover: boolean;
+    settleNegativeAsTransaction: boolean;
+
+    // إضافية
+    roundSalaryToNearest: number;
+    defaultWorkingDaysPerMonth: number;
 }
 
 /**
@@ -60,6 +94,26 @@ export const DEFAULT_CALCULATION_SETTINGS: CalculationSettings = {
     gracePeriodMinutes: 15,
     deductionPriority: ['GOSI', 'LOAN', 'ABSENCE', 'LATE', 'PENALTY'],
     carryOverDeductions: false,
+
+    // قيم افتراضية من موديل PayrollSettings
+    payrollClosingDay: 25,
+    hireTerminationCalcBase: 'CALENDAR_DAYS',
+    hireTerminationMethod: 'EXCLUDE_WEEKENDS',
+    unpaidLeaveCalcBase: 'ACTUAL_WORKING_DAYS',
+    unpaidLeaveMethod: 'BASED_ON_SHIFTS',
+    splitUnpaidByClosingDate: false,
+    overtimeCalcBase: 'ACTUAL_WORKING_DAYS',
+    overtimeMethod: 'BASED_ON_SHIFTS',
+    leaveAllowanceCalcBase: 'CALENDAR_DAYS',
+    leaveAllowanceMethod: 'BASIC_PLUS_HOUSING',
+    showCompanyContributions: true,
+    showClosingDateOnPayslip: true,
+    deductAbsenceFromBasic: true,
+    showActualAbsenceDays: false,
+    enableNegativeBalanceCarryover: false,
+    settleNegativeAsTransaction: false,
+    roundSalaryToNearest: 0,
+    defaultWorkingDaysPerMonth: 30,
 };
 
 /**
