@@ -3,6 +3,8 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { PoliciesService } from '../policies/policies.service';
 import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
 import { FormulaEngineService } from './services/formula-engine.service';
+import { EosService } from '../eos/eos.service';
+import { EosReason } from '../eos/dto/calculate-eos.dto';
 import { PolicyEvaluationContext } from './dto/policy-context.types';
 import {
     CalculationMethod,
@@ -23,6 +25,7 @@ export class PayrollCalculationService {
         private policiesService: PoliciesService,
         private policyEvaluator: PolicyRuleEvaluatorService,
         private formulaEngine: FormulaEngineService,
+        private eosService: EosService,
     ) { }
 
     /**
@@ -236,6 +239,10 @@ export class PayrollCalculationService {
                     },
                     take: 1,
                 },
+                contracts: {
+                    where: { status: 'ACTIVE' },
+                    take: 1
+                },
             },
         });
 
@@ -256,9 +263,12 @@ export class PayrollCalculationService {
 
         const settings = await this.getCalculationSettings(employeeId, companyId);
 
+        const activeContract = employee.contracts?.[0];
+        const terminationDate = activeContract?.terminatedAt || null;
+
         // حساب معامل التناسب (Pro-rata) للتعيين/الإنهاء
         const proRataFactor = this.getProRataFactor(
-            year, month, employee.hireDate, null, // سنفترض انتهاء الخدمة من العقد لاحقاً لو وجد
+            year, month, employee.hireDate, terminationDate,
             settings.hireTerminationCalcBase,
             settings.hireTerminationMethod
         );
@@ -593,6 +603,151 @@ export class PayrollCalculationService {
                     },
                     gosiEligible: false,
                 });
+            }
+        }
+
+        // --- Loans & Advances ---
+        const activeLoans = await this.prisma.advanceRequest.findMany({
+            where: {
+                userId: employeeId,
+                companyId,
+                status: 'APPROVED',
+            },
+            include: {
+                payments: true
+            }
+        });
+
+        for (const loan of activeLoans) {
+            const totalPaid = loan.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const balance = Number(loan.approvedAmount || loan.amount) - totalPaid;
+
+            if (balance > 0) {
+                const installment = Math.min(balance, Number(loan.approvedMonthlyDeduction || loan.monthlyDeduction));
+
+                policyLines.push({
+                    componentId: `LOAN-${loan.id}`,
+                    componentCode: 'LOAN_DED',
+                    componentName: 'قسط سلفة',
+                    sign: 'DEDUCTION',
+                    amount: Math.round(installment * 100) / 100,
+                    descriptionAr: `قسط سلفة (باقي: ${balance.toFixed(2)})`,
+                    source: {
+                        policyId: loan.id,
+                        policyCode: 'ADVANCE',
+                        ruleId: 'INSTALLMENT',
+                        ruleCode: 'LOAN_AUTO',
+                    },
+                    gosiEligible: false,
+                });
+            }
+        }
+
+        // --- Sick Leave Pay Tiers (Saudi Labor Law) ---
+        const sickLeaves = await this.prisma.leaveRequest.findMany({
+            where: {
+                userId: employeeId,
+                companyId,
+                status: 'APPROVED',
+                type: 'SICK',
+                startDate: { lte: periodEnd },
+                endDate: { gte: periodStart },
+            }
+        });
+
+        for (const sick of sickLeaves) {
+            // ملاحظة: الحقول fullPayDays, partialPayDays, unpaidDays تم حسابها عند الموافقة على الطلب
+            const sickUnpaid = Number(sick.unpaidDays || 0);
+            const sickPartial = Number(sick.partialPayDays || 0);
+
+            if (sickUnpaid > 0) {
+                policyLines.push({
+                    componentId: `SICK-UNPAID-${sick.id}`,
+                    componentCode: 'SICK_UNPAID_DED',
+                    componentName: 'خصم إجازة مرضية (بدون أجر)',
+                    sign: 'DEDUCTION',
+                    amount: Math.round(sickUnpaid * dailyRateGeneral * 100) / 100,
+                    descriptionAr: `خصم ${sickUnpaid} يوم مرضى غير مدفوع`,
+                    source: { policyId: sick.id, policyCode: 'LEAVE', ruleId: 'SICK_TIER', ruleCode: 'UNPAID' },
+                    gosiEligible: false,
+                });
+            }
+
+            if (sickPartial > 0) {
+                // القانون السعودي: 75% من الأجر -> خصم 25%
+                const deductionAmount = sickPartial * dailyRateGeneral * 0.25;
+                policyLines.push({
+                    componentId: `SICK-PARTIAL-${sick.id}`,
+                    componentCode: 'SICK_PARTIAL_DED',
+                    componentName: 'خصم إجازة مرضية (75% أجر)',
+                    sign: 'DEDUCTION',
+                    amount: Math.round(deductionAmount * 100) / 100,
+                    descriptionAr: `خصم 25% من أجر ${sickPartial} يوم مرضى`,
+                    source: { policyId: sick.id, policyCode: 'LEAVE', ruleId: 'SICK_TIER', ruleCode: 'PARTIAL' },
+                    gosiEligible: false,
+                });
+            }
+        }
+
+        // --- Retroactive Pay (Backpay) ---
+        const retroPays = await this.prisma.retroPay.findMany({
+            where: {
+                userId: employeeId,
+                companyId,
+                status: 'PENDING',
+                effectiveDate: { lte: periodEnd }
+            }
+        });
+
+        for (const retro of retroPays) {
+            const retroAmount = Number(retro.amount);
+            policyLines.push({
+                componentId: `RETRO-${retro.id}`,
+                componentCode: 'RETRO_PAY',
+                componentName: retro.reason || 'فروقات رواتب رجعية',
+                sign: retroAmount > 0 ? 'EARNING' : 'DEDUCTION',
+                amount: Math.abs(retroAmount),
+                descriptionAr: retro.reason || 'تسوية رجعية',
+                source: {
+                    policyId: retro.id,
+                    policyCode: 'RETRO_PAY',
+                    ruleId: 'RETRO',
+                    ruleCode: 'RETRO',
+                },
+                gosiEligible: retro.isGosiEligible,
+            });
+        }
+
+        // --- End of Service (EOS) Settlement ---
+        if (terminationDate &&
+            terminationDate.getFullYear() === year &&
+            (terminationDate.getMonth() + 1) === month) {
+
+            try {
+                const eosBreakdown = await this.eosService.calculateEos(employeeId, {
+                    lastWorkingDay: terminationDate,
+                    reason: (activeContract?.terminationReason as any) || EosReason.TERMINATION,
+                });
+
+                if (eosBreakdown.netSettlement > 0) {
+                    policyLines.push({
+                        componentId: `EOS-${employeeId}`,
+                        componentCode: 'EOS_SETTLEMENT',
+                        componentName: 'تصفية مستحقات نهاية الخدمة',
+                        sign: 'EARNING',
+                        amount: Math.round(Number(eosBreakdown.netSettlement) * 100) / 100,
+                        descriptionAr: `مكافأة: ${eosBreakdown.totalEos} + إجازات: ${eosBreakdown.leavePayout}`,
+                        source: {
+                            policyId: employeeId,
+                            policyCode: 'EOS',
+                            ruleId: 'FINAL_SETTLEMENT',
+                            ruleCode: 'EOS',
+                        },
+                        gosiEligible: false,
+                    });
+                }
+            } catch (err) {
+                this.logger.error(`Failed to calculate EOS for ${employeeId}: ${err.message}`);
             }
         }
 

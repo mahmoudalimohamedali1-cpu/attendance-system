@@ -31,6 +31,10 @@ export class WpsGeneratorService {
 
         if (!run) throw new Error('تشغيل الرواتب غير موجود');
 
+        const companyBank = await this.prisma.companyBankAccount.findFirst({
+            where: { companyId, isPrimary: true }
+        });
+
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet('WPS SIF File');
 
@@ -45,6 +49,8 @@ export class WpsGeneratorService {
             'Housing Allowance',
             'Other Allowances',
             'Deductions',
+            'Record Type',
+            'MOL ID',
         ];
 
         const headerRow = sheet.addRow(headers);
@@ -71,13 +77,15 @@ export class WpsGeneratorService {
             sheet.addRow([
                 emp.nationalId || emp.employeeCode || '-',
                 `${emp.firstName} ${emp.lastName}`,
-                bankAccount?.bankName || '-',
+                bankAccount?.bankName || companyBank?.bankName || '-',
                 bankAccount?.iban || '-',
                 Number(payslip.netSalary),
                 Number(payslip.baseSalary),
                 Number(housingAllowance),
                 Number(otherAllowances),
                 Number(payslip.totalDeductions),
+                'Salary',
+                companyBank?.molId || '-',
             ]);
         }
 

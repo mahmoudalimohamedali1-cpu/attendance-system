@@ -4,13 +4,14 @@ import { PayrollCalculationController } from './payroll-calculation.controller';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PoliciesModule } from '../policies/policies.module';
 import { PayslipsModule } from '../payslips/payslips.module';
+import { EosModule } from '../eos/eos.module';
 import { PayrollValidationService } from './payroll-validation.service';
 import { WpsGeneratorService } from './wps-generator.service';
 import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
 import { FormulaEngineService } from './services/formula-engine.service';
 
 @Module({
-    imports: [PrismaModule, PoliciesModule, PayslipsModule],
+    imports: [PrismaModule, PoliciesModule, PayslipsModule, EosModule],
     controllers: [PayrollCalculationController],
     providers: [
         PayrollCalculationService,
