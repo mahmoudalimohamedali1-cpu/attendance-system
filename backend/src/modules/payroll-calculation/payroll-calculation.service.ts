@@ -571,9 +571,9 @@ export class PayrollCalculationService {
                             }
                         }
                     }
-                    adjAmount = appliedValue * dailyRate;
+                    adjAmount = appliedValue * dailyRateGeneral;
                 } else if (adj.unit === 'HOURS') {
-                    adjAmount = Number(adj.value) * hourlyRate;
+                    adjAmount = Number(adj.value) * hourlyRateGeneral;
                 }
 
                 if (appliedValue <= 0 && adj.unit === 'DAYS' && adj.effectiveDate) continue;
