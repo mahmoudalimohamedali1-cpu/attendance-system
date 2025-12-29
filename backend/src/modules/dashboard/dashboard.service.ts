@@ -68,6 +68,10 @@ export class DashboardService {
                 deductionsTotal: 0,
                 gosiTotal: 0,
                 netTotal: 0,
+                employerGosiTotal: 0,
+                ledgerDraftAmount: 0,
+                ledgerPostedAmount: 0,
+                eosSettlementTotal: 0,
                 wpsStatus: 'NOT_STARTED',
                 isLocked: false,
             };
@@ -80,8 +84,7 @@ export class DashboardService {
                 payslips: {
                     include: {
                         lines: {
-                            where: { component: { code: 'GOSI_DED' } },
-                            select: { amount: true }
+                            include: { component: true }
                         }
                     }
                 }
@@ -96,6 +99,10 @@ export class DashboardService {
                 deductionsTotal: 0,
                 gosiTotal: 0,
                 netTotal: 0,
+                employerGosiTotal: 0,
+                ledgerDraftAmount: 0,
+                ledgerPostedAmount: 0,
+                eosSettlementTotal: 0,
                 wpsStatus: 'NOT_STARTED',
                 isLocked: false,
             };
@@ -106,8 +113,25 @@ export class DashboardService {
         const grossTotal = run.payslips.reduce((sum, p) => sum + Number(p.grossSalary), 0);
         const deductionsTotal = run.payslips.reduce((sum, p) => sum + Number(p.totalDeductions), 0);
         const netTotal = run.payslips.reduce((sum, p) => sum + Number(p.netSalary), 0);
+
+        // GOSI Calculation
         const gosiTotal = run.payslips.reduce((sum, p) =>
-            sum + p.lines.reduce((s, l) => s + Number(l.amount), 0), 0);
+            sum + p.lines.reduce((s, l) => (l.component.code === 'GOSI_DED' ? s + Number(l.amount) : s), 0), 0);
+
+        const employerGosiTotal = run.payslips.reduce((sum, p) =>
+            sum + p.lines.reduce((s, l) => (l.component.code.startsWith('GOSI_') && l.component.code !== 'GOSI_DED' ? s + Number(l.amount) : s), 0), 0);
+
+        // EOS Total
+        const eosSettlementTotal = run.payslips.reduce((sum, p) =>
+            sum + p.lines.reduce((s, l) => (l.component.code === 'EOS_SETTLEMENT' ? s + Number(l.amount) : s), 0), 0);
+
+        // Ledger Summary
+        const ledger = await this.prisma.payrollLedger.findFirst({
+            where: { runId: run.id }
+        });
+
+        const ledgerDraftAmount = ledger?.status === 'DRAFT' ? Number(ledger.totalNet) : 0;
+        const ledgerPostedAmount = ledger?.status === 'POSTED' ? Number(ledger.totalNet) : 0;
 
         // WPS status
         let wpsStatus: 'NOT_STARTED' | 'READY' | 'EXPORTED' = 'NOT_STARTED';
@@ -121,6 +145,10 @@ export class DashboardService {
             deductionsTotal,
             gosiTotal,
             netTotal,
+            employerGosiTotal,
+            ledgerDraftAmount,
+            ledgerPostedAmount,
+            eosSettlementTotal,
             wpsStatus,
             isLocked: !!run.lockedAt,
         };

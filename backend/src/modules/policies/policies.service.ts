@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreatePolicyDto, PolicyScope, PolicyType } from './dto/create-policy.dto';
+import { FormulaEngineService } from '../payroll-calculation/services/formula-engine.service';
 
 // Deterministic scope rank for ordering
 const SCOPE_RANK: Record<string, number> = {
@@ -14,9 +15,11 @@ const SCOPE_RANK: Record<string, number> = {
 
 @Injectable()
 export class PoliciesService {
+    private readonly logger = new Logger(PoliciesService.name);
     constructor(
         private prisma: PrismaService,
         private auditService: AuditService,
+        private formulaEngine: FormulaEngineService,
     ) { }
 
     async create(dto: CreatePolicyDto, companyId: string, createdById: string) {
@@ -369,30 +372,32 @@ export class PoliciesService {
     }
 
     /**
-     * تقييم معادلة بسيطة
-     * مثال: "hourlyRate * hours * 1.5"
+     * تقييم معادلة باستخدام محرك المعادلات المطور
      */
     private evaluateFormula(formula: string, context: Record<string, any>): number {
-        try {
-            // استبدال المتغيرات بقيمها
-            let expression = formula;
-            for (const [key, value] of Object.entries(context)) {
-                const regex = new RegExp(`\\b${key}\\b`, 'g');
-                expression = expression.replace(regex, String(value));
-            }
+        const variableContext = this.formulaEngine.buildVariableContext({
+            basicSalary: context.salary || 0,
+            totalSalary: context.totalSalary || context.salary || 0,
+            housingAllowance: context.housingAllowance || 0,
+            transportAllowance: context.transportAllowance || 0,
+            otherAllowances: context.otherAllowances || 0,
+            overtimeHours: context.hours || context.overtimeHours || 0,
+            daysWorked: context.daysWorked || 30,
+            daysAbsent: context.daysAbsent || 0,
+            lateMinutes: context.lateMinutes || 0,
+            yearsOfService: context.yearsOfService || 0,
+        });
 
-            // تقييم التعبير الرياضي البسيط (آمن)
-            // فقط أرقام وعمليات حسابية أساسية
-            if (!/^[\d\s+\-*/().]+$/.test(expression)) {
-                console.warn('Formula contains invalid characters:', formula);
-                return 0;
-            }
+        // دمج متغيرات إضافية من السياق (مثل hourlyRate المحسوب يدوياً)
+        const combinedContext = { ...variableContext, ...context };
 
-            return eval(expression) || 0;
-        } catch (e) {
-            console.error('Error evaluating formula:', formula, e);
-            return 0;
+        const result = this.formulaEngine.evaluate(formula, combinedContext);
+
+        if (result.error) {
+            this.logger.warn(`Policy Formula Error: ${result.error} in formula: ${formula}`);
         }
+
+        return result.value;
     }
 
     /**

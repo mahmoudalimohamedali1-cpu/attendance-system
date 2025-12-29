@@ -8,6 +8,10 @@ export class DashboardSummaryDto {
     @ApiProperty() deductionsTotal: number;
     @ApiProperty() gosiTotal: number;
     @ApiProperty() netTotal: number;
+    @ApiProperty() employerGosiTotal: number; // ✨ حصة صاحب العمل في التأمينات
+    @ApiProperty() ledgerDraftAmount: number; // ✨ قيمة القيود المسودة
+    @ApiProperty() ledgerPostedAmount: number; // ✨ قيمة القيود المرحلة
+    @ApiProperty() eosSettlementTotal: number; // ✨ إجمالي تصفية المستحقات
     @ApiProperty() wpsStatus: 'NOT_STARTED' | 'READY' | 'EXPORTED';
     @ApiProperty() isLocked: boolean;
 }
@@ -55,7 +59,7 @@ export class RoleBasedDashboardDto {
 // Role visibility configuration
 export const ROLE_VISIBILITY = {
     ADMIN: {
-        summary: ['period', 'headcount', 'grossTotal', 'deductionsTotal', 'gosiTotal', 'netTotal', 'wpsStatus', 'isLocked'],
+        summary: ['period', 'headcount', 'grossTotal', 'deductionsTotal', 'gosiTotal', 'netTotal', 'employerGosiTotal', 'ledgerDraftAmount', 'ledgerPostedAmount', 'eosSettlementTotal', 'wpsStatus', 'isLocked'],
         health: ['attendance', 'leaves', 'advances', 'policies', 'gosiConfig', 'payrollCalculated', 'payrollLocked', 'mudadStatus', 'wpsReady'],
         exceptions: ['lateEmployees', 'earlyDepartureCases', 'absentWithoutLeave', 'adjustedPayslips', 'highVarianceEmployees', 'noBankAccountCount', 'gosiSkippedCount', 'stuckSubmissionsCount'],
         trends: ['periods', 'gross', 'net', 'gosi', 'otHours'],
@@ -67,7 +71,7 @@ export const ROLE_VISIBILITY = {
         trends: ['periods', 'otHours'],
     },
     FINANCE: {
-        summary: ['period', 'headcount', 'grossTotal', 'deductionsTotal', 'gosiTotal', 'netTotal', 'wpsStatus', 'isLocked'],
+        summary: ['period', 'headcount', 'grossTotal', 'deductionsTotal', 'gosiTotal', 'netTotal', 'employerGosiTotal', 'ledgerDraftAmount', 'ledgerPostedAmount', 'eosSettlementTotal', 'wpsStatus', 'isLocked'],
         health: ['gosiConfig', 'payrollCalculated', 'payrollLocked', 'wpsReady'],
         exceptions: ['adjustedPayslips', 'highVarianceEmployees', 'noBankAccountCount', 'gosiSkippedCount'],
         trends: ['periods', 'gross', 'net', 'gosi'],
