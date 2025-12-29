@@ -8,10 +8,11 @@ import { EosModule } from '../eos/eos.module';
 import { PayrollValidationService } from './payroll-validation.service';
 import { WpsGeneratorService } from './wps-generator.service';
 import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
+import { PayrollLedgerService } from './payroll-ledger.service';
 import { FormulaEngineService } from './services/formula-engine.service';
 
 @Module({
-    imports: [PrismaModule, PoliciesModule, PayslipsModule, EosModule],
+    imports: [PrismaModule, PoliciesModule, PayslipsModule, EosModule, PermissionsModule],
     controllers: [PayrollCalculationController],
     providers: [
         PayrollCalculationService,
@@ -19,6 +20,7 @@ import { FormulaEngineService } from './services/formula-engine.service';
         WpsGeneratorService,
         PolicyRuleEvaluatorService,
         FormulaEngineService,
+        PayrollLedgerService,
     ],
     exports: [
         PayrollCalculationService,
@@ -26,6 +28,7 @@ import { FormulaEngineService } from './services/formula-engine.service';
         WpsGeneratorService,
         PolicyRuleEvaluatorService,
         FormulaEngineService,
+        PayrollLedgerService,
     ],
 })
 export class PayrollCalculationModule { }

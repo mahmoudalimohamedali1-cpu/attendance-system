@@ -5,6 +5,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { PayslipLineSource, AuditAction } from '@prisma/client';
 
 import { PayrollCalculationService } from '../payroll-calculation/payroll-calculation.service';
+import { PayrollLedgerService } from '../payroll-calculation/payroll-ledger.service';
 import { AuditService } from '../audit/audit.service';
 
 
@@ -14,6 +15,7 @@ export class PayrollRunsService {
         private prisma: PrismaService,
         private calculationService: PayrollCalculationService,
         private auditService: AuditService,
+        private ledgerService: PayrollLedgerService,
     ) { }
 
     async create(dto: CreatePayrollRunDto, companyId: string, userId: string) {
@@ -369,44 +371,52 @@ export class PayrollRunsService {
     }
 
     async approve(id: string, companyId: string) {
-        return this.prisma.$transaction(async (tx) => {
-            const run = await tx.payrollRun.updateMany({
-                where: { id, companyId },
-                data: { status: 'FINANCE_APPROVED' },
-            });
-
-            await tx.payslip.updateMany({
-                where: { runId: id, companyId },
-                data: { status: 'FINANCE_APPROVED' }
-            });
-
-            return run;
+        const updated = await tx.payrollRun.update({
+            where: { id, companyId },
+            data: { status: 'FINANCE_APPROVED' },
         });
-    }
+
+        await tx.payslip.updateMany({
+            where: { runId: id, companyId },
+            data: { status: 'FINANCE_APPROVED' }
+        });
+
+        // 🔥 Generate Ledger (DRAFT)
+        await this.ledgerService.generateLedger(id, companyId);
+
+        return updated;
+    });
+}
 
     async pay(id: string, companyId: string) {
-        return this.prisma.$transaction(async (tx) => {
-            const run = await tx.payrollRun.findFirst({
-                where: { id, companyId }
-            });
-            if (!run) throw new NotFoundException('تشغيل الرواتب غير موجود');
-
-            await tx.payrollRun.update({
-                where: { id },
-                data: { status: 'PAID' }
-            });
-
-            await tx.payslip.updateMany({
-                where: { runId: id, companyId },
-                data: { status: 'PAID' }
-            });
-
-            await tx.payrollPeriod.updateMany({
-                where: { id: run.periodId, companyId },
-                data: { status: 'PAID' }
-            });
-
-            return run;
+    return this.prisma.$transaction(async (tx) => {
+        const run = await tx.payrollRun.findFirst({
+            where: { id, companyId }
         });
-    }
+        if (!run) throw new NotFoundException('تشغيل الرواتب غير موجود');
+
+        await tx.payrollRun.update({
+            where: { id },
+            data: { status: 'PAID' }
+        });
+
+        await tx.payslip.updateMany({
+            where: { runId: id, companyId },
+            data: { status: 'PAID' }
+        });
+
+        await tx.payrollPeriod.updateMany({
+            where: { id: run.periodId, companyId },
+            data: { status: 'PAID' }
+        });
+
+        // 🔥 Post Ledger (Mark as POSTED)
+        await tx.payrollLedger.update({
+            where: { runId: id },
+            data: { status: 'POSTED' }
+        });
+
+        return run;
+    });
+}
 }

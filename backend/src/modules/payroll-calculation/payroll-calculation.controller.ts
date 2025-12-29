@@ -8,6 +8,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { PermissionsService } from '../permissions/permissions.service';
+import { ForbiddenException } from '@nestjs/common';
 import { Response } from 'express';
 
 @ApiTags('Payroll Calculation')
@@ -20,6 +22,7 @@ export class PayrollCalculationController {
         private readonly validationService: PayrollValidationService,
         private readonly wpsService: WpsGeneratorService,
         private readonly formulaEngine: FormulaEngineService,
+        private readonly permissionsService: PermissionsService,
     ) { }
 
     @Get('preview')
@@ -32,8 +35,20 @@ export class PayrollCalculationController {
         @Query('employeeId') employeeId: string,
         @Query('year') year: string,
         @Query('month') month: string,
+        @CurrentUser('id') userId: string,
         @CurrentUser('companyId') companyId: string,
     ) {
+        // 🔥 Enforce Scope-based Permissions
+        const access = await this.permissionsService.canAccessEmployee(
+            userId,
+            companyId,
+            'PAYROLL_VIEW',
+            employeeId
+        );
+        if (!access.hasAccess) {
+            throw new ForbiddenException(`ليس لديك صلاحية للوصول لبيانات هذا الموظف: ${access.reason}`);
+        }
+
         return this.service.previewCalculation(
             employeeId,
             companyId,

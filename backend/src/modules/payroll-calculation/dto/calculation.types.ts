@@ -173,6 +173,9 @@ export interface PolicyPayrollLine {
     // نوع الناتج (استحقاق/خصم)
     sign: 'EARNING' | 'DEDUCTION';
 
+    // مساهمة صاحب العمل (لا تخصم من صافي الراتب)
+    isEmployerContribution?: boolean;
+
     // المبلغ المحسوب
     amount: number;
 

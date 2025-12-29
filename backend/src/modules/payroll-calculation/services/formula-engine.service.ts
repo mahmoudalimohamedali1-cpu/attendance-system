@@ -28,153 +28,81 @@ export class FormulaEngineService {
         'DAYS_WORKED', 'DAYS_ABSENT', 'LATE_MINUTES', 'LATE_HOURS',
         'DAILY_RATE', 'HOURLY_RATE', 'MINUTE_RATE',
         'GOSI_BASE', 'GOSI_RATE_EMP', 'GOSI_RATE_COMP',
-        'DAYS_IN_MONTH', 'WORKING_DAYS',
+        'DAYS_IN_MONTH', 'WORKING_DAYS', 'WORKING_DAYS_IN_YEAR',
         'YEARS_OF_SERVICE', 'MONTHS_OF_SERVICE',
     ];
 
-    // الدوال المدعومة
-    private static readonly FUNCTIONS: Record<string, (...args: number[]) => number> = {
-        'min': (...args) => Math.min(...args),
-        'max': (...args) => Math.max(...args),
-        'round': (n, decimals = 2) => Math.round(n * Math.pow(10, decimals)) / Math.pow(10, decimals),
-        'floor': (n) => Math.floor(n),
-        'ceil': (n) => Math.ceil(n),
-        'abs': (n) => Math.abs(n),
-        'trunc': (n) => Math.trunc(n),
-        'sqrt': (n) => Math.sqrt(n),
-        'pow': (base, exp) => Math.pow(base, exp),
-    };
+    // ... (skipped FUNCTIONS)
 
     /**
-     * تقييم معادلة مع متغيرات
-     */
-    evaluate(formula: string, variables: Record<string, number>): { value: number; error?: string } {
-        try {
-            if (!formula || typeof formula !== 'string') {
-                return { value: 0, error: 'Empty formula' };
-            }
-
-            // تنظيف المعادلة
-            let expression = formula.trim().toUpperCase();
-
-            // التحقق من الأمان (لا يسمح بأي كلمات برمجية)
-            const securityCheck = this.securityValidation(expression);
-            if (!securityCheck.valid) {
-                return { value: 0, error: securityCheck.error };
-            }
-
-            // استبدال المتغيرات بقيمها
-            expression = this.substituteVariables(expression, variables);
-
-            // تقييم المعادلة
-            const result = this.evaluateExpression(expression);
-
-            if (isNaN(result) || !isFinite(result)) {
-                return { value: 0, error: 'Invalid calculation result' };
-            }
-
-            return { value: Math.round(result * 100) / 100 };
-        } catch (error) {
-            this.logger.error(`Formula evaluation error: ${error.message}`, error.stack);
-            return { value: 0, error: error.message };
-        }
-    }
-
-    /**
-     * التحقق من أمان المعادلة
-     */
-    private securityValidation(formula: string): { valid: boolean; error?: string } {
-        // قائمة سوداء للكلمات المحظورة
-        const blacklist = [
-            'EVAL', 'FUNCTION', 'CONSTRUCTOR', 'PROTOTYPE',
-            'WINDOW', 'DOCUMENT', 'PROCESS', 'REQUIRE', 'IMPORT',
-            'SETTIMEOUT', 'SETINTERVAL', 'FETCH', 'XMLHTTP',
-            '__PROTO__', 'THIS', 'GLOBAL', 'SELF',
-        ];
-
-        for (const word of blacklist) {
-            if (formula.includes(word)) {
-                return { valid: false, error: `Forbidden keyword: ${word}` };
-            }
-        }
-
-        // التحقق من عدم وجود رموز غريبة
-        const allowedPattern = /^[A-Z0-9_+\-*\/().,\s%^<>=!&|?:]+$/;
-        if (!allowedPattern.test(formula)) {
-            return { valid: false, error: 'Invalid characters in formula' };
-        }
-
-        return { valid: true };
-    }
-
-    /**
-     * استبدال المتغيرات بقيمها
-     */
-    private substituteVariables(formula: string, variables: Record<string, number>): string {
-        let result = formula;
-
-        // ترتيب المتغيرات من الأطول للأقصر لتجنب الاستبدال الجزئي
-        const sortedVars = Object.keys(variables).sort((a, b) => b.length - a.length);
-
-        for (const varName of sortedVars) {
-            const value = variables[varName.toUpperCase()] ?? 0;
-            const regex = new RegExp(`\\b${varName.toUpperCase()}\\b`, 'g');
-            result = result.replace(regex, value.toString());
-        }
-
-        return result;
-    }
-
-    /**
-     * تقييم التعبير الرياضي (بدون eval)
-     * يستخدم Shunting-yard algorithm محسّن
-     */
-    private evaluateExpression(expression: string): number {
-        // إزالة المسافات
-        expression = expression.replace(/\s+/g, '');
-
-        // معالجة الدوال أولاً
-        expression = this.processFunctions(expression);
-
-        // معالجة if-else
-        expression = this.processConditionals(expression);
-
-        // تحويل لـ RPN وتقييم
-        return this.evaluateRPN(this.toRPN(expression));
-    }
-
-    /**
-     * معالجة الدوال
-     */
-    private processFunctions(expression: string): string {
-        let result = expression;
-
-        for (const [funcName, fn] of Object.entries(FormulaEngineService.FUNCTIONS)) {
-            const pattern = new RegExp(`${funcName.toUpperCase()}\\(([^)]+)\\)`, 'gi');
-            result = result.replace(pattern, (_, args) => {
-                const argValues = args.split(',').map((a: string) => {
-                    // تقييم كل argument
-                    const val = this.evaluateRPN(this.toRPN(a.trim()));
-                    return val;
-                });
-                return fn(...argValues).toString();
-            });
-        }
-
-        return result;
-    }
-
-    /**
-     * معالجة if(condition, trueValue, falseValue)
+     * معالجة if(condition, trueValue, falseValue) بشكل متكرر (Nested Support)
      */
     private processConditionals(expression: string): string {
-        const ifPattern = /IF\(([^,]+),([^,]+),([^)]+)\)/gi;
-        return expression.replace(ifPattern, (_, condition, trueVal, falseVal) => {
-            const condResult = this.evaluateCondition(condition.trim());
-            return condResult
-                ? this.evaluateRPN(this.toRPN(trueVal.trim())).toString()
-                : this.evaluateRPN(this.toRPN(falseVal.trim())).toString();
-        });
+        let result = expression;
+
+        // البحث عن آخر IF مفتوحة لإغلاقها (من الداخل للخارج)
+        while (result.includes('IF(') || result.includes('if(')) {
+            const ifIndex = result.toUpperCase().lastIndexOf('IF(');
+            const contentStart = ifIndex + 3;
+
+            // إيجاد القوس المغلق المقابل
+            let bracketCount = 1;
+            let bracketEnd = -1;
+            for (let i = contentStart; i < result.length; i++) {
+                if (result[i] === '(') bracketCount++;
+                if (result[i] === ')') bracketCount--;
+                if (bracketCount === 0) {
+                    bracketEnd = i;
+                    break;
+                }
+            }
+
+            if (bracketEnd === -1) break; // خطأ في الأقواس
+
+            const content = result.substring(contentStart, bracketEnd);
+
+            // تقسيم المحتوى إلى 3 أجزاء (الشرط، القيمة الصحيحة، القيمة الخاطئة)
+            // نأخذ في الاعتبار أن كل جزء قد يحتوي على فواصل داخل دوال أخرى
+            const parts = this.splitByTopLevelComma(content);
+
+            if (parts.length === 3) {
+                const [condition, trueVal, falseVal] = parts;
+                const condResult = this.evaluateCondition(condition.trim());
+                const evaluatedBranch = condResult ? trueVal : falseVal;
+
+                // استبدال الـ IF كاملة بنتيجة الفرع المختار
+                result = result.substring(0, ifIndex) + evaluatedBranch + result.substring(bracketEnd + 1);
+            } else {
+                // خطأ في عدد الأجزاء، نخرج لتجنب الحلقة اللانهائية
+                break;
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * تقسيم النص بناءً على الفواصل التي ليست داخل أقواس
+     */
+    private splitByTopLevelComma(text: string): string[] {
+        const parts: string[] = [];
+        let current = '';
+        let bracketCount = 0;
+
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            if (char === '(') bracketCount++;
+            if (char === ')') bracketCount--;
+
+            if (char === ',' && bracketCount === 0) {
+                parts.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        parts.push(current);
+        return parts;
     }
 
     /**
@@ -320,6 +248,7 @@ export class FormulaEngineService {
             LATE_HOURS: (params.lateMinutes || 0) / 60,
             DAYS_IN_MONTH: daysInMonth,
             WORKING_DAYS: daysInMonth,
+            WORKING_DAYS_IN_YEAR: 360, // المعيار المحاسبي غالباً 30 * 12
             GOSI_BASE: basic + (params.housingAllowance || 0),
             GOSI_RATE_EMP: 0.0975,
             GOSI_RATE_COMP: 0.12,

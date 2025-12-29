@@ -449,32 +449,55 @@ export class PayrollCalculationService {
             this.logger.error(`Error in policy evaluation: ${err.message}`);
         }
 
-        // --- GOSI Calculation ---
-        // Check eligibility: if isSaudiOnly is true, only Saudi employees get GOSI
-        const isEligibleForGosi = gosiConfig && (
-            !gosiConfig.isSaudiOnly || employee.isSaudi === true
-        );
+        // --- GOSI Calculation (Saudi & Non-Saudi) ---
+        let gosiEmployeeAmount = 0;
+        let gosiEmployerAmount = 0;
 
-        if (isEligibleForGosi) {
+        if (gosiConfig) {
             const gosiBase = calculatedLines.filter(l => l.gosiEligible).reduce((sum, l) => sum + l.amount, 0);
             const cappedBase = Math.min(gosiBase, Number(gosiConfig.maxCapAmount));
-            const empRate = Number(gosiConfig.employeeRate) + Number(gosiConfig.sanedRate);
-            const gosiDeduction = (cappedBase * empRate) / 100;
 
-            if (gosiDeduction > 0) {
+            if (employee.isSaudi) {
+                // للسعوديين: التأمينات (9% موظف + 9% شركة) + ساند (0.75% لكل طرف) + الأخطار (2% شركة)
+                const empRate = Number(gosiConfig.employeeRate) + Number(gosiConfig.sanedRate);
+                const coRate = Number(gosiConfig.employerRate) + Number(gosiConfig.sanedRate) + Number(gosiConfig.hazardRate);
+
+                gosiEmployeeAmount = (cappedBase * empRate) / 100;
+                gosiEmployerAmount = (cappedBase * coRate) / 100;
+
+                if (gosiEmployeeAmount > 0) {
+                    policyLines.push({
+                        componentId: 'GOSI-EMP-STATUTORY',
+                        componentCode: 'GOSI_EMP',
+                        componentName: 'تأمينات اجتماعية (موظف)',
+                        sign: 'DEDUCTION',
+                        amount: Math.round(gosiEmployeeAmount * 100) / 100,
+                        descriptionAr: `حصة الموظف (${empRate}%)`,
+                        source: { policyId: gosiConfig.id, policyCode: 'GOSI_CONFIG', ruleId: 'GOSI_EMP', ruleCode: 'GOSI_SAUDI' },
+                        gosiEligible: false,
+                    });
+                }
+            } else {
+                // لغير السعوديين: الأخطار المهنية فقط (2% شركة غالباً) - ولا يخصم شيء من الموظف
+                if (!gosiConfig.isSaudiOnly) {
+                    const coRate = Number(gosiConfig.hazardRate);
+                    gosiEmployerAmount = (cappedBase * coRate) / 100;
+
+                    // لا توجد استقطاعات للموظف الأجنبي للتأمينات عادة في السعودية
+                }
+            }
+
+            // إضافة حصة الشركة كبند "مساهمة كارف" (Employer Contribution) - لا يؤثر على صافي الراتب لكن يظهر في التكاليف
+            if (gosiEmployerAmount > 0) {
                 policyLines.push({
-                    componentId: 'GOSI-STATUTORY',
-                    componentCode: 'GOSI',
-                    componentName: 'التأمينات الاجتماعية',
+                    componentId: 'GOSI-CO-STATUTORY',
+                    componentCode: 'GOSI_CO',
+                    componentName: 'تأمينات اجتماعية (شركة)',
                     sign: 'DEDUCTION',
-                    amount: Math.round(gosiDeduction * 100) / 100,
-                    descriptionAr: `حساب وطني (${empRate}%)`,
-                    source: {
-                        policyId: gosiConfig.id,
-                        policyCode: 'GOSI_CONFIG',
-                        ruleId: 'GOSI_EMP',
-                        ruleCode: 'GOSI_EMP',
-                    },
+                    isEmployerContribution: true, // معلمة كحرصة صاحب عمل لن تظهر في صافي الراتب
+                    amount: Math.round(gosiEmployerAmount * 100) / 100,
+                    descriptionAr: `حصة الشركة من التأمينات`,
+                    source: { policyId: gosiConfig.id, policyCode: 'GOSI_CONFIG', ruleId: 'GOSI_CO', ruleCode: 'EMPLOYER_SHARE' },
                     gosiEligible: false,
                 });
             }
@@ -751,8 +774,10 @@ export class PayrollCalculationService {
             }
         }
 
-        const grossSalary = Math.round(policyLines.filter(l => l.sign === 'EARNING').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
-        const totalDeductions = Math.round(policyLines.filter(l => l.sign === 'DEDUCTION').reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+        const grossSalary = Math.round(policyLines.filter(l => l.sign === 'EARNING' && !l.isEmployerContribution).reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+        const totalDeductions = Math.round(policyLines.filter(l => l.sign === 'DEDUCTION' && !l.isEmployerContribution).reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+
+        const employerContributions = Math.round(policyLines.filter(l => l.isEmployerContribution).reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
 
         const netSalaryRaw = grossSalary - totalDeductions;
         let netSalary = Math.round(netSalaryRaw * 100) / 100;

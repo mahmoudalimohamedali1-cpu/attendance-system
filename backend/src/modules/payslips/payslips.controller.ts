@@ -6,6 +6,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PdfService } from '../../common/pdf/pdf.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
 @ApiTags('Payslips')
 @ApiBearerAuth()
@@ -15,6 +17,7 @@ export class PayslipsController {
     constructor(
         private readonly prisma: PrismaService,
         private readonly pdfService: PdfService,
+        private readonly permissionsService: PermissionsService,
     ) { }
 
     /**
@@ -88,12 +91,23 @@ export class PayslipsController {
     @Get()
     @ApiOperation({ summary: 'Get payslips with filters' })
     async findAll(
+        @CurrentUser('id') userId: string,
         @CurrentUser('companyId') companyId: string,
         @Query('payrollRunId') payrollRunId?: string,
         @Query('periodId') periodId?: string,
         @Query('search') search?: string,
     ) {
-        const where: any = { companyId };
+        // 🔥 Get Accessible Employee IDs (Scope-based)
+        const accessibleIds = await this.permissionsService.getAccessibleEmployeeIds(
+            userId,
+            companyId,
+            'PAYROLL_VIEW'
+        );
+
+        const where: any = {
+            companyId,
+            employeeId: { in: accessibleIds }
+        };
 
         if (payrollRunId) {
             where.runId = payrollRunId;
