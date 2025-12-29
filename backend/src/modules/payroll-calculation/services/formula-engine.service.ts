@@ -290,4 +290,18 @@ export class FormulaEngineService {
         }
         return deps;
     }
+
+    /**
+     * قائمة المتغيرات المدعومة
+     */
+    getSupportedVariables(): string[] {
+        return FormulaEngineService.SUPPORTED_VARIABLES;
+    }
+
+    /**
+     * قائمة الدوال المدعومة
+     */
+    getSupportedFunctions(): string[] {
+        return Object.keys(FormulaEngineService.FUNCTIONS);
+    }
 }
