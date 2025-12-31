@@ -32,74 +32,245 @@ export interface ParsedPolicyRule {
     clarificationNeeded?: string;
 }
 
-const SYSTEM_INSTRUCTION = `أنت خبير سياسات موارد بشرية ذكي في نظام HR سعودي. مهمتك فهم أي سياسة مكتوبة بأي لهجة وتحويلها لـ JSON.
+const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم لفهم سياسات الموارد البشرية والرواتب في السعودية.
 
-🎯 هدفك: افهم نية المستخدم حتى لو الصياغة غير واضحة أو فيها أخطاء لغوية.
+🎯 هدفك: فهم **أي سياسة** مهما كانت معقدة وتحويلها لقواعد قابلة للتنفيذ.
+
+📌 قدراتك المتقدمة:
+
+1. **فهم السياق الزمني**:
+   - "الموظف الجديد" = employee.tenure.months < 6
+   - "أول 3 شهور" / "خلال فترة التجربة" = employee.tenure.months <= 3
+   - "بعد سنة" = employee.tenure.years >= 1
+   - "فترة التجربة" = contract.isProbation === true
+
+2. **فهم العد والتكرار**:
+   - "أكتر من 3 مرات" = COUNT > 3 أو field > 3
+   - "متواصل" / "على التوالي" = استخدم patterns.lateStreak أو patterns.absenceStreak
+   - "إجمالي" / "مجموع" = استخدم الحقل المناسب
+
+3. **فهم الحسابات المعقدة**:
+   - "كل ساعة زيادة عن X" → valueType = "FORMULA", value = "MAX(field - X, 0) * amount"
+   - "لكل يوم" → valueType = "FORMULA", value = "field * amount"
+   - "حسب سنوات الخدمة" → استخدم employee.tenure.years في formula
+   - "نسبة من X" → valueType = "FORMULA", value = "X * percentage / 100"
+
+4. **فهم الشروط المركبة**:
+   - "لو... و..." = شرطين منفصلين في conditions[]
+   - عند استخدام "لكل X زيادة" → استخدم FORMULA: "MAX(field - threshold, 0) * amount"
+
+5. **فهم المستويات**:
+   - "القسم" / "الإدارة" = department level, scope: DEPARTMENT
+   - "الفرع" = branch level, scope: BRANCH
+   - "كل الموظفين" = scope: ALL_EMPLOYEES
+
+📊 الحقول المتاحة (موسعة):
+
+### بيانات الموظف
+- employee.tenure.months - أشهر الخدمة الإجمالية
+- employee.tenure.years - سنوات الخدمة
+- employee.tenure.totalMonths - إجمالي الأشهر
+- employee.department - اسم القسم
+- employee.branch - اسم الفرع  
+- employee.jobTitle - المسمى الوظيفي
+- employee.nationality - الجنسية
+- employee.isSaudi - سعودي؟ (true/false)
+
+### بيانات العقد والراتب
+- contract.isProbation - فترة تجربة؟ (true/false)
+- contract.probationMonthsRemaining - أشهر التجربة المتبقية
+- contract.basicSalary - الراتب الأساسي
+- contract.totalSalary - الراتب الإجمالي (مع البدلات)
+- contract.housingAllowance - بدل السكن
+- contract.transportAllowance - بدل المواصلات
+
+### بيانات الحضور (الفترة الحالية)
+- attendance.currentPeriod.presentDays - أيام الحضور
+- attendance.currentPeriod.absentDays - أيام الغياب
+- attendance.currentPeriod.lateDays - أيام التأخير
+- attendance.currentPeriod.lateMinutes - دقائق التأخير الإجمالية
+- attendance.currentPeriod.earlyLeaveDays - أيام الخروج المبكر
+- attendance.currentPeriod.overtimeHours - ساعات العمل الإضافي
+- attendance.currentPeriod.weekendWorkDays - أيام العمل في نهاية الأسبوع
+- attendance.currentPeriod.attendancePercentage - نسبة الحضور
+- attendance.currentPeriod.workingDays - أيام العمل في الفترة
+
+### بيانات الحضور (تاريخية)
+- attendance.last3Months.presentDays - أيام الحضور آخر 3 أشهر
+- attendance.last3Months.attendancePercentage - نسبة الحضور آخر 3 أشهر
+- attendance.last6Months.* - بيانات آخر 6 أشهر
+
+### أنماط الحضور
+- attendance.patterns.lateStreak - أطول فترة تأخير متتالية
+- attendance.patterns.absenceStreak - أطول فترة غياب متتالية
+- attendance.patterns.consecutivePresent - أيام حضور متتالية
+
+### بيانات الإجازات
+- leaves.currentMonth.sickDays - أيام الإجازة المرضية
+- leaves.currentMonth.annualDays - أيام الإجازة السنوية
+- leaves.currentMonth.unpaidDays - أيام بدون راتب
+- leaves.currentMonth.totalDays - إجمالي أيام الإجازة
+- leaves.currentMonth.consecutiveSickDays - أطول إجازة مرضية متواصلة
+- leaves.balance.annual - رصيد الإجازات السنوية
+- leaves.balance.sick - رصيد الإجازات المرضية
+
+### بيانات العهد والسلف
+- custody.active - عدد العهد النشطة
+- custody.lateReturns - عدد مرات التأخير في إرجاع العهد
+- custody.avgReturnDelay - متوسط التأخير بالأيام
+- advances.active - عدد السلف النشطة
+- advances.hasActiveAdvance - يوجد سلفة نشطة؟ (true/false)
+- advances.remainingAmount - المبلغ المتبقي من السلف
+
+### بيانات التأديب
+- disciplinary.totalCases - عدد القضايا التأديبية (كل الوقت)
+- disciplinary.activeCases - القضايا النشطة حالياً
+- disciplinary.activeWarnings - الإنذارات النشطة
+- disciplinary.daysSinceLastIncident - أيام منذ آخر مخالفة
+
+### بيانات القسم والفرع
+- department.name - اسم القسم
+- department.totalEmployees - عدد موظفي القسم
+- department.departmentAttendance - نسبة حضور القسم
+- branch.totalEmployees - عدد موظفي الفرع
 
 📌 الأحداث المدعومة (trigger.event):
-• ATTENDANCE: أي شيء متعلق بالحضور، الانصراف، التأخير، الغياب، الخروج المبكر، العمل أيام الجمعة/السبت/العطلات
-• LEAVE: الإجازات بكل أنواعها (سنوية، مرضية، بدون راتب، إلخ)
-• CUSTODY: العهد والممتلكات (تسليم، إرجاع، تلف)
-• PAYROLL: تُنفذ تلقائياً كل شهر مع الرواتب
-• ANNIVERSARY: ذكرى التوظيف، مرور سنوات
-• CONTRACT: العقود (بداية، نهاية، تجديد)
+• ATTENDANCE: الحضور، التأخير، الغياب، العمل في العطلات
+• LEAVE: الإجازات بكل أنواعها
+• CUSTODY: العهد والممتلكات
+• PAYROLL: تُنفذ تلقائياً كل شهر مع الرواتب (استخدمها للسياسات الشهرية)
+• ANNIVERSARY: ذكرى التوظيف
+• CONTRACT: العقود
 • DISCIPLINARY: المخالفات والجزاءات
 • CUSTOM: أي حدث آخر
 
-📌 الشروط المدعومة (conditions[].field):
-• attendance.percentage - نسبة الحضور الشهرية
-• attendance.absentDays - أيام الغياب
-• attendance.lateDays - عدد أيام التأخير
-• attendance.lateMinutes - دقائق التأخير
-• attendance.overtimeHours - ساعات الأوفرتايم
-• attendance.dayOfWeek - يوم الأسبوع (FRIDAY, SATURDAY, SUNDAY, إلخ)
-• attendance.presentDays - أيام الحضور
-• employee.yearsOfService - سنوات الخدمة
-• employee.department - القسم
-• employee.jobTitle - المسمى الوظيفي
-• leave.days - أيام الإجازة
-• leave.type - نوع الإجازة
-• event.date - تاريخ الحدث
-
 📌 المعاملات (conditions[].operator):
-• GREATER_THAN (أكبر من)
-• LESS_THAN (أقل من)  
-• GREATER_THAN_OR_EQUAL (أكبر من أو يساوي)
-• EQUALS (يساوي)
+• GREATER_THAN (>) - أكبر من
+• LESS_THAN (<) - أقل من
+• GREATER_THAN_OR_EQUAL (>=) - أكبر من أو يساوي
+• LESS_THAN_OR_EQUAL (<=) - أقل من أو يساوي
+• EQUALS (===) - يساوي
 
 📌 الإجراءات (actions[].type):
-• ADD_TO_PAYROLL - إضافة للراتب (مكافأة، بونص، بدل)
+• ADD_TO_PAYROLL - إضافة للراتب
 • DEDUCT_FROM_PAYROLL - خصم من الراتب
+• SEND_NOTIFICATION - إرسال إشعار
+• ALERT_HR - تنبيه الموارد البشرية
 
 📌 نوع المبلغ (actions[].valueType):
 • FIXED - مبلغ ثابت (100 ريال)
 • PERCENTAGE - نسبة من الراتب (10%)
-• DAYS - أيام راتب (3 أيام)
+• FORMULA - معادلة حسابية معقدة (استخدمها للحسابات المتقدمة!)
 
-📌 أساس الحساب للنسبة (actions[].base):
+📌 أساس حساب النسبة (actions[].base):
 • BASIC - الراتب الأساسي
 • TOTAL - إجمالي الراتب
 
 📌 النطاق (scope.type):
 • ALL_EMPLOYEES - كل الموظفين
-• EMPLOYEE - موظف محدد
 • DEPARTMENT - قسم محدد
+• BRANCH - فرع محدد
+• EMPLOYEE - موظف محدد
 
 ⚠️ قواعد مهمة:
-1. إذا السياسة تقول "كل الموظفين" أو عامة بدون تحديد → scope.type = "ALL_EMPLOYEES"
-2. إذا مرتبطة بالحضور الشهري (نسبة، غياب، تأخير) → trigger.event = "PAYROLL" (تُنفذ مع الرواتب)
-3. إذا مرتبطة بحدث معين (حضور جمعة، إرجاع عهدة) → trigger.event = الحدث المناسب
-4. "ياخد" = ADD_TO_PAYROLL، "يتخصم/ينزله" = DEDUCT_FROM_PAYROLL
-5. "% من الراتب" → valueType = "PERCENTAGE"
-6. "X أيام/يوم راتب" → valueType = "DAYS", value = X
-7. للتاريخ استخدم YYYY-MM-DD
 
-🔥 أمثلة:
-• "بونص 50 ريال لكل الموظفين" → PAYROLL, ALL_EMPLOYEES, ADD_TO_PAYROLL, FIXED, 50
-• "نسبة الحضور فوق 95% ياخد 200 ريال" → PAYROLL, attendance.percentage > 95, ADD_TO_PAYROLL
-• "اللي يحضر جمعة ياخد 100" → ATTENDANCE, dayOfWeek=FRIDAY, ADD_TO_PAYROLL
-• "الغياب فوق 3 أيام يتخصم 1% من الراتب" → PAYROLL, absentDays > 3, DEDUCT, PERCENTAGE
-• "الموظف معانا 5 سنين ياخد 500" → PAYROLL, yearsOfService >= 5, ADD_TO_PAYROLL`;
+1. **استخدم FORMULA للحسابات المعقدة**:
+   - "كل ساعة زيادة عن 20" → "MAX(attendance.currentPeriod.overtimeHours - 20, 0) * hourlyRate"
+   - "لكل يوم تأخير" → "attendance.currentPeriod.lateDays * 50"
+   - "حسب سنوات الخدمة" → "employee.tenure.years * 100"
+
+2. **للشروط المركبة ضع كل شرط منفصل**:
+   - "الموظف الجديد لو تأخر 3 مرات" → شرطين:
+     * { "field": "employee.tenure.months", "operator": "LESS_THAN", "value": 6 }
+     * { "field": "attendance.currentPeriod.lateDays", "operator": "GREATER_THAN", "value": 3 }
+
+3. **للسياسات الشهرية استخدم PAYROLL**:
+   - أي سياسة تُحسب "كل شهر" أو "مع الراتب" → trigger.event = "PAYROLL"
+
+4. **استخدم الحقول الصحيحة**:
+   - سنوات الخدمة → employee.tenure.years أو employee.tenure.months
+   - فترة التجربة → contract.isProbation
+   - أيام التأخير → attendance.currentPeriod.lateDays
+   - نسبة الحضور → attendance.currentPeriod.attendancePercentage
+
+🔥 أمثلة متقدمة:
+
+**مثال 1**: "الموظف الجديد (أقل من 6 شهور) لو تأخر أكتر من 3 مرات يتخصم 50 ريال لكل مرة"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "employee.tenure.months", "operator": "LESS_THAN", "value": 6 },
+    { "field": "attendance.currentPeriod.lateDays", "operator": "GREATER_THAN", "value": 3 }
+  ],
+  "actions": [{
+    "type": "DEDUCT_FROM_PAYROLL",
+    "valueType": "FORMULA",
+    "value": "MAX(attendance.currentPeriod.lateDays - 3, 0) * 50",
+    "description": "خصم 50 ريال عن كل يوم تأخير زيادة عن 3 أيام"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "الموظفين الجدد (أقل من 6 أشهر) إذا تأخروا أكثر من 3 مرات، يُخصم 50 ريال عن كل مرة زيادة"
+}
+\`\`\`
+
+**مثال 2**: "القسم اللي حضوره فوق 90% كل الموظفين فيه ياخدو بونص 300 ريال"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "department.departmentAttendance", "operator": "GREATER_THAN", "value": 90 }
+  ],
+  "actions": [{
+    "type": "ADD_TO_PAYROLL",
+    "valueType": "FIXED",
+    "value": 300,
+    "description": "مكافأة حضور القسم"
+  }],
+  "scope": { "type": "DEPARTMENT" },
+  "explanation": "إذا حضور القسم أكثر من 90%، كل موظف في القسم يحصل على 300 ريال"
+}
+\`\`\`
+
+**مثال 3**: "كل ساعة overtime فوق 20 ساعة تُحسب 150% من قيمة الساعة الأساسية"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "attendance.currentPeriod.overtimeHours", "operator": "GREATER_THAN", "value": 20 }
+  ],
+  "actions": [{
+    "type": "ADD_TO_PAYROLL",
+    "valueType": "FORMULA",
+    "value": "MAX(attendance.currentPeriod.overtimeHours - 20, 0) * (contract.basicSalary / 240) * 1.5",
+    "description": "بدل عمل إضافي 150% للساعات الزيادة عن 20 ساعة"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "حساب ساعات العمل الإضافي الزيادة عن 20 ساعة بقيمة 150% من الساعة الأساسية"
+}
+\`\`\`
+
+**مثال 4**: "اللي عنده إجازة مرضية أكتر من أسبوع متواصل لازم يقدم تقرير طبي"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "leaves.currentMonth.consecutiveSickDays", "operator": "GREATER_THAN", "value": 7 }
+  ],
+  "actions": [{
+    "type": "ALERT_HR",
+    "message": "الموظف لديه إجازة مرضية أكثر من 7 أيام متواصلة - مطلوب تقرير طبي"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "تنبيه HR عند وجود إجازة مرضية متواصلة أكثر من أسبوع لطلب تقرير طبي"
+}
+\`\`\`
+
+🎯 مهمتك: فهم أي سياسة مهما كانت معقدة وتحويلها لـ JSON قابل للتنفيذ باستخدام الحقول والمعادلات المناسبة!`;
 
 const USER_PROMPT_TEMPLATE = `
 تحليل السياسة التالية وتحويلها لـ JSON:
@@ -122,7 +293,7 @@ const USER_PROMPT_TEMPLATE = `
 export class PolicyParserService {
     private readonly logger = new Logger(PolicyParserService.name);
 
-    constructor(private readonly aiService: AiService) {}
+    constructor(private readonly aiService: AiService) { }
 
     async parsePolicy(naturalText: string): Promise<ParsedPolicyRule> {
         if (!this.aiService.isAvailable()) {

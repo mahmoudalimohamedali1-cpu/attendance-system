@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { PolicyPayrollLine } from "../payroll-calculation/dto/calculation.types";
+import { PolicyContextService, EnrichedPolicyContext } from "./policy-context.service";
+import { FormulaParserService } from "./formula-parser.service";
 
 export interface SmartPolicyExecutionResult {
     success: boolean;
@@ -28,7 +30,11 @@ export interface SmartPolicyExecutionContext {
 export class SmartPolicyExecutorService {
     private readonly logger = new Logger(SmartPolicyExecutorService.name);
 
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private policyContext: PolicyContextService,
+        private formulaParser: FormulaParserService
+    ) { }
 
     async executeSmartPolicies(
         companyId: string,
@@ -38,18 +44,14 @@ export class SmartPolicyExecutorService {
         const employeeId = context.employee?.id;
 
         try {
-            // Calculate attendance percentage if not provided
-            if (!context.attendancePercentage && context.workingDays > 0) {
-                const presentDays = context.presentDays || (context.workingDays - context.absentDays);
-                context.attendancePercentage = Math.round((presentDays / context.workingDays) * 100);
-            }
+            //  إثراء السياق بكل البيانات المطلوبة
+            const enrichedContext = await this.policyContext.enrichContext(
+                employeeId,
+                context.month,
+                context.year
+            );
 
-            // Calculate years of service if not provided
-            if (!context.yearsOfService && context.employee?.hireDate) {
-                const hireDate = new Date(context.employee.hireDate);
-                const now = new Date();
-                context.yearsOfService = Math.floor((now.getTime() - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-            }
+            this.logger.log(`Enriched context for employee ${employeeId}: tenure=${enrichedContext.employee.tenure.months}mo, attendance=${enrichedContext.attendance.currentPeriod.attendancePercentage}%`);
 
             // 1. Execute ALL_EMPLOYEES and PAYROLL trigger policies
             const allEmployeePolicies = await this.prisma.smartPolicy.findMany({
@@ -66,8 +68,8 @@ export class SmartPolicyExecutorService {
                 if (!parsed?.understood) continue;
 
                 // Handle ALL_EMPLOYEES or PAYROLL triggered policies
-                if (parsed.scope?.type === "ALL_EMPLOYEES" || policy.triggerEvent === "PAYROLL") {
-                    const result = await this.evaluatePolicy(policy, context);
+                if (parsed.scope?.type === "ALL_EMPLOYEES" || parsed.scope?.type === "DEPARTMENT" || policy.triggerEvent === "PAYROLL") {
+                    const result = await this.evaluateAdvancedPolicy(policy, enrichedContext);
                     if (result.success && result.amount !== 0) {
                         results.push(result);
                         this.logger.log(`Policy ${policy.name} applied: ${result.amount} SAR`);
@@ -127,15 +129,18 @@ export class SmartPolicyExecutorService {
                 }
             }
         } catch (error) {
-            this.logger.error(`Error executing smart policies: ${error.message}`);
+            this.logger.error(`Error executing smart policies: ${error.message}`, error.stack);
         }
 
         return results;
     }
 
-    private async evaluatePolicy(
+    /**
+     * تقييم سياسة متقدمة باستخدام السياق المُثرى والمعادلات المعقدة
+     */
+    private async evaluateAdvancedPolicy(
         policy: any,
-        context: SmartPolicyExecutionContext
+        context: EnrichedPolicyContext
     ): Promise<SmartPolicyExecutionResult> {
         const parsed = policy.parsedRule;
         if (!parsed || !parsed.understood) {
@@ -145,42 +150,68 @@ export class SmartPolicyExecutorService {
         const actions = parsed.actions || [];
         this.logger.log(`Evaluating policy: ${policy.name || policy.id} with ${actions.length} actions`);
 
+        // فحص الشروط أولاً
+        const conditions = parsed.conditions || [];
+        if (conditions.length > 0) {
+            const conditionsMet = await this.evaluateAdvancedConditions(conditions, context);
+            if (!conditionsMet) {
+                this.logger.debug(`Conditions not met for policy ${policy.name}`);
+                return { success: false, amount: 0 };
+            }
+        }
+
+        // فحص scope: DEPARTMENT
+        if (parsed.scope?.type === "DEPARTMENT") {
+            // السياسة تُطبق فقط إذا القسم حقق الشرط
+            // مثال: department.departmentAttendance > 90
+            // الموظف الحالي سيستفيد من السياسة
+            this.logger.log(`Department-level policy applied for ${context.department.name}`);
+        }
+
         let totalAmount = 0;
         let componentName = policy.name || "Smart Policy Adjustment";
         let sign: "EARNING" | "DEDUCTION" = "EARNING";
 
         for (const action of actions) {
             const actionType = (action.type || "").toString().toUpperCase();
-            let value = parseFloat(action.value) || 0;
             const valueType = (action.valueType || "FIXED").toString().toUpperCase();
             const base = (action.base || "BASIC").toString().toUpperCase();
 
-            // Check conditions
-            const conditions = parsed.conditions || [];
-            if (conditions.length > 0) {
-                const conditionsMet = this.evaluateConditions(conditions, context);
-                if (!conditionsMet) {
-                    this.logger.log(`Conditions not met for policy ${policy.name}`);
+            let amount = 0;
+
+            try {
+                if (valueType === "FORMULA") {
+                    // تنفيذ معادلة معقدة
+                    const formula = action.value || "";
+                    this.logger.log(`Evaluating formula: ${formula}`);
+                    amount = await this.formulaParser.evaluateFormula(formula, context);
+                    this.logger.log(`Formula result: ${amount}`);
+                } else if (valueType === "PERCENTAGE") {
+                    // حساب نسبة
+                    const percentage = parseFloat(action.value) || 0;
+                    const baseAmount = base === "TOTAL"
+                        ? context.contract.totalSalary
+                        : context.contract.basicSalary;
+                    amount = (baseAmount * percentage) / 100;
+                } else {
+                    // قيمة ثابتة
+                    amount = parseFloat(action.value) || 0;
+                }
+
+                if (actionType === "ADD_TO_PAYROLL" || actionType === "BONUS" || actionType === "ALLOWANCE" || actionType === "ADD") {
+                    totalAmount += amount;
+                    sign = "EARNING";
+                } else if (actionType === "DEDUCT_FROM_PAYROLL" || actionType === "DEDUCTION" || actionType === "DEDUCT") {
+                    totalAmount += amount;
+                    sign = "DEDUCTION";
+                } else if (actionType === "ALERT_HR" || actionType === "SEND_NOTIFICATION") {
+                    // هذه actions لا تؤثر على الراتب
+                    this.logger.log(`Non-payroll action: ${actionType} - ${action.message || ""}`);
                     continue;
                 }
-            }
-
-            // Calculate amount based on valueType
-            if (valueType === "PERCENTAGE") {
-                const baseAmount = base === "TOTAL" ? context.baseSalary * 1.25 : context.baseSalary;
-                value = (baseAmount * value) / 100;
-            } else if (valueType === "DAYS") {
-                // Days-based: calculate daily rate from base salary
-                const dailyRate = context.baseSalary / 30;
-                value = dailyRate * value;
-            }
-
-            if (actionType === "ADD_TO_PAYROLL" || actionType === "BONUS" || actionType === "ALLOWANCE" || actionType === "ADD") {
-                totalAmount += value;
-                sign = "EARNING";
-            } else if (actionType === "DEDUCT_FROM_PAYROLL" || actionType === "DEDUCTION" || actionType === "DEDUCT") {
-                totalAmount += value;
-                sign = "DEDUCTION";
+            } catch (error) {
+                this.logger.error(`Error evaluating action: ${error.message}`);
+                return { success: false, amount: 0, error: error.message };
             }
         }
 
@@ -211,6 +242,121 @@ export class SmartPolicyExecutorService {
         };
     }
 
+    /**
+     * تقييم شروط متقدمة باستخدام السياق المُثرى
+     */
+    private async evaluateAdvancedConditions(
+        conditions: any[],
+        context: EnrichedPolicyContext
+    ): Promise<boolean> {
+        if (!conditions || conditions.length === 0) {
+            return true;
+        }
+
+        for (const condition of conditions) {
+            const field = condition.field || "";
+            const operator = condition.operator || "EQUALS";
+            const expectedValue = condition.value;
+
+            try {
+                // جلب القيمة الفعلية من السياق المُثرى
+                const actualValue = this.getNestedValue(context, field);
+
+                if (actualValue === undefined || actualValue === null) {
+                    this.logger.warn(`Field ${field} not found in context`);
+                    return false;
+                }
+
+                // تطبيق المعامل
+                const met = this.applyOperator(actualValue, operator, expectedValue);
+
+                if (!met) {
+                    this.logger.debug(`Condition not met: ${field} ${operator} ${expectedValue} (actual: ${actualValue})`);
+                    return false;
+                }
+            } catch (error) {
+                this.logger.error(`Error evaluating condition for field ${field}: ${error.message}`);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * جلب قيمة متداخلة من السياق
+     * مثال: getNestedValue(context, "employee.tenure.months") -> 4
+     */
+    private getNestedValue(obj: any, path: string): any {
+        try {
+            return path.split('.').reduce((current, key) => {
+                if (current === null || current === undefined) {
+                    return undefined;
+                }
+                return current[key];
+            }, obj);
+        } catch {
+            return undefined;
+        }
+    }
+
+    /**
+     * تطبيق معامل المقارنة
+     */
+    private applyOperator(actual: any, operator: string, expected: any): boolean {
+        const op = operator.toUpperCase();
+
+        // تحويل القيم للأرقام إذا لزم الأمر
+        const actualNum = typeof actual === 'number' ? actual : parseFloat(actual);
+        const expectedNum = typeof expected === 'number' ? expected : parseFloat(expected);
+
+        switch (op) {
+            case 'GREATER_THAN':
+            case '>':
+                return actualNum > expectedNum;
+
+            case 'LESS_THAN':
+            case '<':
+                return actualNum < expectedNum;
+
+            case 'GREATER_THAN_OR_EQUAL':
+            case '>=':
+                return actualNum >= expectedNum;
+
+            case 'LESS_THAN_OR_EQUAL':
+            case '<=':
+                return actualNum <= expectedNum;
+
+            case 'EQUALS':
+            case '===':
+            case '==':
+                // للأرقام
+                if (typeof actual === 'number' && typeof expected === 'number') {
+                    return actual === expected;
+                }
+                // للنصوص (case-insensitive)
+                return String(actual).toLowerCase() === String(expected).toLowerCase();
+
+            case 'NOT_EQUALS':
+            case '!==':
+            case '!=':
+                if (typeof actual === 'number' && typeof expected === 'number') {
+                    return actual !== expected;
+                }
+                return String(actual).toLowerCase() !== String(expected).toLowerCase();
+
+            case 'CONTAINS':
+                return String(actual).toLowerCase().includes(String(expected).toLowerCase());
+
+            default:
+                this.logger.warn(`Unknown operator: ${operator}`);
+                return false;
+        }
+    }
+
+    /**
+     * Backward compatibility: keep old method for existing code
+     */
     private evaluateConditions(conditions: any[], context: SmartPolicyExecutionContext): boolean {
         if (!conditions || conditions.length === 0) {
             return true;

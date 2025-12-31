@@ -87,11 +87,11 @@ export class PayrollRunsService {
                         // تحديد مصدر السطر بناءً على نوع المكوّن
                         let sourceType = PayslipLineSource.STRUCTURE;
                         if (pl.componentId === 'GOSI-STATUTORY') {
-                            sourceType = PayslipLineSource.STATUTORY;
+                            sourceType = (PayslipLineSource as any).STATUTORY || 'STATUTORY';
                         } else if (pl.componentCode === 'SMART' || pl.componentId?.startsWith('SMART-')) {
-                            sourceType = PayslipLineSource.SMART;
+                            sourceType = (PayslipLineSource as any).SMART || 'SMART';
                         }
-                        
+
                         payslipLines.push({
                             componentId: pl.componentId,
                             amount: new Decimal(pl.amount.toFixed(2)),
@@ -183,10 +183,11 @@ export class PayrollRunsService {
                 branchId: dto.branchId || undefined,
                 status: 'ACTIVE',
                 salaryAssignments: { some: { isActive: true } }
-            },
+            } as any,
             include: {
                 branch: true,
                 department: true,
+                jobTitle: true,
                 salaryAssignments: {
                     where: { isActive: true },
                     include: { structure: true }
@@ -198,7 +199,7 @@ export class PayrollRunsService {
                         endDate: { gte: period.startDate }
                     }
                 }
-            }
+            } as any
         });
 
         let totalGross = new Decimal(0);
@@ -213,7 +214,7 @@ export class PayrollRunsService {
         const employeePreviews: any[] = [];
 
         for (const employee of employees) {
-            const assignment = employee.salaryAssignments[0];
+            const assignment = (employee as any).salaryAssignments?.[0];
             if (!assignment) continue;
 
             totalBaseSalary = totalBaseSalary.add(Number(assignment.baseSalary));
@@ -236,7 +237,7 @@ export class PayrollRunsService {
             // إضافة السلف للمعاينة
             let employeeAdvanceAmount = 0;
             const advanceDetails: { id: string; amount: number }[] = [];
-            for (const adv of employee.advanceRequests) {
+            for (const adv of (employee as any).advanceRequests || []) {
                 const amount = Number(adv.approvedMonthlyDeduction || adv.monthlyDeduction);
                 employeeAdvanceAmount += amount;
                 advanceDetails.push({ id: adv.id, amount });
@@ -256,8 +257,8 @@ export class PayrollRunsService {
             const gosiAmount = gosiLine?.amount || 0;
             totalGosi = totalGosi.add(gosiAmount);
 
-            const branchName = employee.branch?.name || 'غير محدد';
-            const deptName = employee.department?.name || 'غير محدد';
+            const branchName = (employee as any).branch?.name || 'غير محدد';
+            const deptName = (employee as any).department?.name || 'غير محدد';
 
             if (!byBranch[branchName]) byBranch[branchName] = { count: 0, gross: 0, net: 0 };
             byBranch[branchName].count++;
@@ -277,8 +278,8 @@ export class PayrollRunsService {
                 lastName: employee.lastName,
                 branch: branchName,
                 department: deptName,
-                jobTitle: (employee as any).jobTitle?.name || 'غير محدد',
-                isSaudi: (employee as any).isSaudi || false,
+                jobTitle: (employee as any).jobTitle?.titleAr || 'غير محدد',
+                isSaudi: employee.isSaudi || false,
                 baseSalary: Number(assignment.baseSalary),
                 gross: finalGross,
                 deductions: finalDeductions,
