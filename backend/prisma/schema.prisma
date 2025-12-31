@@ -76,6 +76,10 @@ model Company {
   // السياسات الذكية (AI-Powered)
   smartPolicies SmartPolicy[]
 
+  // نظام تتبع الموقع (Location Tracking)
+  employeeLocationLogs EmployeeLocationLog[]
+  geofenceExitEvents   GeofenceExitEvent[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -349,6 +353,10 @@ model User {
 
   // أرصدة الإجازات المتقدمة
   leaveBalances LeaveBalance[]
+
+  // نظام تتبع الموقع (Location Tracking)
+  locationLogs       EmployeeLocationLog[]
+  geofenceExitEvents GeofenceExitEvent[]
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -742,6 +750,9 @@ model Attendance {
   checkInFaceConfidence  Float?  @map("check_in_face_confidence")
   checkOutFaceVerified   Boolean @default(false) @map("check_out_face_verified")
   checkOutFaceConfidence Float?  @map("check_out_face_confidence")
+
+  // أحداث الخروج من النطاق
+  geofenceExitEvents GeofenceExitEvent[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1162,6 +1173,9 @@ enum NotificationType {
   DISC_DECISION_ISSUED
   DISC_EMP_OBJECTED
   DISC_FINALIZED
+  // Location tracking notifications
+  EMP_EXIT_GEOFENCE       // موظف خرج من نطاق الشركة
+  EMP_RETURN_GEOFENCE     // موظف عاد إلى نطاق الشركة
 }
 
 model Notification {
@@ -3289,4 +3303,72 @@ model JournalEntry {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("payroll_journal_entries")
+}
+
+// ==================== نظام تتبع الموقع (Location Tracking System) ====================
+
+// سجل تحديثات موقع الموظف
+model EmployeeLocationLog {
+  id        String   @id @default(uuid())
+  companyId String?  @map("company_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+
+  latitude   Decimal  @db.Decimal(10, 8)
+  longitude  Decimal  @db.Decimal(11, 8)
+  accuracy   Float?   // دقة GPS بالمتر
+  
+  // حالة الموقع
+  isInsideGeofence   Boolean @default(true) @map("is_inside_geofence")
+  distanceFromBranch Int?    @map("distance_from_branch") // بالمتر
+  
+  // معلومات إضافية
+  batteryLevel Float?  @map("battery_level")
+  deviceInfo   String? @map("device_info")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([userId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([userId, isInsideGeofence])
+  @@map("employee_location_logs")
+}
+
+// أحداث الخروج من نطاق الشركة
+model GeofenceExitEvent {
+  id           String     @id @default(uuid())
+  companyId    String?    @map("company_id")
+  company      Company?   @relation(fields: [companyId], references: [id])
+  userId       String     @map("user_id")
+  user         User       @relation(fields: [userId], references: [id])
+  attendanceId String     @map("attendance_id")
+  attendance   Attendance @relation(fields: [attendanceId], references: [id])
+  
+  // موقع الخروج
+  exitLatitude       Decimal  @db.Decimal(10, 8) @map("exit_latitude")
+  exitLongitude      Decimal  @db.Decimal(11, 8) @map("exit_longitude")
+  distanceFromBranch Int      @map("distance_from_branch")
+  
+  // وقت الخروج والعودة
+  exitTime   DateTime  @map("exit_time")
+  returnTime DateTime? @map("return_time")
+  
+  // موقع العودة (اختياري)
+  returnLatitude  Decimal? @db.Decimal(10, 8) @map("return_latitude")
+  returnLongitude Decimal? @db.Decimal(11, 8) @map("return_longitude")
+  
+  // مدة الخروج بالدقائق
+  durationMinutes Int? @map("duration_minutes")
+  
+  // هل تم إرسال إشعار؟
+  notificationSent Boolean @default(false) @map("notification_sent")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@index([userId, exitTime])
+  @@index([attendanceId])
+  @@index([companyId, exitTime])
+  @@map("geofence_exit_events")
 }

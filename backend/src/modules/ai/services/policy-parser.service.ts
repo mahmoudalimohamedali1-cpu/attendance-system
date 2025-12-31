@@ -2,34 +2,34 @@ import { Injectable, Logger } from "@nestjs/common";
 import { AiService } from "../ai.service";
 
 export interface ParsedPolicyRule {
-    understood: boolean;
-    trigger: {
-        event: "ATTENDANCE" | "LEAVE" | "CUSTODY" | "PAYROLL" | "ANNIVERSARY" | "CONTRACT" | "DISCIPLINARY" | "PERFORMANCE" | "CUSTOM";
-        subEvent?: string;
-    };
-    conditions: Array<{
-        field: string;
-        operator: "=" | "!=" | ">" | "<" | ">=" | "<=" | "CONTAINS" | "IN" | "BETWEEN" | "EQUALS" | "GREATER_THAN" | "LESS_THAN" | "GREATER_THAN_OR_EQUAL";
-        value: any;
-        aggregation?: "SUM" | "COUNT" | "AVG" | "MAX" | "MIN";
-        period?: "DAY" | "WEEK" | "MONTH" | "YEAR" | "ALL_TIME";
-    }>;
-    actions: Array<{
-        type: "ADD_TO_PAYROLL" | "DEDUCT_FROM_PAYROLL" | "SEND_NOTIFICATION" | "ALERT_HR" | "CREATE_RECORD";
-        valueType?: "FIXED" | "PERCENTAGE" | "DAYS" | "FORMULA";
-        value?: number | string;
-        base?: "BASIC" | "TOTAL";
-        componentCode?: string;
-        description?: string;
-        message?: string;
-    }>;
-    scope: {
-        type: "ALL_EMPLOYEES" | "ALL" | "EMPLOYEE" | "DEPARTMENT" | "BRANCH" | "JOB_TITLE";
-        targetId?: string;
-        targetName?: string;
-    };
-    explanation: string;
-    clarificationNeeded?: string;
+  understood: boolean;
+  trigger: {
+    event: "ATTENDANCE" | "LEAVE" | "CUSTODY" | "PAYROLL" | "ANNIVERSARY" | "CONTRACT" | "DISCIPLINARY" | "PERFORMANCE" | "CUSTOM";
+    subEvent?: string;
+  };
+  conditions: Array<{
+    field: string;
+    operator: "=" | "!=" | ">" | "<" | ">=" | "<=" | "CONTAINS" | "IN" | "BETWEEN" | "EQUALS" | "GREATER_THAN" | "LESS_THAN" | "GREATER_THAN_OR_EQUAL";
+    value: any;
+    aggregation?: "SUM" | "COUNT" | "AVG" | "MAX" | "MIN";
+    period?: "DAY" | "WEEK" | "MONTH" | "YEAR" | "ALL_TIME";
+  }>;
+  actions: Array<{
+    type: "ADD_TO_PAYROLL" | "DEDUCT_FROM_PAYROLL" | "SEND_NOTIFICATION" | "ALERT_HR" | "CREATE_RECORD";
+    valueType?: "FIXED" | "PERCENTAGE" | "DAYS" | "FORMULA";
+    value?: number | string;
+    base?: "BASIC" | "TOTAL";
+    componentCode?: string;
+    description?: string;
+    message?: string;
+  }>;
+  scope: {
+    type: "ALL_EMPLOYEES" | "ALL" | "EMPLOYEE" | "DEPARTMENT" | "BRANCH" | "JOB_TITLE";
+    targetId?: string;
+    targetName?: string;
+  };
+  explanation: string;
+  clarificationNeeded?: string;
 }
 
 const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم لفهم سياسات الموارد البشرية والرواتب في السعودية.
@@ -270,6 +270,128 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
 }
 \`\`\`
 
+**مثال 5**: "كل سنة خدمة الموظف ياخد علاوة 200 ريال شهرياً"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "employee.tenure.years", "operator": "GREATER_THAN", "value": 0 }
+  ],
+  "actions": [{
+    "type": "ADD_TO_PAYROLL",
+    "valueType": "FORMULA",
+    "value": "employee.tenure.years * 200",
+    "componentCode": "TENURE_BONUS",
+    "description": "علاوة سنوات الخدمة"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "علاوة شهرية 200 ريال عن كل سنة خدمة للموظف"
+}
+\`\`\`
+
+**مثال 6**: "الموظف السعودي ياخد بدل دعم بنسبة 5% من راتبه الأساسي"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "employee.isSaudi", "operator": "EQUALS", "value": true }
+  ],
+  "actions": [{
+    "type": "ADD_TO_PAYROLL",
+    "valueType": "PERCENTAGE",
+    "value": 5,
+    "base": "BASIC",
+    "componentCode": "SAUDI_SUPPORT",
+    "description": "بدل دعم السعودة"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "بدل دعم 5% من الراتب الأساسي للموظفين السعوديين"
+}
+\`\`\`
+
+**مثال 7**: "لو الموظف رجع العهدة متأخر أكتر من 3 أيام يتخصم 100 ريال"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "CUSTODY", "subEvent": "RETURN_LATE" },
+  "conditions": [
+    { "field": "custody.avgReturnDelay", "operator": "GREATER_THAN", "value": 3 }
+  ],
+  "actions": [{
+    "type": "DEDUCT_FROM_PAYROLL",
+    "valueType": "FIXED",
+    "value": 100,
+    "componentCode": "CUSTODY_PENALTY",
+    "description": "غرامة تأخير إرجاع العهدة"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "خصم 100 ريال عند تأخر إرجاع العهدة أكثر من 3 أيام"
+}
+\`\`\`
+
+**مثال 8**: "الموظفين اللي عندهم إنذارين أو أكتر يتخصم منهم 10% من الراتب"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "disciplinary.activeWarnings", "operator": "GREATER_THAN_OR_EQUAL", "value": 2 }
+  ],
+  "actions": [{
+    "type": "DEDUCT_FROM_PAYROLL",
+    "valueType": "PERCENTAGE",
+    "value": 10,
+    "base": "BASIC",
+    "componentCode": "DISCIPLINARY_DEDUCTION",
+    "description": "خصم تأديبي للإنذارات النشطة"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "خصم 10% من الراتب الأساسي للموظفين الذين لديهم إنذارين أو أكثر نشطين"
+}
+\`\`\`
+
+**مثال 9**: "لو الحضور أقل من 75% والموظف مش جديد يتخصم 500 ريال"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [
+    { "field": "attendance.currentPeriod.attendancePercentage", "operator": "LESS_THAN", "value": 75 },
+    { "field": "employee.tenure.months", "operator": "GREATER_THAN", "value": 3 }
+  ],
+  "actions": [{
+    "type": "DEDUCT_FROM_PAYROLL",
+    "valueType": "FIXED",
+    "value": 500,
+    "componentCode": "LOW_ATTENDANCE_PENALTY",
+    "description": "غرامة انخفاض الحضور"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "خصم 500 ريال للموظفين غير الجدد الذين حضورهم أقل من 75%"
+}
+\`\`\`
+
+**مثال 10**: "قسم المبيعات لو حققوا التارجت كل واحد ياخد 1000 ريال"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "PAYROLL" },
+  "conditions": [],
+  "actions": [{
+    "type": "ADD_TO_PAYROLL",
+    "valueType": "FIXED",
+    "value": 1000,
+    "componentCode": "SALES_TARGET_BONUS",
+    "description": "مكافأة تحقيق التارجت"
+  }],
+  "scope": { "type": "DEPARTMENT", "targetName": "المبيعات" },
+  "explanation": "مكافأة 1000 ريال لكل موظف في قسم المبيعات عند تحقيق الهدف",
+  "clarificationNeeded": "يرجى تحديد معايير تحقيق التارجت - هل هو نسبة مبيعات محددة؟"
+}
+\`\`\`
+
 🎯 مهمتك: فهم أي سياسة مهما كانت معقدة وتحويلها لـ JSON قابل للتنفيذ باستخدام الحقول والمعادلات المناسبة!`;
 
 const USER_PROMPT_TEMPLATE = `
@@ -291,51 +413,51 @@ const USER_PROMPT_TEMPLATE = `
 
 @Injectable()
 export class PolicyParserService {
-    private readonly logger = new Logger(PolicyParserService.name);
+  private readonly logger = new Logger(PolicyParserService.name);
 
-    constructor(private readonly aiService: AiService) { }
+  constructor(private readonly aiService: AiService) { }
 
-    async parsePolicy(naturalText: string): Promise<ParsedPolicyRule> {
-        if (!this.aiService.isAvailable()) {
-            throw new Error("AI service is not available");
-        }
-
-        this.logger.log(`Parsing policy: "${naturalText?.substring(0, 60) || "empty"}..."`);
-
-        const prompt = USER_PROMPT_TEMPLATE.replace("{input}", naturalText || "");
-
-        try {
-            const response = await this.aiService.generateContent(prompt, SYSTEM_INSTRUCTION);
-            const parsed = this.aiService.parseJsonResponse<ParsedPolicyRule>(response);
-
-            // Normalize scope type
-            if (parsed.scope?.type === "ALL") {
-                parsed.scope.type = "ALL_EMPLOYEES";
-            }
-
-            this.logger.log(`Parsed policy: ${parsed.explanation}`);
-            return parsed;
-        } catch (error) {
-            this.logger.error(`Failed to parse policy: ${error.message}`);
-            throw error;
-        }
+  async parsePolicy(naturalText: string): Promise<ParsedPolicyRule> {
+    if (!this.aiService.isAvailable()) {
+      throw new Error("AI service is not available");
     }
 
-    validateParsedRule(rule: ParsedPolicyRule): { valid: boolean; errors: string[] } {
-        const errors: string[] = [];
+    this.logger.log(`Parsing policy: "${naturalText?.substring(0, 60) || "empty"}..."`);
 
-        if (!rule.understood) {
-            errors.push("السياسة غير مفهومة");
-        }
+    const prompt = USER_PROMPT_TEMPLATE.replace("{input}", naturalText || "");
 
-        if (!rule.trigger?.event) {
-            errors.push("لم يتم تحديد الحدث المُحفز");
-        }
+    try {
+      const response = await this.aiService.generateContent(prompt, SYSTEM_INSTRUCTION);
+      const parsed = this.aiService.parseJsonResponse<ParsedPolicyRule>(response);
 
-        if (!rule.actions || rule.actions.length === 0) {
-            errors.push("لم يتم تحديد أي إجراء");
-        }
+      // Normalize scope type
+      if (parsed.scope?.type === "ALL") {
+        parsed.scope.type = "ALL_EMPLOYEES";
+      }
 
-        return { valid: errors.length === 0, errors };
+      this.logger.log(`Parsed policy: ${parsed.explanation}`);
+      return parsed;
+    } catch (error) {
+      this.logger.error(`Failed to parse policy: ${error.message}`);
+      throw error;
     }
+  }
+
+  validateParsedRule(rule: ParsedPolicyRule): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!rule.understood) {
+      errors.push("السياسة غير مفهومة");
+    }
+
+    if (!rule.trigger?.event) {
+      errors.push("لم يتم تحديد الحدث المُحفز");
+    }
+
+    if (!rule.actions || rule.actions.length === 0) {
+      errors.push("لم يتم تحديد أي إجراء");
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
 }

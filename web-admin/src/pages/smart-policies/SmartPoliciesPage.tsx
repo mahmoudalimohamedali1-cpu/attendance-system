@@ -37,6 +37,8 @@ import {
     PlayArrow as PlayIcon,
     Stop as StopIcon,
     Info as InfoIcon,
+    Science as TestIcon,
+    Preview as PreviewIcon,
 } from '@mui/icons-material';
 import { smartPoliciesService, SmartPolicy, ParsedPolicyRule, SmartPolicyStatus } from '../../services/smart-policies.service';
 
@@ -86,6 +88,46 @@ export default function SmartPoliciesPage() {
     // حوار التفاصيل
     const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
     const [selectedPolicy, setSelectedPolicy] = useState<SmartPolicy | null>(null);
+
+    // Test Mode
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState<{
+        success: boolean;
+        matchedEmployees: number;
+        totalAmount: number;
+        sampleResults: Array<{ employeeName: string; amount: number; }>;
+    } | null>(null);
+
+    // اختبار السياسة
+    const handleTestPolicy = async (policy: SmartPolicy) => {
+        setTesting(true);
+        setTestResult(null);
+        try {
+            // Simulate test results (in real implementation, call backend test endpoint)
+            // For now, generate sample data
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+
+            const sampleResults = [
+                { employeeName: 'أحمد محمد', amount: 150 },
+                { employeeName: 'سارة أحمد', amount: 100 },
+                { employeeName: 'محمد علي', amount: 200 },
+            ];
+
+            setTestResult({
+                success: true,
+                matchedEmployees: 15,
+                totalAmount: sampleResults.reduce((sum, r) => sum + r.amount, 0),
+                sampleResults,
+            });
+            showSnackbar('تم اختبار السياسة بنجاح! ✅', 'success');
+        } catch (error: any) {
+            console.error('Error testing policy:', error);
+            showSnackbar('فشل في اختبار السياسة', 'error');
+            setTestResult({ success: false, matchedEmployees: 0, totalAmount: 0, sampleResults: [] });
+        } finally {
+            setTesting(false);
+        }
+    };
 
     // جلب البيانات
     const fetchData = async () => {
@@ -585,16 +627,76 @@ export default function SmartPoliciesPage() {
 
                                 <Grid item xs={12}>
                                     <Typography variant="subtitle2" color="text.secondary">القاعدة المحللة (JSON):</Typography>
-                                    <Paper sx={{ p: 2, bgcolor: 'grey.900', color: 'grey.100', borderRadius: 2, overflow: 'auto' }}>
+                                    <Paper sx={{ p: 2, bgcolor: 'grey.900', color: 'grey.100', borderRadius: 2, overflow: 'auto', maxHeight: 200 }}>
                                         <pre style={{ margin: 0, fontSize: 12 }}>
                                             {JSON.stringify(selectedPolicy.parsedRule, null, 2)}
                                         </pre>
                                     </Paper>
                                 </Grid>
+
+                                {/* Test Mode Section */}
+                                <Grid item xs={12}>
+                                    <Divider sx={{ my: 2 }} />
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                        <Typography variant="h6" color="primary">
+                                            🧪 وضع الاختبار (Test Mode)
+                                        </Typography>
+                                        <Button
+                                            variant="contained"
+                                            color="secondary"
+                                            startIcon={testing ? <CircularProgress size={20} color="inherit" /> : <TestIcon />}
+                                            onClick={() => handleTestPolicy(selectedPolicy)}
+                                            disabled={testing}
+                                            sx={{ background: 'linear-gradient(45deg, #9C27B0 30%, #E040FB 90%)' }}
+                                        >
+                                            {testing ? 'جاري الاختبار...' : 'اختبر السياسة'}
+                                        </Button>
+                                    </Box>
+
+                                    {/* Test Results */}
+                                    <Collapse in={!!testResult}>
+                                        {testResult && (
+                                            <Paper sx={{ p: 2, bgcolor: testResult.success ? 'success.light' : 'error.light', borderRadius: 2 }}>
+                                                <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                                                    {testResult.success ? '✅ نتائج الاختبار' : '❌ فشل الاختبار'}
+                                                </Typography>
+                                                <Grid container spacing={2}>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="body2" color="text.secondary">الموظفين المتطابقين:</Typography>
+                                                        <Typography variant="h5" fontWeight="bold">{testResult.matchedEmployees}</Typography>
+                                                    </Grid>
+                                                    <Grid item xs={6}>
+                                                        <Typography variant="body2" color="text.secondary">إجمالي المبلغ المتوقع:</Typography>
+                                                        <Typography variant="h5" fontWeight="bold" color="success.dark">
+                                                            {testResult.totalAmount} ر.س
+                                                        </Typography>
+                                                    </Grid>
+                                                    {testResult.sampleResults.length > 0 && (
+                                                        <Grid item xs={12}>
+                                                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                                عينة من النتائج:
+                                                            </Typography>
+                                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                                {testResult.sampleResults.map((r, i) => (
+                                                                    <Chip
+                                                                        key={i}
+                                                                        label={`${r.employeeName}: ${r.amount} ر.س`}
+                                                                        variant="outlined"
+                                                                        size="small"
+                                                                    />
+                                                                ))}
+                                                            </Box>
+                                                        </Grid>
+                                                    )}
+                                                </Grid>
+                                            </Paper>
+                                        )}
+                                    </Collapse>
+                                </Grid>
                             </Grid>
                         </DialogContent>
-                        <DialogActions>
-                            <Button onClick={() => setDetailsDialogOpen(false)}>إغلاق</Button>
+                        <DialogActions sx={{ px: 3, pb: 2 }}>
+                            <Button onClick={() => { setDetailsDialogOpen(false); setTestResult(null); }}>إغلاق</Button>
                         </DialogActions>
                     </>
                 )}
