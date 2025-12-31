@@ -81,6 +81,7 @@ export interface CalculationSettings {
     // إضافية
     roundSalaryToNearest: number;
     defaultWorkingDaysPerMonth: number;
+    leaveDailyRateDivisor: number;
 }
 
 /**
@@ -114,6 +115,7 @@ export const DEFAULT_CALCULATION_SETTINGS: CalculationSettings = {
     settleNegativeAsTransaction: false,
     roundSalaryToNearest: 0,
     defaultWorkingDaysPerMonth: 30,
+    leaveDailyRateDivisor: 30,
 };
 
 /**

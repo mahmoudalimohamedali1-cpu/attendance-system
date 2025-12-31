@@ -31,7 +31,7 @@ export class ReportsController {
   @ApiOperation({ summary: 'إحصائيات لوحة التحكم' })
   @ApiResponse({ status: 200, description: 'الإحصائيات' })
   async getDashboardStats(@Request() req: any) {
-    return this.reportsService.getDashboardStats(req.user.id, req.user.role);
+    return this.reportsService.getDashboardStats(req.user.companyId, req.user.id, req.user.role);
   }
 
   @Get('weekly-summary')

@@ -42,6 +42,8 @@ interface SalaryComponent {
     description?: string;
     gosiEligible: boolean;
     otEligible: boolean;
+    eosEligible: boolean;
+    isProrated: boolean;
     formula?: string;
 }
 
@@ -56,6 +58,8 @@ export const SalaryComponentsPage = () => {
         nature: 'FIXED',
         gosiEligible: false,
         otEligible: false,
+        eosEligible: false,
+        isProrated: true,
     });
 
     const fetchComponents = async () => {
@@ -85,6 +89,8 @@ export const SalaryComponentsPage = () => {
                 nature: 'FIXED',
                 gosiEligible: false,
                 otEligible: false,
+                eosEligible: false,
+                isProrated: true,
             });
         }
         setOpen(true);
@@ -173,6 +179,8 @@ export const SalaryComponentsPage = () => {
                                 <TableCell sx={{ fontWeight: 'bold' }}>الطبيعة</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>التأمينات</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>الإضافي</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>نهاية الخدمة</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>نسبي</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }} align="center">الإجراءات</TableCell>
                             </TableRow>
                         </TableHead>
@@ -208,6 +216,22 @@ export const SalaryComponentsPage = () => {
                                             variant={comp.otEligible ? 'filled' : 'outlined'}
                                         />
                                     </TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            label={comp.eosEligible ? 'نعم' : 'لا'}
+                                            size="small"
+                                            color={comp.eosEligible ? 'warning' : 'default'}
+                                            variant={comp.eosEligible ? 'filled' : 'outlined'}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            label={comp.isProrated ? 'نعم' : 'لا'}
+                                            size="small"
+                                            color={comp.isProrated ? 'info' : 'default'}
+                                            variant={comp.isProrated ? 'filled' : 'outlined'}
+                                        />
+                                    </TableCell>
                                     <TableCell align="center">
                                         <IconButton onClick={() => handleOpen(comp)} size="small" color="primary">
                                             <EditIcon fontSize="small" />
@@ -220,7 +244,7 @@ export const SalaryComponentsPage = () => {
                             ))}
                             {components.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
                                         <MonetizationOn sx={{ fontSize: 48, color: 'grey.300', mb: 1 }} />
                                         <Typography color="text.secondary">لا يوجد مكونات راتب مسجلة بعد</Typography>
                                     </TableCell>
@@ -323,6 +347,28 @@ export const SalaryComponentsPage = () => {
                                     />
                                 }
                                 label="خاضع للعمل الإضافي (OT)"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={formData.eosEligible || false}
+                                        onChange={(e) => setFormData({ ...formData, eosEligible: e.target.checked })}
+                                    />
+                                }
+                                label="يدخل في حساب مكافأة نهاية الخدمة"
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={formData.isProrated !== false}
+                                        onChange={(e) => setFormData({ ...formData, isProrated: e.target.checked })}
+                                    />
+                                }
+                                label="يحتسب نسبياً (Pro-rata)"
                             />
                         </Grid>
                     </Grid>

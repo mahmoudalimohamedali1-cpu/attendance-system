@@ -57,6 +57,8 @@ import { DisciplinaryModule } from './modules/disciplinary/disciplinary.module';
 import { CustodyModule } from './modules/custody/custody.module';
 import { EmployeeProfileModule } from './modules/employee-profile/employee-profile.module';
 import { PayrollSettingsModule } from './modules/payroll-settings/payroll-settings.module';
+import { AiModule } from './modules/ai/ai.module';
+import { SmartPoliciesModule } from './modules/smart-policies/smart-policies.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -98,7 +100,8 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     SalaryStructuresModule, // هياكل الرواتب
     SalaryAssignmentsModule, // تعيينات الرواتب
     PayrollPeriodsModule,   // فترات الرواتب
-    PayrollRunsModule,      // مسيرات الرواتب
+    PoliciesModule,         // محرك السياسات
+    PayrollCalculationModule, // محرك الحساب
     BankAccountsModule,     // الحسابات البنكية للموظفين
     CompanyBankAccountsModule, // الحسابات البنكية للشركات
     GosiModule,             // التأمينات الاجتماعية
@@ -107,9 +110,8 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     ExcelModule,            // تصدير Excel
     EmailModule,            // إرسال البريد الإلكتروني
     RetroPayModule,         // الفروقات
-    PoliciesModule,         // محرك السياسات
+    PayrollRunsModule,      // مسيرات الرواتب
     LoanPaymentsModule,     // تتبع سداد السلف
-    PayrollCalculationModule, // محرك الحساب
     CompaniesModule,        // إدارة الشركات
     WpsExportModule,        // تصدير WPS للبنوك
     ExceptionsModule,       // مركز الاستثناءات
@@ -124,6 +126,8 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     CustodyModule,          // موديول العهد
     EmployeeProfileModule,  // بروفايل الموظف الشامل
     PayrollSettingsModule,  // إعدادات الرواتب
+    AiModule,               // الذكاء الاصطناعي لمحرك السياسات
+    SmartPoliciesModule,    // السياسات الذكية المُحللة بالـ AI
   ],
   controllers: [AppController],
   providers: [

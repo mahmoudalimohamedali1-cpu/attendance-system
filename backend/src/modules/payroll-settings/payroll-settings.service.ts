@@ -15,7 +15,7 @@ export class UpdatePayrollSettingsDto {
 
     // Overtime
     overtimeCalcBase?: 'CALENDAR_DAYS' | 'ACTUAL_WORKING_DAYS' | 'FIXED_30_DAYS';
-    overtimeMethod?: 'BASED_ON_SHIFTS' | 'BASED_ON_BASIC_ONLY' | 'BASED_ON_TOTAL';
+    overtimeMethod?: 'BASED_ON_SHIFTS' | 'BASED_ON_BASIC_ONLY' | 'BASED_ON_TOTAL' | 'BASED_ON_ELIGIBLE_COMPONENTS';
 
     // Leave Allowance
     leaveAllowanceCalcBase?: 'CALENDAR_DAYS' | 'ACTUAL_WORKING_DAYS' | 'FIXED_30_DAYS';
@@ -34,6 +34,7 @@ export class UpdatePayrollSettingsDto {
     // Additional
     roundSalaryToNearest?: number;
     defaultWorkingDaysPerMonth?: number;
+    leaveDailyRateDivisor?: number;
 }
 
 @Injectable()
@@ -46,7 +47,7 @@ export class PayrollSettingsService {
     async getSettings(companyId: string) {
         // استخدام any cast لأن Prisma Client قد لا يكون محدثاً
         const payrollSettings = (this.prisma as any).payrollSettings;
-        
+
         let settings = await payrollSettings.findUnique({
             where: { companyId },
         });
@@ -73,7 +74,7 @@ export class PayrollSettingsService {
         }
 
         const payrollSettings = (this.prisma as any).payrollSettings;
-        
+
         // التأكد من وجود الإعدادات أولاً
         const existing = await payrollSettings.findUnique({
             where: { companyId },
@@ -101,7 +102,7 @@ export class PayrollSettingsService {
      */
     async resetToDefaults(companyId: string) {
         const payrollSettings = (this.prisma as any).payrollSettings;
-        
+
         const existing = await payrollSettings.findUnique({
             where: { companyId },
         });

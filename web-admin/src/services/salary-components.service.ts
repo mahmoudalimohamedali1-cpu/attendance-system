@@ -19,6 +19,8 @@ export interface SalaryComponent {
     description?: string;
     gosiEligible: boolean;
     otEligible: boolean;
+    eosEligible: boolean;
+    isProrated: boolean;
     taxable?: boolean;
     formula?: string;
     isActive: boolean;
@@ -34,6 +36,8 @@ export interface CreateSalaryComponentDto {
     description?: string;
     gosiEligible?: boolean;
     otEligible?: boolean;
+    eosEligible?: boolean;
+    isProrated?: boolean;
     taxable?: boolean;
     formula?: string;
 }

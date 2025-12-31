@@ -58,6 +58,7 @@ const OVERTIME_METHODS = [
     { value: 'BASED_ON_SHIFTS', label: 'على أساس مناوبات العمل' },
     { value: 'BASED_ON_BASIC_ONLY', label: 'على أساس الراتب الأساسي فقط' },
     { value: 'BASED_ON_TOTAL', label: 'على أساس إجمالي الراتب' },
+    { value: 'BASED_ON_ELIGIBLE_COMPONENTS', label: 'على أساس البدلات الخاضعة للإضافي (ZenHR)' },
 ];
 
 const LEAVE_ALLOWANCE_METHODS = [
@@ -402,12 +403,22 @@ export default function PayrollSettingsPage() {
                             ))}
                         </TextField>
                     </Grid>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            label="مقسم الراتب اليومي للإجازات"
+                            type="number"
+                            fullWidth
+                            value={settings.leaveDailyRateDivisor}
+                            onChange={(e) => handleChange('leaveDailyRateDivisor', parseInt(e.target.value) || 30)}
+                            helperText="عدد الأيام الذي يقسم عليه الراتب لحساب اليومية (عادة 30)"
+                        />
+                    </Grid>
                 </Grid>
             </SettingsSection>
 
             {/* 6. قسيمة رواتب الموظف */}
-            <SettingsSection
-                icon={<ReceiptIcon />}
+            < SettingsSection
+                icon={< ReceiptIcon />}
                 title="قسيمة رواتب الموظف"
                 description="حدد ما يظهر في قسيمة رواتب الموظفين"
             >
@@ -457,11 +468,11 @@ export default function PayrollSettingsPage() {
                         />
                     </Grid>
                 </Grid>
-            </SettingsSection>
+            </SettingsSection >
 
             {/* 7. أرصدة الرواتب السلبية */}
-            <SettingsSection
-                icon={<TrendingDownIcon />}
+            < SettingsSection
+                icon={< TrendingDownIcon />}
                 title="أرصدة الرواتب السلبية"
                 description="إدارة أرصدة الرواتب السلبية الناتجة عن الإجازات غير المدفوعة أو الخصومات الزائدة"
             >
@@ -489,11 +500,11 @@ export default function PayrollSettingsPage() {
                         />
                     </Grid>
                 </Grid>
-            </SettingsSection>
+            </SettingsSection >
 
             {/* 8. إعدادات إضافية */}
-            <SettingsSection
-                icon={<SettingsIcon />}
+            < SettingsSection
+                icon={< SettingsIcon />}
                 title="إعدادات إضافية"
                 description="إعدادات متقدمة للحسابات"
                 defaultExpanded={false}
@@ -519,7 +530,7 @@ export default function PayrollSettingsPage() {
                         />
                     </Grid>
                 </Grid>
-            </SettingsSection>
-        </Box>
+            </SettingsSection >
+        </Box >
     );
 }

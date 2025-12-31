@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { SmartPolicyTriggerService } from "../smart-policies/smart-policy-trigger.service";
 import { CreateCaseDto } from './dto/create-case.dto';
 import { HRReviewDto, HRInitialAction } from './dto/hr-review.dto';
 import { IssueDecisionDto } from './dto/issue-decision.dto';
@@ -24,6 +25,7 @@ export class DisciplinaryService {
         private prisma: PrismaService,
         private notificationsService: NotificationsService,
         private permissionsService: PermissionsService,
+        private smartPolicyTrigger: SmartPolicyTriggerService,
     ) { }
 
     /**

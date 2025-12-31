@@ -49,6 +49,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ar';
+import { useAuthStore } from '@/store/auth.store';
 
 interface AttendanceRecord {
   id: string;
@@ -83,7 +84,25 @@ interface AttendanceReportResponse {
   };
 }
 
+interface PayrollSummaryRecord {
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
+  baseSalary: number;
+  workingDays: number;
+  totalWorkingHours: number;
+  totalLateMinutes: number;
+  totalEarlyLeaveMinutes: number;
+  totalOvertimeMinutes: number;
+  absentDays: number;
+  lateDeduction: number;
+  absentDeduction: number;
+  overtimeBonus: number;
+}
+
 export const ReportsPage = () => {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
   const [tabValue, setTabValue] = useState(0);
   const [startDate, setStartDate] = useState<Dayjs | null>(() => {
     return dayjs().startOf('month');
@@ -101,11 +120,17 @@ export const ReportsPage = () => {
     enabled: !!startDateStr && !!endDateStr,
   });
 
+  const { data: payrollData, isLoading: payrollLoading } = useQuery<PayrollSummaryRecord[]>({
+    queryKey: ['payroll-report', startDateStr, endDateStr],
+    queryFn: () => api.get(`/reports/payroll?startDate=${startDateStr}&endDate=${endDateStr}`),
+    enabled: isAdmin && !!startDateStr && !!endDateStr,
+  });
+
   const handleExportExcel = async () => {
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/reports/export/excel/attendance?startDate=${startDateStr}&endDate=${endDateStr}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
       const blob = await response.blob();
@@ -123,7 +148,7 @@ export const ReportsPage = () => {
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/reports/export/pdf/attendance?startDate=${startDateStr}&endDate=${endDateStr}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
       const blob = await response.blob();
@@ -131,6 +156,24 @@ export const ReportsPage = () => {
       const a = document.createElement('a');
       a.href = url;
       a.download = `attendance-report-${startDateStr}-${endDateStr}.pdf`;
+      a.click();
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  };
+
+  const handleExportPayrollExcel = async () => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/reports/export/excel/payroll?startDate=${startDateStr}&endDate=${endDateStr}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payroll-report-${startDateStr}-${endDateStr}.xlsx`;
       a.click();
     } catch (err) {
       console.error('Export failed:', err);
@@ -340,6 +383,7 @@ export const ReportsPage = () => {
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
           <Tab label="نظرة عامة" />
           <Tab label="تفاصيل الحضور" />
+          {isAdmin && <Tab label="كشوفات الرواتب" />}
         </Tabs>
       </Box>
 
@@ -489,6 +533,71 @@ export const ReportsPage = () => {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
                 يتم عرض أول 50 سجل فقط. استخدم التصدير لرؤية جميع السجلات.
               </Typography>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tabValue === 2 && isAdmin && (
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                كشوفات الرواتب
+              </Typography>
+              <Button variant="outlined" startIcon={<TableChart />} onClick={handleExportPayrollExcel}>
+                تصدير Excel
+              </Button>
+            </Box>
+            {payrollLoading ? (
+              <Box display="flex" justifyContent="center" py={4}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>كود الموظف</TableCell>
+                      <TableCell>اسم الموظف</TableCell>
+                      <TableCell>الراتب الأساسي</TableCell>
+                      <TableCell>أيام العمل</TableCell>
+                      <TableCell>ساعات العمل</TableCell>
+                      <TableCell>دقائق التأخير</TableCell>
+                      <TableCell>أيام الغياب</TableCell>
+                      <TableCell>خصم التأخير</TableCell>
+                      <TableCell>خصم الغياب</TableCell>
+                      <TableCell>إضافي العمل</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {payrollData && payrollData.length > 0 ? (
+                      payrollData.map((record) => (
+                        <TableRow key={record.employeeId} hover>
+                          <TableCell>{record.employeeCode || '-'}</TableCell>
+                          <TableCell>{record.employeeName}</TableCell>
+                          <TableCell>{record.baseSalary?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
+                          <TableCell>{record.workingDays}</TableCell>
+                          <TableCell>{record.totalWorkingHours.toFixed(2)}</TableCell>
+                          <TableCell>{record.totalLateMinutes}</TableCell>
+                          <TableCell>{record.absentDays}</TableCell>
+                          <TableCell>{record.lateDeduction?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
+                          <TableCell>{record.absentDeduction?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
+                          <TableCell>{record.overtimeBonus?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={10} align="center">
+                          <Typography color="text.secondary" py={4}>
+                            لا توجد بيانات رواتب في هذه الفترة
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
           </CardContent>
         </Card>

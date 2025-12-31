@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
     Box, Typography, Paper, TextField, Button, FormControl, InputLabel, Select, MenuItem,
-    CircularProgress, Alert, Grid, Breadcrumbs, Link, Autocomplete, ToggleButtonGroup, ToggleButton
+    CircularProgress, Alert, Grid, Breadcrumbs, Link, Autocomplete
 } from '@mui/material';
-import { Save, ArrowBack, Person, Inventory2 } from '@mui/icons-material';
+import { Save, ArrowBack, Person, Inventory2, Add } from '@mui/icons-material';
 import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-dom';
-import custodyService, { CustodyItem, CustodyCategory } from '@/services/custody.service';
+import custodyService, { CustodyItem } from '@/services/custody.service';
 import { api } from '@/services/api.service';
 
 interface Employee {
@@ -14,6 +14,11 @@ interface Employee {
     lastName: string;
     employeeCode?: string;
     department?: { name: string };
+}
+
+interface PaginatedResponse<T> {
+    data: T[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
 export default function CustodyAssign() {
@@ -28,9 +33,6 @@ export default function CustodyAssign() {
 
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [availableItems, setAvailableItems] = useState<CustodyItem[]>([]);
-    const [categories, setCategories] = useState<CustodyCategory[]>([]);
-
-    const [mode, setMode] = useState<'existing' | 'new'>('existing');
 
     const [form, setForm] = useState({
         employeeId: '',
@@ -38,24 +40,18 @@ export default function CustodyAssign() {
         expectedReturn: '',
         conditionOnAssign: 'NEW',
         notes: '',
-        // New item fields
-        categoryId: '',
-        code: '',
-        name: '',
-        serialNumber: '',
     });
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [emps, itemsRes, cats] = await Promise.all([
-                    api.get<Employee[]>('/users?status=ACTIVE'),
+                const [empsRes, itemsRes] = await Promise.all([
+                    api.get<PaginatedResponse<Employee>>('/users?status=ACTIVE&limit=1000'),
                     custodyService.getItems({ status: 'AVAILABLE' }),
-                    custodyService.getCategories(),
                 ]);
-                setEmployees(emps);
+                // استخراج مصفوفة الموظفين من الكائن المُرجع
+                setEmployees(empsRes.data || []);
                 setAvailableItems(itemsRes.items);
-                setCategories(cats);
             } catch (err) {
                 console.error(err);
                 setError('فشل في تحميل البيانات');
@@ -68,28 +64,20 @@ export default function CustodyAssign() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!form.custodyItemId) {
+            setError('يرجى اختيار عهدة');
+            return;
+        }
+
         setLoading(true);
         setError(null);
         setSuccess(null);
 
         try {
-            let itemId = form.custodyItemId;
-
-            // Create new item if in new mode
-            if (mode === 'new') {
-                const newItem = await custodyService.createItem({
-                    categoryId: form.categoryId,
-                    code: form.code,
-                    name: form.name,
-                    serialNumber: form.serialNumber || undefined,
-                    condition: form.conditionOnAssign as 'NEW' | 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR',
-                });
-                itemId = newItem.id;
-            }
-
             // Assign custody
             await custodyService.assignCustody({
-                custodyItemId: itemId,
+                custodyItemId: form.custodyItemId,
                 employeeId: form.employeeId,
                 expectedReturn: form.expectedReturn || undefined,
                 conditionOnAssign: form.conditionOnAssign,
@@ -164,25 +152,35 @@ export default function CustodyAssign() {
                             />
                         </Grid>
 
-                        {/* Item Selection Mode */}
+                        {/* Item Selection */}
                         <Grid item xs={12}>
-                            <Typography variant="h6" gutterBottom color="primary">
-                                <Inventory2 sx={{ verticalAlign: 'middle', mr: 1 }} />
-                                اختيار العهدة
-                            </Typography>
-                            <ToggleButtonGroup
-                                value={mode}
-                                exclusive
-                                onChange={(_, newMode) => newMode && setMode(newMode)}
-                                sx={{ mb: 2 }}
-                            >
-                                <ToggleButton value="existing">عهدة موجودة</ToggleButton>
-                                <ToggleButton value="new">إضافة جديدة</ToggleButton>
-                            </ToggleButtonGroup>
-                        </Grid>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                <Typography variant="h6" color="primary">
+                                    <Inventory2 sx={{ verticalAlign: 'middle', mr: 1 }} />
+                                    اختيار العهدة
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<Add />}
+                                    onClick={() => navigate('/custody/items/new')}
+                                >
+                                    إضافة عهدة جديدة
+                                </Button>
+                            </Box>
 
-                        {mode === 'existing' ? (
-                            <Grid item xs={12}>
+                            {availableItems.length === 0 ? (
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                    لا توجد عهد متاحة للتسليم.
+                                    <Button
+                                        size="small"
+                                        onClick={() => navigate('/custody/items/new')}
+                                        sx={{ ml: 1 }}
+                                    >
+                                        أضف عهدة جديدة
+                                    </Button>
+                                </Alert>
+                            ) : (
                                 <Autocomplete
                                     options={availableItems}
                                     getOptionLabel={(option) => `${option.name} (${option.code})`}
@@ -202,53 +200,8 @@ export default function CustodyAssign() {
                                         </li>
                                     )}
                                 />
-                            </Grid>
-                        ) : (
-                            <>
-                                <Grid item xs={12} md={6}>
-                                    <FormControl fullWidth required>
-                                        <InputLabel>الفئة</InputLabel>
-                                        <Select
-                                            value={form.categoryId}
-                                            label="الفئة"
-                                            onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                                        >
-                                            {categories.map((c) => (
-                                                <MenuItem key={c.id} value={c.id}>
-                                                    {c.icon || '📦'} {c.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12} md={6}>
-                                    <TextField
-                                        required
-                                        fullWidth
-                                        label="كود العهدة"
-                                        value={form.code}
-                                        onChange={(e) => setForm({ ...form, code: e.target.value })}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} md={6}>
-                                    <TextField
-                                        required
-                                        fullWidth
-                                        label="اسم العهدة"
-                                        value={form.name}
-                                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                    />
-                                </Grid>
-                                <Grid item xs={12} md={6}>
-                                    <TextField
-                                        fullWidth
-                                        label="الرقم التسلسلي"
-                                        value={form.serialNumber}
-                                        onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
-                                    />
-                                </Grid>
-                            </>
-                        )}
+                            )}
+                        </Grid>
 
                         {/* Assignment Details */}
                         <Grid item xs={12} md={6}>
@@ -295,7 +248,7 @@ export default function CustodyAssign() {
                                 variant="contained"
                                 size="large"
                                 startIcon={loading ? <CircularProgress size={20} /> : <Save />}
-                                disabled={loading}
+                                disabled={loading || availableItems.length === 0}
                             >
                                 {loading ? 'جاري الحفظ...' : 'تسليم العهدة'}
                             </Button>

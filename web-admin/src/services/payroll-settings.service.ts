@@ -18,11 +18,12 @@ export interface PayrollSettingsData {
 
     // حساب ساعات العمل الإضافي
     overtimeCalcBase: 'CALENDAR_DAYS' | 'ACTUAL_WORKING_DAYS' | 'FIXED_30_DAYS';
-    overtimeMethod: 'BASED_ON_SHIFTS' | 'BASED_ON_BASIC_ONLY' | 'BASED_ON_TOTAL';
+    overtimeMethod: 'BASED_ON_SHIFTS' | 'BASED_ON_BASIC_ONLY' | 'BASED_ON_TOTAL' | 'BASED_ON_ELIGIBLE_COMPONENTS';
 
     // حساب بدل أيام الإجازة
     leaveAllowanceCalcBase: 'CALENDAR_DAYS' | 'ACTUAL_WORKING_DAYS' | 'FIXED_30_DAYS';
     leaveAllowanceMethod: 'BASIC_SALARY' | 'BASIC_PLUS_HOUSING' | 'TOTAL_SALARY';
+    leaveDailyRateDivisor: number;
 
     // إعدادات قسيمة الراتب
     showCompanyContributions: boolean;
@@ -41,14 +42,17 @@ export interface PayrollSettingsData {
 
 export const payrollSettingsService = {
     async getSettings(): Promise<PayrollSettingsData> {
-        return api.get('/payroll-settings');
+        const response = await api.get('/payroll-settings') as PayrollSettingsData | { data: PayrollSettingsData };
+        return (response as any).data || response as PayrollSettingsData;
     },
 
     async updateSettings(data: Partial<PayrollSettingsData>): Promise<PayrollSettingsData> {
-        return api.patch('/payroll-settings', data);
+        const response = await api.patch('/payroll-settings', data) as PayrollSettingsData | { data: PayrollSettingsData };
+        return (response as any).data || response as PayrollSettingsData;
     },
 
     async resetToDefaults(): Promise<PayrollSettingsData> {
-        return api.post('/payroll-settings/reset', {});
+        const response = await api.post('/payroll-settings/reset', {}) as PayrollSettingsData | { data: PayrollSettingsData };
+        return (response as any).data || response as PayrollSettingsData;
     },
 };

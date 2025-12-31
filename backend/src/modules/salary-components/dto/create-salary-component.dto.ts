@@ -51,6 +51,16 @@ export class CreateSalaryComponentDto {
     @IsOptional()
     otEligible?: boolean;
 
+    @ApiProperty({ description: 'خاضع لنهاية الخدمة؟', default: false })
+    @IsBoolean()
+    @IsOptional()
+    eosEligible?: boolean;
+
+    @ApiProperty({ description: 'هل يتأثر بالغياب؟ (Pro-rata)', default: true })
+    @IsBoolean()
+    @IsOptional()
+    isProrated?: boolean;
+
     @ApiProperty({ description: 'المعادلة (اختياري)', required: false })
     @IsString()
     @IsOptional()

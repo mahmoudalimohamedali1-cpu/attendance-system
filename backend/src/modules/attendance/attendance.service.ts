@@ -12,6 +12,8 @@ import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { AttendanceStatus, NotificationType } from '@prisma/client';
+import { SmartPolicyTrigger } from '@prisma/client';
+import { SmartPolicyTriggerService } from '../smart-policies/smart-policy-trigger.service';
 
 @Injectable()
 export class AttendanceService {
@@ -20,6 +22,7 @@ export class AttendanceService {
     private geofenceService: GeofenceService,
     private notificationsService: NotificationsService,
     private permissionsService: PermissionsService,
+    private smartPolicyTrigger: SmartPolicyTriggerService,
   ) { }
 
   async checkIn(userId: string, checkInDto: CheckInDto) {
@@ -253,7 +256,7 @@ export class AttendanceService {
       },
       create: {
         userId,
-        companyId: user.companyId,
+        companyId: user.companyId as string,
         branchId: user.branch.id,
         date: today,
         checkInTime: now,
@@ -276,6 +279,28 @@ export class AttendanceService {
         deviceInfo,
       },
     });
+
+    
+    // Trigger smart policies for check-in
+    try {
+      const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
+      await this.smartPolicyTrigger.triggerEvent({
+        employeeId: userId,
+        employeeName: `${user.firstName} ${user.lastName}`,
+        companyId: user.companyId as string,
+        event: SmartPolicyTrigger.ATTENDANCE,
+        subEvent: "CHECK_IN",
+        eventData: {
+          attendanceId: attendance.id,
+          date: new Date().toISOString(),
+          dayOfWeek,
+          lateMinutes,
+          isLate: lateMinutes > 0,
+        },
+      });
+    } catch (err) {
+      console.error("Error triggering smart policy for check-in:", err);
+    }
 
     return {
       message: 'تم تسجيل الحضور بنجاح',

@@ -96,6 +96,13 @@ interface DashboardStats {
     missingFace: number;
     suspiciousToday: number;
   };
+  financials?: {
+    employerGosiTotal: number;
+    eosSettlementTotal: number;
+    ledgerDraftAmount: number;
+    ledgerPostedAmount: number;
+    periodName?: string;
+  };
 }
 
 interface EmployeeDashboard {
@@ -416,10 +423,48 @@ export const DashboardPage = () => {
       color: '#26c6da',
       type: 'req'
     },
+    // Financials
+    {
+      title: 'حصة الشركة (تأمينات)',
+      value: adminStats.financials?.employerGosiTotal || 0,
+      subtitle: 'لهذا الشهر',
+      icon: <SecurityIcon />,
+      color: '#3949ab',
+      type: 'fin',
+      isCurrency: true
+    },
+    {
+      title: 'تصفية مستحقات',
+      value: adminStats.financials?.eosSettlementTotal || 0,
+      subtitle: 'إجمالي المصروف',
+      icon: <MonetizationOn />,
+      color: '#e53935',
+      type: 'fin',
+      isCurrency: true
+    },
+    {
+      title: 'القيود (مسودة)',
+      value: adminStats.financials?.ledgerDraftAmount || 0,
+      subtitle: 'بانتظار الترحيل',
+      icon: <Description />,
+      color: '#fb8c00',
+      type: 'fin',
+      isCurrency: true
+    },
+    {
+      title: 'القيود (مُرحلة)',
+      value: adminStats.financials?.ledgerPostedAmount || 0,
+      subtitle: 'تم تأكيدها',
+      icon: <CheckCircle />,
+      color: '#43a047',
+      type: 'fin',
+      isCurrency: true
+    },
   ];
 
   const opsCards = statCards.filter(c => c.type === 'ops');
   const reqCards = statCards.filter(c => c.type === 'req');
+  const finCards = statCards.filter(c => c.type === 'fin');
 
   const attendanceRate = dashboardStats.employees.total > 0
     ? Math.round((dashboardStats.today.present / dashboardStats.employees.total) * 100)
@@ -568,6 +613,54 @@ export const DashboardPage = () => {
           </Grid>
         ))}
       </Grid>
+
+      {/* Financial Analytics */}
+      {(user?.role === 'ADMIN' || user?.role === 'HR' || user?.role === 'MANAGER' || user?.role === 'FINANCE') && finCards.length > 0 && (
+        <>
+          <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <MonetizationOn color="primary" /> التحليلات المالية (فترة: {adminStats.financials?.periodName})
+          </Typography>
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            {finCards.map((card, index) => (
+              <Grid item xs={12} sm={6} md={3} key={index}>
+                <Card sx={{ height: '100%', position: 'relative', overflow: 'visible', borderRadius: 3, border: `1px solid ${card.color}20`, background: `linear-gradient(135deg, white 0%, ${card.color}08 100%)` }}>
+                  <CardContent>
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -20,
+                        right: 16,
+                        width: 48,
+                        height: 48,
+                        borderRadius: 2,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: card.color,
+                        color: 'white',
+                        boxShadow: `0 4px 20px 0 ${card.color}40`,
+                      }}
+                    >
+                      {card.icon}
+                    </Box>
+                    <Box sx={{ pt: 3 }}>
+                      <Typography variant="h5" fontWeight="bold" color={card.color}>
+                        {Number(card.value).toLocaleString('ar-SA')} {card.isCurrency ? 'ر.س' : ''}
+                      </Typography>
+                      <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>
+                        {card.title}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {card.subtitle}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </>
+      )}
 
       {/* Requests & Follow-ups */}
       <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>

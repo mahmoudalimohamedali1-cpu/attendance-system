@@ -10,6 +10,8 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { LeaveQueryDto } from './dto/leave-query.dto';
 import { NotificationType } from '@prisma/client';
+import { SmartPolicyTrigger } from "@prisma/client";
+import { SmartPolicyTriggerService } from "../smart-policies/smart-policy-trigger.service";
 
 @Injectable()
 export class LeavesService {
@@ -17,6 +19,7 @@ export class LeavesService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private permissionsService: PermissionsService,
+    private smartPolicyTrigger: SmartPolicyTriggerService,
   ) { }
 
   async createLeaveRequest(userId: string, companyId: string, createLeaveDto: CreateLeaveRequestDto) {

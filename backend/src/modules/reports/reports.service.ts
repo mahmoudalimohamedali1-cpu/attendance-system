@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ExportService } from './services/export.service';
 import { ReportQueryDto } from './dto/report-query.dto';
@@ -12,7 +12,87 @@ export class ReportsService {
     private permissionsService: PermissionsService,
   ) { }
 
+  /**
+   * Get payroll metrics for the current month or latest available
+   */
+  private async getPayrollSummaryMetrics(companyId: string) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    // 1. Try to get current month period
+    let period = await this.prisma.payrollPeriod.findFirst({
+      where: { companyId, year, month }
+    });
+
+    // 2. Try to get run for current period
+    let run = null;
+    if (period) {
+      run = await this.prisma.payrollRun.findFirst({
+        where: { companyId, periodId: period.id, isAdjustment: false },
+        include: {
+          payslips: {
+            include: {
+              lines: { include: { component: true } }
+            }
+          }
+        }
+      });
+    }
+
+    // 3. Fallback: Get most recent run with payslips
+    if (!run || run.payslips.length === 0) {
+      run = await this.prisma.payrollRun.findFirst({
+        where: {
+          companyId,
+          isAdjustment: false,
+          payslips: { some: {} } // Has at least one payslip
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          period: true,
+          payslips: {
+            include: {
+              lines: { include: { component: true } }
+            }
+          }
+        }
+      });
+      if (run) period = run.period as any;
+    }
+
+    if (!run || run.payslips.length === 0) {
+      return {
+        employerGosiTotal: 0,
+        eosSettlementTotal: 0,
+        ledgerDraftAmount: 0,
+        ledgerPostedAmount: 0,
+        periodName: 'لا يوجد بيانات رواتب'
+      };
+    }
+
+    const employerGosiTotal = run.payslips.reduce((sum, p) =>
+      sum + p.lines.reduce((s, l) => (l.component.code.startsWith('GOSI_') && l.component.code !== 'GOSI_DED' ? s + Number(l.amount) : s), 0), 0);
+
+    const eosSettlementTotal = run.payslips.reduce((sum, p) =>
+      sum + p.lines.reduce((s, l) => (l.component.code === 'EOS_SETTLEMENT' ? s + Number(l.amount) : s), 0), 0);
+
+    const ledger = await this.prisma.payrollLedger.findFirst({
+      where: { runId: run.id }
+    });
+
+    return {
+      employerGosiTotal,
+      eosSettlementTotal,
+      ledgerDraftAmount: ledger?.status === 'DRAFT' ? Number(ledger.totalNet) : 0,
+      ledgerPostedAmount: ledger?.status === 'POSTED' ? Number(ledger.totalNet) : 0,
+      periodName: period ? `${period.month}/${period.year}` : 'فترة غير محددة'
+    };
+  }
+
   async getDashboardStats(companyId: string, userId?: string, userRole?: string) {
+    const logger = new Logger('ReportsService');
+    logger.debug(`Fetching dashboard stats for role: ${userRole}, company: ${companyId}`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -22,21 +102,23 @@ export class ReportsService {
       accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(userId, companyId, 'REPORTS_VIEW');
     }
 
-    // ADMIN sees everything, or users with accessible employees see aggregated dashboard
-    if (userRole === 'ADMIN' || accessibleEmployeeIds.length > 0) {
-      const employeeFilter = userRole === 'ADMIN'
+    // ADMIN, HR, FINANCE, MANAGER see aggregated dashboard
+    if (userRole === 'ADMIN' || userRole === 'HR' || userRole === 'FINANCE' || userRole === 'MANAGER' || accessibleEmployeeIds.length > 0) {
+      const isAdminOrHrOrManager = userRole === 'ADMIN' || userRole === 'HR' || userRole === 'MANAGER';
+
+      const employeeFilter = isAdminOrHrOrManager
         ? {}
         : { id: { in: accessibleEmployeeIds } };
 
-      const attendanceFilter = userRole === 'ADMIN'
+      const attendanceFilter = isAdminOrHrOrManager
         ? { date: today }
         : { date: today, userId: { in: accessibleEmployeeIds } };
 
-      const leaveFilter = userRole === 'ADMIN'
+      const leaveFilter = isAdminOrHrOrManager
         ? { status: 'PENDING' as const }
         : { status: 'PENDING' as const, userId: { in: accessibleEmployeeIds } };
 
-      const letterFilter = userRole === 'ADMIN'
+      const letterFilter = isAdminOrHrOrManager
         ? { status: 'PENDING' as const }
         : { status: 'PENDING' as const, userId: { in: accessibleEmployeeIds } };
 
@@ -66,7 +148,7 @@ export class ReportsService {
         this.prisma.suspiciousAttempt.count({
           where: {
             createdAt: { gte: today },
-            ...(userRole !== 'ADMIN' ? { userId: { in: accessibleEmployeeIds } } : {})
+            ...(!isAdminOrHrOrManager ? { userId: { in: accessibleEmployeeIds } } : {})
           }
         }),
       ]);
@@ -75,6 +157,9 @@ export class ReportsService {
       const lateToday = todayAttendance.filter((a) => a.status === 'LATE').length;
       const earlyLeaveToday = todayAttendance.filter((a) => a.status === 'EARLY_LEAVE').length;
       const workFromHomeToday = todayAttendance.filter((a) => a.isWorkFromHome).length;
+
+      const payrollMetrics = await this.getPayrollSummaryMetrics(companyId);
+      logger.debug(`Found payroll metrics: ${JSON.stringify(payrollMetrics)}`);
 
       return {
         employees: {
@@ -96,7 +181,8 @@ export class ReportsService {
         compliance: {
           missingFace: missingFaceRegistration,
           suspiciousToday: suspiciousAttemptsToday,
-        }
+        },
+        financials: payrollMetrics,
       };
     }
 
@@ -148,6 +234,7 @@ export class ReportsService {
       remainingLeaveDays: myUserData?.remainingLeaveDays ?? 0,
       annualLeaveDays: myUserData?.annualLeaveDays ?? 0,
       usedLeaveDays: myUserData?.usedLeaveDays ?? 0,
+      financials: { employerGosiTotal: 0, eosSettlementTotal: 0, ledgerDraftAmount: 0, ledgerPostedAmount: 0 },
     };
   }
 

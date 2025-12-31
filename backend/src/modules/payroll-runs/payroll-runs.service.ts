@@ -84,14 +84,25 @@ export class PayrollRunsService {
                 // 1. إضافة الخطوط المحسوبة (من الهيكل، السياسات، والتأمينات)
                 if (calculation.policyLines) {
                     for (const pl of calculation.policyLines) {
+                        // تحديد مصدر السطر بناءً على نوع المكوّن
+                        let sourceType = PayslipLineSource.STRUCTURE;
+                        if (pl.componentId === 'GOSI-STATUTORY') {
+                            sourceType = PayslipLineSource.STATUTORY;
+                        } else if (pl.componentCode === 'SMART' || pl.componentId?.startsWith('SMART-')) {
+                            sourceType = PayslipLineSource.SMART;
+                        }
+                        
                         payslipLines.push({
                             componentId: pl.componentId,
                             amount: new Decimal(pl.amount.toFixed(2)),
-                            sourceType: pl.componentId === 'GOSI-STATUTORY' ? PayslipLineSource.STATUTORY : PayslipLineSource.STRUCTURE,
-                            sign: pl.sign
+                            sourceType,
+                            sign: pl.sign,
+                            descriptionAr: pl.descriptionAr || undefined,
+                            sourceRef: pl.source ? `${pl.source.policyId}:${pl.source.ruleId}` : undefined,
                         });
                     }
                 }
+
 
                 // 2. معالجة السلف (Advances)
                 let advanceDeduction = new Decimal(0);

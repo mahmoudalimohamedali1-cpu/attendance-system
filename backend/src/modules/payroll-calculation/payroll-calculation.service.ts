@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { SmartPolicyExecutorService } from "../smart-policies/smart-policy-executor.service";
+import { AIPolicyEvaluatorService, EmployeePayrollContext } from "../smart-policies/ai-policy-evaluator.service";
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PoliciesService } from '../policies/policies.service';
 import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
@@ -26,6 +28,8 @@ export class PayrollCalculationService {
         private policyEvaluator: PolicyRuleEvaluatorService,
         private formulaEngine: FormulaEngineService,
         private eosService: EosService,
+        private smartPolicyExecutor: SmartPolicyExecutorService,
+        private aiPolicyEvaluator: AIPolicyEvaluatorService,
     ) { }
 
     /**
@@ -772,6 +776,63 @@ export class PayrollCalculationService {
             } catch (err) {
                 this.logger.error(`Failed to calculate EOS for ${employeeId}: ${err.message}`);
             }
+        }
+
+        
+        // === Smart Policy Execution ===
+        try {
+            const smartResults = await this.smartPolicyExecutor.executeSmartPolicies(companyId, {
+                employee: employee,
+                baseSalary: baseSalary,
+                workingDays: daysInMonthGeneral,
+                absentDays: absentDays,
+                lateDays: Math.round(lateMinutes / 60),
+                overtimeHours: overtimeHours,
+                month: month,
+                year: year,
+            });
+            
+            for (const result of smartResults) {
+                if (result.success && result.policyLine) {
+                    policyLines.push(result.policyLine);
+                }
+            }
+            this.logger.log(`Smart policies executed: ${smartResults.length} results`);
+
+        // === AI-Powered Policy Evaluation ===
+        try {
+            const aiContext: EmployeePayrollContext = {
+                employeeId: employee.id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                department: (employee as any).department?.name || null,
+                jobTitle: employee.jobTitle,
+                hireDate: employee.hireDate,
+                yearsOfService: employee.hireDate ? Math.floor((Date.now() - new Date(employee.hireDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0,
+                baseSalary: baseSalary,
+                totalSalary: baseSalary * 1.25,
+                workingDays: daysInMonthGeneral,
+                presentDays: daysInMonthGeneral - absentDays,
+                absentDays: absentDays,
+                lateDays: Math.round(lateMinutes / 60),
+                lateMinutes: lateMinutes,
+                overtimeHours: overtimeHours,
+                attendancePercentage: Math.round(((daysInMonthGeneral - absentDays) / daysInMonthGeneral) * 100),
+                leavesTaken: 0,
+                unpaidLeaves: 0,
+                activePenalties: 0,
+                pendingCustodyReturns: 0,
+                returnedCustodyThisMonth: 0,
+                month: month,
+                year: year,
+            };
+            const aiPolicyLines = await this.aiPolicyEvaluator.evaluateAllPolicies(companyId, aiContext);
+            policyLines.push(...aiPolicyLines);
+            this.logger.log(`AI Policy evaluation: ${aiPolicyLines.length} adjustments`);
+        } catch (err) {
+            this.logger.error(`AI Policy evaluation error: ${err.message}`);
+        }
+        } catch (err) {
+            this.logger.error(`Error executing smart policies: ${err.message}`);
         }
 
         const grossSalary = Math.round(policyLines.filter(l => l.sign === 'EARNING' && !l.isEmployerContribution).reduce((sum, l) => sum + l.amount, 0) * 100) / 100;

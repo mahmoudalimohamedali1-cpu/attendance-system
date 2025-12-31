@@ -18,10 +18,11 @@ export class FormulaEngineService {
     private static readonly SUPPORTED_VARIABLES = [
         'BASIC', 'TOTAL', 'GROSS', 'NET',
         'HOUSING', 'TRANSPORT', 'FOOD', 'OTHER_ALLOWANCES',
-        'OT_HOURS', 'OT_AMOUNT', 'OT_RATE',
+        'OT_HOURS', 'OT_AMOUNT', 'OT_RATE', 'OT_BASE',
+        'GOSI_BASE', 'GOSI_RATE_EMP', 'GOSI_RATE_COMP',
+        'EOS_BASE',
         'DAYS_WORKED', 'DAYS_ABSENT', 'LATE_MINUTES', 'LATE_HOURS',
         'DAILY_RATE', 'HOURLY_RATE', 'MINUTE_RATE',
-        'GOSI_BASE', 'GOSI_RATE_EMP', 'GOSI_RATE_COMP',
         'DAYS_IN_MONTH', 'WORKING_DAYS', 'WORKING_DAYS_IN_YEAR',
         'YEARS_OF_SERVICE', 'MONTHS_OF_SERVICE',
     ];
@@ -247,11 +248,27 @@ export class FormulaEngineService {
         return stack[0] || 0;
     }
 
+
     buildVariableContext(params: any): Record<string, number> {
         const basic = params.basicSalary || 0;
         const daysInMonth = params.daysInMonth || 30;
+
+        // حساب القواعد بناءً على البدلات (ZenHR Style)
+        const components = params.components || [];
+
+        let otBase = basic;
+        let gosiBase = basic;
+        let eosBase = basic;
+
+        for (const comp of components) {
+            const amount = Number(comp.amount) || 0;
+            if (comp.otEligible) otBase += amount;
+            if (comp.gosiEligible) gosiBase += amount;
+            if (comp.eosEligible) eosBase += amount;
+        }
+
         const dailyRate = basic / daysInMonth;
-        const hourlyRate = dailyRate / 8;
+        const hourlyRate = (params.overtimeBase || otBase) / (params.overtimeDivisor || (daysInMonth * 8)); // دعم المقسم المرن
 
         return {
             BASIC: basic,
@@ -262,6 +279,9 @@ export class FormulaEngineService {
             OTHER_ALLOWANCES: params.otherAllowances || 0,
             OT_HOURS: params.overtimeHours || 0,
             OT_RATE: params.overtimeRate || 1.5,
+            OT_BASE: otBase,
+            GOSI_BASE: gosiBase,
+            EOS_BASE: eosBase,
             DAILY_RATE: dailyRate,
             HOURLY_RATE: hourlyRate,
             MINUTE_RATE: hourlyRate / 60,
@@ -272,7 +292,6 @@ export class FormulaEngineService {
             DAYS_IN_MONTH: daysInMonth,
             WORKING_DAYS: daysInMonth,
             WORKING_DAYS_IN_YEAR: 360,
-            GOSI_BASE: basic + (params.housingAllowance || 0),
             GOSI_RATE_EMP: 0.0975,
             GOSI_RATE_COMP: 0.12,
             YEARS_OF_SERVICE: params.yearsOfService || 0,

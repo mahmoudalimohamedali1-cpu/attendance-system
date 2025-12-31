@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger, forwardRef, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreatePolicyDto, PolicyScope, PolicyType } from './dto/create-policy.dto';
@@ -19,6 +19,7 @@ export class PoliciesService {
     constructor(
         private prisma: PrismaService,
         private auditService: AuditService,
+        @Inject(forwardRef(() => FormulaEngineService))
         private formulaEngine: FormulaEngineService,
     ) { }
 

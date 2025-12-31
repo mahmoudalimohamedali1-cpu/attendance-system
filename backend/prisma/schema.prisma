@@ -73,6 +73,9 @@ model Company {
   leaveTypeConfigs LeaveTypeConfig[]
   leaveBalances    LeaveBalance[]
 
+  // السياسات الذكية (AI-Powered)
+  smartPolicies SmartPolicy[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -107,6 +110,7 @@ enum OvertimeCalculationMethod {
   BASED_ON_SHIFTS // على أساس مناوبات العمل
   BASED_ON_BASIC_ONLY // على أساس الراتب الأساسي فقط
   BASED_ON_TOTAL // على أساس إجمالي الراتب
+  BASED_ON_ELIGIBLE_COMPONENTS // على أساس البدلات الخاضعة للإضافي
 }
 
 // طريقة حساب بدل الإجازة
@@ -154,6 +158,7 @@ model PayrollSettings {
   // ========== إعدادات إضافية ==========
   roundSalaryToNearest       Int @default(0) @map("round_salary_to_nearest") // تقريب الراتب (0 = بدون تقريب)
   defaultWorkingDaysPerMonth Int @default(30) @map("default_working_days_per_month")
+  leaveDailyRateDivisor       Int @default(30) @map("leave_daily_rate_divisor") // مقسم الراتب اليومي للإجازات
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1777,6 +1782,8 @@ model SalaryComponent {
   description  String?
   gosiEligible Boolean @default(false) @map("gosi_eligible")
   otEligible   Boolean @default(false) @map("ot_eligible")
+  eosEligible  Boolean @default(false) @map("eos_eligible") // يدخل في حساب مستحقات نهاية الخدمة
+  isProrated   Boolean @default(true) @map("is_prorated") // هل يتأثر بالغياب والتعيين المتأخر (Pro-rated)
   taxable      Boolean @default(false) // خاضع للضريبة
 
   // لربط المكون باللي يعتمد عليه (مثلاً السكن 25% من الأساسي)
@@ -1888,6 +1895,7 @@ enum PayslipLineSource {
   MANUAL // إدخال يدوي
   ADJUSTMENT // تعديل/فرق
   STATUTORY // خصومات قانونية (GOSI, ضرائب)
+  SMART // ذكاء اصطناعي (AI)
 }
 
 model PayslipLine {
@@ -2197,6 +2205,148 @@ model PolicyRule {
   @@index([policyId, isActive, ruleOrder])
   @@index([outputComponentId])
   @@map("policy_rules")
+}
+
+// ==================== السياسات الذكية (AI-Powered Policies) ====================
+
+// نوع الحدث المُفعِّل
+enum SmartPolicyTrigger {
+  ATTENDANCE   // حضور، انصراف، تأخير، غياب
+  LEAVE        // طلب إجازة، موافقة، رفض
+  CUSTODY      // تسليم عهدة، إرجاع عهدة
+  PAYROLL      // حساب الرواتب الشهري
+  ANNIVERSARY  // ذكرى توظيف
+  CONTRACT     // بداية/نهاية عقد
+  DISCIPLINARY // مخالفة، تحقيق
+  PERFORMANCE  // أداء
+  CUSTOM       // أي حدث آخر
+}
+
+// حالة السياسة الذكية
+enum SmartPolicyStatus {
+  DRAFT       // مسودة (لم تُراجع بعد)
+  PENDING     // بانتظار الموافقة
+  ACTIVE      // مفعّلة
+  PAUSED      // موقوفة مؤقتاً
+  ARCHIVED    // مؤرشفة
+}
+
+// نوع الإجراء
+enum SmartPolicyActionType {
+  ADD_TO_PAYROLL       // إضافة مبلغ للراتب
+  DEDUCT_FROM_PAYROLL  // خصم من الراتب
+  SEND_NOTIFICATION    // إرسال إشعار
+  ALERT_HR             // تنبيه الموارد البشرية
+  CREATE_RECORD        // إنشاء سجل
+}
+
+model SmartPolicy {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // النص الأصلي (ما كتبه المستخدم بالعربي/العامية)
+  originalText String @map("original_text") @db.Text
+  
+  // اسم السياسة (اختياري - يُستخرج من الـ AI أو يُدخله المستخدم)
+  name        String?
+  description String? @db.Text
+  
+  // الحدث المُفعِّل
+  triggerEvent    SmartPolicyTrigger @map("trigger_event")
+  triggerSubEvent String?            @map("trigger_sub_event") // مثال: RETURNED, APPROVED
+  
+  // القاعدة المحللة بالذكاء الاصطناعي (JSON كامل)
+  parsedRule Json @map("parsed_rule")
+  
+  // الشروط المحللة (للبحث السريع)
+  conditions Json @default("[]")
+  
+  // الإجراءات المحللة
+  actions Json @default("[]")
+  
+  // النطاق: لمن تُطبق السياسة
+  scopeType   String  @default("ALL") @map("scope_type") // ALL, EMPLOYEE, DEPARTMENT, BRANCH, JOB_TITLE
+  scopeId     String? @map("scope_id")     // معرف الهدف (إن وُجد)
+  scopeName   String? @map("scope_name")   // اسم الهدف (للعرض)
+  
+  // الحالة والتفعيل
+  status   SmartPolicyStatus @default(DRAFT)
+  isActive Boolean           @default(false) @map("is_active")
+  
+  // الأولوية (الأعلى تُنفذ أولاً)
+  priority Int @default(0)
+  
+  // تاريخ الصلاحية
+  effectiveFrom DateTime? @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+  
+  // شرح الـ AI للقاعدة (بالعربي)
+  aiExplanation String? @map("ai_explanation") @db.Text
+  
+  // هل الـ AI طلب توضيح؟
+  clarificationNeeded String? @map("clarification_needed") @db.Text
+  
+  // إحصائيات التنفيذ
+  executionCount    Int       @default(0) @map("execution_count")
+  lastExecutedAt    DateTime? @map("last_executed_at")
+  totalAmountPaid   Decimal   @default(0) @map("total_amount_paid") @db.Decimal(12, 2)
+  totalAmountDeduct Decimal   @default(0) @map("total_amount_deduct") @db.Decimal(12, 2)
+  
+  // من أنشأها وراجعها
+  createdById  String?   @map("created_by_id")
+  approvedById String?   @map("approved_by_id")
+  approvedAt   DateTime? @map("approved_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // سجل التنفيذات
+  executions SmartPolicyExecution[]
+  
+  @@index([companyId, status, isActive])
+  @@index([companyId, triggerEvent])
+  @@index([status, isActive])
+  @@map("smart_policies")
+}
+
+// سجل تنفيذ السياسة الذكية
+model SmartPolicyExecution {
+  id       String      @id @default(uuid())
+  policyId String      @map("policy_id")
+  policy   SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  
+  // الموظف المتأثر
+  employeeId   String @map("employee_id")
+  employeeName String @map("employee_name")
+  
+  // الحدث الذي أطلق التنفيذ
+  triggerEvent    String  @map("trigger_event")
+  triggerSubEvent String? @map("trigger_sub_event")
+  triggerData     Json?   @map("trigger_data") // بيانات الحدث (مثل: تاريخ إرجاع العهدة)
+  
+  // نتيجة فحص الشروط
+  conditionsMet Boolean @map("conditions_met")
+  conditionsLog Json?   @map("conditions_log") // تفاصيل فحص كل شرط
+  
+  // الإجراء المُنفذ
+  actionType   String?  @map("action_type") // ADD_TO_PAYROLL, DEDUCT_FROM_PAYROLL, etc.
+  actionValue  Decimal? @map("action_value") @db.Decimal(10, 2)
+  actionResult Json?    @map("action_result") // نتيجة الإجراء
+  
+  // هل نجح التنفيذ؟
+  isSuccess    Boolean @map("is_success")
+  errorMessage String? @map("error_message") @db.Text
+  
+  // ربط بالراتب (إن وُجد)
+  payrollPeriod String? @map("payroll_period") // YYYY-MM
+  
+  executedAt DateTime @default(now()) @map("executed_at")
+  
+  @@index([policyId, executedAt])
+  @@index([employeeId, executedAt])
+  @@index([triggerEvent])
+  @@map("smart_policy_executions")
 }
 
 // ==================== Government Compliance Tracking ====================

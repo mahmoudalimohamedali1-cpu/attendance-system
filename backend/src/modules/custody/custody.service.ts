@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { User, NotificationType, CustodyItemStatus, CustodyAssignmentStatus, CustodyReturnStatus, CustodyTransferStatus, CustodyMaintenanceStatus, CustodyCondition, MaintenanceType } from '@prisma/client';
+import { SmartPolicyTriggerService } from "../smart-policies/smart-policy-trigger.service";
+import { User, NotificationType, CustodyItemStatus, CustodyAssignmentStatus, CustodyReturnStatus, CustodyTransferStatus, CustodyMaintenanceStatus, CustodyCondition, MaintenanceType, SmartPolicyTrigger } from '@prisma/client';
 import {
     CreateCategoryCto, UpdateCategoryCto,
     CreateItemDto, UpdateItemDto,
@@ -18,6 +19,7 @@ export class CustodyService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly notificationsService: NotificationsService,
+        private readonly smartPolicyTrigger: SmartPolicyTriggerService,
     ) { }
 
     // ==================== Categories ====================

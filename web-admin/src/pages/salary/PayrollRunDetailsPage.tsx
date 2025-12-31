@@ -414,6 +414,7 @@ export const PayrollRunDetailsPage = () => {
                                                     'STATUTORY': { label: 'تأمينات', color: 'info' },
                                                     'MANUAL': { label: 'يدوي', color: 'warning' },
                                                     'ADJUSTMENT': { label: 'تعديل', color: 'secondary' },
+                                                    'SMART': { label: 'ذكاء اصطناعي', color: 'success' },
                                                 };
                                                 return badges[sourceType] || { label: sourceType, color: 'default' };
                                             };

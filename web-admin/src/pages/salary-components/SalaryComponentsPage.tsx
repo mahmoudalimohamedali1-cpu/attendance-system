@@ -73,6 +73,8 @@ export default function SalaryComponentsPage() {
         description: '',
         gosiEligible: true,
         otEligible: false,
+        eosEligible: false,
+        isProrated: true,
         formula: '',
     };
 
@@ -162,6 +164,8 @@ export default function SalaryComponentsPage() {
                 description: comp.description || '',
                 gosiEligible: comp.gosiEligible,
                 otEligible: comp.otEligible,
+                eosEligible: comp.eosEligible,
+                isProrated: comp.isProrated,
                 formula: comp.formula || '',
             });
         } else {
@@ -237,6 +241,8 @@ export default function SalaryComponentsPage() {
                             <TableCell>الطبيعة</TableCell>
                             <TableCell>GOSI</TableCell>
                             <TableCell>OT</TableCell>
+                            <TableCell>EOS</TableCell>
+                            <TableCell>Pro-rata</TableCell>
                             <TableCell align="center">إجراءات</TableCell>
                         </TableRow>
                     </TableHead>
@@ -264,6 +270,20 @@ export default function SalaryComponentsPage() {
                                         label={c.otEligible ? 'نعم' : 'لا'}
                                         size="small"
                                         color={c.otEligible ? 'info' : 'default'}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <Chip
+                                        label={c.eosEligible ? 'نعم' : 'لا'}
+                                        size="small"
+                                        color={c.eosEligible ? 'warning' : 'default'}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <Chip
+                                        label={c.isProrated ? 'نعم' : 'لا'}
+                                        size="small"
+                                        color={c.isProrated ? 'primary' : 'default'}
                                     />
                                 </TableCell>
                                 <TableCell align="center">
@@ -548,6 +568,28 @@ export default function SalaryComponentsPage() {
                                     />
                                 }
                                 label="يدخل في حساب OT"
+                            />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={formData.eosEligible}
+                                        onChange={(e) => setFormData({ ...formData, eosEligible: e.target.checked })}
+                                    />
+                                }
+                                label="يدخل في حساب مكافأة نهاية الخدمة"
+                            />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={formData.isProrated}
+                                        onChange={(e) => setFormData({ ...formData, isProrated: e.target.checked })}
+                                    />
+                                }
+                                label="يتأثر بالغياب والالتحاق المتأخر"
                             />
                         </Grid>
                     </Grid>
