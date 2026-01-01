@@ -10,6 +10,6 @@ import { SmartPoliciesModule } from "../smart-policies/smart-policies.module";
   imports: [NotificationsModule, PermissionsModule, forwardRef(() => SmartPoliciesModule)],
   controllers: [AttendanceController],
   providers: [AttendanceService, GeofenceService],
-  exports: [AttendanceService],
+  exports: [AttendanceService, GeofenceService],
 })
-export class AttendanceModule {}
+export class AttendanceModule { }
