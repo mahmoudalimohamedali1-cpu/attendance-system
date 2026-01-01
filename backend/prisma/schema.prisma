@@ -80,6 +80,10 @@ model Company {
   employeeLocationLogs EmployeeLocationLog[]
   geofenceExitEvents   GeofenceExitEvent[]
 
+  // نظام الترحيب (Onboarding)
+  onboardingTemplates  OnboardingTemplate[]
+  onboardingProcesses  OnboardingProcess[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -357,6 +361,9 @@ model User {
   // نظام تتبع الموقع (Location Tracking)
   locationLogs       EmployeeLocationLog[]
   geofenceExitEvents GeofenceExitEvent[]
+
+  // نظام الترحيب (Onboarding)
+  onboardingProcesses OnboardingProcess[]
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -3371,4 +3378,137 @@ model GeofenceExitEvent {
   @@index([attendanceId])
   @@index([companyId, exitTime])
   @@map("geofence_exit_events")
+}
+
+// ==================== نظام ترحيب الموظفين (Employee Onboarding System) ====================
+
+// نوع عملية الترحيب
+enum OnboardingType {
+  JOINING      // انضمام موظف جديد
+  OFFBOARDING  // إنهاء خدمة
+  RETURN       // عودة من إجازة طويلة
+}
+
+// نوع المسؤول عن المهمة
+enum AssigneeType {
+  HR
+  IT
+  MANAGER
+  FINANCE
+  EMPLOYEE
+}
+
+// حالة العملية
+enum OnboardingProcessStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// حالة المهمة
+enum OnboardingTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+// قوالب سير العمل للترحيب
+model OnboardingTemplate {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  name        String
+  nameEn      String?  @map("name_en")
+  description String?
+  type        OnboardingType @default(JOINING)
+  isActive    Boolean  @default(true)
+
+  tasks       OnboardingTemplateTask[]
+  processes   OnboardingProcess[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, type])
+  @@map("onboarding_templates")
+}
+
+// مهام القالب
+model OnboardingTemplateTask {
+  id         String   @id @default(uuid())
+  templateId String   @map("template_id")
+  template   OnboardingTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  title       String
+  titleEn     String?  @map("title_en")
+  description String?
+
+  assigneeType   AssigneeType @default(HR)
+  dueDays        Int          @default(1)  // عدد الأيام من تاريخ البدء
+  priority       Int          @default(1)  // ترتيب الأولوية
+  requiresPhoto  Boolean      @default(false) @map("requires_photo")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([templateId])
+  @@map("onboarding_template_tasks")
+}
+
+// عملية الترحيب الفعلية للموظف
+model OnboardingProcess {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  userId     String @map("user_id")
+  user       User   @relation(fields: [userId], references: [id])
+
+  templateId String @map("template_id")
+  template   OnboardingTemplate @relation(fields: [templateId], references: [id])
+
+  type        OnboardingType
+  status      OnboardingProcessStatus @default(IN_PROGRESS)
+  startDate   DateTime @default(now()) @map("start_date")
+  completedAt DateTime? @map("completed_at")
+
+  tasks       OnboardingTask[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@index([userId])
+  @@map("onboarding_processes")
+}
+
+// المهام الفعلية للموظف
+model OnboardingTask {
+  id        String   @id @default(uuid())
+  processId String   @map("process_id")
+  process   OnboardingProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  title       String
+  titleEn     String?  @map("title_en")
+  description String?
+
+  assigneeId   String?      @map("assignee_id")
+  assigneeType AssigneeType
+
+  status      OnboardingTaskStatus @default(PENDING)
+  dueDate     DateTime     @map("due_date")
+  completedAt DateTime?    @map("completed_at")
+  completedBy String?      @map("completed_by")
+
+  // توثيق بالصورة
+  photoUrl    String?      @map("photo_url")
+  notes       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([processId, status])
+  @@map("onboarding_tasks")
 }

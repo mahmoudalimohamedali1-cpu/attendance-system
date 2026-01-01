@@ -60,6 +60,7 @@ import { PayrollSettingsModule } from './modules/payroll-settings/payroll-settin
 import { AiModule } from './modules/ai/ai.module';
 import { SmartPoliciesModule } from './modules/smart-policies/smart-policies.module';
 import { LocationTrackingModule } from './modules/location-tracking/location-tracking.module';
+import { OrganizationModule } from './modules/organization/organization.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -130,6 +131,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     AiModule,               // الذكاء الاصطناعي لمحرك السياسات
     SmartPoliciesModule,    // السياسات الذكية المُحللة بالـ AI
     LocationTrackingModule, // نظام تتبع موقع الموظفين
+    OrganizationModule,     // الهيكل التنظيمي
   ],
   controllers: [AppController],
   providers: [

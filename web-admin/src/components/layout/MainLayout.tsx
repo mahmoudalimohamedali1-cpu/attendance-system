@@ -42,6 +42,8 @@ import {
   Payments,
   Receipt as ReceiptIcon,
   MyLocation as LocationIcon,
+  AccountTree,
+  AutoAwesome,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
@@ -81,6 +83,7 @@ const allMenuItems: MenuItem[] = [
   { text: 'المستخدمين', icon: <People />, path: '/users', requiredRole: 'ADMIN', requiredPermission: ['EMPLOYEES_VIEW', 'EMPLOYEES_EDIT'] },
   { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance', requiredPermission: ['ATTENDANCE_VIEW', 'ATTENDANCE_EDIT'] },
   { text: 'تتبع الموظفين', icon: <LocationIcon />, path: '/tracking', requiredRole: 'ADMIN', requiredPermission: ['ATTENDANCE_VIEW'] },
+  { text: 'الهيكل التنظيمي', icon: <AccountTree />, path: '/org-structure', requiredRole: 'ADMIN' },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
   { text: 'الجزاءات والتحقيقات', icon: <Security />, path: '/disciplinary', requiredPermission: ['DISC_MANAGER_CREATE', 'DISC_HR_REVIEW', 'DISC_HR_DECISION', 'DISC_HR_FINALIZE', 'DISC_EMPLOYEE_RESPONSE'] },
@@ -100,6 +103,7 @@ const allMenuItems: MenuItem[] = [
   { text: 'الأجهزة', icon: <Business />, path: '/devices', requiredRole: 'ADMIN' },
   { text: 'الصلاحيات', icon: <Security />, path: '/permissions', requiredRole: 'ADMIN' },
   { text: 'السياسات', icon: <Security />, path: '/policies', requiredRole: 'ADMIN' },
+  { text: 'السياسات الذكية', icon: <AutoAwesome />, path: '/smart-policies', requiredRole: 'ADMIN' },
   { text: 'الإعدادات', icon: <Settings />, path: '/settings', requiredRole: 'ADMIN' },
 ];
 
