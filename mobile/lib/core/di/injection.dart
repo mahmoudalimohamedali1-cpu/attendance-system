@@ -7,6 +7,7 @@ import '../config/app_config.dart';
 import '../network/api_client.dart';
 import '../network/auth_interceptor.dart';
 import '../services/location_service.dart';
+import '../services/location_tracking_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
 
@@ -94,6 +95,8 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<NotificationService>(
     () => NotificationService(),
   );
+  
+  // تسجيل خدمة تتبع الموقع (يتم التسجيل بعد ApiClient)
   print('✅ Services registered');
   
   // Network - استخدام الإعدادات من AppConfig
@@ -134,6 +137,12 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<ApiClient>(
     () => ApiClient(getIt()),
   );
+  
+  // تسجيل خدمة تتبع الموقع (بعد ApiClient)
+  getIt.registerLazySingleton<LocationTrackingService>(
+    () => LocationTrackingService(getIt<ApiClient>(), getIt<LocationService>()),
+  );
+  print('✅ LocationTrackingService registered');
   
   // Data sources
   getIt.registerLazySingleton<AuthRemoteDataSource>(
@@ -265,6 +274,7 @@ Future<void> configureDependencies() async {
       getHistoryUseCase: getIt<GetAttendanceHistoryUseCase>(),
       getTodayAttendanceUseCase: getIt<GetTodayAttendanceUseCase>(),
       locationService: getIt<LocationService>(),
+      locationTrackingService: getIt<LocationTrackingService>(),
     ),
   );
   
