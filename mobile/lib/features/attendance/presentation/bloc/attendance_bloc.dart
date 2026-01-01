@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/services/location_service.dart';
+import '../../../../core/services/location_tracking_service.dart';
 import '../../../../core/services/security_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../domain/entities/attendance_entity.dart';
@@ -153,6 +154,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final GetAttendanceHistoryUseCase getHistoryUseCase;
   final GetTodayAttendanceUseCase getTodayAttendanceUseCase;
   final LocationService locationService;
+  final LocationTrackingService? locationTrackingService;
 
   AttendanceEntity? _todayAttendance;
   List<AttendanceEntity> _history = [];
@@ -163,6 +165,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     required this.getHistoryUseCase,
     required this.getTodayAttendanceUseCase,
     required this.locationService,
+    this.locationTrackingService,
   }) : super(AttendanceInitial()) {
     on<GetTodayAttendanceEvent>(_onGetTodayAttendance);
     on<CheckInEvent>(_onCheckIn);
@@ -229,6 +232,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         (failure) => emit(AttendanceError(failure.message)),
         (checkInResult) {
           _todayAttendance = checkInResult.attendance;
+          
+          // 📍 بدء تتبع الموقع بعد تسجيل الحضور
+          locationTrackingService?.startTracking();
+          
           emit(AttendanceCheckInSuccess(
             attendance: checkInResult.attendance,
             lateMinutes: checkInResult.lateMinutes,
@@ -284,6 +291,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         (failure) => emit(AttendanceError(failure.message)),
         (checkOutResult) {
           _todayAttendance = checkOutResult.attendance;
+          
+          // 🛑 إيقاف تتبع الموقع عند تسجيل الانصراف
+          locationTrackingService?.stopTracking();
+          
           emit(AttendanceCheckOutSuccess(
             attendance: checkOutResult.attendance,
             earlyLeaveMinutes: checkOutResult.earlyLeaveMinutes,

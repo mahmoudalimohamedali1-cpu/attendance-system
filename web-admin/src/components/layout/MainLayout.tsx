@@ -41,6 +41,7 @@ import {
   ExpandMore,
   Payments,
   Receipt as ReceiptIcon,
+  MyLocation as LocationIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
@@ -79,6 +80,7 @@ const allMenuItems: MenuItem[] = [
   // HR Management
   { text: 'المستخدمين', icon: <People />, path: '/users', requiredRole: 'ADMIN', requiredPermission: ['EMPLOYEES_VIEW', 'EMPLOYEES_EDIT'] },
   { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance', requiredPermission: ['ATTENDANCE_VIEW', 'ATTENDANCE_EDIT'] },
+  { text: 'تتبع الموظفين', icon: <LocationIcon />, path: '/tracking', requiredRole: 'ADMIN', requiredPermission: ['ATTENDANCE_VIEW'] },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
   { text: 'الجزاءات والتحقيقات', icon: <Security />, path: '/disciplinary', requiredPermission: ['DISC_MANAGER_CREATE', 'DISC_HR_REVIEW', 'DISC_HR_DECISION', 'DISC_HR_FINALIZE', 'DISC_EMPLOYEE_RESPONSE'] },

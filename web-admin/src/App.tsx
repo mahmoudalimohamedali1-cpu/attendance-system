@@ -60,6 +60,7 @@ const CustodyItemDetail = lazy(() => import('@/pages/custody/CustodyItemDetail')
 const MyPayslipsPage = lazy(() => import('./pages/my-payslips/MyPayslipsPage'));
 const PayrollSettingsPage = lazy(() => import('./pages/payroll-settings/PayrollSettingsPage'));
 const SmartPoliciesPage = lazy(() => import('./pages/smart-policies/SmartPoliciesPage'));
+const EmployeeTrackingPage = lazy(() => import('./pages/tracking/EmployeeTrackingPage'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -343,6 +344,11 @@ function App() {
           <Route path="payroll-settings" element={
             <Suspense fallback={<PageLoader />}>
               <PayrollSettingsPage />
+            </Suspense>
+          } />
+          <Route path="tracking" element={
+            <Suspense fallback={<PageLoader />}>
+              <EmployeeTrackingPage />
             </Suspense>
           } />
           <Route path="custody">

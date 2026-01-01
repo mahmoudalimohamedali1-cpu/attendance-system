@@ -335,5 +335,12 @@ class ApiClient {
     print('📤 Uploading ${filePaths.length} disciplinary attachments for case $caseId');
     return await _dio.post('/disciplinary/cases/$caseId/upload-files', data: formData);
   }
+
+  // ==================== Location Tracking endpoints ====================
+  
+  /// تحديث موقع الموظف (للتتبع بعد تسجيل الحضور)
+  Future<Response> updateLocation(Map<String, dynamic> data) async {
+    return await _dio.post('/location-tracking/update', data: data);
+  }
 }
 

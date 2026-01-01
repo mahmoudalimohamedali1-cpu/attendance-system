@@ -59,6 +59,7 @@ import { EmployeeProfileModule } from './modules/employee-profile/employee-profi
 import { PayrollSettingsModule } from './modules/payroll-settings/payroll-settings.module';
 import { AiModule } from './modules/ai/ai.module';
 import { SmartPoliciesModule } from './modules/smart-policies/smart-policies.module';
+import { LocationTrackingModule } from './modules/location-tracking/location-tracking.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -128,6 +129,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     PayrollSettingsModule,  // إعدادات الرواتب
     AiModule,               // الذكاء الاصطناعي لمحرك السياسات
     SmartPoliciesModule,    // السياسات الذكية المُحللة بالـ AI
+    LocationTrackingModule, // نظام تتبع موقع الموظفين
   ],
   controllers: [AppController],
   providers: [
