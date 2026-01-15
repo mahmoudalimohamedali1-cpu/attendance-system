@@ -362,27 +362,54 @@ export class AttendanceService {
 
   async checkOut(userId: string, checkOutDto: CheckOutDto) {
     const { latitude, longitude, isMockLocation, deviceInfo, faceEmbedding } = checkOutDto;
-
-    console.log('=== CHECK-OUT REQUEST ===');
-    console.log('userId:', userId);
-    console.log('faceEmbedding received:', faceEmbedding ? `YES (${Array.isArray(faceEmbedding) ? faceEmbedding.length : 'string'})` : 'NO');
-
-    const user = await this.prisma.user.findFirst({
-      where: { id: userId, companyId: checkOutDto.companyId },
-      include: { branch: true, department: true, faceData: true },
-    });
-
-    if (!user || !user.branch) {
-      throw new NotFoundException('المستخدم أو الفرع غير موجود');
-    }
-
-    console.log('User faceRegistered:', user.faceRegistered);
-    console.log('User faceData exists:', !!user.faceData);
-
-    // Check mock location
+    const user = await this.prisma.user.findFirst({ where: { id: userId, companyId: checkOutDto.companyId }, include: { branch: true, department: true, faceData: true } });
+    if (!user || !user.branch) throw new NotFoundException('المستخدم أو الفرع غير موجود');
     if (isMockLocation) {
       await this.logSuspiciousAttempt(userId, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
       throw new ForbiddenException('تم رصد استخدام موقع وهمي. لا يمكن تسجيل الانصراف.');
+    }
+    if (checkOutDto.integrityToken) {
+      try {
+        const integrityVerdict = await this.integrityService.verifyIntegrityToken(checkOutDto.integrityToken);
+        // Log integrity check result
+        if (!integrityVerdict.isValid || integrityVerdict.riskLevel === 'HIGH' || integrityVerdict.riskLevel === 'CRITICAL') {
+          await this.logSuspiciousAttempt(
+            userId,
+            'INTEGRITY_FAILED',
+            latitude,
+            longitude,
+            deviceInfo,
+          );
+          // Alert HR if risk is high
+          if (this.integrityService.shouldAlertHR(integrityVerdict)) {
+            await this.notifyAdminSuspiciousActivity(
+              user,
+              `فشل فحص سلامة الجهاز - مستوى الخطورة: ${integrityVerdict.riskLevel}`,
+            );
+          }
+        }
+        // Block attendance if critical risk
+        if (this.integrityService.shouldBlockAttendance(integrityVerdict)) {
+          throw new ForbiddenException(
+            'جهازك لا يلبي معايير الأمان المطلوبة. يرجى استخدام جهاز آخر أو التواصل مع الدعم الفني.',
+          );
+        }
+      } catch (error) {
+        if (error instanceof ForbiddenException) {
+          throw error;
+        }
+        // Log error but don't block attendance if integrity check itself fails
+        console.error('Integrity verification error:', error);
+      }
+    } else if (checkOutDto.integrityCheckFailed) {
+      // If client couldn't get integrity token, log it
+      await this.logSuspiciousAttempt(
+        userId,
+        'INTEGRITY_CHECK_UNAVAILABLE',
+        latitude,
+        longitude,
+        deviceInfo,
+      );
     }
 
     // التحقق من الوجه - إجباري إذا كان الوجه مسجلاً
