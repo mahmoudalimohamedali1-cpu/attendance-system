@@ -3,7 +3,7 @@
   "spec": "015-integration-marketplace",
   "state": "building",
   "subtasks": {
-    "completed": 3,
+    "completed": 5,
     "total": 21,
     "in_progress": 1,
     "failed": 0
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 5,
+    "number": 7,
     "started_at": "2026-01-15T22:37:58.173341"
   },
-  "last_update": "2026-01-15T22:51:44.298298"
+  "last_update": "2026-01-15T22:56:47.022408"
 }

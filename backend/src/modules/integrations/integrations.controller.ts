@@ -93,18 +93,18 @@ export class IntegrationsController {
     );
   }
 
-  @Post(':integrationId/toggle')
+  @Patch(':id/toggle')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'تفعيل/تعطيل التكامل' })
   @ApiResponse({ status: 200, description: 'تم تغيير حالة التكامل' })
   async toggleIntegration(
-    @Param('integrationId') integrationId: string,
+    @Param('id') id: string,
     @Body() body: { enabled: boolean },
     @CurrentUser('companyId') companyId: string,
     @CurrentUser('id') userId: string,
   ) {
     return this.integrationsService.toggleIntegration(
-      integrationId,
+      id,
       companyId,
       userId,
       body.enabled,
