@@ -169,8 +169,8 @@ export class IntegrityService {
             return 'MEDIUM';
         }
 
-        // لا يوجد أي integrity = مشبوه جداً
-        return 'HIGH';
+        // لا يوجد أي integrity = مشبوه جداً - يجب حظر الحضور
+        return 'CRITICAL';
     }
 
     /**
