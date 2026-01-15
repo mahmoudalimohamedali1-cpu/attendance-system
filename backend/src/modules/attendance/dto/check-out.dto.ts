@@ -84,5 +84,46 @@ export class CheckOutDto {
   @IsOptional()
   @IsBoolean()
   faceVerifiedLocally?: boolean;
+
+  // ============ بيانات الجهاز ============
+
+  @ApiPropertyOptional({
+    description: 'معرف الجهاز الفريد',
+    example: 'a1b2c3d4e5f6',
+  })
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+
+  @ApiPropertyOptional({
+    description: 'بصمة الجهاز',
+  })
+  @IsOptional()
+  @IsString()
+  deviceFingerprint?: string;
+
+  // ============ Play Integrity API ============
+
+  @ApiPropertyOptional({
+    description: 'Play Integrity Token من Google',
+  })
+  @IsOptional()
+  @IsString()
+  integrityToken?: string;
+
+  @ApiPropertyOptional({
+    description: 'هل فشل فحص Integrity على الجهاز',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  integrityCheckFailed?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'رسالة خطأ Integrity إن وجدت',
+  })
+  @IsOptional()
+  @IsString()
+  integrityError?: string;
 }
 
