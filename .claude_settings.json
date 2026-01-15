@@ -1,0 +1,44 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Glob(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Grep(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification\\.auto-claude\\specs\\011-complete-google-play-integrity-api-verification/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification\\.auto-claude\\specs\\011-complete-google-play-integrity-api-verification/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification\\.auto-claude\\specs\\011-complete-google-play-integrity-api-verification/**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
+      "Glob(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
+      "Grep(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
+      "Glob(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
+      "Grep(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}
