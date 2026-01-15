@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ConfigureIntegrationDto } from './dto/configure-integration.dto';
 
 @ApiTags('integrations')
 @ApiBearerAuth()
@@ -81,7 +82,7 @@ export class IntegrationsController {
   @ApiResponse({ status: 200, description: 'تم تعديل الإعدادات' })
   async configureIntegration(
     @Param('integrationId') integrationId: string,
-    @Body() body: { config: Record<string, any> },
+    @Body() configDto: ConfigureIntegrationDto,
     @CurrentUser('companyId') companyId: string,
     @CurrentUser('id') userId: string,
   ) {
@@ -89,7 +90,25 @@ export class IntegrationsController {
       integrationId,
       companyId,
       userId,
-      body.config,
+      configDto,
+    );
+  }
+
+  @Post(':id/configure')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'تعديل إعدادات التكامل (POST)' })
+  @ApiResponse({ status: 200, description: 'تم تعديل الإعدادات' })
+  async configureIntegrationPost(
+    @Param('id') id: string,
+    @Body() configDto: ConfigureIntegrationDto,
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.integrationsService.configureIntegration(
+      id,
+      companyId,
+      userId,
+      configDto,
     );
   }
 

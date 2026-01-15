@@ -235,9 +235,45 @@ export class IntegrationsService {
     integrationId: string,
     companyId: string,
     userId: string,
-    config: Record<string, any>,
+    configDto: {
+      apiKey?: string;
+      apiSecret?: string;
+      webhookUrl?: string;
+      configData?: Record<string, any>;
+      syncEnabled?: boolean;
+      syncInterval?: number;
+    },
   ) {
     const oldIntegration = await this.getIntegrationDetails(integrationId, companyId);
+
+    // Build the config object from the DTO
+    const config: Record<string, any> = {};
+
+    if (configDto.apiKey !== undefined) {
+      config.apiKey = configDto.apiKey;
+    }
+    if (configDto.apiSecret !== undefined) {
+      config.apiSecret = configDto.apiSecret;
+    }
+    if (configDto.webhookUrl !== undefined) {
+      config.webhookUrl = configDto.webhookUrl;
+    }
+    if (configDto.syncEnabled !== undefined) {
+      config.syncEnabled = configDto.syncEnabled;
+    }
+    if (configDto.syncInterval !== undefined) {
+      config.syncInterval = configDto.syncInterval;
+    }
+    if (configDto.configData !== undefined) {
+      // Merge custom config data
+      Object.assign(config, configDto.configData);
+    }
+
+    // Merge with existing config to preserve other settings
+    const mergedConfig = {
+      ...(oldIntegration?.config || {}),
+      ...config,
+    };
 
     const integration = await this.prisma.integration.update({
       where: {
@@ -245,7 +281,7 @@ export class IntegrationsService {
         companyId,
       },
       data: {
-        config,
+        config: mergedConfig,
       },
     });
 
@@ -255,7 +291,7 @@ export class IntegrationsService {
       integrationId,
       userId,
       { config: oldIntegration?.config },
-      { config },
+      { config: mergedConfig },
       `تعديل إعدادات التكامل: ${integrationId}`,
     );
 
