@@ -84,6 +84,10 @@ model Company {
   onboardingTemplates  OnboardingTemplate[]
   onboardingProcesses  OnboardingProcess[]
 
+  // نظام التكامل مع الأنظمة الخارجية (Integration Marketplace)
+  integrations       Integration[]
+  integrationLogs    IntegrationLog[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -3511,4 +3515,165 @@ model OnboardingTask {
 
   @@index([processId, status])
   @@map("onboarding_tasks")
+}
+
+// ==================== نظام التكامل مع الأنظمة الخارجية (Integration Marketplace) ====================
+
+// فئة التكامل
+enum IntegrationCategory {
+  ACCOUNTING  // أنظمة المحاسبة
+  ERP         // أنظمة تخطيط موارد المؤسسات
+  COMMUNICATION // أنظمة التواصل
+  HR          // أنظمة الموارد البشرية
+  PAYROLL     // أنظمة الرواتب
+  BANKING     // الأنظمة البنكية
+  OTHER       // أخرى
+}
+
+// حالة التكامل
+enum IntegrationStatus {
+  ACTIVE      // نشط
+  INACTIVE    // غير نشط
+  ERROR       // خطأ
+  PENDING     // قيد الانتظار
+}
+
+// حالة صحة التكامل
+enum IntegrationHealthStatus {
+  HEALTHY     // سليم
+  DEGRADED    // متدهور
+  DOWN        // معطل
+  UNKNOWN     // غير معروف
+}
+
+// نوع عملية التكامل
+enum IntegrationLogAction {
+  SYNC        // مزامنة
+  TEST        // اختبار
+  CONFIGURE   // إعداد
+  ENABLE      // تفعيل
+  DISABLE     // إيقاف
+  ERROR       // خطأ
+}
+
+// نموذج التكامل الرئيسي
+model Integration {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // معلومات أساسية
+  name        String   // اسم التكامل
+  nameEn      String?  @map("name_en")
+  slug        String   @unique // معرف فريد للتكامل
+  description String?  @db.Text
+  category    IntegrationCategory
+  logo        String?  // رابط الشعار
+  version     String   @default("1.0.0")
+
+  // حالة التكامل
+  status      IntegrationStatus @default(INACTIVE)
+  enabled     Boolean           @default(false)
+
+  // معلومات التطوير
+  developerName  String?  @map("developer_name")
+  developerEmail String?  @map("developer_email")
+  websiteUrl     String?  @map("website_url")
+  documentationUrl String? @map("documentation_url")
+  supportUrl     String?  @map("support_url")
+
+  // العلاقات
+  config  IntegrationConfig?
+  logs    IntegrationLog[]
+  health  IntegrationHealth?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, slug])
+  @@index([companyId, status])
+  @@index([category])
+  @@map("integrations")
+}
+
+// إعدادات التكامل
+model IntegrationConfig {
+  id            String      @id @default(uuid())
+  integrationId String      @unique @map("integration_id")
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  // بيانات الإعداد (مشفرة)
+  apiKey       String? @map("api_key")
+  apiSecret    String? @map("api_secret")
+  webhookUrl   String? @map("webhook_url")
+  configData   Json?   @map("config_data") // إعدادات إضافية مخصصة
+
+  // إعدادات المزامنة
+  syncEnabled  Boolean @default(false) @map("sync_enabled")
+  syncInterval Int?    @map("sync_interval") // بالدقائق
+  lastSyncAt   DateTime? @map("last_sync_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("integration_configs")
+}
+
+// سجل عمليات التكامل
+model IntegrationLog {
+  id            String      @id @default(uuid())
+  integrationId String      @map("integration_id")
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  companyId     String      @map("company_id")
+  company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  action      IntegrationLogAction
+  status      IntegrationStatus
+  message     String?      @db.Text
+  errorCode   String?      @map("error_code")
+  errorDetails Json?       @map("error_details")
+  metadata    Json?        // بيانات إضافية
+
+  duration    Int?         // مدة العملية بالميلي ثانية
+  recordsProcessed Int?    @default(0) @map("records_processed")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([integrationId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([action, status])
+  @@map("integration_logs")
+}
+
+// صحة التكامل ومراقبته
+model IntegrationHealth {
+  id            String      @id @default(uuid())
+  integrationId String      @unique @map("integration_id")
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  status           IntegrationHealthStatus @default(UNKNOWN)
+  lastCheckAt      DateTime?               @map("last_check_at")
+  lastSuccessAt    DateTime?               @map("last_success_at")
+  lastFailureAt    DateTime?               @map("last_failure_at")
+
+  // إحصائيات
+  totalSyncs       Int @default(0) @map("total_syncs")
+  successfulSyncs  Int @default(0) @map("successful_syncs")
+  failedSyncs      Int @default(0) @map("failed_syncs")
+  errorCount       Int @default(0) @map("error_count")
+  consecutiveErrors Int @default(0) @map("consecutive_errors")
+
+  // معلومات الأداء
+  avgResponseTime  Float? @map("avg_response_time") // متوسط وقت الاستجابة بالميلي ثانية
+  uptime           Float? // نسبة التشغيل
+
+  // رسائل الحالة
+  statusMessage    String? @map("status_message")
+  lastError        String? @map("last_error") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("integration_health")
 }
