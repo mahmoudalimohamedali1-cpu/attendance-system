@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeofenceService } from './services/geofence.service';
+import { IntegrityService } from './services/integrity.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { CheckInDto } from './dto/check-in.dto';
@@ -20,6 +21,7 @@ export class AttendanceService {
   constructor(
     private prisma: PrismaService,
     private geofenceService: GeofenceService,
+    private integrityService: IntegrityService,
     private notificationsService: NotificationsService,
     private permissionsService: PermissionsService,
     private smartPolicyTrigger: SmartPolicyTriggerService,
@@ -63,6 +65,54 @@ export class AttendanceService {
       await this.logSuspiciousAttempt(userId, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
       await this.notifyAdminSuspiciousActivity(user, 'محاولة حضور باستخدام موقع وهمي');
       throw new ForbiddenException('تم رصد استخدام موقع وهمي. لا يمكن تسجيل الحضور.');
+    }
+
+    // Verify Play Integrity token if provided
+    if (checkInDto.integrityToken) {
+      try {
+        const integrityVerdict = await this.integrityService.verifyIntegrityToken(checkInDto.integrityToken);
+
+        // Log integrity check result
+        if (!integrityVerdict.isValid || integrityVerdict.riskLevel === 'HIGH' || integrityVerdict.riskLevel === 'CRITICAL') {
+          await this.logSuspiciousAttempt(
+            userId,
+            'INTEGRITY_FAILED',
+            latitude,
+            longitude,
+            deviceInfo,
+          );
+
+          // Alert HR if risk is high
+          if (this.integrityService.shouldAlertHR(integrityVerdict)) {
+            await this.notifyAdminSuspiciousActivity(
+              user,
+              `فشل فحص سلامة الجهاز - مستوى الخطورة: ${integrityVerdict.riskLevel}`,
+            );
+          }
+        }
+
+        // Block attendance if critical risk
+        if (this.integrityService.shouldBlockAttendance(integrityVerdict)) {
+          throw new ForbiddenException(
+            'جهازك لا يلبي معايير الأمان المطلوبة. يرجى استخدام جهاز آخر أو التواصل مع الدعم الفني.',
+          );
+        }
+      } catch (error) {
+        if (error instanceof ForbiddenException) {
+          throw error;
+        }
+        // Log error but don't block attendance if integrity check itself fails
+        console.error('Integrity verification error:', error);
+      }
+    } else if (checkInDto.integrityCheckFailed) {
+      // If client couldn't get integrity token, log it
+      await this.logSuspiciousAttempt(
+        userId,
+        'INTEGRITY_CHECK_UNAVAILABLE',
+        latitude,
+        longitude,
+        deviceInfo,
+      );
     }
 
     // Check geofence (skip if work from home)
