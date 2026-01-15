@@ -163,4 +163,34 @@ export class IntegrationsController {
       offset,
     );
   }
+
+  @Post(':id/test')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'اختبار اتصال التكامل' })
+  @ApiResponse({ status: 200, description: 'نتيجة اختبار الاتصال' })
+  async testConnection(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.integrationsService.testConnection(
+      id,
+      companyId,
+      userId,
+    );
+  }
+
+  @Get(':id/health')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'فحص صحة التكامل' })
+  @ApiResponse({ status: 200, description: 'حالة صحة التكامل' })
+  async getIntegrationHealth(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.integrationsService.getIntegrationHealth(
+      id,
+      companyId,
+    );
+  }
 }

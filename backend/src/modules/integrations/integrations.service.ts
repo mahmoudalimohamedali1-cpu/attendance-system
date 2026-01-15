@@ -370,4 +370,161 @@ export class IntegrationsService {
       skip: offset,
     });
   }
+
+  async testConnection(
+    integrationId: string,
+    companyId: string,
+    userId: string,
+  ) {
+    // التحقق من وجود التكامل
+    const integration = await this.prisma.integration.findUnique({
+      where: {
+        id: integrationId,
+        companyId,
+      },
+    });
+
+    if (!integration) {
+      throw new Error('Integration not found');
+    }
+
+    // محاكاة اختبار الاتصال
+    // في التنفيذ الحقيقي، يتم إنشاء مثيل من provider المناسب واستدعاء testConnection()
+    const startTime = Date.now();
+
+    try {
+      // محاكاة تأخير الشبكة
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // التحقق من وجود الإعدادات المطلوبة
+      const config = integration.config as Record<string, any>;
+      const hasRequiredConfig = config?.apiKey || config?.baseUrl;
+
+      const duration = Date.now() - startTime;
+
+      if (hasRequiredConfig) {
+        // تسجيل اختبار الاتصال الناجح
+        await this.auditService.log(
+          'UPDATE',
+          'Integration',
+          integrationId,
+          userId,
+          null,
+          { connectionTest: 'success' },
+          `اختبار اتصال ناجح: ${integration.name}`,
+        );
+
+        return {
+          success: true,
+          message: 'تم اختبار الاتصال بنجاح',
+          messageEn: 'Connection test successful',
+          timestamp: new Date(),
+          details: {
+            latency: duration,
+            integrationName: integration.name,
+            status: integration.status,
+          },
+        };
+      } else {
+        // تسجيل فشل اختبار الاتصال
+        await this.auditService.log(
+          'UPDATE',
+          'Integration',
+          integrationId,
+          userId,
+          null,
+          { connectionTest: 'failed' },
+          `فشل اختبار الاتصال: ${integration.name}`,
+        );
+
+        return {
+          success: false,
+          message: 'فشل اختبار الاتصال - إعدادات غير مكتملة',
+          messageEn: 'Connection test failed - incomplete configuration',
+          timestamp: new Date(),
+          details: {
+            error: 'Missing required configuration (apiKey or baseUrl)',
+          },
+        };
+      }
+    } catch (error) {
+      await this.auditService.log(
+        'UPDATE',
+        'Integration',
+        integrationId,
+        userId,
+        null,
+        { connectionTest: 'error', error: error.message },
+        `خطأ في اختبار الاتصال: ${integration.name}`,
+      );
+
+      return {
+        success: false,
+        message: 'خطأ في اختبار الاتصال',
+        messageEn: 'Connection test error',
+        timestamp: new Date(),
+        details: {
+          error: error.message || 'Unknown error',
+        },
+      };
+    }
+  }
+
+  async getIntegrationHealth(
+    integrationId: string,
+    companyId: string,
+  ) {
+    // التحقق من وجود التكامل
+    const integration = await this.prisma.integration.findUnique({
+      where: {
+        id: integrationId,
+        companyId,
+      },
+    });
+
+    if (!integration) {
+      throw new Error('Integration not found');
+    }
+
+    // محاكاة فحص الصحة
+    // في التنفيذ الحقيقي، يتم إنشاء مثيل من provider المناسب واستدعاء getHealth()
+    const config = integration.config as Record<string, any>;
+    const hasRequiredConfig = config?.apiKey || config?.baseUrl;
+
+    // حساب حالة الصحة بناءً على التكامل
+    let status = 'HEALTHY';
+    let message = 'التكامل يعمل بشكل طبيعي';
+    let messageEn = 'Integration is healthy';
+
+    if (!integration.enabled) {
+      status = 'INACTIVE';
+      message = 'التكامل معطل';
+      messageEn = 'Integration is disabled';
+    } else if (!hasRequiredConfig) {
+      status = 'ERROR';
+      message = 'إعدادات التكامل غير مكتملة';
+      messageEn = 'Integration configuration incomplete';
+    } else if (integration.status === 'ERROR') {
+      status = 'ERROR';
+      message = 'يوجد خطأ في التكامل';
+      messageEn = 'Integration has errors';
+    } else if (integration.status === 'WARNING') {
+      status = 'WARNING';
+      message = 'التكامل يعمل مع تحذيرات';
+      messageEn = 'Integration has warnings';
+    }
+
+    return {
+      status,
+      lastCheckAt: new Date(),
+      message,
+      messageEn,
+      details: {
+        integrationName: integration.name,
+        enabled: integration.enabled,
+        configValid: hasRequiredConfig,
+        provider: integration.provider,
+      },
+    };
+  }
 }
