@@ -101,8 +101,7 @@ export class AttendanceService {
         if (error instanceof ForbiddenException) {
           throw error;
         }
-        // Log error but don't block attendance if integrity check itself fails
-        console.error('Integrity verification error:', error);
+        // Silently continue - don't block attendance if integrity check itself fails
       }
     } else if (checkInDto.integrityCheckFailed) {
       // If client couldn't get integrity token, log it
@@ -398,8 +397,7 @@ export class AttendanceService {
         if (error instanceof ForbiddenException) {
           throw error;
         }
-        // Log error but don't block attendance if integrity check itself fails
-        console.error('Integrity verification error:', error);
+        // Silently continue - don't block attendance if integrity check itself fails
       }
     } else if (checkOutDto.integrityCheckFailed) {
       // If client couldn't get integrity token, log it
