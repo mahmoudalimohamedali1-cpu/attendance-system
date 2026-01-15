@@ -146,18 +146,18 @@ export class IntegrationsController {
     );
   }
 
-  @Get(':integrationId/logs')
+  @Get(':id/logs')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'سجل نشاط التكامل' })
   @ApiResponse({ status: 200, description: 'سجل النشاط' })
   async getIntegrationLogs(
-    @Param('integrationId') integrationId: string,
+    @Param('id') id: string,
     @CurrentUser('companyId') companyId: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
     return this.integrationsService.getIntegrationLogs(
-      integrationId,
+      id,
       companyId,
       limit,
       offset,
