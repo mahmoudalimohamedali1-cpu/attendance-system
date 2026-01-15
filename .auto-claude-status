@@ -1,25 +1,25 @@
 {
   "active": true,
   "spec": "015-integration-marketplace",
-  "state": "planning",
+  "state": "building",
   "subtasks": {
-    "completed": 0,
-    "total": 0,
+    "completed": 2,
+    "total": 21,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Database Schema",
+    "current": "Backend API - Integration Management",
     "id": null,
-    "total": 2
+    "total": 5
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 2,
+    "number": 4,
     "started_at": "2026-01-15T22:37:58.173341"
   },
-  "last_update": "2026-01-15T22:44:20.996592"
+  "last_update": "2026-01-15T22:49:55.195788"
 }
