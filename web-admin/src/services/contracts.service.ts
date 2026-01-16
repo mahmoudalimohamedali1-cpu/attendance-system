@@ -248,6 +248,16 @@ class ContractsService {
         return (response as any).data || response;
     }
 
+    async registerToQiwa(id: string): Promise<Contract> {
+        const response = await api.post(`/qiwa/contracts/register/${id}`, {}) as { data: Contract } | Contract;
+        return (response as any).data || response;
+    }
+
+    async syncQiwaStatus(id: string): Promise<Contract> {
+        const response = await api.post(`/qiwa/contracts/sync/${id}`, {}) as { data: Contract } | Contract;
+        return (response as any).data || response;
+    }
+
     async terminate(id: string, data: TerminateContractDto): Promise<Contract> {
         const response = await api.post(`${this.basePath}/${id}/terminate`, data) as { data: Contract } | Contract;
         return (response as any).data || response;

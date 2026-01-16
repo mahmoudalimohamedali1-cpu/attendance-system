@@ -43,6 +43,7 @@ import {
     Send as SendIcon,
     CheckCircle as SignIcon,
     CloudUpload as QiwaIcon,
+    Sync as SyncIcon,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import {
@@ -277,6 +278,28 @@ export default function ContractsPage() {
         }
     };
 
+    // Register to QIWA
+    const handleRegisterToQiwa = async (contract: Contract) => {
+        try {
+            await contractsService.registerToQiwa(contract.id);
+            setSuccess('تم تسجيل العقد في منصة قوى بنجاح');
+            fetchData();
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'حدث خطأ');
+        }
+    };
+
+    // Sync QIWA status
+    const handleSyncQiwaStatus = async (contract: Contract) => {
+        try {
+            await contractsService.syncQiwaStatus(contract.id);
+            setSuccess('تم مزامنة حالة العقد من منصة قوى');
+            fetchData();
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'حدث خطأ');
+        }
+    };
+
     // Terminate
     const handleOpenTerminate = (contract: Contract) => {
         setSelectedContract(contract);
@@ -500,6 +523,8 @@ export default function ContractsPage() {
                     onSendToEmployee={handleSendToEmployee}
                     onEmployerSign={handleEmployerSign}
                     onQiwa={handleOpenQiwa}
+                    onRegisterToQiwa={handleRegisterToQiwa}
+                    onSyncQiwaStatus={handleSyncQiwaStatus}
                     onRenew={handleOpenRenew}
                     onTerminate={handleOpenTerminate}
                     onDelete={handleOpenDelete}
@@ -514,6 +539,8 @@ export default function ContractsPage() {
                     onSendToEmployee={handleSendToEmployee}
                     onEmployerSign={handleEmployerSign}
                     onQiwa={handleOpenQiwa}
+                    onRegisterToQiwa={handleRegisterToQiwa}
+                    onSyncQiwaStatus={handleSyncQiwaStatus}
                     onRenew={handleOpenRenew}
                     onTerminate={handleOpenTerminate}
                     onDelete={handleOpenDelete}
@@ -528,6 +555,8 @@ export default function ContractsPage() {
                     onSendToEmployee={handleSendToEmployee}
                     onEmployerSign={handleEmployerSign}
                     onQiwa={handleOpenQiwa}
+                    onRegisterToQiwa={handleRegisterToQiwa}
+                    onSyncQiwaStatus={handleSyncQiwaStatus}
                     onRenew={handleOpenRenew}
                     onTerminate={handleOpenTerminate}
                     onDelete={handleOpenDelete}
@@ -874,6 +903,8 @@ function ContractsTable({
     onSendToEmployee,
     onEmployerSign,
     onQiwa,
+    onRegisterToQiwa,
+    onSyncQiwaStatus,
     onRenew,
     onTerminate,
     onDelete,
@@ -885,6 +916,8 @@ function ContractsTable({
     onSendToEmployee: (c: Contract) => void;
     onEmployerSign: (c: Contract) => void;
     onQiwa: (c: Contract) => void;
+    onRegisterToQiwa: (c: Contract) => void;
+    onSyncQiwaStatus: (c: Contract) => void;
     onRenew: (c: Contract) => void;
     onTerminate: (c: Contract) => void;
     onDelete: (c: Contract) => void;
@@ -965,7 +998,24 @@ function ContractsTable({
                                 )}
                                 {contract.status === 'ACTIVE' && (
                                     <>
-                                        <Tooltip title="تحديث حالة قوى">
+                                        {/* Register to QIWA for NOT_SUBMITTED contracts */}
+                                        {(!contract.qiwaStatus || contract.qiwaStatus === 'NOT_SUBMITTED') && (
+                                            <Tooltip title="تسجيل في منصة قوى">
+                                                <IconButton size="small" color="primary" onClick={() => onRegisterToQiwa(contract)}>
+                                                    <QiwaIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        {/* Sync QIWA status for registered contracts */}
+                                        {(contract.qiwaStatus === 'PENDING' || contract.qiwaStatus === 'AUTHENTICATED' || contract.qiwaStatus === 'REJECTED' || contract.qiwaStatus === 'EXPIRED') && (
+                                            <Tooltip title="مزامنة حالة قوى">
+                                                <IconButton size="small" color="info" onClick={() => onSyncQiwaStatus(contract)}>
+                                                    <SyncIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        {/* Manual QIWA update dialog */}
+                                        <Tooltip title="تحديث حالة قوى يدوياً">
                                             <IconButton size="small" color="info" onClick={() => onQiwa(contract)}>
                                                 <QiwaIcon fontSize="small" />
                                             </IconButton>
