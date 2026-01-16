@@ -1,5 +1,13 @@
 import React, { useMemo } from 'react';
 import { Box, Typography, Tooltip, Paper } from '@mui/material';
+import {
+    BarChart,
+    CheckCircle,
+    Cancel,
+    Schedule,
+    BeachAccess,
+    Celebration
+} from '@mui/icons-material';
 import { GlassCard } from '@/components/premium';
 
 interface AttendanceDay {
@@ -16,13 +24,13 @@ interface AttendanceHeatmapProps {
 }
 
 const statusConfig = {
-    present: { color: '#22c55e', label: 'حاضر', emoji: '✓' },
-    absent: { color: '#ef4444', label: 'غائب', emoji: '✗' },
-    late: { color: '#f59e0b', label: 'متأخر', emoji: '⏰' },
-    leave: { color: '#8b5cf6', label: 'إجازة', emoji: '🏖️' },
-    weekend: { color: '#e2e8f0', label: 'عطلة', emoji: '' },
-    holiday: { color: '#06b6d4', label: 'عطلة رسمية', emoji: '🎉' },
-    empty: { color: 'transparent', label: '', emoji: '' },
+    present: { color: '#22c55e', label: 'حاضر', icon: <CheckCircle /> },
+    absent: { color: '#ef4444', label: 'غائب', icon: <Cancel /> },
+    late: { color: '#f59e0b', label: 'متأخر', icon: <Schedule /> },
+    leave: { color: '#8b5cf6', label: 'إجازة', icon: <BeachAccess /> },
+    weekend: { color: '#e2e8f0', label: 'عطلة', icon: null },
+    holiday: { color: '#06b6d4', label: 'عطلة رسمية', icon: <Celebration /> },
+    empty: { color: 'transparent', label: '', icon: null },
 };
 
 const weekDays = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
@@ -96,7 +104,7 @@ export const AttendanceHeatmap: React.FC<AttendanceHeatmapProps> = ({
     return (
         <GlassCard sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight="bold" sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-                📊 سجل الحضور
+                <BarChart /> سجل الحضور
                 {month !== undefined && (
                     <Typography component="span" color="text.secondary" fontWeight="normal">
                         - {months[month]} {year}
