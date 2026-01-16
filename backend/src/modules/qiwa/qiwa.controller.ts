@@ -1,18 +1,22 @@
 import { Controller, Get, Post, Param, Query, UseGuards, Res } from '@nestjs/common';
 import { Response } from 'express';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { QiwaService } from './qiwa.service';
+import { SaudizationService } from './services/saudization.service';
 
 @ApiTags('قوى - Qiwa')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('qiwa')
 export class QiwaController {
-    constructor(private readonly qiwaService: QiwaService) { }
+    constructor(
+        private readonly qiwaService: QiwaService,
+        private readonly saudizationService: SaudizationService,
+    ) { }
 
     @Get('contracts')
     @RequirePermission('QIWA_EXPORT')
@@ -80,6 +84,83 @@ export class QiwaController {
         @CurrentUser('id') userId: string,
     ) {
         return this.qiwaService.syncContractStatus(contractId, companyId, userId);
+    }
+
+    @Get('saudization/ratio')
+    @RequirePermission('QIWA_EXPORT')
+    @ApiOperation({ summary: 'نسبة السعودة الإجمالية للشركة' })
+    @ApiQuery({ name: 'targetRatio', type: Number, required: false, example: 75 })
+    getSaudizationRatio(
+        @CurrentUser('companyId') companyId: string,
+        @Query('targetRatio') targetRatio?: string,
+    ) {
+        return this.saudizationService.getCompanySaudizationRatio(
+            companyId,
+            targetRatio ? parseInt(targetRatio) : undefined,
+        );
+    }
+
+    @Get('saudization/by-branch')
+    @RequirePermission('QIWA_EXPORT')
+    @ApiOperation({ summary: 'نسبة السعودة حسب الفروع' })
+    @ApiQuery({ name: 'targetRatio', type: Number, required: false, example: 75 })
+    getSaudizationByBranch(
+        @CurrentUser('companyId') companyId: string,
+        @Query('targetRatio') targetRatio?: string,
+    ) {
+        return this.saudizationService.getSaudizationByBranch(
+            companyId,
+            targetRatio ? parseInt(targetRatio) : undefined,
+        );
+    }
+
+    @Get('saudization/by-department')
+    @RequirePermission('QIWA_EXPORT')
+    @ApiOperation({ summary: 'نسبة السعودة حسب الأقسام' })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiQuery({ name: 'targetRatio', type: Number, required: false, example: 75 })
+    getSaudizationByDepartment(
+        @CurrentUser('companyId') companyId: string,
+        @Query('branchId') branchId?: string,
+        @Query('targetRatio') targetRatio?: string,
+    ) {
+        return this.saudizationService.getSaudizationByDepartment(
+            companyId,
+            branchId,
+            targetRatio ? parseInt(targetRatio) : undefined,
+        );
+    }
+
+    @Get('saudization/branch/:id')
+    @RequirePermission('QIWA_EXPORT')
+    @ApiOperation({ summary: 'نسبة السعودة لفرع محدد' })
+    @ApiQuery({ name: 'targetRatio', type: Number, required: false, example: 75 })
+    getBranchSaudizationRatio(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') branchId: string,
+        @Query('targetRatio') targetRatio?: string,
+    ) {
+        return this.saudizationService.getBranchSaudizationRatio(
+            companyId,
+            branchId,
+            targetRatio ? parseInt(targetRatio) : undefined,
+        );
+    }
+
+    @Get('saudization/department/:id')
+    @RequirePermission('QIWA_EXPORT')
+    @ApiOperation({ summary: 'نسبة السعودة لقسم محدد' })
+    @ApiQuery({ name: 'targetRatio', type: Number, required: false, example: 75 })
+    getDepartmentSaudizationRatio(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') departmentId: string,
+        @Query('targetRatio') targetRatio?: string,
+    ) {
+        return this.saudizationService.getDepartmentSaudizationRatio(
+            companyId,
+            departmentId,
+            targetRatio ? parseInt(targetRatio) : undefined,
+        );
     }
 }
 
