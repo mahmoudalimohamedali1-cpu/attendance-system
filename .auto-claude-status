@@ -3,13 +3,13 @@
   "spec": "018-qiwa-platform-integration",
   "state": "building",
   "subtasks": {
-    "completed": 6,
+    "completed": 8,
     "total": 16,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Saudization Ratio Calculator",
+    "current": "Compliance Warnings System",
     "id": null,
     "total": 2
   },
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 8,
+    "number": 10,
     "started_at": "2026-01-16T02:30:26.397761"
   },
-  "last_update": "2026-01-16T02:53:51.876274"
+  "last_update": "2026-01-16T02:59:31.904078"
 }

@@ -7,6 +7,7 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { QiwaService } from './qiwa.service';
 import { SaudizationService } from './services/saudization.service';
+import { ComplianceWarningsService } from './services/compliance-warnings.service';
 
 @ApiTags('قوى - Qiwa')
 @ApiBearerAuth()
@@ -16,6 +17,7 @@ export class QiwaController {
     constructor(
         private readonly qiwaService: QiwaService,
         private readonly saudizationService: SaudizationService,
+        private readonly complianceWarningsService: ComplianceWarningsService,
     ) { }
 
     @Get('contracts')
@@ -161,6 +163,13 @@ export class QiwaController {
             departmentId,
             targetRatio ? parseInt(targetRatio) : undefined,
         );
+    }
+
+    @Get('compliance/warnings')
+    @RequirePermission('QIWA_EXPORT')
+    @ApiOperation({ summary: 'تحذيرات الامتثال لمتطلبات قوى' })
+    getComplianceWarnings(@CurrentUser('companyId') companyId: string) {
+        return this.complianceWarningsService.getComplianceWarnings(companyId);
     }
 }
 
