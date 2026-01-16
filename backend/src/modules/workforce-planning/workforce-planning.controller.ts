@@ -7,6 +7,7 @@ import { CoverageAnalyzerService } from './services/coverage-analyzer.service';
 import { ForecastRequestDto, ForecastResponseDto } from './dto/forecast.dto';
 import { OptimizeScheduleRequestDto, OptimizeScheduleResponseDto } from './dto/schedule-optimization.dto';
 import { CoverageAnalysisRequestDto, CoverageAnalysisResponseDto } from './dto/coverage-analysis.dto';
+import { CreateScenarioRequestDto, ScenarioResponseDto } from './dto/scenario.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -76,5 +77,16 @@ export class WorkforcePlanningController {
             departmentId,
         };
         return this.coverageAnalyzerService.analyzeCoverage(companyId, requestDto);
+    }
+
+    @Post('scenario')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Create and analyze what-if scenario' })
+    async createScenario(
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('sub') userId: string,
+        @Body() requestDto: CreateScenarioRequestDto,
+    ): Promise<ScenarioResponseDto> {
+        return this.service.createScenario(companyId, userId, requestDto);
     }
 }
