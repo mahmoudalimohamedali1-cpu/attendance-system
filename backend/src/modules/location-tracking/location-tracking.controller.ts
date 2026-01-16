@@ -13,9 +13,13 @@ import {
     ApiOperation,
     ApiResponse,
     ApiBearerAuth,
+    ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { LocationTrackingService } from './location-tracking.service';
+import { LocationReportsService } from './location-reports.service';
 import {
     UpdateLocationDto,
     LocationHistoryQueryDto,
@@ -26,7 +30,10 @@ import {
 @UseGuards(JwtAuthGuard)
 @Controller('location-tracking')
 export class LocationTrackingController {
-    constructor(private readonly locationTrackingService: LocationTrackingService) { }
+    constructor(
+        private readonly locationTrackingService: LocationTrackingService,
+        private readonly reportsService: LocationReportsService,
+    ) { }
 
     @Post('update')
     @ApiOperation({ summary: 'تحديث موقع الموظف (من التطبيق)' })
@@ -43,6 +50,88 @@ export class LocationTrackingController {
         const companyId = req.user.companyId;
         return this.locationTrackingService.getActiveEmployees(companyId);
     }
+
+    // ==================== تقارير التتبع ====================
+
+    @Get('reports/summary')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'ملخص تقارير الخروج' })
+    @ApiQuery({ name: 'startDate', required: true, type: String })
+    @ApiQuery({ name: 'endDate', required: true, type: String })
+    async getExitSummary(
+        @Req() req: any,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+    ) {
+        const companyId = req.user.companyId;
+        return this.reportsService.getExitSummary(
+            companyId,
+            new Date(startDate),
+            new Date(endDate),
+        );
+    }
+
+    @Get('reports/daily')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'التقرير اليومي للخروج' })
+    @ApiQuery({ name: 'startDate', required: true, type: String })
+    @ApiQuery({ name: 'endDate', required: true, type: String })
+    async getDailyReport(
+        @Req() req: any,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+    ) {
+        const companyId = req.user.companyId;
+        return this.reportsService.getDailyExitReport(
+            companyId,
+            new Date(startDate),
+            new Date(endDate),
+        );
+    }
+
+    @Get('reports/employees')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'إحصائيات جميع الموظفين' })
+    @ApiQuery({ name: 'startDate', required: true, type: String })
+    @ApiQuery({ name: 'endDate', required: true, type: String })
+    async getAllEmployeesStats(
+        @Req() req: any,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+    ) {
+        const companyId = req.user.companyId;
+        return this.reportsService.getAllEmployeesExitStats(
+            companyId,
+            new Date(startDate),
+            new Date(endDate),
+        );
+    }
+
+    @Get('reports/employee/:userId')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'تقرير تفصيلي لموظف' })
+    @ApiQuery({ name: 'startDate', required: true, type: String })
+    @ApiQuery({ name: 'endDate', required: true, type: String })
+    async getEmployeeReport(
+        @Req() req: any,
+        @Param('userId') userId: string,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+    ) {
+        const companyId = req.user.companyId;
+        return this.reportsService.getEmployeeExitDetail(
+            companyId,
+            userId,
+            new Date(startDate),
+            new Date(endDate),
+        );
+    }
+
+    // ==================== باقي الـ Endpoints ====================
 
     @Get(':userId')
     @ApiOperation({ summary: 'موقع موظف معين (للمسؤولين)' })
@@ -80,3 +169,4 @@ export class LocationTrackingController {
         return this.locationTrackingService.getExitEvents(requesterId, targetUserId, companyId, date);
     }
 }
+

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -7,15 +7,40 @@ import { PayslipLineSource, AuditAction } from '@prisma/client';
 import { PayrollCalculationService } from '../payroll-calculation/payroll-calculation.service';
 import { PayrollLedgerService } from '../payroll-calculation/payroll-ledger.service';
 import { AuditService } from '../audit/audit.service';
+import { EmployeeDebtService } from '../employee-debt/employee-debt.service';
+import { GosiValidationService } from '../gosi/gosi-validation.service';
+import { PayrollValidationService } from './payroll-validation.service';
+import { DebtSourceType } from '@prisma/client';
+
+// ✅ Decimal imports for financial calculations
+import {
+    toDecimal,
+    toNumber,
+    toFixed,
+    add,
+    sub,
+    mul,
+    isPositive,
+    isNegative,
+    isZero,
+    abs,
+    round,
+    ZERO,
+} from '../../common/utils/decimal.util';
 
 
 @Injectable()
 export class PayrollRunsService {
+    private readonly logger = new Logger(PayrollRunsService.name);
+
     constructor(
         private prisma: PrismaService,
         private calculationService: PayrollCalculationService,
         private auditService: AuditService,
         private ledgerService: PayrollLedgerService,
+        private employeeDebtService: EmployeeDebtService,
+        private gosiValidationService: GosiValidationService,
+        private payrollValidationService: PayrollValidationService,
     ) { }
 
     async create(dto: CreatePayrollRunDto, companyId: string, userId: string) {
@@ -23,12 +48,68 @@ export class PayrollRunsService {
         if (!period) throw new NotFoundException('فترة الرواتب غير موجودة');
         if (period.status === 'PAID') throw new BadRequestException('لا يمكن تشغيل الرواتب لفترة مدفوعة بالفعل');
 
+        // ✅ GOSI Validation Gate - بوابة التحقق من إعدادات التأمينات
+        const gosiValidation = await this.gosiValidationService.validateForPayroll(
+            companyId,
+            period.startDate,
+            { strictMode: false, allowExpired: false }
+        );
+
+        if (!gosiValidation.canProceed) {
+            const errorMessages = gosiValidation.issues
+                .filter(i => i.severity === 'ERROR')
+                .map(i => i.messageAr)
+                .join('، ');
+
+            throw new BadRequestException(
+                `فشل التحقق من إعدادات التأمينات الاجتماعية: ${errorMessages}. ` +
+                `يرجى مراجعة إعدادات GOSI قبل تشغيل الرواتب.`
+            );
+        }
+
+        // Log warnings if any
+        if (gosiValidation.summary.warnings > 0) {
+            const warningMessages = gosiValidation.issues
+                .filter(i => i.severity === 'WARNING')
+                .map(i => `${i.code}: ${i.messageAr}`)
+                .join(', ');
+            this.logger.warn(`GOSI Validation Warnings for payroll run: ${warningMessages}`);
+        }
+
+        // ✅ التحقق من عدم وجود تشغيل سابق لنفس الفترة (منع التشغيل المتكرر)
+        const existingRun = await this.prisma.payrollRun.findFirst({
+            where: {
+                periodId: dto.periodId,
+                companyId,
+                status: { notIn: ['CANCELLED', 'ARCHIVED'] }
+            }
+        });
+
+        if (existingRun) {
+            throw new BadRequestException(
+                `يوجد تشغيل رواتب سابق لهذه الفترة (ID: ${existingRun.id}). ` +
+                `الحالة: ${existingRun.status}. ` +
+                `يرجى إلغاء التشغيل السابق أو استخدام فترة جديدة.`
+            );
+        }
+
         // 1. التأكد من وجود المكونات النظامية (لخصم السلف)
         let loanComp = await this.prisma.salaryComponent.findFirst({ where: { code: 'LOAN_DED', companyId } });
         if (!loanComp) {
             loanComp = await this.prisma.salaryComponent.create({
                 data: { code: 'LOAN_DED', nameAr: 'خصم سلفة', type: 'DEDUCTION', nature: 'VARIABLE', companyId } as any
             });
+        }
+
+        // تجهيز قائمة الموظفين المستثنين
+        const excludedIds = new Set(dto.excludedEmployeeIds || []);
+
+        // تجهيز خريطة التعديلات (مكافآت/خصومات)
+        const adjustmentsMap = new Map<string, { type: 'bonus' | 'deduction'; amount: number; reason: string }[]>();
+        if (dto.adjustments) {
+            for (const adj of dto.adjustments) {
+                adjustmentsMap.set(adj.employeeId, adj.items);
+            }
         }
 
         const employees = await this.prisma.user.findMany({
@@ -52,11 +133,28 @@ export class PayrollRunsService {
                         startDate: { lte: period.endDate },
                         endDate: { gte: period.startDate }
                     }
+                },
+                // جلب توزيعات مراكز التكلفة الفعالة
+                costCenterAllocations: {
+                    where: {
+                        isActive: true,
+                        OR: [
+                            { effectiveTo: null },
+                            { effectiveTo: { gte: new Date() } }
+                        ]
+                    },
+                    select: {
+                        costCenterId: true,
+                        percentage: true
+                    }
                 }
-            }
-        });
+            } as any
+        }) as any[];
 
-        if (employees.length === 0) throw new BadRequestException('لا يوجد موظفين نشطين لديهم تعيينات رواتب للفلتر المختار');
+        // تطبيق فلتر الموظفين المستثنين
+        const filteredEmployees = employees.filter(emp => !excludedIds.has(emp.id));
+
+        if (filteredEmployees.length === 0) throw new BadRequestException('لا يوجد موظفين نشطين لديهم تعيينات رواتب للفلتر المختار');
 
         const result = await this.prisma.$transaction(async (tx) => {
             const run = await tx.payrollRun.create({
@@ -68,18 +166,39 @@ export class PayrollRunsService {
                 }
             });
 
-            for (const employee of employees) {
+            for (const employee of filteredEmployees) {
                 // محرك الحساب المركزي (Consolidated Breakdown)
                 const calculation = await this.calculationService.calculateForEmployee(
                     employee.id,
                     companyId,
+                    period.startDate,
+                    period.endDate,
                     period.year,
                     period.month,
                 );
 
                 const assignment = employee.salaryAssignments[0];
                 const baseSalary = assignment.baseSalary;
-                const payslipLines = [];
+                const payslipLines: any[] = [];
+
+                // تحديد مركز التكلفة الافتراضي للموظف
+                const employeeCostCenterId = employee.costCenterId;
+                const allocations = (employee as any).costCenterAllocations || [];
+
+                // دالة مساعدة للحصول على costCenterId من التوزيعات أو الافتراضي
+                const getPrimaryCostCenterId = (): string | null => {
+                    // إذا كان لديه توزيعات، نستخدم مركز التكلفة ذو النسبة الأعلى
+                    if (allocations.length > 0) {
+                        const primary = allocations.reduce((max: any, curr: any) =>
+                            Number(curr.percentage) > Number(max.percentage) ? curr : max
+                        );
+                        return primary.costCenterId;
+                    }
+                    // وإلا نستخدم مركز التكلفة الافتراضي
+                    return employeeCostCenterId || null;
+                };
+
+                const primaryCostCenterId = getPrimaryCostCenterId();
 
                 // 1. إضافة الخطوط المحسوبة (من الهيكل، السياسات، والتأمينات)
                 if (calculation.policyLines) {
@@ -99,29 +218,129 @@ export class PayrollRunsService {
                             sign: pl.sign,
                             descriptionAr: pl.descriptionAr || undefined,
                             sourceRef: pl.source ? `${pl.source.policyId}:${pl.source.ruleId}` : undefined,
+                            costCenterId: primaryCostCenterId, // ربط بمركز التكلفة
                         });
                     }
                 }
 
 
-                // 2. معالجة السلف (Advances)
-                let advanceDeduction = new Decimal(0);
-                for (const advance of employee.advanceRequests) {
-                    const ded = advance.approvedMonthlyDeduction || advance.monthlyDeduction;
-                    const dedAmount = new Decimal(ded.toString());
-                    advanceDeduction = advanceDeduction.add(dedAmount);
+                // NOTE: السلف تم حسابها بالفعل في payroll-calculation.service.ts وهي مضمنة في policyLines
+                // لا نضيفها مرة أخرى هنا لتجنب الخصم المزدوج
 
-                    payslipLines.push({
-                        componentId: loanComp!.id,
-                        amount: dedAmount,
-                        sourceType: PayslipLineSource.POLICY,
-                        sign: 'DEDUCTION'
-                    });
+                // ✅ إضافة التعديلات اليدوية (مكافآت/خصومات) من الواجهة
+                // Using Decimal for all financial calculations
+                let adjustmentBonus: Decimal = ZERO;
+                let adjustmentDeduction: Decimal = ZERO;
+                const employeeAdjustments = adjustmentsMap.get(employee.id) || [];
+
+                for (const adj of employeeAdjustments) {
+                    const adjAmount = toDecimal(adj.amount);
+                    if (adj.type === 'bonus') {
+                        adjustmentBonus = add(adjustmentBonus, adjAmount);
+                        payslipLines.push({
+                            componentId: null, // تعديل يدوي
+                            amount: round(adjAmount),
+                            sourceType: 'MANUAL' as any,
+                            sign: 'EARNING',
+                            descriptionAr: `مكافأة يدوية: ${adj.reason}`,
+                            sourceRef: 'WIZARD_ADJUSTMENT',
+                            costCenterId: primaryCostCenterId,
+                        });
+                    } else {
+                        adjustmentDeduction = add(adjustmentDeduction, adjAmount);
+                        payslipLines.push({
+                            componentId: null, // تعديل يدوي
+                            amount: round(adjAmount),
+                            sourceType: 'MANUAL' as any,
+                            sign: 'DEDUCTION',
+                            descriptionAr: `خصم يدوي: ${adj.reason}`,
+                            sourceRef: 'WIZARD_ADJUSTMENT',
+                            costCenterId: primaryCostCenterId,
+                        });
+                    }
                 }
 
-                const finalGross = new Decimal(calculation.grossSalary.toFixed(2));
-                const finalDeductions = new Decimal((calculation.totalDeductions + advanceDeduction.toNumber()).toFixed(2));
-                const finalNet = finalGross.sub(finalDeductions);
+                // ✅ Using Decimal for final calculations
+                const finalGross = round(add(toDecimal(calculation.grossSalary), adjustmentBonus));
+                let finalDeductions = round(add(toDecimal(calculation.totalDeductions), adjustmentDeduction));
+                let finalNet = sub(finalGross, finalDeductions);
+
+                // ✅ خصم الديون السابقة من الراتب (إن وجدت)
+                let debtDeductionAmount: Decimal = ZERO;
+                if (isPositive(finalNet)) {
+                    const debtResult = await this.employeeDebtService.deductFromSalary({
+                        employeeId: employee.id,
+                        companyId,
+                        availableAmount: finalNet,
+                        maxDeductionPercent: 50, // الحد الأقصى 50% من الراتب الصافي
+                        sourceId: run.id,
+                        processedBy: userId,
+                    });
+
+                    if (isPositive(debtResult.totalDeducted)) {
+                        debtDeductionAmount = debtResult.totalDeducted;
+                        finalDeductions = add(finalDeductions, debtDeductionAmount);
+                        finalNet = sub(finalNet, debtDeductionAmount);
+
+                        // إضافة سطر خصم الدين
+                        payslipLines.push({
+                            componentId: null,
+                            amount: round(debtDeductionAmount),
+                            sourceType: 'DEBT_REPAYMENT' as any,
+                            sign: 'DEDUCTION',
+                            descriptionAr: `سداد ديون سابقة (${debtResult.transactions.length} دين)`,
+                            sourceRef: 'DEBT_LEDGER',
+                            costCenterId: primaryCostCenterId,
+                        });
+
+                        calculation.calculationTrace.push({
+                            step: 'DEBT_DEDUCTION',
+                            description: 'خصم سداد ديون سابقة',
+                            formula: `Deducted ${toFixed(debtDeductionAmount)} SAR for ${debtResult.transactions.length} debt(s)`,
+                            result: toNumber(debtDeductionAmount),
+                        });
+
+                        this.logger.log(`Deducted ${toFixed(debtDeductionAmount)} SAR from employee ${employee.id} for debt repayment`);
+                    }
+                }
+
+                // ⚠️ CRITICAL: التحقق من الراتب السالب
+                // ✅ Using Decimal utilities for negative balance handling
+                let hasNegativeBalance = false;
+                let negativeBalanceAmount: Decimal = ZERO;
+
+                if (isNegative(finalNet)) {
+                    hasNegativeBalance = true;
+                    negativeBalanceAmount = abs(finalNet);
+
+                    // تسجيل تحذير باستخدام Logger بدلاً من console.warn
+                    this.logger.warn(`⚠️ Negative salary detected for employee ${employee.id}: ${toFixed(finalNet)} SAR. ` +
+                        `Setting net to 0 and recording ${toFixed(negativeBalanceAmount)} SAR as employee debt.`);
+
+                    // ✅ تطبيق الحد الأدنى صفر - لا يجوز راتب سالب
+                    finalNet = ZERO;
+
+                    // ✅ تسجيل المبلغ السالب في trace الحساب للمراجعة
+                    calculation.calculationTrace.push({
+                        step: 'NEGATIVE_BALANCE_CARRYFORWARD',
+                        description: 'رصيد سالب مُرحَّل للشهر القادم',
+                        formula: `Original Net: ${toFixed(sub(finalGross, finalDeductions))} → Adjusted to 0`,
+                        result: toNumber(negativeBalanceAmount),
+                    });
+
+                    // ✅ إنشاء سجل دين جديد للموظف
+                    await this.employeeDebtService.createDebt({
+                        companyId,
+                        employeeId: employee.id,
+                        amount: negativeBalanceAmount,
+                        sourceType: DebtSourceType.PAYROLL_NEGATIVE_BALANCE,
+                        sourceId: run.id,
+                        periodId: dto.periodId,
+                        reason: `رصيد سالب من مسير الرواتب - الفترة ${period.month}/${period.year}`,
+                    });
+
+                    this.logger.log(`Created debt record for employee ${employee.id}: ${toFixed(negativeBalanceAmount)} SAR`);
+                }
 
                 await tx.payslip.create({
                     data: {
@@ -133,7 +352,7 @@ export class PayrollRunsService {
                         grossSalary: finalGross,
                         totalDeductions: finalDeductions,
                         netSalary: finalNet,
-                        status: 'DRAFT',
+                        status: (hasNegativeBalance ? 'REQUIRES_REVIEW' : 'DRAFT') as any,
                         calculationTrace: calculation.calculationTrace as any,
                         lines: {
                             create: payslipLines
@@ -152,17 +371,34 @@ export class PayrollRunsService {
 
             return {
                 ...runWithPayslips,
-                payslipsCount: runWithPayslips?.payslips?.length || employees.length
+                payslipsCount: runWithPayslips?.payslips?.length || filteredEmployees.length,
+                excludedCount: excludedIds.size,
+                adjustmentsCount: adjustmentsMap.size,
             };
         });
+
+        // تحضير رسالة التدقيق
+        let auditMessage = `إنشاء دورة رواتب جديدة لـ ${result.payslipsCount} موظف`;
+        if (result.excludedCount && result.excludedCount > 0) {
+            auditMessage += ` (استثناء ${result.excludedCount} موظف)`;
+        }
+        if (result.adjustmentsCount && result.adjustmentsCount > 0) {
+            auditMessage += ` (تعديلات على ${result.adjustmentsCount} موظف)`;
+        }
 
         await this.auditService.logPayrollChange(
             userId,
             result.id!,
             AuditAction.CREATE,
             null,
-            { runId: result.id, periodId: dto.periodId, employeeCount: result.payslipsCount },
-            `إنشاء دورة رواتب جديدة لـ ${result.payslipsCount} موظف`,
+            {
+                runId: result.id,
+                periodId: dto.periodId,
+                employeeCount: result.payslipsCount,
+                excludedCount: result.excludedCount,
+                adjustmentsCount: result.adjustmentsCount,
+            },
+            auditMessage,
         );
 
         return result;
@@ -187,10 +423,18 @@ export class PayrollRunsService {
             include: {
                 branch: true,
                 department: true,
-                jobTitle: true,
+                jobTitleRef: true,
                 salaryAssignments: {
                     where: { isActive: true },
-                    include: { structure: true }
+                    include: {
+                        structure: {
+                            include: {
+                                lines: {
+                                    include: { component: true }
+                                }
+                            }
+                        }
+                    }
                 },
                 advanceRequests: {
                     where: {
@@ -202,26 +446,29 @@ export class PayrollRunsService {
             } as any
         });
 
-        let totalGross = new Decimal(0);
-        let totalDeductions = new Decimal(0);
-        let totalNet = new Decimal(0);
-        let totalGosi = new Decimal(0);
-        let totalAdvances = new Decimal(0);
-        let totalBaseSalary = new Decimal(0);
+        // ✅ Using Decimal for all totals
+        let totalGross: Decimal = ZERO;
+        let totalDeductions: Decimal = ZERO;
+        let totalNet: Decimal = ZERO;
+        let totalGosi: Decimal = ZERO;
+        let totalAdvances: Decimal = ZERO;
+        let totalBaseSalary: Decimal = ZERO;
 
-        const byBranch: Record<string, { count: number; gross: number; net: number }> = {};
-        const byDepartment: Record<string, { count: number; gross: number; net: number }> = {};
+        const byBranch: Record<string, { count: number; gross: Decimal; net: Decimal }> = {};
+        const byDepartment: Record<string, { count: number; gross: Decimal; net: Decimal }> = {};
         const employeePreviews: any[] = [];
 
         for (const employee of employees) {
             const assignment = (employee as any).salaryAssignments?.[0];
             if (!assignment) continue;
 
-            totalBaseSalary = totalBaseSalary.add(Number(assignment.baseSalary));
+            totalBaseSalary = add(totalBaseSalary, toDecimal(assignment.baseSalary));
 
             const calculation = await this.calculationService.calculateForEmployee(
                 employee.id,
                 companyId,
+                period.startDate,
+                period.endDate,
                 period.year,
                 period.month
             );
@@ -234,41 +481,42 @@ export class PayrollRunsService {
                 .filter(pl => pl.sign === 'DEDUCTION')
                 .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
 
-            // إضافة السلف للمعاينة
-            let employeeAdvanceAmount = 0;
+            // إضافة السلف للمعاينة - Using Decimal
+            let employeeAdvanceAmount: Decimal = ZERO;
             const advanceDetails: { id: string; amount: number }[] = [];
             for (const adv of (employee as any).advanceRequests || []) {
-                const amount = Number(adv.approvedMonthlyDeduction || adv.monthlyDeduction);
-                employeeAdvanceAmount += amount;
-                advanceDetails.push({ id: adv.id, amount });
-                deductionItems.push({ name: 'خصم سلفة', code: 'ADVANCE', amount });
+                const amount = toDecimal(adv.approvedMonthlyDeduction || adv.monthlyDeduction);
+                employeeAdvanceAmount = add(employeeAdvanceAmount, amount);
+                advanceDetails.push({ id: adv.id, amount: toNumber(amount) });
+                deductionItems.push({ name: 'خصم سلفة', code: 'ADVANCE', amount: toNumber(amount) });
             }
 
-            const finalGross = calculation.grossSalary;
-            const finalDeductions = calculation.totalDeductions + employeeAdvanceAmount;
-            const finalNet = finalGross - finalDeductions;
+            // ✅ Using Decimal for calculations
+            const finalGross = toDecimal(calculation.grossSalary);
+            const finalDeductions = add(toDecimal(calculation.totalDeductions), employeeAdvanceAmount);
+            const finalNet = sub(finalGross, finalDeductions);
 
-            totalGross = totalGross.add(finalGross);
-            totalDeductions = totalDeductions.add(finalDeductions);
-            totalNet = totalNet.add(finalNet);
-            totalAdvances = totalAdvances.add(employeeAdvanceAmount);
+            totalGross = add(totalGross, finalGross);
+            totalDeductions = add(totalDeductions, finalDeductions);
+            totalNet = add(totalNet, finalNet);
+            totalAdvances = add(totalAdvances, employeeAdvanceAmount);
 
             const gosiLine = (calculation.policyLines || []).find(pl => pl.componentCode === 'GOSI');
-            const gosiAmount = gosiLine?.amount || 0;
-            totalGosi = totalGosi.add(gosiAmount);
+            const gosiAmount = toDecimal(gosiLine?.amount || 0);
+            totalGosi = add(totalGosi, gosiAmount);
 
             const branchName = (employee as any).branch?.name || 'غير محدد';
             const deptName = (employee as any).department?.name || 'غير محدد';
 
-            if (!byBranch[branchName]) byBranch[branchName] = { count: 0, gross: 0, net: 0 };
+            if (!byBranch[branchName]) byBranch[branchName] = { count: 0, gross: ZERO, net: ZERO };
             byBranch[branchName].count++;
-            byBranch[branchName].gross += finalGross;
-            byBranch[branchName].net += finalNet;
+            byBranch[branchName].gross = add(byBranch[branchName].gross, finalGross);
+            byBranch[branchName].net = add(byBranch[branchName].net, finalNet);
 
-            if (!byDepartment[deptName]) byDepartment[deptName] = { count: 0, gross: 0, net: 0 };
+            if (!byDepartment[deptName]) byDepartment[deptName] = { count: 0, gross: ZERO, net: ZERO };
             byDepartment[deptName].count++;
-            byDepartment[deptName].gross += finalGross;
-            byDepartment[deptName].net += finalNet;
+            byDepartment[deptName].gross = add(byDepartment[deptName].gross, finalGross);
+            byDepartment[deptName].net = add(byDepartment[deptName].net, finalNet);
 
             employeePreviews.push({
                 id: employee.id,
@@ -280,12 +528,12 @@ export class PayrollRunsService {
                 department: deptName,
                 jobTitle: (employee as any).jobTitle?.titleAr || 'غير محدد',
                 isSaudi: employee.isSaudi || false,
-                baseSalary: Number(assignment.baseSalary),
-                gross: finalGross,
-                deductions: finalDeductions,
-                gosi: gosiAmount,
-                advances: employeeAdvanceAmount,
-                net: finalNet,
+                baseSalary: toNumber(toDecimal(assignment.baseSalary)),
+                gross: toNumber(finalGross),
+                deductions: toNumber(finalDeductions),
+                gosi: toNumber(gosiAmount),
+                advances: toNumber(employeeAdvanceAmount),
+                net: toNumber(finalNet),
                 earnings,
                 deductionItems,
                 advanceDetails,
@@ -325,6 +573,7 @@ export class PayrollRunsService {
             }
         } catch { }
 
+        // ✅ Convert Decimal values to numbers for API response
         return {
             period: {
                 id: period.id,
@@ -334,23 +583,33 @@ export class PayrollRunsService {
             },
             summary: {
                 totalEmployees: employees.length,
-                totalBaseSalary: Number(totalBaseSalary),
-                totalGross: Number(totalGross),
-                totalDeductions: Number(totalDeductions),
-                totalNet: Number(totalNet),
-                totalGosi: Number(totalGosi),
-                totalAdvances: Number(totalAdvances),
+                totalBaseSalary: toNumber(totalBaseSalary),
+                totalGross: toNumber(totalGross),
+                totalDeductions: toNumber(totalDeductions),
+                totalNet: toNumber(totalNet),
+                totalGosi: toNumber(totalGosi),
+                totalAdvances: toNumber(totalAdvances),
             },
             comparison: previousMonth ? {
                 previousMonth,
-                grossChange: Number(totalGross) - previousMonth.gross,
-                grossChangePercent: previousMonth.gross > 0 ? ((Number(totalGross) - previousMonth.gross) / previousMonth.gross * 100) : 0,
-                netChange: Number(totalNet) - previousMonth.net,
-                netChangePercent: previousMonth.net > 0 ? ((Number(totalNet) - previousMonth.net) / previousMonth.net * 100) : 0,
+                grossChange: toNumber(totalGross) - previousMonth.gross,
+                grossChangePercent: previousMonth.gross > 0 ? ((toNumber(totalGross) - previousMonth.gross) / previousMonth.gross * 100) : 0,
+                netChange: toNumber(totalNet) - previousMonth.net,
+                netChangePercent: previousMonth.net > 0 ? ((toNumber(totalNet) - previousMonth.net) / previousMonth.net * 100) : 0,
                 headcountChange: employees.length - previousMonth.headcount,
             } : null,
-            byBranch: Object.entries(byBranch).map(([name, data]) => ({ name, ...data })),
-            byDepartment: Object.entries(byDepartment).map(([name, data]) => ({ name, ...data })),
+            byBranch: Object.entries(byBranch).map(([name, data]) => ({
+                name,
+                count: data.count,
+                gross: toNumber(data.gross),
+                net: toNumber(data.net)
+            })),
+            byDepartment: Object.entries(byDepartment).map(([name, data]) => ({
+                name,
+                count: data.count,
+                gross: toNumber(data.gross),
+                net: toNumber(data.net)
+            })),
             employees: employeePreviews,
             gosiEnabled: !!gosiConfig,
         };
@@ -382,7 +641,34 @@ export class PayrollRunsService {
         });
     }
 
-    async approve(id: string, companyId: string) {
+    async approve(id: string, companyId: string, skipValidation = false) {
+        // ✅ التحقق من صحة المسير قبل الاعتماد
+        if (!skipValidation) {
+            const validation = await this.payrollValidationService.validatePayrollRun(id, companyId, {
+                strictMode: false,
+                skipGosiValidation: false,
+            });
+
+            if (!validation.canProceed) {
+                const errors = validation.issues
+                    .filter(i => i.severity === 'ERROR')
+                    .map(i => i.messageAr)
+                    .slice(0, 5) // أول 5 أخطاء
+                    .join('، ');
+
+                throw new BadRequestException(
+                    `فشل اعتماد مسير الرواتب - يوجد ${validation.summary.errors} أخطاء: ${errors}`
+                );
+            }
+
+            // تسجيل التحذيرات
+            if (validation.summary.warnings > 0) {
+                this.logger.warn(
+                    `Approving payroll run ${id} with ${validation.summary.warnings} warnings`
+                );
+            }
+        }
+
         return this.prisma.$transaction(async (tx) => {
             const updated = await tx.payrollRun.update({
                 where: { id, companyId },
@@ -401,12 +687,30 @@ export class PayrollRunsService {
         });
     }
 
-    async pay(id: string, companyId: string) {
+    async pay(id: string, companyId: string, skipValidation = false) {
+        // ✅ التحقق النهائي قبل الصرف
+        if (!skipValidation) {
+            const validation = await this.payrollValidationService.quickValidateBeforeClose(id, companyId);
+
+            if (!validation.canClose) {
+                throw new BadRequestException(
+                    `لا يمكن صرف الرواتب - يوجد مشاكل حرجة: ${validation.criticalIssues.join('، ')}`
+                );
+            }
+        }
+
         return this.prisma.$transaction(async (tx) => {
             const run = await tx.payrollRun.findFirst({
                 where: { id, companyId }
             });
             if (!run) throw new NotFoundException('تشغيل الرواتب غير موجود');
+
+            // التحقق من أن المسير معتمد
+            if (run.status !== 'FINANCE_APPROVED') {
+                throw new BadRequestException(
+                    `يجب اعتماد المسير أولاً قبل الصرف. الحالة الحالية: ${run.status}`
+                );
+            }
 
             await tx.payrollRun.update({
                 where: { id },
@@ -428,6 +732,8 @@ export class PayrollRunsService {
                 where: { runId: id },
                 data: { status: 'POSTED' }
             });
+
+            this.logger.log(`Payroll run ${id} marked as PAID`);
 
             return run;
         });

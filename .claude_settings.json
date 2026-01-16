@@ -1,0 +1,34 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Glob(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Grep(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\specs\\021-deploy-all-features-you-added-to-the-vps-72-61-239/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\specs\\021-deploy-all-features-you-added-to-the-vps-72-61-239/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\specs\\021-deploy-all-features-you-added-to-the-vps-72-61-239/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}

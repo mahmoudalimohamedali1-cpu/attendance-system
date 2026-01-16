@@ -5,6 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -16,25 +17,29 @@ export default defineConfig({
       '@/utils': path.resolve(__dirname, './src/utils'),
       '@/types': path.resolve(__dirname, './src/types'),
       '@/config': path.resolve(__dirname, './src/config'),
+
+      // ✅ FIX: point to the ESM folder (not index.js) so subpath imports work
+      '@mui/system': path.resolve(__dirname, './node_modules/@mui/system/esm'),
     },
   },
+
   base: '/',
+
   server: {
     port: 5173,
     strictPort: true,
     host: true,
   },
+
   build: {
     outDir: 'dist',
     sourcemap: false,
     minify: 'esbuild',
-    // Chunk size warning threshold (KB)
     chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
-        // Entry file naming
-        entryFileNames: 'js/[name]-[hash].js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },

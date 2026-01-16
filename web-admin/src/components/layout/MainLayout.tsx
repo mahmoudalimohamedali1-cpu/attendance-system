@@ -44,6 +44,16 @@ import {
   MyLocation as LocationIcon,
   AccountTree,
   AutoAwesome,
+  TrendingUp,
+  Star,
+  EmojiEvents,
+  Psychology as PsychologyIcon,
+  Storefront as StorefrontIcon,
+  Insights as InsightsIcon,
+  Timeline as TimelineIcon,
+  LocalShipping as LogisticsIcon,
+  Speed as SpeedIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
@@ -84,7 +94,12 @@ const allMenuItems: MenuItem[] = [
   { text: 'الحضور والانصراف', icon: <AccessTime />, path: '/attendance', requiredPermission: ['ATTENDANCE_VIEW', 'ATTENDANCE_EDIT'] },
   { text: 'تتبع الموظفين', icon: <LocationIcon />, path: '/tracking', requiredRole: 'ADMIN', requiredPermission: ['ATTENDANCE_VIEW'] },
   { text: 'الهيكل التنظيمي', icon: <AccountTree />, path: '/org-structure', requiredRole: 'ADMIN' },
+  { text: 'المهام', icon: <AutoAwesome />, path: '/tasks', requiredPermission: ['EMPLOYEES_VIEW', 'EMPLOYEES_EDIT'] },
+  { text: '👥 تعاون الفريق', icon: <People />, path: '/team-collaboration', requiredRole: 'ADMIN' },
+  { text: '📊 إدارة المشاريع', icon: <AccountTree />, path: '/projects', requiredRole: 'ADMIN' },
+  { text: '🧠 المساعد الذكي', icon: <AutoAwesome />, path: '/genius-ai' },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
+  { text: 'العطلات الرسمية', icon: <EventNote />, path: '/holidays', requiredRole: 'ADMIN', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE_HR'] },
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
   { text: 'الجزاءات والتحقيقات', icon: <Security />, path: '/disciplinary', requiredPermission: ['DISC_MANAGER_CREATE', 'DISC_HR_REVIEW', 'DISC_HR_DECISION', 'DISC_HR_FINALIZE', 'DISC_EMPLOYEE_RESPONSE'] },
   { text: 'العهد والأصول', icon: <Business />, path: '/custody', requiredRole: 'ADMIN', requiredPermission: ['CUSTODY_VIEW', 'CUSTODY_ASSIGN', 'CUSTODY_APPROVE', 'CUSTODY_MANAGE_ITEMS', 'CUSTODY_MANAGE_CATEGORIES'] },
@@ -116,16 +131,20 @@ const payrollGroup: MenuGroup = {
     { text: 'إعدادات الرواتب', icon: <Settings />, path: '/payroll-settings' },
     { text: 'دورات الرواتب', icon: <MonetizationOn />, path: '/salary' },
     { text: 'قسائم الرواتب', icon: <Description />, path: '/payslips' },
+    { text: 'إدارة المكافآت', icon: <EmojiEvents />, path: '/bonus-management' },
+    { text: 'إدارة العمولات', icon: <TrendingUp />, path: '/commission-management' },
+    { text: 'إدارة البدلات', icon: <MonetizationOn />, path: '/allowance-management' },
+    { text: 'تقارير الرواتب', icon: <Assessment />, path: '/payroll-reports' },
     { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises' },
     { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay' },
     { text: 'أقساط السلف', icon: <MonetizationOn />, path: '/loan-payments' },
     { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos' },
     { text: 'الحسابات البنكية', icon: <MonetizationOn />, path: '/bank-accounts' },
+    { text: 'مراكز التكلفة', icon: <AccountTree />, path: '/cost-centers' },
     { text: 'مركز الاستثناءات', icon: <Security />, path: '/exceptions' },
   ],
 };
 
-// Compliance submenu group
 const complianceGroup: MenuGroup = {
   text: 'الالتزام الحكومي',
   icon: <Business />,
@@ -135,8 +154,65 @@ const complianceGroup: MenuGroup = {
     { text: 'متابعة WPS', icon: <MonetizationOn />, path: '/wps-tracking' },
     { text: 'مُدد', icon: <Business />, path: '/mudad' },
     { text: 'التأمينات GOSI', icon: <Business />, path: '/gosi' },
+    { text: 'تكامل قوى', icon: <Business />, path: '/qiwa' },
+    { text: '🇸🇦 السعودة ونطاقات', icon: <Business />, path: '/saudization' },
     { text: 'عقود قوى', icon: <Description />, path: '/contracts' },
     { text: 'سجل الإرسالات', icon: <Security />, path: '/audit/submissions' },
+  ],
+};
+
+// Performance Management submenu group
+const performanceGroup: MenuGroup = {
+  text: 'إدارة الأداء',
+  icon: <TrendingUp />,
+  requiredRole: 'ADMIN',
+  children: [
+    { text: 'تقييم الأداء', icon: <Assessment />, path: '/performance-reviews' },
+    { text: 'الأهداف و OKRs', icon: <Star />, path: '/goals' },
+    { text: 'التقدير والمكافآت', icon: <EmojiEvents />, path: '/recognition' },
+  ],
+};
+
+// Smart Policies submenu group
+const smartPoliciesGroup: MenuGroup = {
+  text: '🤖 السياسات الذكية',
+  icon: <PsychologyIcon />,
+  requiredRole: 'ADMIN',
+  children: [
+    { text: 'إدارة السياسات', icon: <AutoAwesome />, path: '/smart-policies' },
+    { text: 'لوحة التحكم', icon: <InsightsIcon />, path: '/smart-policies/dashboard' },
+    { text: 'سوق السياسات', icon: <StorefrontIcon />, path: '/smart-policies/marketplace' },
+    { text: 'معالج الإنشاء', icon: <TimelineIcon />, path: '/smart-policies/wizard' },
+  ],
+};
+
+// Logistics submenu group
+const logisticsGroup: MenuGroup = {
+  text: '🚛 اللوجستيات والتوصيل',
+  icon: <LogisticsIcon />,
+  requiredRole: 'ADMIN',
+  children: [
+    { text: 'لوحة اللوجستيات', icon: <LogisticsIcon />, path: '/logistics' },
+  ],
+};
+
+// KPI submenu group
+const kpiGroup: MenuGroup = {
+  text: '📊 مؤشرات الأداء KPI',
+  icon: <SpeedIcon />,
+  requiredRole: 'ADMIN',
+  children: [
+    { text: 'محرك KPI', icon: <SpeedIcon />, path: '/kpi' },
+  ],
+};
+
+// Integrations submenu group
+const integrationsGroup: MenuGroup = {
+  text: '🔗 التكاملات',
+  icon: <LinkIcon />,
+  requiredRole: 'ADMIN',
+  children: [
+    { text: 'إدارة التكاملات', icon: <LinkIcon />, path: '/integrations' },
   ],
 };
 
@@ -158,6 +234,11 @@ export const MainLayout = () => {
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [complianceOpen, setComplianceOpen] = useState(false);
+  const [performanceOpen, setPerformanceOpen] = useState(false);
+  const [smartPoliciesOpen, setSmartPoliciesOpen] = useState(false);
+  const [logisticsOpen, setLogisticsOpen] = useState(false);
+  const [kpiOpen, setKpiOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
@@ -346,6 +427,245 @@ export const MainLayout = () => {
                 <Collapse in={complianceOpen} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
                     {complianceGroup.children.map((item) => (
+                      <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
+                        <ListItemButton
+                          selected={location.pathname === item.path}
+                          onClick={() => {
+                            navigate(item.path);
+                            setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': { bgcolor: 'primary.dark' },
+                              '& .MuiListItemIcon-root': { color: 'white' },
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 30, '& svg': { fontSize: 18 } }}>{item.icon}</ListItemIcon>
+                          <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            )}
+
+            {/* Performance Management Submenu */}
+            {user?.role === 'ADMIN' && (
+              <>
+                <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                  <ListItemButton
+                    onClick={() => setPerformanceOpen(!performanceOpen)}
+                    sx={{
+                      borderRadius: 2,
+                      bgcolor: performanceOpen ? 'action.selected' : 'transparent',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>{performanceGroup.icon}</ListItemIcon>
+                    <ListItemText primary={performanceGroup.text} />
+                    {performanceOpen ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={performanceOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {performanceGroup.children.map((item) => (
+                      <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
+                        <ListItemButton
+                          selected={location.pathname === item.path}
+                          onClick={() => {
+                            navigate(item.path);
+                            setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': { bgcolor: 'primary.dark' },
+                              '& .MuiListItemIcon-root': { color: 'white' },
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 30, '& svg': { fontSize: 18 } }}>{item.icon}</ListItemIcon>
+                          <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            )}
+
+            {/* Smart Policies Submenu - NEW! */}
+            {user?.role === 'ADMIN' && (
+              <>
+                <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                  <ListItemButton
+                    onClick={() => setSmartPoliciesOpen(!smartPoliciesOpen)}
+                    sx={{
+                      borderRadius: 2,
+                      bgcolor: smartPoliciesOpen ? 'action.selected' : 'transparent',
+                      background: smartPoliciesOpen ? 'linear-gradient(135deg, rgba(156,39,176,0.1) 0%, rgba(103,58,183,0.1) 100%)' : 'transparent',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36, color: '#9C27B0' }}>{smartPoliciesGroup.icon}</ListItemIcon>
+                    <ListItemText
+                      primary={smartPoliciesGroup.text}
+                      primaryTypographyProps={{ fontWeight: 'bold' }}
+                    />
+                    {smartPoliciesOpen ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={smartPoliciesOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {smartPoliciesGroup.children.map((item) => (
+                      <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
+                        <ListItemButton
+                          selected={location.pathname === item.path}
+                          onClick={() => {
+                            navigate(item.path);
+                            setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            '&.Mui-selected': {
+                              background: 'linear-gradient(135deg, #9C27B0 0%, #673AB7 100%)',
+                              color: 'white',
+                              '&:hover': { background: 'linear-gradient(135deg, #7B1FA2 0%, #512DA8 100%)' },
+                              '& .MuiListItemIcon-root': { color: 'white' },
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 30, '& svg': { fontSize: 18 } }}>{item.icon}</ListItemIcon>
+                          <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            )}
+
+            {/* Logistics Submenu */}
+            {user?.role === 'ADMIN' && (
+              <>
+                <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                  <ListItemButton
+                    onClick={() => setLogisticsOpen(!logisticsOpen)}
+                    sx={{
+                      borderRadius: 2,
+                      bgcolor: logisticsOpen ? 'action.selected' : 'transparent',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>{logisticsGroup.icon}</ListItemIcon>
+                    <ListItemText primary={logisticsGroup.text} />
+                    {logisticsOpen ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={logisticsOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {logisticsGroup.children.map((item) => (
+                      <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
+                        <ListItemButton
+                          selected={location.pathname === item.path}
+                          onClick={() => {
+                            navigate(item.path);
+                            setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': { bgcolor: 'primary.dark' },
+                              '& .MuiListItemIcon-root': { color: 'white' },
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 30, '& svg': { fontSize: 18 } }}>{item.icon}</ListItemIcon>
+                          <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            )}
+
+            {/* KPI Submenu */}
+            {user?.role === 'ADMIN' && (
+              <>
+                <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                  <ListItemButton
+                    onClick={() => setKpiOpen(!kpiOpen)}
+                    sx={{
+                      borderRadius: 2,
+                      bgcolor: kpiOpen ? 'action.selected' : 'transparent',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>{kpiGroup.icon}</ListItemIcon>
+                    <ListItemText primary={kpiGroup.text} />
+                    {kpiOpen ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={kpiOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {kpiGroup.children.map((item) => (
+                      <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
+                        <ListItemButton
+                          selected={location.pathname === item.path}
+                          onClick={() => {
+                            navigate(item.path);
+                            setMobileOpen(false);
+                          }}
+                          sx={{
+                            pl: 4,
+                            borderRadius: 2,
+                            '&.Mui-selected': {
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              '&:hover': { bgcolor: 'primary.dark' },
+                              '& .MuiListItemIcon-root': { color: 'white' },
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 30, '& svg': { fontSize: 18 } }}>{item.icon}</ListItemIcon>
+                          <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: 14 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            )}
+
+            {/* Integrations Submenu */}
+            {user?.role === 'ADMIN' && (
+              <>
+                <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+                  <ListItemButton
+                    onClick={() => setIntegrationsOpen(!integrationsOpen)}
+                    sx={{
+                      borderRadius: 2,
+                      bgcolor: integrationsOpen ? 'action.selected' : 'transparent',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>{integrationsGroup.icon}</ListItemIcon>
+                    <ListItemText primary={integrationsGroup.text} />
+                    {integrationsOpen ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={integrationsOpen} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {integrationsGroup.children.map((item) => (
                       <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
                         <ListItemButton
                           selected={location.pathname === item.path}

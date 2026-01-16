@@ -1,0 +1,138 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var AIPolicyEvaluatorService_1;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AIPolicyEvaluatorService = void 0;
+const common_1 = require("@nestjs/common");
+const prisma_service_1 = require("../../common/prisma/prisma.service");
+const ai_service_1 = require("../ai/ai.service");
+const AI_EVALUATOR_PROMPT = `أنت محرك تنفيذ سياسات الرواتب الذكي. مهمتك تحديد هل سياسة معينة تنطبق على موظف بناءً على بياناته.
+
+📋 السياسة المطلوب تقييمها:
+{policyText}
+
+👤 بيانات الموظف:
+{employeeContext}
+
+🎯 مطلوب منك:
+1. افحص هل شروط السياسة تنطبق على هذا الموظف
+2. لو تنطبق، احسب المبلغ (ثابت أو نسبة أو أيام)
+3. أرجع الإجابة بصيغة JSON
+
+⚠️ قواعد مهمة:
+- "نسبة الحضور" = (الأيام الحاضر فيها / أيام العمل) × 100
+- "سنوات الخدمة" = عدد السنين من تاريخ التعيين
+- "يوم راتب" = الراتب الأساسي ÷ 30
+- لو السياسة تقول "أكثر من X" يعني > وليس >=
+- لو السياسة تقول "X أو أكثر" أو "على الأقل X" يعني >=
+
+أرجع JSON فقط:
+{
+  "applies": true/false,
+  "amount": الرقم (0 لو لا تنطبق),
+  "type": "EARNING" أو "DEDUCTION",
+  "reason": "سبب قصير بالعربي"
+}`;
+let AIPolicyEvaluatorService = AIPolicyEvaluatorService_1 = class AIPolicyEvaluatorService {
+    constructor(prisma, aiService) {
+        this.prisma = prisma;
+        this.aiService = aiService;
+        this.logger = new common_1.Logger(AIPolicyEvaluatorService_1.name);
+    }
+    async evaluateAllPolicies(companyId, context) {
+        const policyLines = [];
+        try {
+            const policies = await this.prisma.smartPolicy.findMany({
+                where: { companyId, isActive: true },
+            });
+            this.logger.log(`Evaluating ${policies.length} policies for ${context.employeeName} using AI`);
+            for (const policy of policies) {
+                try {
+                    const result = await this.evaluatePolicyWithAI(policy, context);
+                    if (result.applies && result.amount !== 0) {
+                        policyLines.push({
+                            componentId: "SMART-AI-" + policy.id.substring(0, 6),
+                            componentName: policy.name || "Smart Policy",
+                            componentCode: "SMART",
+                            amount: Math.abs(result.amount),
+                            sign: result.type,
+                            descriptionAr: `سياسة ذكية: ${result.reason}`,
+                            source: {
+                                policyId: policy.id,
+                                policyCode: "SMART-AI",
+                                ruleId: "AI-EVAL",
+                                ruleCode: "AI",
+                            },
+                        });
+                        this.logger.log(`✅ Policy "${policy.name}" applies: ${result.amount} SAR (${result.type})`);
+                    }
+                }
+                catch (error) {
+                    this.logger.error(`Error evaluating policy ${policy.id}: ${error.message}`);
+                }
+            }
+        }
+        catch (error) {
+            this.logger.error(`Error fetching policies: ${error.message}`);
+        }
+        return policyLines;
+    }
+    async evaluatePolicyWithAI(policy, context) {
+        if (!this.aiService.isAvailable()) {
+            return { policyId: policy.id, policyName: policy.name, applies: false, amount: 0, type: "EARNING", reason: "AI غير متاح" };
+        }
+        const contextText = `
+- الاسم: ${context.employeeName}
+- القسم: ${context.department || "غير محدد"}
+- المسمى الوظيفي: ${context.jobTitle || "غير محدد"}
+- سنوات الخدمة: ${context.yearsOfService} سنة
+- الراتب الأساسي: ${context.baseSalary} ريال
+- إجمالي الراتب: ${context.totalSalary} ريال
+- أيام العمل بالشهر: ${context.workingDays}
+- أيام الحضور: ${context.presentDays}
+- أيام الغياب: ${context.absentDays}
+- أيام التأخير: ${context.lateDays}
+- دقائق التأخير الإجمالية: ${context.lateMinutes}
+- ساعات الأوفرتايم: ${context.overtimeHours}
+- نسبة الحضور: ${context.attendancePercentage}%
+- إجازات هذا الشهر: ${context.leavesTaken}
+- إجازات بدون راتب: ${context.unpaidLeaves}
+- جزاءات نشطة: ${context.activePenalties}
+- عهد مسترجعة هذا الشهر: ${context.returnedCustodyThisMonth}
+- الشهر: ${context.month}/${context.year}`;
+        const prompt = AI_EVALUATOR_PROMPT
+            .replace("{policyText}", policy.originalText || policy.name)
+            .replace("{employeeContext}", contextText);
+        try {
+            const response = await this.aiService.generateContent(prompt);
+            const parsed = this.aiService.parseJsonResponse(response);
+            return {
+                policyId: policy.id,
+                policyName: policy.name,
+                applies: parsed.applies,
+                amount: parsed.amount || 0,
+                type: parsed.type || "EARNING",
+                reason: parsed.reason || "",
+            };
+        }
+        catch (error) {
+            this.logger.error(`AI evaluation failed for policy ${policy.name}: ${error.message}`);
+            return { policyId: policy.id, policyName: policy.name, applies: false, amount: 0, type: "EARNING", reason: "فشل التقييم" };
+        }
+    }
+};
+exports.AIPolicyEvaluatorService = AIPolicyEvaluatorService;
+exports.AIPolicyEvaluatorService = AIPolicyEvaluatorService = AIPolicyEvaluatorService_1 = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        ai_service_1.AiService])
+], AIPolicyEvaluatorService);
+//# sourceMappingURL=ai-policy-evaluator.service.js.map

@@ -36,6 +36,9 @@ class _HomePageState extends State<HomePage> {
       // Refresh notifications when a new one arrives
       context.read<NotificationsBloc>().add(GetNotificationsEvent());
       
+      // Check for task deep link
+      final taskId = message.data['taskId'];
+      
       // Show a snackbar or update UI
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -44,7 +47,12 @@ class _HomePageState extends State<HomePage> {
             action: SnackBarAction(
               label: 'عرض',
               onPressed: () {
-                context.go('/notifications');
+                // Navigate to task if taskId exists, otherwise to notifications
+                if (taskId != null && taskId.isNotEmpty) {
+                  context.push('/my-tasks/$taskId');
+                } else {
+                  context.go('/notifications');
+                }
               },
             ),
           ),
@@ -55,9 +63,17 @@ class _HomePageState extends State<HomePage> {
     // Listen for background messages (when app is opened from notification)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('📬 Background notification opened: ${message.notification?.title}');
-      // Navigate to notifications page
+      
+      // Check for task deep link
+      final taskId = message.data['taskId'];
+      
       if (mounted) {
-        context.go('/notifications');
+        // Navigate to task if taskId exists, otherwise to notifications
+        if (taskId != null && taskId.isNotEmpty) {
+          context.push('/my-tasks/$taskId');
+        } else {
+          context.go('/notifications');
+        }
       }
     });
   }
@@ -359,6 +375,28 @@ class _QuickActionsCard extends StatelessWidget {
                     label: 'سجل الحضور',
                     color: Colors.teal,
                     onTap: () => context.go('/attendance'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.task_alt,
+                    label: 'مهامي',
+                    color: Colors.indigo,
+                    onTap: () => context.go('/my-tasks'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _QuickActionButton(
+                    icon: Icons.person,
+                    label: 'الملف الشخصي',
+                    color: Colors.brown,
+                    onTap: () => context.go('/profile'),
                   ),
                 ),
               ],

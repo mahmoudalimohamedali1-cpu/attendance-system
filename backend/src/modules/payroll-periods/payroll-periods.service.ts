@@ -7,22 +7,34 @@ export class PayrollPeriodsService {
     constructor(private prisma: PrismaService) { }
 
     async create(dto: CreatePayrollPeriodDto, companyId: string) {
-        const existing = await this.prisma.payrollPeriod.findFirst({
+        // Check for overlapping periods in the same company
+        const periodStart = new Date(dto.startDate);
+        const periodEnd = new Date(dto.endDate);
+
+        const overlapping = await this.prisma.payrollPeriod.findFirst({
             where: {
                 companyId,
-                month: dto.month,
-                year: dto.year
+                OR: [
+                    {
+                        startDate: { lte: periodEnd },
+                        endDate: { gte: periodStart }
+                    }
+                ]
             }
         });
-        if (existing) throw new ConflictException('فترة الرواتب لهذا الشهر والسنة موجودة بالفعل في هذه الشركة');
+
+        if (overlapping) {
+            throw new ConflictException(`توجد فترة رواتب متداخلة مع التواريخ المحددة (من ${overlapping.startDate.toLocaleDateString()} إلى ${overlapping.endDate.toLocaleDateString()})`);
+        }
 
         return this.prisma.payrollPeriod.create({
             data: {
                 companyId,
                 month: dto.month,
                 year: dto.year,
-                startDate: new Date(dto.startDate),
-                endDate: new Date(dto.endDate),
+                startDate: periodStart,
+                endDate: periodEnd,
+                frequency: dto.frequency as any,
                 status: 'DRAFT',
             }
         });

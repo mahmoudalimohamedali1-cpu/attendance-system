@@ -34,6 +34,12 @@ import {
     Add as AddIcon,
     OpenInNew as OpenInNewIcon,
     Assessment as AuditIcon,
+    EmojiEvents as BonusIcon,
+    TrendingUp as CommissionIcon,
+    Category as AllowanceIcon,
+    MonetizationOn as SalaryIcon,
+    Receipt as PayslipIcon,
+    FileDownload as ExportIcon,
 } from '@mui/icons-material';
 import { useDashboard, useDashboardTrends } from '../../hooks/useDashboard';
 import { useAuthStore } from '../../store/auth.store';
@@ -529,6 +535,120 @@ export const PayrollDashboardPage: React.FC = () => {
                         </Paper>
                     </Grid>
                 )}
+
+                {/* Quick Actions */}
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 2 }}>
+                        <Typography variant="h6" gutterBottom>
+                            الإجراءات السريعة
+                        </Typography>
+                        <Divider sx={{ mb: 2 }} />
+                        <Grid container spacing={2}>
+                            <Grid item xs={6} sm={4} md={2}>
+                                <Card
+                                    sx={{
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
+                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                        color: 'white',
+                                    }}
+                                    onClick={() => navigate('/bonus-management')}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                                        <BonusIcon sx={{ fontSize: 40, mb: 1 }} />
+                                        <Typography variant="body2">إدارة المكافآت</Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            <Grid item xs={6} sm={4} md={2}>
+                                <Card
+                                    sx={{
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
+                                        background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                                        color: 'white',
+                                    }}
+                                    onClick={() => navigate('/commission-management')}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                                        <CommissionIcon sx={{ fontSize: 40, mb: 1 }} />
+                                        <Typography variant="body2">إدارة العمولات</Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            <Grid item xs={6} sm={4} md={2}>
+                                <Card
+                                    sx={{
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
+                                        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                        color: 'white',
+                                    }}
+                                    onClick={() => navigate('/allowance-management')}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                                        <AllowanceIcon sx={{ fontSize: 40, mb: 1 }} />
+                                        <Typography variant="body2">إدارة البدلات</Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            <Grid item xs={6} sm={4} md={2}>
+                                <Card
+                                    sx={{
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
+                                        background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                                        color: 'white',
+                                    }}
+                                    onClick={() => navigate('/salary')}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                                        <SalaryIcon sx={{ fontSize: 40, mb: 1 }} />
+                                        <Typography variant="body2">مسيرة الرواتب</Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            <Grid item xs={6} sm={4} md={2}>
+                                <Card
+                                    sx={{
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
+                                        background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                                        color: 'white',
+                                    }}
+                                    onClick={() => navigate('/payroll-reports')}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                                        <PayslipIcon sx={{ fontSize: 40, mb: 1 }} />
+                                        <Typography variant="body2">التقارير</Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                            <Grid item xs={6} sm={4} md={2}>
+                                <Card
+                                    sx={{
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 },
+                                        background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                                        color: '#333',
+                                    }}
+                                    onClick={() => navigate('/wps-export')}
+                                >
+                                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                                        <ExportIcon sx={{ fontSize: 40, mb: 1 }} />
+                                        <Typography variant="body2">تصدير WPS</Typography>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+                </Grid>
             </Grid>
         </Box>
     );

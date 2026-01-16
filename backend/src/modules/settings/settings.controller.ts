@@ -40,7 +40,118 @@ export class SettingsController {
     return this.settingsService.getAllSettings(companyId);
   }
 
-  @Get(':key')
+  // ============ Holidays Routes (MUST come before key/:key) ============
+  @Get('holidays/all')
+  @Roles('ADMIN', 'HR', 'MANAGER', 'EMPLOYEE')
+  @ApiOperation({ summary: 'قائمة العطلات' })
+  @ApiResponse({ status: 200, description: 'العطلات' })
+  async getHolidays(@CurrentUser('companyId') companyId: string, @Query('year') year?: number) {
+    return this.settingsService.getHolidays(companyId, year);
+  }
+
+  @Get('holidays/employee/:employeeId')
+  @Roles('ADMIN', 'HR', 'MANAGER')
+  @ApiOperation({ summary: 'العطلات المطبقة على موظف في فترة معينة' })
+  @ApiResponse({ status: 200, description: 'العطلات' })
+  async getEmployeeHolidays(
+    @Param('employeeId') employeeId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.settingsService.getEmployeeHolidaysInPeriod(
+      employeeId,
+      new Date(startDate),
+      new Date(endDate),
+      companyId,
+    );
+  }
+
+  @Get('holidays/check')
+  @Roles('ADMIN', 'HR', 'MANAGER', 'EMPLOYEE')
+  @ApiOperation({ summary: 'التحقق إذا كان التاريخ عطلة لموظف' })
+  @ApiResponse({ status: 200, description: 'معلومات العطلة' })
+  async checkHoliday(
+    @Query('date') date: string,
+    @Query('employeeId') employeeId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.settingsService.getEmployeeHolidayInfo(
+      new Date(date),
+      employeeId,
+      companyId,
+    );
+  }
+
+  @Post('holidays')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'إضافة عطلة' })
+  @ApiResponse({ status: 201, description: 'تمت الإضافة' })
+  async createHoliday(
+    @Body() body: {
+      name: string;
+      nameEn?: string;
+      date: string;
+      isRecurring?: boolean;
+      isPaid?: boolean;
+      applicationType?: 'ALL' | 'BRANCH' | 'DEPARTMENT' | 'SPECIFIC_EMPLOYEES' | 'EXCLUDE_EMPLOYEES';
+      countAsWorkDay?: boolean;
+      overtimeMultiplier?: number;
+      notes?: string;
+      assignments?: {
+        type: 'BRANCH' | 'DEPARTMENT' | 'EMPLOYEE';
+        ids: string[];
+      };
+    },
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.settingsService.createHoliday({
+      ...body,
+      date: new Date(body.date),
+      applicationType: body.applicationType as any,
+    }, companyId);
+  }
+
+  @Patch('holidays/:id')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'تعديل عطلة' })
+  @ApiResponse({ status: 200, description: 'تم التعديل' })
+  async updateHoliday(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() body: {
+      name?: string;
+      nameEn?: string;
+      date?: string;
+      isRecurring?: boolean;
+      isPaid?: boolean;
+      applicationType?: 'ALL' | 'BRANCH' | 'DEPARTMENT' | 'SPECIFIC_EMPLOYEES' | 'EXCLUDE_EMPLOYEES';
+      countAsWorkDay?: boolean;
+      overtimeMultiplier?: number;
+      notes?: string;
+      assignments?: {
+        type: 'BRANCH' | 'DEPARTMENT' | 'EMPLOYEE';
+        ids: string[];
+      };
+    },
+  ) {
+    const updateData: any = { ...body };
+    if (body.date) {
+      updateData.date = new Date(body.date);
+    }
+    return this.settingsService.updateHoliday(id, companyId, updateData);
+  }
+
+  @Delete('holidays/:id')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'حذف عطلة' })
+  @ApiResponse({ status: 200, description: 'تم الحذف' })
+  async deleteHoliday(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
+    return this.settingsService.deleteHoliday(id, companyId);
+  }
+
+  // ============ Dynamic Key Routes (MUST come AFTER specific routes) ============
+  @Get('key/:key')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'الحصول على إعداد محدد' })
   @ApiResponse({ status: 200, description: 'الإعداد' })
@@ -67,7 +178,7 @@ export class SettingsController {
     return this.settingsService.setMultipleSettings(body.settings, companyId);
   }
 
-  @Delete(':key')
+  @Delete('key/:key')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'حذف إعداد' })
   @ApiResponse({ status: 200, description: 'تم الحذف' })
@@ -75,62 +186,6 @@ export class SettingsController {
     return this.settingsService.deleteSetting(key, companyId);
   }
 
-  // Holidays
-  @Get('holidays/all')
-  @ApiOperation({ summary: 'قائمة العطلات' })
-  @ApiResponse({ status: 200, description: 'العطلات' })
-  async getHolidays(@CurrentUser('companyId') companyId: string, @Query('year') year?: number) {
-    return this.settingsService.getHolidays(companyId, year);
-  }
-
-  @Post('holidays')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'إضافة عطلة' })
-  @ApiResponse({ status: 201, description: 'تمت الإضافة' })
-  async createHoliday(
-    @Body() body: { name: string; nameEn?: string; date: string; isRecurring?: boolean },
-    @CurrentUser('companyId') companyId: string,
-  ) {
-    return this.settingsService.createHoliday({
-      ...body,
-      date: new Date(body.date),
-    }, companyId);
-  }
-
-  @Patch('holidays/:id')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'تعديل عطلة' })
-  @ApiResponse({ status: 200, description: 'تم التعديل' })
-  async updateHoliday(
-    @Param('id') id: string,
-    @CurrentUser('companyId') companyId: string,
-    @Body() body: { name?: string; nameEn?: string; date?: string; isRecurring?: boolean },
-  ) {
-    const updateData: Partial<{ name: string; nameEn?: string; date: Date; isRecurring?: boolean }> = {};
-
-    if (body.name !== undefined) {
-      updateData.name = body.name;
-    }
-    if (body.nameEn !== undefined) {
-      updateData.nameEn = body.nameEn;
-    }
-    if (body.date !== undefined) {
-      updateData.date = new Date(body.date);
-    }
-    if (body.isRecurring !== undefined) {
-      updateData.isRecurring = body.isRecurring;
-    }
-
-    return this.settingsService.updateHoliday(id, companyId, updateData);
-  }
-
-  @Delete('holidays/:id')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'حذف عطلة' })
-  @ApiResponse({ status: 200, description: 'تم الحذف' })
-  async deleteHoliday(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
-    return this.settingsService.deleteHoliday(id, companyId);
-  }
 
   // ============ سياسة ترحيل الإجازات ============
 

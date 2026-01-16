@@ -15,7 +15,7 @@ export interface StatusLog {
 }
 
 // استخدام متغير البيئة - Direct URL to bypass api.service
-const API_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1';
 
 // Helper to get auth header
 const getAuthHeader = () => ({

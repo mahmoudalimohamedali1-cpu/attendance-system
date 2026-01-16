@@ -12,7 +12,7 @@ export interface EmployeePayrollContext {
     yearsOfService: number;
     baseSalary: number;
     totalSalary: number;
-    
+
     // Attendance stats for the month
     workingDays: number;
     presentDays: number;
@@ -21,18 +21,18 @@ export interface EmployeePayrollContext {
     lateMinutes: number;
     overtimeHours: number;
     attendancePercentage: number;
-    
+
     // Leave stats
     leavesTaken: number;
     unpaidLeaves: number;
-    
+
     // Disciplinary
     activePenalties: number;
-    
+
     // Custody
     pendingCustodyReturns: number;
     returnedCustodyThisMonth: number;
-    
+
     // Period
     month: number;
     year: number;
@@ -82,7 +82,7 @@ export class AIPolicyEvaluatorService {
     constructor(
         private prisma: PrismaService,
         private aiService: AiService,
-    ) {}
+    ) { }
 
     /**
      * Evaluate ALL active smart policies for an employee using AI
@@ -93,19 +93,63 @@ export class AIPolicyEvaluatorService {
     ): Promise<PolicyPayrollLine[]> {
         const policyLines: PolicyPayrollLine[] = [];
 
+        // 🔧 FIX: Graceful degradation when AI is unavailable
+        // Return empty array if AI service is not available (API limit, etc)
+        if (!this.aiService.isAvailable()) {
+            this.logger.warn('AI Service is not available - skipping AI policy evaluation');
+            return policyLines;
+        }
+
         try {
             // Get all active smart policies
             const policies = await this.prisma.smartPolicy.findMany({
                 where: { companyId, isActive: true },
             });
 
+
             this.logger.log(`Evaluating ${policies.length} policies for ${context.employeeName} using AI`);
 
             // Evaluate each policy with AI
             for (const policy of policies) {
                 try {
+                    const parsedRule = policy.parsedRule as any;
+
+                    // 🔧 FIX: تخطي السياسات التي لها قواعد محللة وشروط محددة
+                    // هذه السياسات يتم تنفيذها بواسطة SmartPolicyExecutorService بدون AI
+                    if (parsedRule?.understood === true &&
+                        parsedRule?.conditions &&
+                        Array.isArray(parsedRule.conditions) &&
+                        parsedRule.conditions.length > 0) {
+                        this.logger.debug(`Skipping policy "${policy.name}" - has parsed conditions, will be handled by SmartPolicyExecutor`);
+                        continue;
+                    }
+
+                    // 🆕 فلتر الأقسام المستهدفة
+                    if (parsedRule?.applicableDepartments && parsedRule.applicableDepartments.length > 0) {
+                        const empDept = (context.department || '').toLowerCase();
+                        const matchesDept = parsedRule.applicableDepartments.some((dept: string) =>
+                            empDept.includes(dept.toLowerCase()) || dept.toLowerCase().includes(empDept)
+                        );
+                        if (!matchesDept) {
+                            this.logger.debug(`Skipping policy "${policy.name}" - department "${context.department}" not in ${parsedRule.applicableDepartments.join(', ')}`);
+                            continue;
+                        }
+                    }
+
+                    // 🆕 فلتر المسميات الوظيفية المستهدفة
+                    if (parsedRule?.applicableJobTitles && parsedRule.applicableJobTitles.length > 0) {
+                        const empJobTitle = (context.jobTitle || '').toLowerCase();
+                        const matchesJobTitle = parsedRule.applicableJobTitles.some((title: string) =>
+                            empJobTitle.includes(title.toLowerCase()) || title.toLowerCase().includes(empJobTitle)
+                        );
+                        if (!matchesJobTitle) {
+                            this.logger.debug(`Skipping policy "${policy.name}" - job title "${context.jobTitle}" not in ${parsedRule.applicableJobTitles.join(', ')}`);
+                            continue;
+                        }
+                    }
+
                     const result = await this.evaluatePolicyWithAI(policy, context);
-                    
+
                     if (result.applies && result.amount !== 0) {
                         policyLines.push({
                             componentId: "SMART-AI-" + policy.id.substring(0, 6),
@@ -121,7 +165,7 @@ export class AIPolicyEvaluatorService {
                                 ruleCode: "AI",
                             },
                         });
-                        
+
                         this.logger.log(`✅ Policy "${policy.name}" applies: ${result.amount} SAR (${result.type})`);
                     }
                 } catch (error) {

@@ -77,6 +77,17 @@ export class AttendanceController {
     return this.attendanceService.getAttendanceHistory(userId, companyId, query);
   }
 
+  @Get('my-records')
+  @ApiOperation({ summary: 'سجلاتي الشخصية' })
+  @ApiResponse({ status: 200, description: 'قائمة سجلات الحضور الخاصة بي' })
+  async getMyRecords(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Query() query: AttendanceQueryDto,
+  ) {
+    return this.attendanceService.getAttendanceHistory(userId, companyId, query);
+  }
+
   @Get('stats/monthly/:year/:month')
   @ApiOperation({ summary: 'إحصائيات الحضور الشهرية' })
   @ApiResponse({ status: 200, description: 'إحصائيات الشهر' })

@@ -24,4 +24,8 @@ export class CreatePayrollPeriodDto {
     @IsDateString()
     @IsNotEmpty()
     endDate: string;
+
+    @ApiProperty({ description: 'تردد الراتب (شهري، أسبوعي، الخ)', enum: ['WEEKLY', 'BI_WEEKLY', 'MONTHLY', 'OTHER'], default: 'MONTHLY' })
+    @IsNotEmpty()
+    frequency: 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY' | 'OTHER';
 }

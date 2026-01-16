@@ -1,0 +1,1 @@
+﻿src/modules/smart-policies/features/policy-marketplace.service.ts(431,17): error TS2353: Object literal may only specify known properties, and 'metadata' does not exist in type 'Without<SmartPolicyCreateInput, SmartPolicyUncheckedCreateInput> & SmartPolicyUncheckedCreateInput'.

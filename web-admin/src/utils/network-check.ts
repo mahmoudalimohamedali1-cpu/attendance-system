@@ -8,7 +8,10 @@ export const checkBackendConnection = async (): Promise<boolean> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-    const response = await fetch('http://localhost:3000/health', {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+    const healthUrl = baseUrl.replace('/api/v1', '/health');
+
+    const response = await fetch(healthUrl, {
       method: 'GET',
       signal: controller.signal,
       headers: {
@@ -41,9 +44,10 @@ export const getBackendStatus = async (): Promise<{
     };
   }
 
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
   return {
     online: false,
-    message: 'لا يمكن الاتصال بالخادم. تأكد أن Backend يعمل على http://localhost:3000',
+    message: `لا يمكن الاتصال بالخادم. تأكد أن Backend يعمل على ${baseUrl.replace('/api/v1', '')}`,
   };
 };
 

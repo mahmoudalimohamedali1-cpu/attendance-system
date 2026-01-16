@@ -61,6 +61,26 @@ import { AiModule } from './modules/ai/ai.module';
 import { SmartPoliciesModule } from './modules/smart-policies/smart-policies.module';
 import { LocationTrackingModule } from './modules/location-tracking/location-tracking.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { TasksModule } from './modules/tasks/tasks.module';
+import { AiChatModule } from './modules/ai-chat/ai-chat.module';
+import { AiAnalyticsModule } from './modules/ai-analytics/ai-analytics.module';
+import { AiPayrollModule } from './modules/ai-payroll/ai-payroll.module';
+import { GoalsModule } from './modules/goals/goals.module';
+import { AiManagerModule } from './modules/ai-manager/ai-manager.module';
+import { AiHrModule } from './modules/ai-hr/ai-hr.module';
+import { AiPredictiveModule } from './modules/ai-predictive/ai-predictive.module';
+import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
+import { PerformanceReviewsModule } from './modules/performance-reviews/performance-reviews.module';
+import { RecognitionModule } from './modules/recognition/recognition.module';
+import { CompanyConfigModule } from './modules/company-config/company-config.module';
+import { KPIModule } from './modules/kpi/kpi.module';
+import { LogisticsModule } from './modules/logistics/logistics.module';
+import { SaudizationModule } from './modules/saudization/saudization.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { ProgramsModule } from './modules/programs/programs.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { EmployeeDebtModule } from './modules/employee-debt/employee-debt.module';
+import { SecurityModule } from './common/security/security.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
 @Module({
@@ -132,6 +152,26 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     SmartPoliciesModule,    // السياسات الذكية المُحللة بالـ AI
     LocationTrackingModule, // نظام تتبع موقع الموظفين
     OrganizationModule,     // الهيكل التنظيمي
+    TasksModule,            // نظام المهام
+    AiChatModule,           // مساعد الموظفين الذكي
+    AiAnalyticsModule,      // تحليلات الأداء الذكية
+    AiPayrollModule,        // تحليلات الرواتب الذكية
+    AiManagerModule,        // لوحة المدير الذكية
+    AiHrModule,             // أتمتة الموارد البشرية
+    AiPredictiveModule,     // التحليلات التنبؤية
+    CostCentersModule,      // مراكز التكلفة Enterprise
+    PerformanceReviewsModule, // نظام تقييم الأداء
+    GoalsModule,              // نظام الأهداف و OKRs
+    RecognitionModule,        // جدار التقدير (Kudos)
+    CompanyConfigModule,      // 🆕 إعدادات الشركة للتقييم (U-PEE)
+    KPIModule,                // 🆕 محرك مؤشرات الأداء (KPI Engine)
+    LogisticsModule,          // 🚛 نظام اللوجستيات والتوصيل
+    SaudizationModule,        // 🇸🇦 نظام السعودة ونطاقات
+    ProjectsModule,           // 📊 إدارة المشاريع والمحفظة
+    ProgramsModule,           // 📊 إدارة البرامج
+    IntegrationsModule,       // 🔗 التكاملات الخارجية (Slack, Teams, GitHub, etc.)
+    EmployeeDebtModule,       // 💰 دفتر ديون الموظفين
+    SecurityModule,           // 🔒 أمان المعادلات
   ],
   controllers: [AppController],
   providers: [

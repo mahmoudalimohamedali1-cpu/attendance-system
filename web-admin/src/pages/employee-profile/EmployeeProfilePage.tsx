@@ -36,6 +36,7 @@ import {
     TrendingUp,
     AccessTime,
     Save,
+    Hub,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import { useAuthStore } from '@/store/auth.store';
@@ -403,6 +404,26 @@ export const EmployeeProfilePage = () => {
                                     <Typography variant="body2" fontWeight={600}>{formatDate(p.hireDate)}</Typography>
                                 </Box>
                             </Box>
+
+                            {/* Cost Center - مركز التكلفة */}
+                            {p.costCenter && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#E3F2FD' }}>
+                                        <Hub fontSize="small" sx={{ color: '#1976D2' }} />
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">مركز التكلفة</Typography>
+                                        <Typography variant="body2" fontWeight={600}>
+                                            {p.costCenter.nameAr || p.costCenter.name || '-'}
+                                        </Typography>
+                                        {p.costCenter.code && (
+                                            <Typography variant="caption" color="text.secondary">
+                                                ({p.costCenter.code})
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Box>
+                            )}
                         </Box>
                     </Box>
                 </Grid>

@@ -1,0 +1,283 @@
+import { Injectable, Logger } from '@nestjs/common';
+
+/**
+ * 🏢 Facilities Service
+ * Implements remaining ideas: Office facilities management
+ * 
+ * Features:
+ * - Room booking
+ * - Parking management
+ * - Desk reservation
+ * - Facility requests
+ */
+
+export interface Room {
+    id: string;
+    name: string;
+    nameAr: string;
+    floor: number;
+    capacity: number;
+    amenities: string[];
+    available: boolean;
+}
+
+export interface RoomBooking {
+    id: string;
+    roomId: string;
+    roomName: string;
+    userId: string;
+    userName: string;
+    title: string;
+    start: Date;
+    end: Date;
+    attendees: number;
+    status: 'pending' | 'confirmed' | 'cancelled';
+}
+
+export interface ParkingSpot {
+    id: string;
+    zone: string;
+    number: string;
+    type: 'regular' | 'vip' | 'accessible' | 'ev';
+    typeAr: string;
+    assigned: boolean;
+    assignedTo?: string;
+}
+
+export interface DeskReservation {
+    id: string;
+    deskNumber: string;
+    floor: number;
+    userId: string;
+    date: Date;
+    status: 'reserved' | 'checked_in' | 'cancelled';
+}
+
+export interface FacilityRequest {
+    id: string;
+    userId: string;
+    type: 'maintenance' | 'cleaning' | 'supplies' | 'it' | 'security';
+    typeAr: string;
+    description: string;
+    location: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    status: 'open' | 'in_progress' | 'completed';
+    createdAt: Date;
+}
+
+@Injectable()
+export class FacilitiesService {
+    private readonly logger = new Logger(FacilitiesService.name);
+
+    // Meeting rooms
+    private readonly rooms: Room[] = [
+        { id: '1', name: 'Innovation Hub', nameAr: 'مركز الابتكار', floor: 1, capacity: 20, amenities: ['projector', 'whiteboard', 'video_conf'], available: true },
+        { id: '2', name: 'Executive Suite', nameAr: 'قاعة التنفيذيين', floor: 3, capacity: 12, amenities: ['projector', 'video_conf', 'catering'], available: true },
+        { id: '3', name: 'Focus Room A', nameAr: 'غرفة التركيز أ', floor: 2, capacity: 4, amenities: ['whiteboard'], available: true },
+        { id: '4', name: 'Training Center', nameAr: 'مركز التدريب', floor: 1, capacity: 50, amenities: ['projector', 'microphone', 'recording'], available: false },
+        { id: '5', name: 'Brainstorm Lab', nameAr: 'معمل العصف الذهني', floor: 2, capacity: 8, amenities: ['whiteboard', 'sticky_notes', 'screens'], available: true },
+    ];
+
+    // Bookings
+    private bookings: Map<string, RoomBooking> = new Map();
+    private deskReservations: Map<string, DeskReservation> = new Map();
+    private facilityRequests: Map<string, FacilityRequest> = new Map();
+
+    /**
+     * 🏢 Get available rooms
+     */
+    getAvailableRooms(capacity?: number, floor?: number): Room[] {
+        let rooms = this.rooms.filter(r => r.available);
+        if (capacity) {
+            rooms = rooms.filter(r => r.capacity >= capacity);
+        }
+        if (floor) {
+            rooms = rooms.filter(r => r.floor === floor);
+        }
+        return rooms;
+    }
+
+    /**
+     * 📅 Book a room
+     */
+    bookRoom(
+        roomId: string,
+        userId: string,
+        userName: string,
+        title: string,
+        start: Date,
+        end: Date,
+        attendees: number
+    ): { success: boolean; booking?: RoomBooking; message: string } {
+        const room = this.rooms.find(r => r.id === roomId);
+        if (!room) {
+            return { success: false, message: '❌ الغرفة غير موجودة' };
+        }
+
+        if (!room.available) {
+            return { success: false, message: '❌ الغرفة غير متاحة' };
+        }
+
+        if (attendees > room.capacity) {
+            return { success: false, message: `❌ السعة القصوى ${room.capacity} شخص` };
+        }
+
+        const id = `BOOK-${Date.now().toString(36).toUpperCase()}`;
+        const booking: RoomBooking = {
+            id,
+            roomId,
+            roomName: room.nameAr,
+            userId,
+            userName,
+            title,
+            start,
+            end,
+            attendees,
+            status: 'confirmed',
+        };
+
+        this.bookings.set(id, booking);
+        return { success: true, booking, message: `✅ تم حجز ${room.nameAr}` };
+    }
+
+    /**
+     * 🚗 Get parking status
+     */
+    getParkingStatus(): { available: number; total: number; zones: { zone: string; available: number }[] } {
+        const spots: ParkingSpot[] = [
+            { id: '1', zone: 'A', number: 'A-01', type: 'regular', typeAr: 'عادي', assigned: true },
+            { id: '2', zone: 'A', number: 'A-02', type: 'regular', typeAr: 'عادي', assigned: false },
+            { id: '3', zone: 'B', number: 'B-01', type: 'vip', typeAr: 'VIP', assigned: true },
+            { id: '4', zone: 'B', number: 'B-02', type: 'ev', typeAr: 'سيارات كهربائية', assigned: false },
+            { id: '5', zone: 'C', number: 'C-01', type: 'accessible', typeAr: 'ذوي الاحتياجات', assigned: false },
+        ];
+
+        const available = spots.filter(s => !s.assigned).length;
+        const zones = ['A', 'B', 'C'].map(zone => ({
+            zone,
+            available: spots.filter(s => s.zone === zone && !s.assigned).length,
+        }));
+
+        return { available, total: spots.length, zones };
+    }
+
+    /**
+     * 🪑 Reserve desk
+     */
+    reserveDesk(
+        userId: string,
+        deskNumber: string,
+        floor: number,
+        date: Date
+    ): { success: boolean; reservation?: DeskReservation; message: string } {
+        const id = `DESK-${Date.now().toString(36).toUpperCase()}`;
+
+        const reservation: DeskReservation = {
+            id,
+            deskNumber,
+            floor,
+            userId,
+            date,
+            status: 'reserved',
+        };
+
+        this.deskReservations.set(id, reservation);
+        return {
+            success: true,
+            reservation,
+            message: `✅ تم حجز المكتب ${deskNumber} - الطابق ${floor}`,
+        };
+    }
+
+    /**
+     * 📝 Submit facility request
+     */
+    submitRequest(
+        userId: string,
+        type: FacilityRequest['type'],
+        description: string,
+        location: string,
+        priority: FacilityRequest['priority']
+    ): FacilityRequest {
+        const id = `REQ-${Date.now().toString(36).toUpperCase()}`;
+
+        const typeNames: Record<string, string> = {
+            maintenance: 'صيانة',
+            cleaning: 'نظافة',
+            supplies: 'مستلزمات',
+            it: 'تقنية معلومات',
+            security: 'أمن',
+        };
+
+        const request: FacilityRequest = {
+            id,
+            userId,
+            type,
+            typeAr: typeNames[type],
+            description,
+            location,
+            priority,
+            status: 'open',
+            createdAt: new Date(),
+        };
+
+        this.facilityRequests.set(id, request);
+        return request;
+    }
+
+    /**
+     * 📊 Format available rooms
+     */
+    formatAvailableRooms(capacity?: number): string {
+        const rooms = this.getAvailableRooms(capacity);
+
+        if (rooms.length === 0) {
+            return '❌ لا توجد غرف متاحة حالياً';
+        }
+
+        let message = '🏢 **الغرف المتاحة:**\n\n';
+
+        for (const room of rooms) {
+            message += `📍 **${room.nameAr}**\n`;
+            message += `   الطابق: ${room.floor} | السعة: ${room.capacity} شخص\n`;
+            message += `   المرافق: ${room.amenities.join(', ')}\n\n`;
+        }
+
+        message += '💡 قل "احجز [اسم الغرفة]" للحجز';
+        return message;
+    }
+
+    /**
+     * 📊 Format booking confirmation
+     */
+    formatBooking(booking: RoomBooking): string {
+        const dateStr = booking.start.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'short' });
+        const timeStr = `${booking.start.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })} - ${booking.end.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}`;
+
+        let message = `✅ **تم تأكيد الحجز #${booking.id}**\n\n`;
+        message += `📍 الغرفة: ${booking.roomName}\n`;
+        message += `📅 التاريخ: ${dateStr}\n`;
+        message += `⏰ الوقت: ${timeStr}\n`;
+        message += `👥 الحضور: ${booking.attendees}\n`;
+        message += `📋 الموضوع: ${booking.title}`;
+
+        return message;
+    }
+
+    /**
+     * 📊 Format parking status
+     */
+    formatParkingStatus(): string {
+        const status = this.getParkingStatus();
+
+        let message = `🚗 **حالة المواقف:**\n\n`;
+        message += `📊 المتاحة: ${status.available}/${status.total}\n\n`;
+
+        for (const zone of status.zones) {
+            const bar = '█'.repeat(zone.available) + '░'.repeat(5 - zone.available);
+            message += `المنطقة ${zone.zone}: ${bar} ${zone.available} متاحة\n`;
+        }
+
+        return message;
+    }
+}

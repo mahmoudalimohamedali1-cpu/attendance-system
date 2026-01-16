@@ -1,0 +1,16 @@
+﻿src/modules/smart-policies/policy-analytics.service.ts(2,31): error TS2307: Cannot find module '@/modules/prisma/prisma.service' or its corresponding type declarations.
+src/modules/smart-policies/policy-analytics.service.ts(100,48): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/modules/smart-policies/policy-analytics.service.ts(101,63): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/modules/smart-policies/policy-analytics.service.ts(102,60): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/modules/smart-policies/policy-analytics.service.ts(113,21): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/modules/smart-policies/policy-analytics.service.ts(114,20): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/modules/smart-policies/policy-analytics.service.ts(114,23): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/modules/smart-policies/policy-analytics.service.ts(116,18): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/modules/smart-policies/policy-analytics.service.ts(124,62): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/modules/smart-policies/policy-coach.service.ts(2,31): error TS2307: Cannot find module '@/modules/prisma/prisma.service' or its corresponding type declarations.
+src/modules/smart-policies/policy-coach.service.ts(157,63): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/modules/smart-policies/policy-coach.service.ts(188,54): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/modules/smart-policies/policy-coach.service.ts(223,48): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/modules/smart-policies/policy-coach.service.ts(224,50): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/modules/smart-policies/policy-coach.service.ts(279,50): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/modules/smart-policies/policy-templates.service.ts(2,31): error TS2307: Cannot find module '@/modules/prisma/prisma.service' or its corresponding type declarations.

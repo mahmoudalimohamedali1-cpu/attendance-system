@@ -39,6 +39,14 @@ import {
     Info as InfoIcon,
     Science as TestIcon,
     Preview as PreviewIcon,
+    History as HistoryIcon,
+    Send as SendIcon,
+    ThumbUp as ApproveIcon,
+    ThumbDown as RejectIcon,
+    PlaylistAddCheck as QueueIcon,
+    Timeline as TimelineIcon,
+    Warning as WarningIcon,
+    Assignment as AuditIcon,
 } from '@mui/icons-material';
 import { smartPoliciesService, SmartPolicy, ParsedPolicyRule, SmartPolicyStatus } from '../../services/smart-policies.service';
 
@@ -98,6 +106,53 @@ export default function SmartPoliciesPage() {
         sampleResults: Array<{ employeeName: string; amount: number; }>;
     } | null>(null);
 
+    // 🧠 Self-Extending AI State
+    const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+    const [extending, setExtending] = useState(false);
+    const [extendResult, setExtendResult] = useState<{
+        needsExtension: boolean;
+        extended?: boolean;
+        addedModels?: string[];
+        message: string;
+        missingFields?: Array<{ name: string; type: string; description: string }>;
+        suggestedModels?: Array<{ name: string; fields: Array<{ name: string; type: string }> }>;
+    } | null>(null);
+    const [extendText, setExtendText] = useState('');
+
+    // === NEW: Approval Queue State ===
+    const [approvalQueue, setApprovalQueue] = useState<any[]>([]);
+    const [approvalQueueLoading, setApprovalQueueLoading] = useState(false);
+    const [showApprovalQueue, setShowApprovalQueue] = useState(false);
+
+    // === NEW: Simulation State ===
+    const [simulationDialogOpen, setSimulationDialogOpen] = useState(false);
+    const [simulationPolicy, setSimulationPolicy] = useState<SmartPolicy | null>(null);
+    const [simulationPeriod, setSimulationPeriod] = useState(new Date().toISOString().slice(0, 7));
+    const [simulating, setSimulating] = useState(false);
+    const [simulationResult, setSimulationResult] = useState<any>(null);
+
+    // === NEW: Version History State ===
+    const [versionDialogOpen, setVersionDialogOpen] = useState(false);
+    const [versionPolicy, setVersionPolicy] = useState<SmartPolicy | null>(null);
+    const [versions, setVersions] = useState<any[]>([]);
+    const [versionsLoading, setVersionsLoading] = useState(false);
+
+    // === NEW: Conflict Detection State ===
+    const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+    const [conflictPolicy, setConflictPolicy] = useState<SmartPolicy | null>(null);
+    const [conflictResult, setConflictResult] = useState<{
+        hasConflicts: boolean;
+        conflictingPolicies: any[];
+        warnings: string[];
+    } | null>(null);
+    const [conflictsLoading, setConflictsLoading] = useState(false);
+
+    // === NEW: Audit Log State ===
+    const [auditDialogOpen, setAuditDialogOpen] = useState(false);
+    const [auditPolicy, setAuditPolicy] = useState<SmartPolicy | null>(null);
+    const [auditLogs, setAuditLogs] = useState<any[]>([]);
+    const [auditLoading, setAuditLoading] = useState(false);
+
     // اختبار السياسة
     const handleTestPolicy = async (policy: SmartPolicy) => {
         setTesting(true);
@@ -150,6 +205,151 @@ export default function SmartPoliciesPage() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // === NEW: Fetch Approval Queue ===
+    const fetchApprovalQueue = async () => {
+        setApprovalQueueLoading(true);
+        try {
+            const result = await smartPoliciesService.getApprovalQueue();
+            setApprovalQueue(result.data || []);
+        } catch (error: any) {
+            console.error('Error fetching approval queue:', error);
+            showSnackbar('فشل في جلب قائمة الموافقات', 'error');
+        } finally {
+            setApprovalQueueLoading(false);
+        }
+    };
+
+    // === NEW: Submit for Approval ===
+    const handleSubmitForApproval = async (policy: SmartPolicy) => {
+        try {
+            await smartPoliciesService.submitForApproval(policy.id);
+            showSnackbar('تم إرسال السياسة للموافقة ✅', 'success');
+            fetchData();
+        } catch (error: any) {
+            console.error('Error submitting for approval:', error);
+            showSnackbar(error.response?.data?.message || 'فشل في إرسال السياسة للموافقة', 'error');
+        }
+    };
+
+    // === NEW: Approve Policy ===
+    const handleApprove = async (policyId: string, activateNow: boolean = true) => {
+        try {
+            await smartPoliciesService.approve(policyId, undefined, activateNow);
+            showSnackbar('تمت الموافقة على السياسة ✅', 'success');
+            fetchData();
+            fetchApprovalQueue();
+        } catch (error: any) {
+            console.error('Error approving policy:', error);
+            showSnackbar('فشل في الموافقة على السياسة', 'error');
+        }
+    };
+
+    // === NEW: Reject Policy ===
+    const handleReject = async (policyId: string) => {
+        const reason = window.prompt('سبب الرفض:');
+        if (!reason) return;
+        try {
+            await smartPoliciesService.reject(policyId, reason);
+            showSnackbar('تم رفض السياسة', 'info');
+            fetchData();
+            fetchApprovalQueue();
+        } catch (error: any) {
+            console.error('Error rejecting policy:', error);
+            showSnackbar('فشل في رفض السياسة', 'error');
+        }
+    };
+
+    // === NEW: Open Simulation Dialog ===
+    const handleOpenSimulation = (policy: SmartPolicy) => {
+        setSimulationPolicy(policy);
+        setSimulationResult(null);
+        setSimulationDialogOpen(true);
+    };
+
+    // === NEW: Run Simulation ===
+    const handleRunSimulation = async () => {
+        if (!simulationPolicy) return;
+        setSimulating(true);
+        try {
+            const result = await smartPoliciesService.simulate(simulationPolicy.id, simulationPeriod);
+            setSimulationResult(result);
+            showSnackbar(`تم المحاكاة: ${result.summary.affectedEmployees} موظف متأثر`, 'success');
+        } catch (error: any) {
+            console.error('Error running simulation:', error);
+            showSnackbar('فشل في تشغيل المحاكاة', 'error');
+        } finally {
+            setSimulating(false);
+        }
+    };
+
+    // === NEW: Open Version History ===
+    const handleOpenVersionHistory = async (policy: SmartPolicy) => {
+        setVersionPolicy(policy);
+        setVersionDialogOpen(true);
+        setVersionsLoading(true);
+        try {
+            const result = await smartPoliciesService.getVersionHistory(policy.id);
+            setVersions(result.data || []);
+        } catch (error: any) {
+            console.error('Error fetching version history:', error);
+            showSnackbar('فشل في جلب تاريخ الإصدارات', 'error');
+        } finally {
+            setVersionsLoading(false);
+        }
+    };
+
+    // === NEW: Revert to Version ===
+    const handleRevertToVersion = async (versionNumber: number) => {
+        if (!versionPolicy) return;
+        if (!window.confirm(`هل تريد استعادة الإصدار ${versionNumber}؟`)) return;
+        try {
+            await smartPoliciesService.revertToVersion(versionPolicy.id, versionNumber);
+            showSnackbar(`تم استعادة الإصدار ${versionNumber} ✅`, 'success');
+            setVersionDialogOpen(false);
+            fetchData();
+        } catch (error: any) {
+            console.error('Error reverting to version:', error);
+            showSnackbar('فشل في استعادة الإصدار', 'error');
+        }
+    };
+
+    // === NEW: Open Conflict Detection ===
+    const handleOpenConflicts = async (policy: SmartPolicy) => {
+        setConflictPolicy(policy);
+        setConflictDialogOpen(true);
+        setConflictsLoading(true);
+        setConflictResult(null);
+        try {
+            const result = await smartPoliciesService.detectConflicts(policy.id);
+            setConflictResult({
+                hasConflicts: result.hasConflicts,
+                conflictingPolicies: result.conflictingPolicies || [],
+                warnings: result.warnings || [],
+            });
+        } catch (error: any) {
+            console.error('Error detecting conflicts:', error);
+            showSnackbar('فشل في اكتشاف التعارضات', 'error');
+        } finally {
+            setConflictsLoading(false);
+        }
+    };
+
+    // === NEW: Open Audit Log ===
+    const handleOpenAuditLog = async (policy: SmartPolicy) => {
+        setAuditPolicy(policy);
+        setAuditDialogOpen(true);
+        setAuditLoading(true);
+        try {
+            const result = await smartPoliciesService.getAuditLog(policy.id);
+            setAuditLogs(result.data || []);
+        } catch (error: any) {
+            console.error('Error fetching audit log:', error);
+            showSnackbar('فشل في جلب سجل التدقيق', 'error');
+        } finally {
+            setAuditLoading(false);
+        }
+    };
 
     // تحليل النص بالذكاء الاصطناعي
     const handleAnalyze = async () => {
@@ -229,6 +429,56 @@ export default function SmartPoliciesPage() {
         setDetailsDialogOpen(true);
     };
 
+    // 🧠 تحليل وتوسيع النظام تلقائياً
+    const handleAnalyzeAndExtend = async (confirm: boolean = false) => {
+        if (!extendText.trim()) {
+            showSnackbar('الرجاء كتابة وصف السياسة', 'warning');
+            return;
+        }
+
+        // Prevent double-click
+        if (extending) return;
+
+        setExtending(true);
+        // Only clear result for new analysis, not for confirm
+        if (!confirm) {
+            setExtendResult(null);
+        }
+
+        try {
+            console.log('🔍 Starting auto-extend analysis...', { confirm });
+            const result = await smartPoliciesService.autoExtend(extendText, confirm);
+            console.log('✅ Auto-extend result:', result);
+
+            if (result) {
+                setExtendResult(result);
+
+                if (result.needsExtension && !confirm) {
+                    showSnackbar('تم اكتشاف حقول ناقصة! راجعها وأكد التوسيع 🔧', 'info');
+                } else if (result.extended) {
+                    showSnackbar(`🎉 تم توسيع النظام! أضفنا: ${result.addedModels?.join(', ')}`, 'success');
+                } else if (!result.needsExtension) {
+                    showSnackbar('✅ السياسة يمكن تنفيذها بالحقول الحالية', 'success');
+                }
+            }
+        } catch (error: any) {
+            console.error('❌ Error extending system:', error);
+            console.error('❌ Error name:', error?.name);
+            console.error('❌ Error message:', error?.message);
+            console.error('❌ Error response:', error?.response?.data);
+
+            // Build a useful error message
+            const errorMessage =
+                error?.response?.data?.message ||
+                error?.message ||
+                'حدث خطأ غير متوقع';
+
+            showSnackbar(errorMessage, 'error');
+        } finally {
+            setExtending(false);
+        }
+    };
+
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
             {/* العنوان والإحصائيات */}
@@ -250,6 +500,22 @@ export default function SmartPoliciesPage() {
                             disabled={loading}
                         >
                             تحديث
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="secondary"
+                            startIcon={<SparkleIcon />}
+                            onClick={() => setExtendDialogOpen(true)}
+                            sx={{
+                                borderColor: '#9C27B0',
+                                color: '#9C27B0',
+                                '&:hover': {
+                                    borderColor: '#7B1FA2',
+                                    bgcolor: 'rgba(156, 39, 176, 0.04)',
+                                },
+                            }}
+                        >
+                            🧠 توسيع النظام
                         </Button>
                         <Button
                             variant="contained"
@@ -424,15 +690,84 @@ export default function SmartPoliciesPage() {
                                             }
                                             label={policy.isActive ? 'مفعّلة' : 'موقوفة'}
                                         />
-                                        <Box>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                            {/* Submit for Approval - only for DRAFT */}
+                                            {policy.status === 'DRAFT' && (
+                                                <Tooltip title="إرسال للموافقة">
+                                                    <IconButton
+                                                        color="primary"
+                                                        size="small"
+                                                        onClick={() => handleSubmitForApproval(policy)}
+                                                    >
+                                                        <SendIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                            {/* Approve/Reject - only for PENDING */}
+                                            {policy.status === 'PENDING' && (
+                                                <>
+                                                    <Tooltip title="موافقة">
+                                                        <IconButton
+                                                            color="success"
+                                                            size="small"
+                                                            onClick={() => handleApprove(policy.id)}
+                                                        >
+                                                            <ApproveIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="رفض">
+                                                        <IconButton
+                                                            color="error"
+                                                            size="small"
+                                                            onClick={() => handleReject(policy.id)}
+                                                        >
+                                                            <RejectIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </>
+                                            )}
+                                            <Tooltip title="محاكاة">
+                                                <IconButton
+                                                    color="secondary"
+                                                    size="small"
+                                                    onClick={() => handleOpenSimulation(policy)}
+                                                >
+                                                    <TestIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="تاريخ الإصدارات">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleOpenVersionHistory(policy)}
+                                                >
+                                                    <HistoryIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="اكتشاف التعارضات">
+                                                <IconButton
+                                                    size="small"
+                                                    color="warning"
+                                                    onClick={() => handleOpenConflicts(policy)}
+                                                >
+                                                    <WarningIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="سجل التدقيق">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleOpenAuditLog(policy)}
+                                                >
+                                                    <AuditIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
                                             <Tooltip title="التفاصيل">
-                                                <IconButton onClick={() => handleViewDetails(policy)}>
-                                                    <InfoIcon />
+                                                <IconButton size="small" onClick={() => handleViewDetails(policy)}>
+                                                    <InfoIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
                                             <Tooltip title="حذف">
-                                                <IconButton color="error" onClick={() => handleDelete(policy.id)}>
-                                                    <DeleteIcon />
+                                                <IconButton color="error" size="small" onClick={() => handleDelete(policy.id)}>
+                                                    <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
                                         </Box>
@@ -700,6 +1035,426 @@ export default function SmartPoliciesPage() {
                         </DialogActions>
                     </>
                 )}
+            </Dialog>
+
+            {/* 🧠 حوار توسيع النظام تلقائياً */}
+            <Dialog
+                open={extendDialogOpen}
+                onClose={() => !extending && setExtendDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ pb: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <SparkleIcon sx={{ color: '#9C27B0' }} />
+                        <Typography variant="h6">🧠 توسيع النظام تلقائياً (Self-Extending AI)</Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ mt: 2 }}>
+                        <Alert severity="info" sx={{ mb: 3 }}>
+                            اكتب السياسة أو الميزة اللي محتاجها، والذكاء الاصطناعي هيكتشف الحقول الناقصة ويضيفها للنظام تلقائياً!
+                            <br />
+                            <strong>مثال:</strong> "الموظف اللي عنده سيارة شركة يتخصم منه 0.5 ريال لكل كيلو زيادة عن 500"
+                        </Alert>
+
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            label="اكتب السياسة أو الميزة المطلوبة"
+                            placeholder="مثال: تتبع استخدام سيارات الشركة للموظفين"
+                            value={extendText}
+                            onChange={(e) => setExtendText(e.target.value)}
+                            disabled={extending}
+                            sx={{ mb: 2 }}
+                        />
+
+                        <Button
+                            variant="contained"
+                            startIcon={extending ? <CircularProgress size={20} color="inherit" /> : <SparkleIcon />}
+                            onClick={() => handleAnalyzeAndExtend(false)}
+                            disabled={extending || !extendText.trim()}
+                            fullWidth
+                            size="large"
+                            sx={{
+                                mb: 3,
+                                background: 'linear-gradient(45deg, #9C27B0 30%, #E040FB 90%)',
+                            }}
+                        >
+                            {extending ? 'جاري التحليل...' : '🔍 تحليل واكتشاف الحقول الناقصة'}
+                        </Button>
+
+                        {/* عرض نتيجة التحليل */}
+                        <Collapse in={!!extendResult}>
+                            {extendResult && (
+                                <Paper sx={{ p: 3, borderRadius: 2, bgcolor: extendResult.needsExtension ? 'warning.light' : 'success.light' }}>
+                                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {extendResult.needsExtension ? '🔧 النظام يحتاج توسيع!' : '✅ السياسة جاهزة للتنفيذ'}
+                                    </Typography>
+
+                                    {extendResult.needsExtension && (
+                                        <>
+                                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                الحقول الناقصة:
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                                                {extendResult.missingFields?.map((f, i) => (
+                                                    <Chip
+                                                        key={i}
+                                                        label={`${f.name} (${f.type})`}
+                                                        color="warning"
+                                                        variant="outlined"
+                                                    />
+                                                ))}
+                                            </Box>
+
+                                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                                الجداول المقترحة:
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                                                {extendResult.suggestedModels?.map((m, i) => (
+                                                    <Chip
+                                                        key={i}
+                                                        label={m.name}
+                                                        color="primary"
+                                                    />
+                                                ))}
+                                            </Box>
+
+                                            {!extendResult.extended && (
+                                                <Button
+                                                    variant="contained"
+                                                    color="success"
+                                                    startIcon={extending ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
+                                                    onClick={() => handleAnalyzeAndExtend(true)}
+                                                    disabled={extending}
+                                                    fullWidth
+                                                    sx={{ mt: 2 }}
+                                                >
+                                                    {extending ? 'جاري التوسيع...' : '✅ أكد وأضف للنظام'}
+                                                </Button>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {extendResult.extended && (
+                                        <Alert severity="success" sx={{ mt: 2 }}>
+                                            🎉 تم إضافة: {extendResult.addedModels?.join(', ')}
+                                            <br />
+                                            الآن يمكنك استخدام هذه الحقول في السياسات!
+                                        </Alert>
+                                    )}
+
+                                    <Typography variant="body2" sx={{ mt: 2 }}>
+                                        💬 {extendResult.message}
+                                    </Typography>
+                                </Paper>
+                            )}
+                        </Collapse>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 3 }}>
+                    <Button
+                        onClick={() => { setExtendDialogOpen(false); setExtendText(''); setExtendResult(null); }}
+                        disabled={extending}
+                    >
+                        إغلاق
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* 🧪 حوار المحاكاة */}
+            <Dialog
+                open={simulationDialogOpen}
+                onClose={() => !simulating && setSimulationDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <TestIcon color="secondary" />
+                        <Typography variant="h6">🧪 محاكاة السياسة</Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {simulationPolicy && (
+                        <Box sx={{ mt: 2 }}>
+                            <Alert severity="info" sx={{ mb: 3 }}>
+                                محاكاة تأثير السياسة على الموظفين بدون تطبيقها فعلياً.
+                                <br />
+                                <strong>السياسة:</strong> {simulationPolicy.name || simulationPolicy.originalText?.slice(0, 50)}
+                            </Alert>
+
+                            <TextField
+                                fullWidth
+                                type="month"
+                                label="الفترة (شهر/سنة)"
+                                value={simulationPeriod}
+                                onChange={(e) => setSimulationPeriod(e.target.value)}
+                                sx={{ mb: 3 }}
+                                InputLabelProps={{ shrink: true }}
+                            />
+
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                fullWidth
+                                size="large"
+                                startIcon={simulating ? <CircularProgress size={20} color="inherit" /> : <PlayIcon />}
+                                onClick={handleRunSimulation}
+                                disabled={simulating}
+                                sx={{ mb: 3, background: 'linear-gradient(45deg, #9C27B0 30%, #E040FB 90%)' }}
+                            >
+                                {simulating ? 'جاري المحاكاة...' : '🚀 تشغيل المحاكاة'}
+                            </Button>
+
+                            {/* نتائج المحاكاة */}
+                            <Collapse in={!!simulationResult}>
+                                {simulationResult && (
+                                    <Paper sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 2 }}>
+                                        <Typography variant="h6" gutterBottom>📊 نتائج المحاكاة</Typography>
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={6} sm={3}>
+                                                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light' }}>
+                                                    <Typography variant="h4" color="primary.dark">{simulationResult.summary?.totalEmployees || 0}</Typography>
+                                                    <Typography variant="body2">إجمالي الموظفين</Typography>
+                                                </Paper>
+                                            </Grid>
+                                            <Grid item xs={6} sm={3}>
+                                                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light' }}>
+                                                    <Typography variant="h4" color="warning.dark">{simulationResult.summary?.affectedEmployees || 0}</Typography>
+                                                    <Typography variant="body2">المتأثرين</Typography>
+                                                </Paper>
+                                            </Grid>
+                                            <Grid item xs={6} sm={3}>
+                                                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light' }}>
+                                                    <Typography variant="h4" color="success.dark">{simulationResult.summary?.totalAdditions || 0}</Typography>
+                                                    <Typography variant="body2">إضافات (ر.س)</Typography>
+                                                </Paper>
+                                            </Grid>
+                                            <Grid item xs={6} sm={3}>
+                                                <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light' }}>
+                                                    <Typography variant="h4" color="error.dark">{simulationResult.summary?.totalDeductions || 0}</Typography>
+                                                    <Typography variant="body2">خصومات (ر.س)</Typography>
+                                                </Paper>
+                                            </Grid>
+                                        </Grid>
+
+                                        {simulationResult.results?.length > 0 && (
+                                            <Box sx={{ mt: 3 }}>
+                                                <Typography variant="subtitle2" gutterBottom>الموظفين المتأثرين:</Typography>
+                                                <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                                                    {simulationResult.results.slice(0, 10).map((r: any, i: number) => (
+                                                        <Chip
+                                                            key={i}
+                                                            label={`${r.employeeName}: ${r.amount} ر.س`}
+                                                            variant="outlined"
+                                                            size="small"
+                                                            color={r.type === 'ADDITION' ? 'success' : r.type === 'DEDUCTION' ? 'error' : 'default'}
+                                                            sx={{ m: 0.5 }}
+                                                        />
+                                                    ))}
+                                                    {simulationResult.results.length > 10 && (
+                                                        <Chip label={`+${simulationResult.results.length - 10} آخرين`} size="small" sx={{ m: 0.5 }} />
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                        )}
+                                    </Paper>
+                                )}
+                            </Collapse>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 3 }}>
+                    <Button onClick={() => { setSimulationDialogOpen(false); setSimulationResult(null); }} disabled={simulating}>
+                        إغلاق
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* 📜 حوار تاريخ الإصدارات */}
+            <Dialog
+                open={versionDialogOpen}
+                onClose={() => setVersionDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <HistoryIcon color="primary" />
+                        <Typography variant="h6">📜 تاريخ الإصدارات</Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {versionPolicy && (
+                        <Box sx={{ mt: 2 }}>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                السياسة: {versionPolicy.name || versionPolicy.originalText?.slice(0, 50)}
+                            </Typography>
+                            <Divider sx={{ my: 2 }} />
+
+                            {versionsLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : versions.length === 0 ? (
+                                <Alert severity="info">لا توجد إصدارات سابقة لهذه السياسة</Alert>
+                            ) : (
+                                <Box>
+                                    {versions.map((version, index) => (
+                                        <Paper key={version.id} sx={{ p: 2, mb: 2, bgcolor: index === 0 ? 'success.light' : 'grey.50' }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Box>
+                                                    <Typography variant="subtitle1" fontWeight="bold">
+                                                        الإصدار {version.versionNumber}
+                                                        {index === 0 && <Chip label="الحالي" size="small" color="success" sx={{ ml: 1 }} />}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {version.changedByName} - {new Date(version.createdAt).toLocaleDateString('ar-SA')}
+                                                    </Typography>
+                                                    <Typography variant="body2">{version.changeReason}</Typography>
+                                                </Box>
+                                                {index !== 0 && (
+                                                    <Button
+                                                        variant="outlined"
+                                                        size="small"
+                                                        onClick={() => handleRevertToVersion(version.versionNumber)}
+                                                    >
+                                                        استعادة
+                                                    </Button>
+                                                )}
+                                            </Box>
+                                        </Paper>
+                                    ))}
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 3 }}>
+                    <Button onClick={() => setVersionDialogOpen(false)}>إغلاق</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* 🔍 حوار اكتشاف التعارضات */}
+            <Dialog
+                open={conflictDialogOpen}
+                onClose={() => setConflictDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <WarningIcon color="warning" />
+                        <Typography variant="h6">🔍 اكتشاف التعارضات</Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {conflictPolicy && (
+                        <Box sx={{ mt: 2 }}>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                السياسة: {conflictPolicy.name || conflictPolicy.originalText?.slice(0, 50)}
+                            </Typography>
+                            <Divider sx={{ my: 2 }} />
+
+                            {conflictsLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : conflictResult ? (
+                                <Box>
+                                    {!conflictResult.hasConflicts ? (
+                                        <Alert severity="success" sx={{ mb: 2 }}>
+                                            ✅ لا توجد تعارضات! السياسة آمنة للتفعيل.
+                                        </Alert>
+                                    ) : (
+                                        <>
+                                            {conflictResult.warnings.map((w, i) => (
+                                                <Alert key={i} severity="warning" sx={{ mb: 1 }}>{w}</Alert>
+                                            ))}
+                                            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                                                السياسات المتعارضة ({conflictResult.conflictingPolicies.length}):
+                                            </Typography>
+                                            {conflictResult.conflictingPolicies.map((c, i) => (
+                                                <Paper key={i} sx={{ p: 2, mb: 1, bgcolor: c.severity === 'HIGH' ? 'error.light' : c.severity === 'MEDIUM' ? 'warning.light' : 'grey.100' }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Box>
+                                                            <Typography fontWeight="bold">{c.name}</Typography>
+                                                            <Typography variant="body2" color="text.secondary">{c.description}</Typography>
+                                                        </Box>
+                                                        <Chip label={c.severity} size="small" color={c.severity === 'HIGH' ? 'error' : c.severity === 'MEDIUM' ? 'warning' : 'default'} />
+                                                    </Box>
+                                                </Paper>
+                                            ))}
+                                        </>
+                                    )}
+                                </Box>
+                            ) : null}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 3 }}>
+                    <Button onClick={() => setConflictDialogOpen(false)}>إغلاق</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* 📋 حوار سجل التدقيق */}
+            <Dialog
+                open={auditDialogOpen}
+                onClose={() => setAuditDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AuditIcon color="primary" />
+                        <Typography variant="h6">📋 سجل التدقيق</Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {auditPolicy && (
+                        <Box sx={{ mt: 2 }}>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                السياسة: {auditPolicy.name || auditPolicy.originalText?.slice(0, 50)}
+                            </Typography>
+                            <Divider sx={{ my: 2 }} />
+
+                            {auditLoading ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                                    <CircularProgress />
+                                </Box>
+                            ) : auditLogs.length === 0 ? (
+                                <Alert severity="info">لا توجد سجلات تدقيق لهذه السياسة</Alert>
+                            ) : (
+                                <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                                    {auditLogs.map((log, i) => (
+                                        <Paper key={log.id || i} sx={{ p: 2, mb: 1, bgcolor: 'grey.50' }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                <Box>
+                                                    <Typography fontWeight="bold">
+                                                        {log.action?.replace(/_/g, ' ')}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {log.userName} - {new Date(log.createdAt).toLocaleString('ar-SA')}
+                                                    </Typography>
+                                                    {log.description && (
+                                                        <Typography variant="body2" sx={{ mt: 0.5 }}>{log.description}</Typography>
+                                                    )}
+                                                </Box>
+                                                <Chip label={log.action} size="small" variant="outlined" />
+                                            </Box>
+                                        </Paper>
+                                    ))}
+                                </Box>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 3 }}>
+                    <Button onClick={() => setAuditDialogOpen(false)}>إغلاق</Button>
+                </DialogActions>
             </Dialog>
 
             {/* Snackbar */}

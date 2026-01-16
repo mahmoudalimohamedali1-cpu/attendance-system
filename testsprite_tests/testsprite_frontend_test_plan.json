@@ -1,0 +1,856 @@
+[
+  {
+    "id": "TC001",
+    "title": "Successful Login",
+    "description": "Verify user can log in successfully with valid email and password.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login endpoint POST /api/v1/auth/login."
+      },
+      {
+        "type": "action",
+        "description": "Submit request with valid email and password."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains authentication token and success status."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Login Failure with Incorrect Credentials",
+    "description": "Verify login fails with incorrect email or password and proper error message is returned.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send login request with invalid email and/or password to POST /api/v1/auth/login."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response status indicates failure and error message is appropriate."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "User Registration Success",
+    "description": "Verify new user registration completes successfully with valid input data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/auth/register with valid user details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user is created and response returns success."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "User Registration Fail with Missing Fields",
+    "description": "Verify registration fails with missing required fields and returns proper validation errors.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/auth/register with incomplete user data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response returns validation errors specifying missing fields."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Refresh Authentication Token",
+    "description": "Verify valid refresh token provides a new authentication token.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/auth/refresh with valid refresh token."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains new access token and status success."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Logout Successfully",
+    "description": "Verify authenticated user can log out successfully.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/auth/logout with valid authentication."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify session or token invalidation and success response."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Forgot Password Request",
+    "description": "Verify user can request password reset with valid email.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST to /api/v1/auth/forgot-password with registered email."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response success and reset instructions sent."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Retrieve List of Users",
+    "description": "Verify logged-in user can retrieve paginated list of employees.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/users with valid authentication."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains list of users with expected data."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Get User Details by ID",
+    "description": "Verify retrieval of specific user details by user ID.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/users/:id with valid user ID."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains detailed info of the specified user."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Create New User",
+    "description": "Verify creating a new employee user via POST /api/v1/users works with valid data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/users with valid user attributes."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify new user is created and response contains user info."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Update Existing User",
+    "description": "Verify update of existing user details by ID via PUT /api/v1/users/:id.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/users/:id with updated attributes."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user details are updated and response confirms success."
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Delete User by ID",
+    "description": "Verify deletion of a user by ID via DELETE /api/v1/users/:id.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send DELETE request to /api/v1/users/:id."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user is removed and response indicates success."
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Get Logged-in User Profile",
+    "description": "Verify authenticated user can retrieve own profile data via GET /api/v1/users/profile.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/users/profile with authentication token."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains profile information of logged-in user."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Check-in Attendance Successfully with Valid Geofence and Face Recognition",
+    "description": "Verify employee can check-in attendance only within geofenced area and using face recognition.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/attendance/check-in with valid geolocation and accepted face data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify check-in is successful and recorded in attendance system."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Check-in Attendance Failure Outside Geofence",
+    "description": "Verify attendance check-in is denied if employee tries to check in outside allowed geofence.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST /api/v1/attendance/check-in request with geolocation outside allowed area."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify check-in is rejected and proper error message is returned."
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Check-in Attendance Failure with Face Recognition Mismatch",
+    "description": "Verify attendance check-in fails when face recognition does not match registered user.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST /api/v1/attendance/check-in with invalid or unmatched face recognition data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify system rejects check-in and returns face recognition failure message."
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Successful Check-out Attendance",
+    "description": "Verify employee can check-out successfully after checking in.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/attendance/check-out with valid authentication and active check-in record."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify check-out is recorded properly and attendance duration calculated."
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Check-out Without Prior Check-in",
+    "description": "Verify check-out fails if employee has not checked in first.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/attendance/check-out without existing active check-in."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify check-out is rejected with proper error message."
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Retrieve My Attendance Records",
+    "description": "Verify logged-in user can retrieve own attendance records via GET /api/v1/attendance/my-records.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET /api/v1/attendance/my-records with valid authentication."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response returns correct attendance records for user."
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Retrieve Today's Attendance Records",
+    "description": "Verify system returns list of today's attendance entries via GET /api/v1/attendance/today.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/attendance/today with authenticated user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains attendance records of today as per user role."
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Generate Attendance Report",
+    "description": "Verify attendance report generation with filters and summarization via GET /api/v1/attendance/report.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/attendance/report with date range and filtering parameters."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains correct filtered attendance report data."
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Create Leave Request Successfully",
+    "description": "Verify employee can create a leave request with valid dates and reason via POST /api/v1/leaves.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/leaves with valid leave details."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm leave request is stored and response returns success."
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Fetch Leave Requests List",
+    "description": "Verify retrieval of list of leave requests via GET /api/v1/leaves with pagination.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/leaves."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response returns paginated list of leave requests."
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Get Leave Request Details by ID",
+    "description": "Verify retrieval of single leave request details via GET /api/v1/leaves/:id.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/leaves/:id with valid leave ID."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response returns details of the specified leave request."
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Update Leave Request",
+    "description": "Verify update of leave request details via PUT /api/v1/leaves/:id before approval.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/leaves/:id with updated leave information."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify leave request is updated successfully if not approved yet."
+      }
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Delete Leave Request",
+    "description": "Verify deletion of leave request via DELETE /api/v1/leaves/:id before approval.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send DELETE request to /api/v1/leaves/:id."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify leave request is deleted if not approved and response confirms success."
+      }
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "Approve Leave Request",
+    "description": "Verify manager can approve leave request via PUT /api/v1/leaves/:id/approve.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/leaves/:id/approve as authorized manager."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify leave request status is updated to approved and notification sent."
+      }
+    ]
+  },
+  {
+    "id": "TC028",
+    "title": "Reject Leave Request",
+    "description": "Verify manager can reject leave request via PUT /api/v1/leaves/:id/reject.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/leaves/:id/reject as authorized manager."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify leave request status is updated to rejected and notification sent."
+      }
+    ]
+  },
+  {
+    "id": "TC029",
+    "title": "Check Leave Balance",
+    "description": "Verify employee can retrieve current leave balance via GET /api/v1/leaves/balance.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/leaves/balance as authenticated user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response shows correct leave balance amounts."
+      }
+    ]
+  },
+  {
+    "id": "TC030",
+    "title": "Create New Branch",
+    "description": "Verify creation of new branch via POST /api/v1/branches with valid data.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/branches with valid branch details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify branch is created and response contains new branch info."
+      }
+    ]
+  },
+  {
+    "id": "TC031",
+    "title": "Retrieve Branch List",
+    "description": "Verify retrieval of all branches via GET /api/v1/branches.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/branches."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response returns list of branches."
+      }
+    ]
+  },
+  {
+    "id": "TC032",
+    "title": "Get Branch Details by ID",
+    "description": "Verify retrieval of branch details via GET /api/v1/branches/:id.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/branches/:id with valid branch ID."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains branch details."
+      }
+    ]
+  },
+  {
+    "id": "TC033",
+    "title": "Update Branch Details",
+    "description": "Verify updating branch info via PUT /api/v1/branches/:id.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/branches/:id with updated information."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify branch info is updated successfully."
+      }
+    ]
+  },
+  {
+    "id": "TC034",
+    "title": "Delete Branch",
+    "description": "Verify deletion of branch via DELETE /api/v1/branches/:id.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send DELETE request to /api/v1/branches/:id."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm deletion and response success."
+      }
+    ]
+  },
+  {
+    "id": "TC035",
+    "title": "Create Department Successfully",
+    "description": "Verify creation of new department via POST /api/v1/departments with valid data.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/departments with valid department data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify department is created and response confirms success."
+      }
+    ]
+  },
+  {
+    "id": "TC036",
+    "title": "Retrieve Departments List",
+    "description": "Verify retrieval of list of departments via GET /api/v1/departments.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/departments."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response includes departments data."
+      }
+    ]
+  },
+  {
+    "id": "TC037",
+    "title": "Update Department Details",
+    "description": "Verify updating a department name or info via PUT /api/v1/departments/:id.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/departments/:id with updated details."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm department is updated and response returns success."
+      }
+    ]
+  },
+  {
+    "id": "TC038",
+    "title": "Dashboard Summary Retrieval",
+    "description": "Verify executive dashboard summary data is retrievable via GET /api/v1/dashboard.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/dashboard."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify dashboard data is returned with key metrics."
+      }
+    ]
+  },
+  {
+    "id": "TC039",
+    "title": "Dashboard Stats Retrieval",
+    "description": "Verify retrieval of dashboard statistics via GET /api/v1/dashboard/stats.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/dashboard/stats."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm stats data correctness and completeness."
+      }
+    ]
+  },
+  {
+    "id": "TC040",
+    "title": "Dashboard Attendance Summary",
+    "description": "Verify retrieval of attendance summary on dashboard via GET /api/v1/dashboard/attendance-summary.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/dashboard/attendance-summary."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify correct attendance summary data is returned."
+      }
+    ]
+  },
+  {
+    "id": "TC041",
+    "title": "Retrieve Notification List",
+    "description": "Verify user can get list of notifications via GET /api/v1/notifications.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/notifications as authenticated user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains user notification items."
+      }
+    ]
+  },
+  {
+    "id": "TC042",
+    "title": "Mark Notification as Read",
+    "description": "Verify user can mark a single notification as read via PUT /api/v1/notifications/:id/read.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/notifications/:id/read for specific notification."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm notification status updated to read."
+      }
+    ]
+  },
+  {
+    "id": "TC043",
+    "title": "Mark All Notifications as Read",
+    "description": "Verify user can mark all notifications as read via PUT /api/v1/notifications/read-all.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/notifications/read-all."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all notifications are marked as read in response."
+      }
+    ]
+  },
+  {
+    "id": "TC044",
+    "title": "Retrieve System Settings",
+    "description": "Verify retrieval of current company/system settings via GET /api/v1/settings.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/settings."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response returns current system settings."
+      }
+    ]
+  },
+  {
+    "id": "TC045",
+    "title": "Update System Settings",
+    "description": "Verify update of company or system settings via PUT /api/v1/settings with valid data.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/settings with updated settings data."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm settings updated and response confirms success."
+      }
+    ]
+  },
+  {
+    "id": "TC046",
+    "title": "Retrieve Holidays List",
+    "description": "Verify retrieval of company holidays via GET /api/v1/settings/holidays.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/settings/holidays."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response includes list of holidays with dates."
+      }
+    ]
+  },
+  {
+    "id": "TC047",
+    "title": "Create Payroll Run Successfully",
+    "description": "Verify that a payroll run can be created via POST /api/v1/payroll-runs with valid data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send POST request to /api/v1/payroll-runs with valid payroll calculation parameters."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payroll run is created and response returns correct details."
+      }
+    ]
+  },
+  {
+    "id": "TC048",
+    "title": "List Payroll Runs",
+    "description": "Verify retrieval of list of payroll runs via GET /api/v1/payroll-runs.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/payroll-runs."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response returns correct list of payroll runs."
+      }
+    ]
+  },
+  {
+    "id": "TC049",
+    "title": "Get Payroll Run Details",
+    "description": "Verify retrieval of detailed payroll run information via GET /api/v1/payroll-runs/:id.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send GET request to /api/v1/payroll-runs/:id with valid payroll run ID."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response contains details of the specified payroll run."
+      }
+    ]
+  },
+  {
+    "id": "TC050",
+    "title": "Approve Payroll Run",
+    "description": "Verify that a payroll run can be approved via PUT /api/v1/payroll-runs/:id/approve.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send PUT request to /api/v1/payroll-runs/:id/approve as authorized user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payroll run status is updated to approved and response confirms success."
+      }
+    ]
+  }
+]

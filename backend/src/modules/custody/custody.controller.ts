@@ -7,6 +7,7 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '@prisma/client';
 import { CustodyService } from './custody.service';
+import { AuditService } from '../audit/audit.service';
 import {
     CreateCategoryCto, UpdateCategoryCto,
     CreateItemDto, UpdateItemDto,
@@ -20,7 +21,10 @@ import {
 @Controller('custody')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class CustodyController {
-    constructor(private readonly custodyService: CustodyService) { }
+    constructor(
+        private readonly custodyService: CustodyService,
+        private readonly auditService: AuditService,
+    ) { }
 
     // ==================== Categories ====================
 
@@ -208,6 +212,61 @@ export class CustodyController {
     @RequirePermission('CUSTODY_VIEW_SELF')
     getMyReport(@CurrentUser() user: User) {
         return this.custodyService.getEmployeeCustodyReport(user.companyId!, user.id);
+    }
+
+    // ==================== Audit History ====================
+
+    @Get('audit/history')
+    @RequirePermission('CUSTODY_AUDIT_VIEW')
+    async getCustodyAuditHistory(
+        @Query('entityId') entityId?: string,
+        @Query('entity') entity?: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+    ) {
+        // Filter by custody-related entities
+        const custodyEntities = ['CustodyCategory', 'CustodyItem', 'CustodyAssignment', 'CustodyReturn', 'CustodyTransfer', 'CustodyMaintenance'];
+        const filterEntity = entity && custodyEntities.includes(entity) ? entity : undefined;
+
+        return this.auditService.getAuditLogs({
+            entityId,
+            entity: filterEntity,
+            startDate,
+            endDate,
+            page: page ? parseInt(page) : 1,
+            limit: limit ? parseInt(limit) : 50,
+        });
+    }
+
+    @Get('audit/item/:itemId')
+    @RequirePermission('CUSTODY_AUDIT_VIEW')
+    async getItemAuditHistory(
+        @Param('itemId') itemId: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+    ) {
+        return this.auditService.getAuditLogs({
+            entityId: itemId,
+            entity: 'CustodyItem',
+            page: page ? parseInt(page) : 1,
+            limit: limit ? parseInt(limit) : 50,
+        });
+    }
+
+    @Get('audit/employee/:employeeId')
+    @RequirePermission('CUSTODY_AUDIT_VIEW')
+    async getEmployeeCustodyAuditHistory(
+        @Param('employeeId') employeeId: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+    ) {
+        return this.auditService.getAuditLogs({
+            userId: employeeId,
+            page: page ? parseInt(page) : 1,
+            limit: limit ? parseInt(limit) : 50,
+        });
     }
 }
 

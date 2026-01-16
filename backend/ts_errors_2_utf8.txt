@@ -1,0 +1,28 @@
+﻿src/modules/contracts/contracts.service.ts(114,17): error TS2322: Type 'string' is not assignable to type 'PayrollFrequency | undefined'.
+src/modules/contracts/contracts.service.ts(173,13): error TS2322: Type '{ qiwaStatus?: QiwaAuthStatus | undefined; qiwaContractId?: string | undefined; notes?: string | undefined; additionalTerms?: string | undefined; documentUrl?: string | undefined; ... 15 more ...; type?: ContractType | undefined; }' is not assignable to type '(Without<ContractUpdateInput, ContractUncheckedUpdateInput> & ContractUncheckedUpdateInput) | (Without<...> & ContractUpdateInput)'.
+  Type '{ qiwaStatus?: QiwaAuthStatus | undefined; qiwaContractId?: string | undefined; notes?: string | undefined; additionalTerms?: string | undefined; documentUrl?: string | undefined; ... 15 more ...; type?: ContractType | undefined; }' is not assignable to type 'Without<ContractUncheckedUpdateInput, ContractUpdateInput> & ContractUpdateInput'.
+    Types of property 'salaryCycle' are incompatible.
+      Type 'string | undefined' is not assignable to type 'PayrollFrequency | EnumPayrollFrequencyFieldUpdateOperationsInput | undefined'.
+        Type 'string' is not assignable to type 'PayrollFrequency | EnumPayrollFrequencyFieldUpdateOperationsInput | undefined'.
+src/modules/logistics/logistics.controller.ts(12,30): error TS2307: Cannot find module '../auth/jwt-auth.guard' or its corresponding type declarations.
+src/modules/logistics/logistics.controller.ts(30,20): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(37,22): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(53,25): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(60,26): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(76,30): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(83,32): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(100,9): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(116,9): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.module.ts(4,30): error TS2307: Cannot find module '../../prisma/prisma.module' or its corresponding type declarations.
+src/modules/logistics/logistics.service.ts(2,31): error TS2307: Cannot find module '../../prisma/prisma.service' or its corresponding type declarations.
+src/modules/payroll-calculation/payroll-calculation.service.ts(929,52): error TS2304: Cannot find name 'daysInMonthGeneral'.
+src/modules/payroll-calculation/payroll-calculation.service.ts(929,87): error TS2304: Cannot find name 'daysInMonthGeneral'.
+src/modules/payroll-calculation/payroll-calculation.service.ts(992,26): error TS2304: Cannot find name 'daysInMonthGeneral'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(358,56): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/modules/smart-policies/features/advanced-analytics.service.ts(893,21): error TS2353: Object literal may only specify known properties, and 'result' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(901,21): error TS2353: Object literal may only specify known properties, and 'result' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(914,48): error TS18048: 'impactData._avg' is possibly 'undefined'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(930,17): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(981,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(984,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/policy-marketplace.service.ts(427,17): error TS2561: Object literal may only specify known properties, but 'scope' does not exist in type 'Without<SmartPolicyCreateInput, SmartPolicyUncheckedCreateInput> & SmartPolicyUncheckedCreateInput'. Did you mean to write 'scopeId'?

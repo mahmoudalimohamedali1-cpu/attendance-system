@@ -8,6 +8,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { UploadModule } from "../../common/upload/upload.module";
 import { PermissionsModule } from "../permissions/permissions.module";
 import { SmartPoliciesModule } from "../smart-policies/smart-policies.module";
+import { TimezoneService } from "../../common/services/timezone.service";
 
 @Module({
   imports: [NotificationsModule, UploadModule, PermissionsModule, forwardRef(() => SmartPoliciesModule)],
@@ -17,6 +18,7 @@ import { SmartPoliciesModule } from "../smart-policies/smart-policies.module";
     LeaveCalculationService,
     LeaveTypeConfigService,
     LeaveBalanceService,
+    TimezoneService,
   ],
   exports: [
     LeavesService,
@@ -25,4 +27,5 @@ import { SmartPoliciesModule } from "../smart-policies/smart-policies.module";
     LeaveBalanceService,
   ],
 })
-export class LeavesModule {}
+export class LeavesModule { }
+

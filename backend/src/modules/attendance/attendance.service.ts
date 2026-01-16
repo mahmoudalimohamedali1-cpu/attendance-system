@@ -8,6 +8,8 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeofenceService } from './services/geofence.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { TimezoneService } from '../../common/services/timezone.service';
+import { SettingsService } from '../settings/settings.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
@@ -17,12 +19,18 @@ import { SmartPolicyTriggerService } from '../smart-policies/smart-policy-trigge
 
 @Injectable()
 export class AttendanceService {
+  // Configurable face verification threshold (0.0 - 1.0)
+  // Increase this value for stricter face matching (recommended: 0.6-0.7)
+  private readonly FACE_THRESHOLD = 0.6; // Issue #16: Increased from 0.5 to 0.6 for better security
+
   constructor(
     private prisma: PrismaService,
     private geofenceService: GeofenceService,
     private notificationsService: NotificationsService,
     private permissionsService: PermissionsService,
     private smartPolicyTrigger: SmartPolicyTriggerService,
+    private timezoneService: TimezoneService,
+    private settingsService: SettingsService, // For holiday checking
   ) { }
 
   async checkIn(userId: string, checkInDto: CheckInDto) {
@@ -43,11 +51,8 @@ export class AttendanceService {
     }
 
     // Check if work from home is enabled for today
-    // استخدام التوقيت المحلي (UTC+2)
-    const nowForDate = new Date();
-    const localDate = new Date(nowForDate.getTime() + (2 * 60 * 60 * 1000)); // UTC+2 (Egypt/Saudi)
-    // إنشاء تاريخ اليوم في UTC (بدون وقت)
-    const today = new Date(Date.UTC(localDate.getUTCFullYear(), localDate.getUTCMonth(), localDate.getUTCDate()));
+    // Use TimezoneService for proper timezone handling
+    const today = this.timezoneService.getLocalToday();
 
     const workFromHomeRecord = await this.prisma.workFromHome.findUnique({
       where: {
@@ -60,7 +65,7 @@ export class AttendanceService {
 
     // Check mock location
     if (isMockLocation) {
-      await this.logSuspiciousAttempt(userId, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
+      await this.logSuspiciousAttempt(userId, user.companyId as string, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
       await this.notifyAdminSuspiciousActivity(user, 'محاولة حضور باستخدام موقع وهمي');
       throw new ForbiddenException('تم رصد استخدام موقع وهمي. لا يمكن تسجيل الحضور.');
     }
@@ -81,6 +86,7 @@ export class AttendanceService {
       if (!geofenceResult.isWithin) {
         await this.logSuspiciousAttempt(
           userId,
+          user.companyId as string,
           'OUT_OF_RANGE',
           latitude,
           longitude,
@@ -103,8 +109,14 @@ export class AttendanceService {
       },
     });
 
-    if (existingAttendance?.checkInTime) {
-      throw new BadRequestException('تم تسجيل الحضور مسبقاً لهذا اليوم');
+    // Issue #52: Stricter check - reject if attendance record exists at all
+    if (existingAttendance) {
+      if (existingAttendance.checkInTime) {
+        throw new BadRequestException('تم تسجيل الحضور مسبقاً لهذا اليوم');
+      }
+      // Record exists without checkInTime - this is an inconsistent state, log and reject
+      console.warn(`Inconsistent attendance record for user ${userId}: exists but no checkInTime`);
+      throw new BadRequestException('يوجد سجل حضور غير مكتمل، يرجى التواصل مع الدعم');
     }
 
     // Parse work times
@@ -116,7 +128,9 @@ export class AttendanceService {
     const startMinutes = workStartTime.hours * 60 + workStartTime.minutes;
 
     // Check early check-in restriction
-    const earlyCheckInPeriod = user.branch.earlyCheckInPeriod;
+    // Issue #44: Clamp earlyCheckInPeriod to max 2 hours (120 minutes) to prevent misconfiguration abuse
+    const MAX_EARLY_CHECKIN_LIMIT = 120; // 2 hours maximum
+    const earlyCheckInPeriod = Math.min(user.branch.earlyCheckInPeriod || 30, MAX_EARLY_CHECKIN_LIMIT);
     const earliestCheckIn = startMinutes - earlyCheckInPeriod;
 
     if (currentMinutes < earliestCheckIn) {
@@ -172,15 +186,13 @@ export class AttendanceService {
           const similarityPercent = Math.round(similarity * 100);
           console.log(`🔍 Face verification for check-in: similarity = ${similarityPercent}%`);
 
-          // threshold = 0.5 (50%)
-          const FACE_THRESHOLD = 0.5;
-
-          if (similarity < FACE_THRESHOLD) {
-            console.log(`❌ Face verification FAILED: ${similarityPercent}% < ${FACE_THRESHOLD * 100}%`);
+          if (similarity < this.FACE_THRESHOLD) {
+            console.log(`❌ Face verification FAILED: ${similarityPercent}% < ${this.FACE_THRESHOLD * 100}%`);
 
             // تسجيل محاولة مشبوهة
             await this.logSuspiciousAttempt(
               userId,
+              user.companyId as string,
               'FACE_MISMATCH',
               latitude,
               longitude,
@@ -188,7 +200,7 @@ export class AttendanceService {
             );
 
             throw new ForbiddenException(
-              `الوجه غير مطابق (${similarityPercent}%) - يجب أن يكون التطابق أكثر من ${FACE_THRESHOLD * 100}%`
+              `الوجه غير مطابق (${similarityPercent}%) - يجب أن يكون التطابق أكثر من ${this.FACE_THRESHOLD * 100}%`
             );
           }
 
@@ -246,6 +258,19 @@ export class AttendanceService {
       throw new BadRequestException('يجب التقاط صورة الوجه للتحقق من الهوية');
     }
 
+
+    // 🎉 Check if today is an official holiday for this employee
+    const holidayInfo = await this.settingsService.getEmployeeHolidayInfo(today, userId, user.companyId as string);
+    const isHolidayToday = holidayInfo.isHoliday;
+
+    // Determine final status (holiday takes precedence over normal status for overtime calculation)
+    let finalStatus: AttendanceStatus = workFromHomeRecord ? 'WORK_FROM_HOME' : status;
+    if (isHolidayToday && !workFromHomeRecord) {
+      finalStatus = 'HOLIDAY' as AttendanceStatus; // Working on holiday = overtime based on multiplier
+      const multiplier = holidayInfo.holiday?.overtimeMultiplier || 2;
+      console.log(`🎉 Employee ${userId} is working on holiday "${holidayInfo.holiday?.name}" - overtime multiplier: ${multiplier}x`);
+    }
+
     // Create or update attendance record
     const attendance = await this.prisma.attendance.upsert({
       where: {
@@ -263,24 +288,26 @@ export class AttendanceService {
         checkInLatitude: latitude,
         checkInLongitude: longitude,
         checkInDistance: distance,
-        status: workFromHomeRecord ? 'WORK_FROM_HOME' : status,
-        lateMinutes,
+        status: finalStatus,
+        lateMinutes: isHolidayToday ? 0 : lateMinutes, // No late penalty on holidays
         isWorkFromHome: !!workFromHomeRecord,
         deviceInfo,
+        notes: isHolidayToday ? `عمل في عطلة: ${holidayInfo.holiday?.name}` : undefined,
       },
       update: {
         checkInTime: now,
         checkInLatitude: latitude,
         checkInLongitude: longitude,
         checkInDistance: distance,
-        status: workFromHomeRecord ? 'WORK_FROM_HOME' : status,
-        lateMinutes,
+        status: finalStatus,
+        lateMinutes: isHolidayToday ? 0 : lateMinutes, // No late penalty on holidays
         isWorkFromHome: !!workFromHomeRecord,
         deviceInfo,
+        notes: isHolidayToday ? `عمل في عطلة: ${holidayInfo.holiday?.name}` : undefined,
       },
     });
 
-    
+
     // Trigger smart policies for check-in
     try {
       const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
@@ -331,7 +358,7 @@ export class AttendanceService {
 
     // Check mock location
     if (isMockLocation) {
-      await this.logSuspiciousAttempt(userId, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
+      await this.logSuspiciousAttempt(userId, user.companyId as string, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
       throw new ForbiddenException('تم رصد استخدام موقع وهمي. لا يمكن تسجيل الانصراف.');
     }
 
@@ -359,15 +386,13 @@ export class AttendanceService {
         const similarityPercent = Math.round(similarity * 100);
         console.log(`🔍 Face verification for user ${userId}: similarity = ${similarityPercent}%`);
 
-        // threshold = 0.5 (50%) - يمكن تعديله حسب الحاجة
-        const FACE_THRESHOLD = 0.5;
-
-        if (similarity < FACE_THRESHOLD) {
-          console.log(`❌ Face verification FAILED: ${similarityPercent}% < ${FACE_THRESHOLD * 100}%`);
+        if (similarity < this.FACE_THRESHOLD) {
+          console.log(`❌ Face verification FAILED: ${similarityPercent}% < ${this.FACE_THRESHOLD * 100}%`);
 
           // تسجيل محاولة مشبوهة
           await this.logSuspiciousAttempt(
             userId,
+            user.companyId as string,
             'FACE_MISMATCH',
             latitude,
             longitude,
@@ -375,7 +400,7 @@ export class AttendanceService {
           );
 
           throw new ForbiddenException(
-            `الوجه غير مطابق (${similarityPercent}%) - يجب أن يكون التطابق أكثر من ${FACE_THRESHOLD * 100}%`
+            `الوجه غير مطابق (${similarityPercent}%) - يجب أن يكون التطابق أكثر من ${this.FACE_THRESHOLD * 100}%`
           );
         }
 
@@ -388,10 +413,8 @@ export class AttendanceService {
       }
     }
 
-    // استخدام التوقيت المحلي
-    const nowCheckOut = new Date();
-    const localDateCheckOut = new Date(nowCheckOut.getTime() + (2 * 60 * 60 * 1000)); // UTC+2
-    const today = new Date(Date.UTC(localDateCheckOut.getUTCFullYear(), localDateCheckOut.getUTCMonth(), localDateCheckOut.getUTCDate()));
+    // Use TimezoneService for proper timezone handling
+    const today = this.timezoneService.getLocalToday();
 
     // Get today's attendance
     const attendance = await this.prisma.attendance.findUnique({
@@ -426,6 +449,7 @@ export class AttendanceService {
       if (!geofenceResult.isWithin) {
         await this.logSuspiciousAttempt(
           userId,
+          user.companyId as string,
           'OUT_OF_RANGE',
           latitude,
           longitude,
@@ -452,9 +476,12 @@ export class AttendanceService {
     if (currentMinutes < endMinutes) {
       earlyLeaveMinutes = endMinutes - currentMinutes;
 
-      // Update status if it was PRESENT
+      // Issue #28-29: Handle combined status properly
       if (status === 'PRESENT') {
         status = 'EARLY_LEAVE';
+      } else if (status === 'LATE') {
+        // Employee was late AND is leaving early - combined status
+        status = 'LATE_AND_EARLY';
       }
 
       // Notify employee
@@ -506,10 +533,8 @@ export class AttendanceService {
   }
 
   async getTodayAttendance(userId: string, companyId: string) {
-    // استخدام التوقيت المحلي
-    const nowToday = new Date();
-    const localDateToday = new Date(nowToday.getTime() + (2 * 60 * 60 * 1000)); // UTC+2
-    const today = new Date(Date.UTC(localDateToday.getUTCFullYear(), localDateToday.getUTCMonth(), localDateToday.getUTCDate()));
+    // Use TimezoneService for proper timezone handling
+    const today = this.timezoneService.getLocalToday();
 
     const attendance = await this.prisma.attendance.findFirst({
       where: {
@@ -597,10 +622,10 @@ export class AttendanceService {
       absentDays: attendances.filter((a) => a.status === 'ABSENT').length,
       workFromHomeDays: attendances.filter((a) => a.status === 'WORK_FROM_HOME').length,
       onLeaveDays: attendances.filter((a) => a.status === 'ON_LEAVE').length,
-      totalWorkingMinutes: attendances.reduce((sum, a) => sum + a.workingMinutes, 0),
-      totalOvertimeMinutes: attendances.reduce((sum, a) => sum + a.overtimeMinutes, 0),
-      totalLateMinutes: attendances.reduce((sum, a) => sum + a.lateMinutes, 0),
-      totalEarlyLeaveMinutes: attendances.reduce((sum, a) => sum + a.earlyLeaveMinutes, 0),
+      totalWorkingMinutes: attendances.reduce((sum, a) => sum + (a.workingMinutes || 0), 0),
+      totalOvertimeMinutes: attendances.reduce((sum, a) => sum + (a.overtimeMinutes || 0), 0),
+      totalLateMinutes: attendances.reduce((sum, a) => sum + (a.lateMinutes || 0), 0),
+      totalEarlyLeaveMinutes: attendances.reduce((sum, a) => sum + (a.earlyLeaveMinutes || 0), 0),
     };
 
     return {
@@ -711,7 +736,8 @@ export class AttendanceService {
   }
 
   async getDailyStats(companyId: string, date?: Date) {
-    const targetDate = date || new Date();
+    // Issue #39: Don't mutate the input parameter - create new date
+    const targetDate = new Date(date || new Date());
     targetDate.setHours(0, 0, 0, 0);
 
     const [totalEmployees, attendances] = await Promise.all([
@@ -727,6 +753,7 @@ export class AttendanceService {
       presentCount: attendances.filter((a) => a.checkInTime).length,
       lateCount: attendances.filter((a) => a.status === 'LATE').length,
       earlyLeaveCount: attendances.filter((a) => a.status === 'EARLY_LEAVE').length,
+      lateAndEarlyCount: attendances.filter((a) => a.status === 'LATE_AND_EARLY').length, // NEW: Combined status count
       absentCount: totalEmployees - attendances.filter((a) => a.checkInTime).length,
       workFromHomeCount: attendances.filter((a) => a.isWorkFromHome).length,
     };
@@ -740,6 +767,7 @@ export class AttendanceService {
 
   private async logSuspiciousAttempt(
     userId: string,
+    companyId: string, // Performance fix: Pass directly instead of querying
     attemptType: string,
     latitude: number,
     longitude: number,
@@ -749,7 +777,7 @@ export class AttendanceService {
     await this.prisma.suspiciousAttempt.create({
       data: {
         userId,
-        companyId: (await this.prisma.user.findFirst({ where: { id: userId }, select: { companyId: true } }))?.companyId,
+        companyId,
         attemptType,
         latitude,
         longitude,
@@ -760,8 +788,12 @@ export class AttendanceService {
   }
 
   private async notifyAdminSuspiciousActivity(user: any, message: string) {
+    // Security fix: Only notify admins from the same company
     const admins = await this.prisma.user.findMany({
-      where: { role: 'ADMIN' },
+      where: {
+        role: 'ADMIN',
+        companyId: user.companyId, // Scoped to company
+      },
     });
 
     for (const admin of admins) {
@@ -776,8 +808,12 @@ export class AttendanceService {
   }
 
   private async notifyAdminLateCheckIn(user: any, lateMinutes: number) {
+    // Security fix: Only notify admins/managers from the same company
     const admins = await this.prisma.user.findMany({
-      where: { role: { in: ['ADMIN', 'MANAGER'] } },
+      where: {
+        role: { in: ['ADMIN', 'MANAGER'] },
+        companyId: user.companyId, // Scoped to company
+      },
     });
 
     for (const admin of admins) {
@@ -794,8 +830,12 @@ export class AttendanceService {
   }
 
   private async notifyAdminEarlyCheckOut(user: any, earlyLeaveMinutes: number) {
+    // Security fix: Only notify admins/managers from the same company
     const admins = await this.prisma.user.findMany({
-      where: { role: { in: ['ADMIN', 'MANAGER'] } },
+      where: {
+        role: { in: ['ADMIN', 'MANAGER'] },
+        companyId: user.companyId, // Scoped to company
+      },
     });
 
     for (const admin of admins) {

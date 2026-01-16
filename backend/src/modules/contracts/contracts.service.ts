@@ -111,7 +111,7 @@ export class ContractsService {
                 startDate: new Date(dto.startDate),
                 endDate: dto.endDate ? new Date(dto.endDate) : null,
                 probationEndDate: dto.probationEndDate ? new Date(dto.probationEndDate) : null,
-                salaryCycle: dto.salaryCycle || 'MONTHLY',
+                salaryCycle: (dto.salaryCycle as any) || 'MONTHLY',
                 // حقول الراتب
                 basicSalary: dto.basicSalary,
                 housingAllowance: dto.housingAllowance,
@@ -176,7 +176,7 @@ export class ContractsService {
                 ...(dto.startDate && { startDate: new Date(dto.startDate) }),
                 ...(dto.endDate && { endDate: new Date(dto.endDate) }),
                 ...(dto.probationEndDate && { probationEndDate: new Date(dto.probationEndDate) }),
-                ...(dto.salaryCycle && { salaryCycle: dto.salaryCycle }),
+                ...(dto.salaryCycle && { salaryCycle: dto.salaryCycle as any }),
                 // حقول الراتب
                 ...(dto.basicSalary !== undefined && { basicSalary: dto.basicSalary }),
                 ...(dto.housingAllowance !== undefined && { housingAllowance: dto.housingAllowance }),

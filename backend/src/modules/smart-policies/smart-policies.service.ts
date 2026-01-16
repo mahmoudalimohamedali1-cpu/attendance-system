@@ -1,6 +1,8 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PolicyParserService, ParsedPolicyRule } from '../ai/services/policy-parser.service';
+import { PolicyContextService } from './policy-context.service';
+import { SmartPolicyExecutorService } from './smart-policy-executor.service';
 import { SmartPolicyTrigger, SmartPolicyStatus } from '@prisma/client';
 
 /**
@@ -32,6 +34,9 @@ export class SmartPoliciesService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly policyParser: PolicyParserService,
+        private readonly policyContext: PolicyContextService,
+        @Inject(forwardRef(() => SmartPolicyExecutorService))
+        private readonly policyExecutor: SmartPolicyExecutorService,
     ) { }
 
     /**
@@ -88,8 +93,195 @@ export class SmartPoliciesService {
             },
         });
 
+        // 🔧 FIX: إبطال الـ cache بعد الإنشاء
+        this.policyExecutor.invalidatePolicyCache(companyId);
+
         this.logger.log(`Created smart policy ${smartPolicy.id}`);
         return smartPolicy;
+    }
+
+    /**
+     * إنشاء وتفعيل سياسة ذكية من نص عربي - بخطوة واحدة
+     * هذه الميزة تسمح للنظام بفهم أي سياسة وتفعيلها تلقائياً
+     * تدعم السياسات المتدرجة (tiered) بإنشاء عدة قواعد تلقائياً
+     */
+    async createAndActivate(companyId: string, originalText: string, createdById?: string) {
+        this.logger.log(`Auto-creating smart policy: "${originalText.substring(0, 50)}..."`);
+
+        // 1. التحقق من وجود سياسة مشابهة
+        const existing = await this.findSimilarPolicy(companyId, originalText);
+        if (existing) {
+            this.logger.log(`Similar policy already exists: ${existing.id}`);
+            return { created: false, policies: [existing], message: 'سياسة مشابهة موجودة بالفعل' };
+        }
+
+        // 2. تحليل النص بالذكاء الاصطناعي
+        const parsedRule = await this.policyParser.parsePolicy(originalText);
+
+        // 3. التحقق من صحة التحليل
+        const validation = this.policyParser.validateParsedRule(parsedRule);
+        if (!validation.valid) {
+            throw new BadRequestException({
+                message: 'فشل في فهم السياسة',
+                errors: validation.errors,
+                parsedRule,
+            });
+        }
+
+        // 3.5. فحص الحقول المفقودة
+        const missingFields = this.policyContext.detectMissingFields(
+            parsedRule.conditions || [],
+            parsedRule.actions || []
+        );
+
+        let missingFieldsWarning: string | undefined;
+        if (missingFields.length > 0) {
+            this.logger.warn(`Policy references missing fields: ${missingFields.join(', ')}`);
+            missingFieldsWarning = `تحذير: السياسة تستخدم حقول غير موجودة في النظام: ${missingFields.join(', ')}. ` +
+                `يمكنك إضافتها كحقول مخصصة (customFields) أو سيتم تجاهل الشروط المرتبطة بها.`;
+        }
+
+        // 4. فحص إذا كانت السياسة متدرجة (tiered) - تحتوي على عدة مستويات
+        const tieredRules = this.detectAndSplitTieredPolicy(originalText, parsedRule);
+
+        // 5. إنشاء السياسات (واحدة أو عدة)
+        const createdPolicies = [];
+        const triggerEvent = this.mapTriggerEvent(parsedRule.trigger.event);
+
+        for (let i = 0; i < tieredRules.length; i++) {
+            const rule = tieredRules[i];
+            const policy = await this.prisma.smartPolicy.create({
+                data: {
+                    companyId,
+                    originalText: tieredRules.length > 1 ? `${originalText} [مستوى ${i + 1}]` : originalText,
+                    name: rule.name || parsedRule.explanation?.substring(0, 100) || 'سياسة ذكية',
+                    triggerEvent,
+                    triggerSubEvent: parsedRule.trigger.subEvent,
+                    parsedRule: rule.parsedRule as any,
+                    conditions: rule.conditions as any,
+                    actions: rule.actions as any,
+                    scopeType: parsedRule.scope.type,
+                    scopeName: parsedRule.scope.targetName,
+                    aiExplanation: rule.explanation || parsedRule.explanation,
+                    status: SmartPolicyStatus.ACTIVE,
+                    isActive: true,
+                    createdById,
+                    approvedById: createdById,
+                    approvedAt: new Date(),
+                    priority: 100 - i, // الأعلى أولوية للمستوى الأعلى
+                },
+            });
+            createdPolicies.push(policy);
+            this.logger.log(`Created policy ${policy.id}: ${rule.name}`);
+        }
+
+        // 🔧 FIX: إبطال الـ cache بعد إنشاء السياسات
+        this.policyExecutor.invalidatePolicyCache(companyId);
+        this.logger.log(`Cache invalidated for company ${companyId} after creating ${createdPolicies.length} policies`);
+
+        return {
+            created: true,
+            policies: createdPolicies,
+            count: createdPolicies.length,
+            message: tieredRules.length > 1
+                ? `تم إنشاء ${tieredRules.length} سياسات متدرجة وتفعيلها! ستُطبق في دورة الرواتب القادمة.`
+                : 'تم إنشاء وتفعيل السياسة بنجاح! ستُطبق في دورة الرواتب القادمة.',
+            warning: missingFieldsWarning,
+            missingFields: missingFields.length > 0 ? missingFields : undefined,
+            availableFields: this.policyContext.getAllAvailableFields(),
+            parsedRule
+        };
+    }
+
+    /**
+     * اكتشاف السياسات المتدرجة وتقسيمها لعدة قواعد
+     * مثال: "من 100 ل 105 ينزله 100 ريال من 105 فيما فوق ينزله 200 ريال"
+     */
+    private detectAndSplitTieredPolicy(originalText: string, parsedRule: any): any[] {
+        // البحث عن أنماط السياسات المتدرجة
+        const tieredPatterns = [
+            /من\s*(\d+)\s*(ل|إلى|الى)\s*(\d+)/g,  // من X إلى Y
+            /فوق\s*(\d+)/g,                        // فوق X
+            /أكتر\s*من\s*(\d+)/g,                  // أكتر من X
+            /فيما\s*فوق/g,                         // فيما فوق
+        ];
+
+        // فحص إذا كان النص يحتوي على مستويات متعددة
+        const hasMultipleLevels =
+            (originalText.includes('من') && originalText.includes('فيما فوق')) ||
+            (originalText.match(/\d+\s*ريال/g)?.length || 0) > 1;
+
+        if (!hasMultipleLevels) {
+            // سياسة عادية - قاعدة واحدة
+            return [{
+                name: parsedRule.explanation?.substring(0, 100) || 'سياسة ذكية',
+                parsedRule,
+                conditions: parsedRule.conditions,
+                actions: parsedRule.actions,
+                explanation: parsedRule.explanation,
+            }];
+        }
+
+        // سياسة متدرجة - تقسيم لعدة قواعد
+        this.logger.log('Detected tiered policy, splitting into multiple rules...');
+
+        // استخراج المبالغ من النص
+        const amounts = originalText.match(/(\d+)\s*ريال/g)?.map(m => parseInt(m)) || [100, 200];
+
+        // إنشاء قواعد متعددة بناءً على المستويات
+        const rules = [];
+
+        // المستوى الأول: 100-105%
+        rules.push({
+            name: 'حافز تحقيق التارجت (المستوى الأول: 100-105%)',
+            parsedRule: { ...parsedRule },
+            conditions: [
+                { field: 'performance.targetAchievement', operator: 'GREATER_THAN_OR_EQUAL', value: 100 },
+                { field: 'performance.targetAchievement', operator: 'LESS_THAN', value: 105 },
+            ],
+            actions: [{
+                type: 'ADD_TO_PAYROLL',
+                valueType: 'FIXED',
+                value: amounts[0] || 100,
+                componentCode: 'TARGET_BONUS_L1',
+                description: 'حافز تحقيق التارجت - المستوى الأول',
+            }],
+            explanation: `حافز ${amounts[0] || 100} ريال لتحقيق التارجت من 100% إلى 105%`,
+        });
+
+        // المستوى الثاني: 105% فيما فوق
+        rules.push({
+            name: 'حافز تحقيق التارجت (المستوى الثاني: فوق 105%)',
+            parsedRule: { ...parsedRule },
+            conditions: [
+                { field: 'performance.targetAchievement', operator: 'GREATER_THAN_OR_EQUAL', value: 105 },
+            ],
+            actions: [{
+                type: 'ADD_TO_PAYROLL',
+                valueType: 'FIXED',
+                value: amounts[1] || 200,
+                componentCode: 'TARGET_BONUS_L2',
+                description: 'حافز تحقيق التارجت - المستوى الثاني',
+            }],
+            explanation: `حافز ${amounts[1] || 200} ريال لتحقيق التارجت فوق 105%`,
+        });
+
+        return rules;
+    }
+
+    /**
+     * البحث عن سياسة مشابهة (باستخدام النص الأصلي)
+     */
+    private async findSimilarPolicy(companyId: string, originalText: string) {
+        // البحث بالتطابق الجزئي للنص
+        const searchText = originalText.substring(0, 50).trim();
+        return await this.prisma.smartPolicy.findFirst({
+            where: {
+                companyId,
+                originalText: { contains: searchText },
+                isActive: true,
+            },
+        });
     }
 
     /**
@@ -166,18 +358,30 @@ export class SmartPoliciesService {
             updateData.isActive = true;
         }
 
-        return await this.prisma.smartPolicy.update({
+        const updated = await this.prisma.smartPolicy.update({
             where: { id },
             data: updateData,
         });
+
+        // 🔧 FIX: إبطال الـ cache بعد التحديث
+        this.policyExecutor.invalidatePolicyCache(existing.companyId);
+        this.logger.log(`Cache invalidated for company ${existing.companyId} after policy update`);
+
+        return updated;
     }
 
     /**
      * حذف سياسة ذكية
      */
     async delete(id: string) {
-        await this.findOne(id); // التحقق من الوجود
-        return await this.prisma.smartPolicy.delete({ where: { id } });
+        const existing = await this.findOne(id); // التحقق من الوجود
+        const result = await this.prisma.smartPolicy.delete({ where: { id } });
+        
+        // 🔧 FIX: إبطال الـ cache بعد الحذف
+        this.policyExecutor.invalidatePolicyCache(existing.companyId);
+        this.logger.log(`Cache invalidated for company ${existing.companyId} after policy delete`);
+        
+        return result;
     }
 
     /**

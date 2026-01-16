@@ -2,8 +2,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsBoolean, IsString, Min, Max, IsNotEmpty } from 'class-validator';
 
 export class CheckInDto {
-  @ApiProperty({ description: 'معرف الشركة' })
-  @IsOptional()
+  @ApiProperty({
+    description: 'معرف الشركة (يُستخدم للتحقق من صلاحية الموظف)',
+    example: 'company-uuid-here',
+  })
+  @IsOptional() // Note: Made optional for backward compatibility, but should be provided
   @IsString()
   companyId?: string;
 
@@ -29,12 +32,14 @@ export class CheckInDto {
   @Max(180)
   longitude: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'هل الموقع وهمي (Mock Location)',
     example: false,
+    default: false,
   })
+  @IsOptional()
   @IsBoolean()
-  isMockLocation: boolean;
+  isMockLocation?: boolean;
 
   @ApiPropertyOptional({
     description: 'معلومات الجهاز',
@@ -45,11 +50,15 @@ export class CheckInDto {
   deviceInfo?: string;
 
   @ApiPropertyOptional({
-    description: 'دقة GPS بالمتر',
+    description: 'دقة GPS بالمتر (يُرفض إذا كانت أكبر من 100 متر)',
     example: 10,
+    minimum: 0,
+    maximum: 100,
   })
   @IsOptional()
   @IsNumber()
+  @Min(0, { message: 'دقة GPS يجب أن تكون قيمة موجبة' })
+  @Max(100, { message: 'دقة GPS ضعيفة جداً (يجب أن تكون أقل من 100 متر)' })
   accuracy?: number;
 
   // ============ بيانات التعرف على الوجه ============

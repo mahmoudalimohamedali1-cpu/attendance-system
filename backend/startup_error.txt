@@ -1,0 +1,71 @@
+node : node:internal/modules/
+cjs/loader:1473
+At line:1 char:1
++ node --trace-warnings 
+dist/src/main.js 2>&1 | 
+Out-File -Encoding asci ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (node:in  
+  ternal/modules/cjs/loade   
+ r:1473:String) [], Remot    
+eException
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+  return 
+process.dlopen(module, path.t
+oNamespacedPath(filename));
+                 ^
+
+Error: \\?\C:\Users\Administr
+ator\Downloads\attendance sys
+tem\attendance-system\backend
+\node_modules\bcrypt\lib\bind
+ing\napi-v3\bcrypt_lib.node 
+is not a valid Win32 
+application.
+
+\\?\C:\Users\Administrator\Do
+wnloads\attendance system\att
+endance-system\backend\node_m
+odules\bcrypt\lib\binding\nap
+i-v3\bcrypt_lib.node
+    at 
+Module._extensions..node (nod
+e:internal/modules/cjs/loader
+:1473:18)
+    at Module.load (node:inte
+rnal/modules/cjs/loader:1207:
+32)
+    at Module._load (node:int
+ernal/modules/cjs/loader:1023
+:12)
+    at Module.require (node:i
+nternal/modules/cjs/loader:12
+35:19)
+    at require (node:internal
+/modules/helpers:176:18)
+    at Object.<anonymous> (C:
+\Users\Administrator\Download
+s\attendance system\attendanc
+e-system\backend\node_modules
+\bcrypt\bcrypt.js:6:16)
+    at Module._compile (node:
+internal/modules/cjs/loader:1
+376:14)
+    at 
+Module._extensions..js (node:
+internal/modules/cjs/loader:1
+435:10)
+    at Module.load (node:inte
+rnal/modules/cjs/loader:1207:
+32)
+    at Module._load (node:int
+ernal/modules/cjs/loader:1023
+:12) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+
+Node.js v20.10.0

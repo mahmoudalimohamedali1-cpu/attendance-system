@@ -1,0 +1,1 @@
+﻿src/modules/smart-policies/features/policy-marketplace.service.ts(430,17): error TS2561: Object literal may only specify known properties, but 'createdBy' does not exist in type 'Without<SmartPolicyCreateInput, SmartPolicyUncheckedCreateInput> & SmartPolicyUncheckedCreateInput'. Did you mean to write 'createdById'?

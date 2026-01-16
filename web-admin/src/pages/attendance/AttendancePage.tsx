@@ -89,9 +89,11 @@ export const AttendancePage = () => {
       case 'PRESENT': return 'حاضر';
       case 'LATE': return 'متأخر';
       case 'EARLY_LEAVE': return 'انصراف مبكر';
+      case 'LATE_AND_EARLY': return 'متأخر + مبكر';
       case 'ABSENT': return 'غائب';
       case 'ON_LEAVE': return 'إجازة';
       case 'WORK_FROM_HOME': return 'عمل من المنزل';
+      case 'HOLIDAY': return '🎉 عطلة رسمية'; // NEW: Working on holiday
       default: return status;
     }
   };
@@ -101,16 +103,25 @@ export const AttendancePage = () => {
       case 'PRESENT': return 'success';
       case 'LATE': return 'warning';
       case 'EARLY_LEAVE': return 'info';
+      case 'LATE_AND_EARLY': return 'error';
       case 'ABSENT': return 'error';
       case 'ON_LEAVE': return 'secondary';
       case 'WORK_FROM_HOME': return 'primary';
+      case 'HOLIDAY': return 'warning'; // Gold/yellow for holiday
       default: return 'default';
     }
   };
 
+  // Issue #62: Handle null, empty string, and invalid dates
   const formatTime = (time: string | null) => {
-    if (!time) return '-';
-    return format(new Date(time), 'hh:mm a', { locale: ar });
+    if (!time || time === '') return '-';
+    try {
+      const date = new Date(time);
+      if (isNaN(date.getTime())) return '-'; // Invalid date
+      return format(date, 'hh:mm a', { locale: ar });
+    } catch {
+      return '-';
+    }
   };
 
   const formatMinutes = (minutes: number) => {
@@ -127,6 +138,31 @@ export const AttendancePage = () => {
     present: attendance.filter(a => a.status === 'PRESENT').length,
     late: attendance.filter(a => a.status === 'LATE').length,
     absent: attendance.filter(a => a.status === 'ABSENT').length,
+  };
+
+  // Issue #57: Export attendance data to CSV
+  const exportToCSV = () => {
+    if (!attendance.length) return;
+
+    const headers = ['الموظف', 'التاريخ', 'الحضور', 'الانصراف', 'الحالة', 'التأخير (دقيقة)', 'ساعات العمل'];
+    const rows = attendance.map(a => [
+      `${a.user?.firstName || ''} ${a.user?.lastName || ''}`,
+      a.date ? format(new Date(a.date), 'yyyy-MM-dd') : '',
+      a.checkInTime ? format(new Date(a.checkInTime), 'HH:mm') : '',
+      a.checkOutTime ? format(new Date(a.checkOutTime), 'HH:mm') : '',
+      getStatusLabel(a.status),
+      a.lateMinutes || 0,
+      Math.round((a.workingMinutes || 0) / 60 * 10) / 10,
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `attendance_${dateFilter || 'all'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -222,14 +258,27 @@ export const AttendancePage = () => {
               select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              sx={{ width: 150 }}
+              sx={{ width: 180 }}
             >
               <MenuItem value="all">جميع الحالات</MenuItem>
               <MenuItem value="PRESENT">حاضر</MenuItem>
               <MenuItem value="LATE">متأخر</MenuItem>
+              <MenuItem value="EARLY_LEAVE">انصراف مبكر</MenuItem>
+              <MenuItem value="LATE_AND_EARLY">متأخر + مبكر</MenuItem>
               <MenuItem value="ABSENT">غائب</MenuItem>
               <MenuItem value="ON_LEAVE">إجازة</MenuItem>
+              <MenuItem value="WORK_FROM_HOME">عمل من المنزل</MenuItem>
+              <MenuItem value="HOLIDAY">🎉 عطلة رسمية</MenuItem>
             </TextField>
+            <Button
+              variant="outlined"
+              startIcon={<FileDownload />}
+              onClick={exportToCSV}
+              disabled={!attendance.length}
+              sx={{ height: 40 }}
+            >
+              تصدير CSV
+            </Button>
           </Box>
 
           {isLoading ? (

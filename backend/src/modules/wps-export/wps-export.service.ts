@@ -518,8 +518,38 @@ export class WpsExportService {
 
     private validateIBAN(iban: string): boolean {
         if (!iban) return false;
+
+        // تنظيف IBAN
         const clean = iban.replace(/\s/g, '').toUpperCase();
-        return /^SA[0-9A-Z]{22}$/.test(clean);
+
+        // التحقق من الطول والشكل للسعودية
+        if (!/^SA[0-9]{22}$/.test(clean)) {
+            return false;
+        }
+
+        // ✅ التحقق من MOD-97 (ISO 13616)
+        // نقل أول 4 حروف للنهاية
+        const rearranged = clean.substring(4) + clean.substring(0, 4);
+
+        // تحويل الحروف لأرقام (A=10, B=11, ... Z=35)
+        let numericString = '';
+        for (const char of rearranged) {
+            if (char >= 'A' && char <= 'Z') {
+                numericString += (char.charCodeAt(0) - 55).toString();
+            } else {
+                numericString += char;
+            }
+        }
+
+        // حساب MOD-97 للأرقام الكبيرة
+        let remainder = 0;
+        for (let i = 0; i < numericString.length; i++) {
+            const digit = parseInt(numericString[i], 10);
+            remainder = (remainder * 10 + digit) % 97;
+        }
+
+        // IBAN صحيح إذا كان الباقي = 1
+        return remainder === 1;
     }
 
     private extractBankCode(iban: string): string {

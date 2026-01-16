@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "post api v1 auth login",
+    "description": "Test user login functionality with valid and invalid credentials, including email and phone login, and verify JWT token issuance."
+  },
+  {
+    "id": "TC002",
+    "title": "post api v1 auth register",
+    "description": "Test user registration with valid and invalid data, ensuring proper validation and user creation."
+  },
+  {
+    "id": "TC003",
+    "title": "post api v1 auth refresh",
+    "description": "Test JWT token refresh endpoint to ensure new tokens are issued correctly and expired tokens are handled."
+  },
+  {
+    "id": "TC004",
+    "title": "post api v1 auth logout",
+    "description": "Test user logout functionality to ensure tokens are invalidated and user sessions are terminated."
+  },
+  {
+    "id": "TC005",
+    "title": "post api v1 attendance check in",
+    "description": "Test attendance check-in with valid geofencing and face recognition data, and handle invalid or missing data scenarios."
+  },
+  {
+    "id": "TC006",
+    "title": "post api v1 attendance check out",
+    "description": "Test attendance check-out with valid geofencing and face recognition data, and handle invalid or missing data scenarios."
+  },
+  {
+    "id": "TC007",
+    "title": "get api v1 attendance my records",
+    "description": "Test retrieval of user's attendance records, including filtering and pagination if applicable."
+  },
+  {
+    "id": "TC008",
+    "title": "post api v1 leaves",
+    "description": "Test leave request creation with valid and invalid data, including leave type, dates, and user eligibility."
+  },
+  {
+    "id": "TC009",
+    "title": "get api v1 leaves",
+    "description": "Test retrieval of leave requests for the user, including filtering by status and date range."
+  },
+  {
+    "id": "TC010",
+    "title": "put api v1 leaves id approve",
+    "description": "Test approval of leave requests by authorized users, including validation of leave status and permissions."
+  }
+]

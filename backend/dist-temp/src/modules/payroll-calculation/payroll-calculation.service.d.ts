@@ -1,0 +1,30 @@
+import { SmartPolicyExecutorService } from "../smart-policies/smart-policy-executor.service";
+import { AIPolicyEvaluatorService } from "../smart-policies/ai-policy-evaluator.service";
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { PoliciesService } from '../policies/policies.service';
+import { PolicyRuleEvaluatorService } from './services/policy-rule-evaluator.service';
+import { FormulaEngineService } from './services/formula-engine.service';
+import { EosService } from '../eos/eos.service';
+import { EmployeePayrollCalculation } from './dto/calculation.types';
+export declare class PayrollCalculationService {
+    private prisma;
+    private policiesService;
+    private policyEvaluator;
+    private formulaEngine;
+    private eosService;
+    private smartPolicyExecutor;
+    private aiPolicyEvaluator;
+    private readonly logger;
+    constructor(prisma: PrismaService, policiesService: PoliciesService, policyEvaluator: PolicyRuleEvaluatorService, formulaEngine: FormulaEngineService, eosService: EosService, smartPolicyExecutor: SmartPolicyExecutorService, aiPolicyEvaluator: AIPolicyEvaluatorService);
+    private getDaysInMonth;
+    private getDaysByBase;
+    private getWorkingDaysInMonth;
+    private getProRataFactor;
+    private mapMethodToBase;
+    private getCalculationSettings;
+    private mapWorkDayBaseToMethod;
+    private getMonthlyAttendanceData;
+    calculateForEmployee(employeeId: string, companyId: string, year: number, month: number): Promise<EmployeePayrollCalculation>;
+    previewCalculation(employeeId: string, companyId: string, year: number, month: number): Promise<EmployeePayrollCalculation>;
+    private topologicalSort;
+}

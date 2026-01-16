@@ -59,12 +59,25 @@ interface PayslipLine {
     amount: number;
     isFixed: boolean;
     sourceType?: string;
+    // === Issue #7: Smart Policy Source Fields ===
+    policyId?: string;
+    policyName?: string;
+    policyExplanation?: string;
+    descriptionAr?: string;
+    source?: {
+        policyId?: string;
+        policyCode?: string;
+        ruleId?: string;
+        ruleCode?: string;
+        eventRef?: string;
+    };
     component?: {
         code: string;
         nameAr: string;
         nameEn: string;
     };
 }
+
 
 interface Payslip {
     id: string;
@@ -590,12 +603,34 @@ export default function PayslipsPage() {
                                     {selectedPayslip.lines?.filter(l => l.type === 'EARNING').map((line) => (
                                         <ListItem key={line.id} divider>
                                             <ListItemText
-                                                primary={line.component?.nameAr || line.componentName || line.componentCode}
+                                                primary={
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <span>{line.descriptionAr || line.component?.nameAr || line.componentName || line.componentCode}</span>
+                                                        {/* Issue #7: Smart Policy Badge */}
+                                                        {(line.source?.policyId || line.policyId) && (
+                                                            <Chip
+                                                                label="سياسة ذكية"
+                                                                size="small"
+                                                                color="primary"
+                                                                variant="filled"
+                                                                sx={{ fontSize: '0.7rem' }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                }
                                                 secondary={
-                                                    <Box component="span" display="flex" gap={1} alignItems="center">
-                                                        <span>{line.component?.code || line.componentCode}</span>
-                                                        {line.sourceType && (
-                                                            <Chip label={line.sourceType} size="small" variant="outlined" />
+                                                    <Box component="span" display="flex" flexDirection="column" gap={0.5}>
+                                                        <Box display="flex" gap={1} alignItems="center">
+                                                            <span>{line.component?.code || line.componentCode}</span>
+                                                            {line.sourceType && (
+                                                                <Chip label={line.sourceType} size="small" variant="outlined" />
+                                                            )}
+                                                        </Box>
+                                                        {/* Issue #7: Policy Explanation */}
+                                                        {line.policyExplanation && (
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                                💡 {line.policyExplanation}
+                                                            </Typography>
                                                         )}
                                                     </Box>
                                                 }
@@ -603,6 +638,7 @@ export default function PayslipsPage() {
                                             <Typography color="success.main">+{formatCurrency(line.amount)}</Typography>
                                         </ListItem>
                                     ))}
+
                                     <ListItem sx={{ bgcolor: 'success.50' }}>
                                         <ListItemText primary="إجمالي الاستحقاقات" primaryTypographyProps={{ fontWeight: 'bold' }} />
                                         <Typography fontWeight="bold" color="success.main">
@@ -621,12 +657,34 @@ export default function PayslipsPage() {
                                     {selectedPayslip.lines?.filter(l => l.type === 'DEDUCTION').map((line) => (
                                         <ListItem key={line.id} divider>
                                             <ListItemText
-                                                primary={line.component?.nameAr || line.componentName || line.componentCode}
+                                                primary={
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <span>{line.descriptionAr || line.component?.nameAr || line.componentName || line.componentCode}</span>
+                                                        {/* Issue #7: Smart Policy Badge */}
+                                                        {(line.source?.policyId || line.policyId) && (
+                                                            <Chip
+                                                                label="سياسة ذكية"
+                                                                size="small"
+                                                                color="error"
+                                                                variant="filled"
+                                                                sx={{ fontSize: '0.7rem' }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                }
                                                 secondary={
-                                                    <Box component="span" display="flex" gap={1} alignItems="center">
-                                                        <span>{line.component?.code || line.componentCode}</span>
-                                                        {line.sourceType && (
-                                                            <Chip label={line.sourceType} size="small" variant="outlined" />
+                                                    <Box component="span" display="flex" flexDirection="column" gap={0.5}>
+                                                        <Box display="flex" gap={1} alignItems="center">
+                                                            <span>{line.component?.code || line.componentCode}</span>
+                                                            {line.sourceType && (
+                                                                <Chip label={line.sourceType} size="small" variant="outlined" />
+                                                            )}
+                                                        </Box>
+                                                        {/* Issue #7: Policy Explanation */}
+                                                        {line.policyExplanation && (
+                                                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                                💡 {line.policyExplanation}
+                                                            </Typography>
                                                         )}
                                                     </Box>
                                                 }
@@ -634,6 +692,7 @@ export default function PayslipsPage() {
                                             <Typography color="error.main">-{formatCurrency(line.amount)}</Typography>
                                         </ListItem>
                                     ))}
+
                                     <ListItem divider>
                                         <ListItemText
                                             primary="حصة الموظف من التأمينات"

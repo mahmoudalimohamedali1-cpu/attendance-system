@@ -82,6 +82,114 @@ export interface CalculationSettings {
     roundSalaryToNearest: number;
     defaultWorkingDaysPerMonth: number;
     leaveDailyRateDivisor: number;
+
+    // ========== الميزات الجديدة (1-10) ==========
+    // معاملات الوقت الإضافي
+    weekendOvertimeMultiplier: number;
+    holidayOvertimeMultiplier: number;
+    // بدل المناوبة الليلية
+    nightShiftAllowancePercent: number;
+    // حدود الخصومات
+    maxDeductionPercent: number;
+    minNetSalary: number;
+    // القفل التلقائي
+    autoLockDay: number;
+    // العملة
+    defaultCurrency: string;
+    enableMultiCurrency: boolean;
+
+    // ========== الميزات الجديدة (11-20) ==========
+    // المكافآت
+    enableBonusTracking: boolean;
+    bonusCalculationMethod: string;
+    // العمولات
+    enableCommission: boolean;
+    commissionCalculationBase: string;
+    // البدلات
+    enableAllowanceCategories: boolean;
+    maxAllowancePercent: number;
+    // الضرائب
+    enableTaxCalculation: boolean;
+    taxCalculationMethod: string;
+    // السلفة
+    enableSalaryAdvance: boolean;
+    maxAdvancePercent: number;
+
+    // ========== الميزات الجديدة (21-30) ==========
+    // القروض
+    enableLoanDeduction: boolean;
+    maxLoanDeductionPercent: number;
+    // سير العمل
+    enableApprovalWorkflow: boolean;
+    approvalLevels: number;
+    // البنك
+    enableBankTransfer: boolean;
+    defaultBankCode: string;
+    // الدفع بأثر رجعي
+    enableRetroactivePay: boolean;
+    retroactiveMonthsLimit: number;
+    // نهاية الخدمة
+    enableEosCalculation: boolean;
+    eosCalculationMethod: string;
+
+    // ========== الميزات الجديدة (31-40) ==========
+    // التأمينات (GOSI)
+    enableGosiCalculation: boolean;
+    gosiEmployeePercent: number;
+    gosiEmployerPercent: number;
+    // صرف الإجازات
+    enableVacationEncashment: boolean;
+    vacationEncashmentMethod: string;
+    // عقوبات الحضور
+    enableAttendancePenalty: boolean;
+    lateDeductionMethod: string;
+    lateThresholdMinutes: number;
+    absenceDeductionMethod: string;
+    absenceProgressiveRate: number;
+    // خصم الانصراف المبكر
+    enableEarlyDeparturePenalty: boolean;
+    earlyDepartureDeductionMethod: string;
+    earlyDepartureThresholdMinutes: number;
+    // الخصم التراكمي للتأخير
+    enableCumulativeLateDeduction: boolean;
+    lateCountForDayDeduction: number;
+    // إعدادات GOSI المتقدمة
+    gosiMaxSalary: number;
+    enableSanedCalculation: boolean;
+    sanedEmployeePercent: number;
+    sanedEmployerPercent: number;
+    hazardRatePercent: number;
+    // قسيمة الراتب
+    enablePayslipEmail: boolean;
+    payslipLanguage: string;
+
+    // ========== الميزات الجديدة (41-50) ==========
+    // الحد الأقصى للوقت الإضافي
+    enableOvertimeCap: boolean;
+    maxOvertimeHoursPerMonth: number;
+    // التوليد التلقائي
+    enableAutoPayrollGeneration: boolean;
+    autoPayrollGenerationDay: number;
+    // التدقيق والتقريب
+    enablePayrollAuditTrail: boolean;
+    enableSalaryRounding: boolean;
+    salaryRoundingMethod: string;
+    // الميزانية والتكلفة
+    enableDepartmentBudget: boolean;
+    enableCostCenterTracking: boolean;
+    // التصدير
+    defaultPayrollExportFormat: string;
+
+    // ========== إعدادات الإجازة المرضية (51-55) ==========
+    enableSickLeaveDeduction: boolean;
+    sickLeavePartialPayPercent: number;
+    sickLeaveFullPayDays: number;
+    sickLeavePartialPayDays: number;
+    sickLeaveUnpaidDays: number;
+
+    // ========== إعدادات طريقة الحساب (56-58) ==========
+    dailyWorkingHours: number;
+    workingDaysPerWeek: number;
 }
 
 /**
@@ -116,6 +224,90 @@ export const DEFAULT_CALCULATION_SETTINGS: CalculationSettings = {
     roundSalaryToNearest: 0,
     defaultWorkingDaysPerMonth: 30,
     leaveDailyRateDivisor: 30,
+
+    // الميزات الجديدة (1-10)
+    weekendOvertimeMultiplier: 2.0,
+    holidayOvertimeMultiplier: 2.0,
+    nightShiftAllowancePercent: 0,
+    maxDeductionPercent: 50,
+    minNetSalary: 0,
+    autoLockDay: 0,
+    defaultCurrency: 'SAR',
+    enableMultiCurrency: false,
+
+    // الميزات الجديدة (11-20)
+    enableBonusTracking: true,
+    bonusCalculationMethod: 'FIXED',
+    enableCommission: false,
+    commissionCalculationBase: 'SALES',
+    enableAllowanceCategories: true,
+    maxAllowancePercent: 100,
+    enableTaxCalculation: false,
+    taxCalculationMethod: 'EXEMPT',
+    enableSalaryAdvance: true,
+    maxAdvancePercent: 50,
+
+    // الميزات الجديدة (21-30)
+    enableLoanDeduction: true,
+    maxLoanDeductionPercent: 30,
+    enableApprovalWorkflow: false,
+    approvalLevels: 1,
+    enableBankTransfer: true,
+    defaultBankCode: '',
+    enableRetroactivePay: true,
+    retroactiveMonthsLimit: 3,
+    enableEosCalculation: true,
+    eosCalculationMethod: 'SAUDI_LABOR_LAW',
+
+    // الميزات الجديدة (31-40)
+    enableGosiCalculation: true,
+    gosiEmployeePercent: 9.75,
+    gosiEmployerPercent: 11.75,
+    enableVacationEncashment: true,
+    vacationEncashmentMethod: 'ON_TERMINATION',
+    enableAttendancePenalty: true,
+    lateDeductionMethod: 'PER_MINUTE',
+    lateThresholdMinutes: 120,
+    absenceDeductionMethod: 'DAILY_RATE',
+    absenceProgressiveRate: 1.0,
+    // خصم الانصراف المبكر
+    enableEarlyDeparturePenalty: false,
+    earlyDepartureDeductionMethod: 'PER_MINUTE',
+    earlyDepartureThresholdMinutes: 120,
+    // الخصم التراكمي للتأخير
+    enableCumulativeLateDeduction: false,
+    lateCountForDayDeduction: 3,
+    // إعدادات GOSI المتقدمة
+    gosiMaxSalary: 45000,
+    enableSanedCalculation: true,
+    sanedEmployeePercent: 0.75,
+    sanedEmployerPercent: 0.75,
+    hazardRatePercent: 2.0,
+    enablePayslipEmail: false,
+    payslipLanguage: 'AR',
+
+    // الميزات الجديدة (41-50)
+    enableOvertimeCap: false,
+    maxOvertimeHoursPerMonth: 50,
+    enableAutoPayrollGeneration: false,
+    autoPayrollGenerationDay: 25,
+    enablePayrollAuditTrail: true,
+    enableSalaryRounding: false,
+    salaryRoundingMethod: 'NEAREST',
+    enableDepartmentBudget: false,
+    enableCostCenterTracking: false,
+    defaultPayrollExportFormat: 'EXCEL',
+
+    // إعدادات الإجازة المرضية (51-55)
+    enableSickLeaveDeduction: true,
+    sickLeavePartialPayPercent: 75,
+    sickLeaveFullPayDays: 30,
+    sickLeavePartialPayDays: 60,
+    sickLeaveUnpaidDays: 30,
+
+    // إعدادات طريقة الحساب (56-58)
+    dailyWorkingHours: 8,
+    workingDaysPerWeek: 5,
 };
 
 /**
@@ -199,4 +391,13 @@ export interface PolicyPayrollLine {
     taxable?: boolean;
     gosiEligible?: boolean;
     wpsIncluded?: boolean;
+
+    // 🔥 Loan payment tracking data (for payroll deduction processing)
+    _loanPaymentData?: {
+        advanceRequestId: string;
+        amount: number;
+        paymentType: string;
+        periodMonth: number;
+        periodYear: number;
+    };
 }

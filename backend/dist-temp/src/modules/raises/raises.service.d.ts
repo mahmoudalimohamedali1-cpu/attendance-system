@@ -1,0 +1,685 @@
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { CreateRaiseRequestDto } from './dto/create-raise-request.dto';
+import { ManagerDecisionDto, HRDecisionDto, DecisionType } from './dto/raise-decision.dto';
+import { RaiseStatus } from '@prisma/client';
+import { PermissionsService } from '../permissions/permissions.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ApprovalWorkflowService } from '../../common/services/approval-workflow.service';
+export declare class FinanceDecisionDto {
+    decision: DecisionType;
+    notes?: string;
+}
+export declare class CEODecisionDto {
+    decision: DecisionType;
+    notes?: string;
+}
+export declare class RaisesService {
+    private readonly prisma;
+    private readonly permissionsService;
+    private readonly notificationsService;
+    private readonly approvalWorkflowService;
+    constructor(prisma: PrismaService, permissionsService: PermissionsService, notificationsService: NotificationsService, approvalWorkflowService: ApprovalWorkflowService);
+    private mapTypeToEnum;
+    private mapDecisionToEnum;
+    createRaiseRequest(userId: string, companyId: string, dto: CreateRaiseRequestDto): Promise<{
+        user: {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    }>;
+    getMyRaiseRequests(userId: string, companyId: string): Promise<({
+        managerApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+        hrApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    })[]>;
+    getRaiseRequestById(id: string, userId: string, companyId: string): Promise<{
+        user: {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+            salary: import("@prisma/client/runtime/library").Decimal | null;
+            hireDate: Date | null;
+            branch: {
+                id: string;
+                name: string;
+                nameEn: string | null;
+                address: string | null;
+                createdAt: Date;
+                updatedAt: Date;
+                companyId: string | null;
+                isActive: boolean;
+                workStartTime: string;
+                workEndTime: string;
+                lateGracePeriod: number;
+                geofenceRadius: number;
+                latitude: import("@prisma/client/runtime/library").Decimal;
+                longitude: import("@prisma/client/runtime/library").Decimal;
+                timezone: string;
+                earlyCheckInPeriod: number;
+                earlyCheckOutPeriod: number;
+                workingDays: string;
+            } | null;
+            department: {
+                id: string;
+                name: string;
+                nameEn: string | null;
+                createdAt: Date;
+                updatedAt: Date;
+                companyId: string | null;
+                branchId: string;
+                workStartTime: string | null;
+                workEndTime: string | null;
+            } | null;
+        };
+        managerApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+        hrApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    }>;
+    cancelRaiseRequest(id: string, userId: string, companyId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    }>;
+    getManagerInbox(managerId: string, companyId: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+            salary: import("@prisma/client/runtime/library").Decimal | null;
+            hireDate: Date | null;
+            branch: {
+                name: string;
+            } | null;
+            department: {
+                name: string;
+            } | null;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    })[]>;
+    managerDecision(requestId: string, companyId: string, managerId: string, dto: ManagerDecisionDto): Promise<{
+        user: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    }>;
+    getHRInbox(hrUserId: string, companyId: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+            salary: import("@prisma/client/runtime/library").Decimal | null;
+            hireDate: Date | null;
+            branch: {
+                name: string;
+            } | null;
+            department: {
+                name: string;
+            } | null;
+        };
+        managerApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    })[]>;
+    hrDecision(requestId: string, companyId: string, hrUserId: string, dto: HRDecisionDto): Promise<{
+        user: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    }>;
+    getAllRaiseRequests(companyId: string, status?: RaiseStatus): Promise<({
+        user: {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+            branch: {
+                name: string;
+            } | null;
+            department: {
+                name: string;
+            } | null;
+        };
+        managerApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+        hrApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    })[]>;
+    getRaiseStats(companyId: string, userId?: string): Promise<{
+        pending: number;
+        approved: number;
+        rejected: number;
+        total: number;
+    }>;
+    getFinanceInbox(financeUserId: string, companyId: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+            salary: import("@prisma/client/runtime/library").Decimal | null;
+            hireDate: Date | null;
+            branch: {
+                name: string;
+            } | null;
+            department: {
+                name: string;
+            } | null;
+        };
+        managerApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+        hrApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    })[]>;
+    financeDecision(requestId: string, companyId: string, financeUserId: string, dto: FinanceDecisionDto): Promise<{
+        user: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    }>;
+    getCEOInbox(ceoUserId: string, companyId: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+            salary: import("@prisma/client/runtime/library").Decimal | null;
+            hireDate: Date | null;
+            branch: {
+                name: string;
+            } | null;
+            department: {
+                name: string;
+            } | null;
+        };
+        managerApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+        hrApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+        financeApprover: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        } | null;
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    })[]>;
+    ceoDecision(requestId: string, companyId: string, ceoUserId: string, dto: CEODecisionDto): Promise<{
+        user: {
+            id: string;
+            firstName: string;
+            lastName: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.RaiseStatus;
+        companyId: string | null;
+        type: import(".prisma/client").$Enums.RaiseType;
+        amount: import("@prisma/client/runtime/library").Decimal;
+        notes: string | null;
+        userId: string;
+        attachments: import("@prisma/client/runtime/library").JsonValue | null;
+        currentStep: import(".prisma/client").$Enums.ApprovalStep;
+        managerDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        managerDecisionAt: Date | null;
+        managerNotes: string | null;
+        managerAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        hrDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        hrDecisionAt: Date | null;
+        hrDecisionNotes: string | null;
+        hrAttachments: import("@prisma/client/runtime/library").JsonValue | null;
+        managerApproverId: string | null;
+        hrApproverId: string | null;
+        financeDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        financeDecisionAt: Date | null;
+        financeDecisionNotes: string | null;
+        ceoDecision: import(".prisma/client").$Enums.ApprovalDecision;
+        ceoDecisionAt: Date | null;
+        ceoDecisionNotes: string | null;
+        approvalChain: import("@prisma/client/runtime/library").JsonValue | null;
+        financeApproverId: string | null;
+        ceoApproverId: string | null;
+        effectiveMonth: Date;
+        appliedToSalary: boolean;
+    }>;
+    applyRaiseToSalary(requestId: string, companyId: string): Promise<void>;
+}

@@ -1,0 +1,185 @@
+﻿
+> attendance-admin-dashboard@1.0.0 build
+> vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+node.exe : 
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "getRecurringTasks" 
+in object literal[33m
+At C:\Program Files\nodejs\npm.ps1:29 
+char:3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecifi 
+   ed: ([1m[33m[plugi...ct literal[3  
+  3m:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeComm 
+   andError
+ 
+551|  
+552|      // 1. Recurring Tasks
+553|      getRecurringTasks: () =>
+   |      ^
+554|          api.get<{ tasks: Task[]; 
+total: number }>('/tasks/recurring'),
+555|      createRecurringTask: (data: 
+Partial<Task> & { recurrenceType: 
+string; recurrenceEnd?: string }) =>
+[39m
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "createRecurringTask" 
+in object literal[33m
+553|      getRecurringTasks: () =>
+554|          api.get<{ tasks: Task[]; 
+total: number }>('/tasks/recurring'),
+555|      createRecurringTask: (data: 
+Partial<Task> & { recurrenceType: 
+string; recurrenceEnd?: string }) =>
+   |      ^
+556|          
+api.post<Task>('/tasks/recurring', data),
+557|  
+[39m
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "cloneTask" in object 
+literal[33m
+561|      bulkDeleteTasks: (taskIds: 
+string[]) =>
+562|          api.post<{ deleted: number 
+}>('/tasks/bulk-delete', { taskIds }),
+563|      cloneTask: (taskId: string, 
+options?: { includeChecklists?: boolean; 
+includeAttachments?: boolean; 
+includeDependencies?: boolean; 
+newAssigneeId?: string }) =>
+   |      ^
+564|          
+api.post<Task>(`/tasks/${taskId}/clone`, 
+options),
+565|  
+[39m
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "getActivityFeed" in 
+object literal[33m
+575|  
+576|      // 4. Activity Feed
+577|      getActivityFeed: (taskId: 
+string, limit?: number) =>
+   |      ^
+578|          api.get<{ id: string; 
+action: string; actor: UserBrief; 
+details?: any; createdAt: string 
+}[]>(`/tasks/${taskId}/activity`, { 
+params: { limit } }),
+579|  
+[39m
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "startTimer" in 
+object literal[33m
+579|  
+580|      // 5. Timer
+581|      startTimer: (taskId: string) =>
+   |      ^
+582|          api.post<{ id: string; 
+taskId: string; startTime: string 
+}>(`/tasks/${taskId}/timer/start`),
+583|      stopTimer: (timeLogId: string, 
+description?: string) =>
+[39m
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "stopTimer" in object 
+literal[33m
+581|      startTimer: (taskId: string) =>
+582|          api.post<{ id: string; 
+taskId: string; startTime: string 
+}>(`/tasks/${taskId}/timer/start`),
+583|      stopTimer: (timeLogId: string, 
+description?: string) =>
+   |      ^
+584|          api.put<{ id: string; 
+duration: number; description?: string 
+}>(`/tasks/timer/${timeLogId}/stop`, { 
+description }),
+585|  
+[39m
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "getResourceCapacity" 
+in object literal[33m
+609|  
+610|      // 9. Resource Capacity
+611|      getResourceCapacity: 
+(startDate?: string, endDate?: string) =>
+   |      ^
+612|          api.get<{ employees: { id: 
+string; name: string; capacity: number; 
+allocated: number; available: number 
+}[]; summary: any 
+}>('/tasks/resource/capacity', { params: 
+{ startDate, endDate } }),
+613|      suggestReassignment: (taskId: 
+string) =>
+[39m
+[1m[33m[plugin:vite:esbuild][39m[22m 
+[33m[plugin vite:esbuild] 
+src/services/tasks.service.ts: 
+[33mDuplicate key "getTeamWorkload" in 
+object literal[33m
+719|  
+720|      // ============ TEAM 
+COLLABORATION (10 ┘à┘è╪▓╪º╪¬) 
+============
+721|      getTeamWorkload: () => 
+api.get<any>('/tasks/team/workload'),
+   |      ^
+722|      getSkillsMatrix: () => api.get<
+any>('/tasks/team/skills-matrix'),
+723|      getResourceUtilization: 
+(params?: { startDate?: string; 
+endDate?: string }) => 
+api.get<any>('/tasks/team/utilization', 
+{ params }),
+[39m
+[32mΓ£ô[39m 2950 modules transformed.
+[31mx[39m Build failed in 6.88s
+[31merror during build:
+[31mCould not resolve "./api" from "src/
+services/employee-debt.service.ts"[31m
+file: [36mC:/Users/Administrator/Downloa
+ds/attendance system/attendance-system/we
+b-admin/src/services/employee-debt.servic
+e.ts[31m
+    at getRollupError (file:///C:/Users/A
+dministrator/Downloads/attendance%20syste
+m/attendance-system/web-admin/node_module
+s/rollup/dist/es/shared/parseAst.js:401:4
+1)
+    at error (file:///C:/Users/Administra
+tor/Downloads/attendance%20system/attenda
+nce-system/web-admin/node_modules/rollup/
+dist/es/shared/parseAst.js:397:42)
+    at 
+ModuleLoader.handleInvalidResolvedId (fil
+e:///C:/Users/Administrator/Downloads/att
+endance%20system/attendance-system/web-ad
+min/node_modules/rollup/dist/es/shared/no
+de-entry.js:21661:24)
+    at file:///C:/Users/Administrator/Dow
+nloads/attendance%20system/attendance-sys
+tem/web-admin/node_modules/rollup/dist/es
+/shared/node-entry.js:21621:26[39m

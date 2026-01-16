@@ -140,6 +140,7 @@ export const PayrollRunDetailsPage = () => {
             case 'APPROVED': return 'معتمد';
             case 'LOCKED': return 'مقفل 🔒';
             case 'PAID': return 'تم الصرف ✅';
+            case 'REQUIRES_REVIEW': return '⚠️ يتطلب مراجعة';
             default: return status;
         }
     };
@@ -151,6 +152,7 @@ export const PayrollRunDetailsPage = () => {
             case 'APPROVED': return 'success';
             case 'LOCKED': return 'success';
             case 'PAID': return 'success';
+            case 'REQUIRES_REVIEW': return 'warning';
             default: return 'default';
         }
     };
@@ -338,36 +340,48 @@ export const PayrollRunDetailsPage = () => {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredPayslips.map((payslip) => (
-                                <TableRow key={payslip.id} hover>
-                                    <TableCell>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <Avatar sx={{ width: 32, height: 32 }}>{payslip.employee?.firstName[0]}</Avatar>
-                                            <Box>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    {payslip.employee?.firstName} {payslip.employee?.lastName}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary">{payslip.employee?.employeeCode}</Typography>
+                            {filteredPayslips.map((payslip) => {
+                                const netSalary = parseFloat(payslip.netSalary);
+                                const isNegativeOrReview = netSalary < 0 || payslip.status === 'REQUIRES_REVIEW';
+
+                                return (
+                                    <TableRow
+                                        key={payslip.id}
+                                        hover
+                                        sx={isNegativeOrReview ? { bgcolor: 'warning.50', borderLeft: '4px solid', borderLeftColor: 'warning.main' } : {}}
+                                    >
+                                        <TableCell>
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <Avatar sx={{ width: 32, height: 32 }}>{payslip.employee?.firstName[0]}</Avatar>
+                                                <Box>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        {payslip.employee?.firstName} {payslip.employee?.lastName}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.secondary">{payslip.employee?.employeeCode}</Typography>
+                                                </Box>
+                                                {isNegativeOrReview && (
+                                                    <Chip label="⚠️" size="small" color="warning" sx={{ ml: 1, height: 20 }} />
+                                                )}
                                             </Box>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>{parseFloat(payslip.baseSalary).toLocaleString()} ريال</TableCell>
-                                    <TableCell sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                                        {parseFloat(payslip.grossSalary).toLocaleString()} ريال
-                                    </TableCell>
-                                    <TableCell sx={{ color: 'error.main' }}>
-                                        {parseFloat(payslip.totalDeductions).toLocaleString()} ريال
-                                    </TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.50' }}>
-                                        {parseFloat(payslip.netSalary).toLocaleString()} ريال
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <IconButton size="small" onClick={() => setSelectedPayslip(payslip)}>
-                                            <Visibility fontSize="small" />
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                        </TableCell>
+                                        <TableCell>{parseFloat(payslip.baseSalary).toLocaleString()} ريال</TableCell>
+                                        <TableCell sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                                            {parseFloat(payslip.grossSalary).toLocaleString()} ريال
+                                        </TableCell>
+                                        <TableCell sx={{ color: 'error.main' }}>
+                                            {parseFloat(payslip.totalDeductions).toLocaleString()} ريال
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', bgcolor: netSalary < 0 ? 'error.100' : 'primary.50', color: netSalary < 0 ? 'error.main' : 'inherit' }}>
+                                            {netSalary.toLocaleString()} ريال
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <IconButton size="small" onClick={() => setSelectedPayslip(payslip)}>
+                                                <Visibility fontSize="small" />
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </TableContainer>

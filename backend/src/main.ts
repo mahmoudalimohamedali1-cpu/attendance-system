@@ -87,9 +87,9 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 3000;
-  // استمع على 0.0.0.0 للسماح بالاتصال من الشبكة المحلية
-  await app.listen(port, '0.0.0.0');
-  console.log(`🚀 Server running on http://0.0.0.0:${port}`);
+  // استمع على :: للسماح بالاتصال من IPv4 و IPv6
+  await app.listen(port);
+  console.log(`🚀 Server running on port ${port}`);
   console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
   console.log(`📱 للاتصال من الموبايل: http://YOUR_IP:${port}/api/v1`);
 }

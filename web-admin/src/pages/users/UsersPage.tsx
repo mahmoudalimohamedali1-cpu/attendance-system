@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -45,6 +45,7 @@ import {
   AccountBalance,
   CloudUpload,
   AccountCircle,
+  AccountTree,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import { User } from '@/store/auth.store';
@@ -95,6 +96,15 @@ interface DirectManagerUser {
   };
 }
 
+interface CostCenter {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn?: string;
+  type: string;
+  status: string;
+}
+
 export const UsersPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,6 +128,7 @@ export const UsersPage = () => {
     branchId: '',
     departmentId: '',
     managerId: '',
+    costCenterId: '', // مركز التكلفة
     salary: '',
     hireDate: '',
     annualLeaveDays: '',
@@ -206,6 +217,36 @@ export const UsersPage = () => {
     queryFn: () => api.get('/job-titles/direct-manager-users'),
   });
 
+  // جلب مراكز التكلفة
+  const { data: costCenters } = useQuery<CostCenter[]>({
+    queryKey: ['cost-centers'],
+    queryFn: () => api.get('/cost-centers'),
+  });
+
+  // جلب جميع المدراء (MANAGER و ADMIN) كخيار بديل
+  const { data: allManagersData } = useQuery<UsersResponse>({
+    queryKey: ['all-managers-for-dropdown'],
+    queryFn: () => api.get('/users?limit=200&status=ACTIVE'),
+  });
+
+  // دمج المدراء - استخدم directManagerUsers إذا متوفر، وإلا استخدم جميع المدراء والمديرين
+  const allAvailableManagers = useMemo(() => {
+    // إذا كان هناك مستخدمين بدرجات وظيفية محددة كمدير مباشر، استخدمهم
+    if (directManagerUsers && directManagerUsers.length > 0) {
+      return directManagerUsers;
+    }
+    // وإلا استخدم جميع المستخدمين بدور MANAGER أو ADMIN
+    return allManagersData?.data
+      ?.filter(u => u.role === 'MANAGER' || u.role === 'ADMIN')
+      ?.map(m => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        email: m.email,
+        jobTitle: m.jobTitle,
+      })) || [];
+  }, [directManagerUsers, allManagersData]);
+
   // فلترة الأقسام حسب الفرع المختار
   const filteredDepartments = departments?.filter(
     (dept) => dept.branchId === formData.branchId
@@ -220,6 +261,7 @@ export const UsersPage = () => {
         departmentId: userData.departmentId || undefined,
         managerId: userData.managerId || undefined,
         jobTitleId: userData.jobTitleId || undefined,
+        costCenterId: userData.costCenterId || undefined,
         hireDate: userData.hireDate || undefined,
         annualLeaveDays: userData.annualLeaveDays ? parseInt(userData.annualLeaveDays) : 21,
       };
@@ -260,12 +302,13 @@ export const UsersPage = () => {
         departmentId: data.departmentId || undefined,
         managerId: data.managerId || undefined,
         jobTitleId: data.jobTitleId || undefined,
+        costCenterId: data.costCenterId || undefined,
         hireDate: data.hireDate || undefined,
       };
       if (!payload.password) {
         delete payload.password;
       }
-      return api.patch(`/ users / ${id} `, payload);
+      return api.patch(`/users/${id}`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -284,7 +327,7 @@ export const UsersPage = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/ users / ${id} `),
+    mutationFn: (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
@@ -292,7 +335,7 @@ export const UsersPage = () => {
 
   // إعادة تعيين الوجه
   const resetFaceMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/ users / ${id}/reset-face`),
+    mutationFn: (id: string) => api.post(`/users/${id}/reset-face`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       alert('تم إعادة تعيين الوجه بنجاح. يمكن للموظف تسجيل وجهه من جديد عند الحضور القادم.');
@@ -326,6 +369,7 @@ export const UsersPage = () => {
         branchId: user.branch?.id || '',
         departmentId: user.department?.id || '',
         managerId: user.manager?.id || '',
+        costCenterId: (user as any).costCenterId || '',
         salary: user.salary ? String(user.salary) : '',
         hireDate: user.hireDate ? new Date(user.hireDate).toISOString().split('T')[0] : '',
         annualLeaveDays: user.annualLeaveDays ? String(user.annualLeaveDays) : '',
@@ -347,6 +391,7 @@ export const UsersPage = () => {
         branchId: '',
         departmentId: '',
         managerId: '',
+        costCenterId: '',
         salary: '',
         hireDate: '',
         annualLeaveDays: '',
@@ -892,13 +937,40 @@ export const UsersPage = () => {
                 label="المدير المباشر"
                 value={formData.managerId}
                 onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
-                helperText="اختياري - يظهر فقط أصحاب الدرجات الوظيفية المحددة كمديرين مباشرين"
+                helperText="اختياري - اختر المدير المباشر للموظف"
               >
                 <MenuItem value="">لا يوجد</MenuItem>
-                {directManagerUsers?.map((manager) => (
+                {allAvailableManagers?.map((manager) => (
                   <MenuItem key={manager.id} value={manager.id}>
                     {manager.firstName} {manager.lastName}
-                    {manager.jobTitleRef && ` (${manager.jobTitleRef.name})`}
+                    {manager.jobTitle && ` (${manager.jobTitle})`}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            {/* مركز التكلفة */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" gutterBottom sx={{ mt: 2 }}>
+                <AccountTree sx={{ fontSize: 16, mr: 0.5, verticalAlign: 'middle' }} />
+                مركز التكلفة (اختياري)
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                select
+                label="مركز التكلفة"
+                value={formData.costCenterId}
+                onChange={(e) => setFormData({ ...formData, costCenterId: e.target.value })}
+                helperText="اختياري - اختر مركز التكلفة الذي سيُحسب عليه راتب الموظف"
+              >
+                <MenuItem value="">
+                  <em>بدون مركز تكلفة</em>
+                </MenuItem>
+                {costCenters?.filter(cc => cc.status === 'ACTIVE').map((cc) => (
+                  <MenuItem key={cc.id} value={cc.id}>
+                    {cc.code} - {cc.nameAr}
                   </MenuItem>
                 ))}
               </TextField>

@@ -39,7 +39,7 @@ export class GosiService {
         });
     }
 
-    async update(id: string, dto: Partial<CreateGosiConfigDto>, companyId: string) {
+    async update(id: string, dto: Partial<CreateGosiConfigDto>, companyId: string, userId?: string) {
         // Verify the config belongs to the company
         const existing = await this.prisma.gosiConfig.findFirst({
             where: { id, companyId }
@@ -54,10 +54,27 @@ export class GosiService {
             });
         }
 
-        return this.prisma.gosiConfig.update({
+        const updated = await this.prisma.gosiConfig.update({
             where: { id },
             data: dto
         });
+
+        // ✅ تسجيل تغييرات GOSI للتدقيق
+        console.log(`[GOSI AUDIT] Config ${id} updated by ${userId || 'SYSTEM'}:`, {
+            previousRates: {
+                employeeRate: existing.employeeRate,
+                employerRate: existing.employerRate,
+                maxCapAmount: existing.maxCapAmount,
+            },
+            newRates: {
+                employeeRate: dto.employeeRate ?? existing.employeeRate,
+                employerRate: dto.employerRate ?? existing.employerRate,
+                maxCapAmount: dto.maxCapAmount ?? existing.maxCapAmount,
+            },
+            timestamp: new Date().toISOString(),
+        });
+
+        return updated;
     }
 }
 

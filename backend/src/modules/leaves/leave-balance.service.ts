@@ -150,11 +150,15 @@ export class LeaveBalanceService {
         }
 
         // خصم من الرصيد وإزالة من المعلق
+        // Issue #21: Ensure pending doesn't go negative
+        const currentPending = Number(balance.pending);
+        const newPending = Math.max(0, currentPending - days);
+
         return this.prisma.leaveBalance.update({
             where: { id: balance.id },
             data: {
                 used: { increment: days },
-                pending: { decrement: days },
+                pending: newPending,
             },
         });
     }
@@ -207,6 +211,18 @@ export class LeaveBalanceService {
 
         if (!balance) {
             throw new BadRequestException('فشل في إنشاء رصيد الإجازة');
+        }
+
+        // Issue #55: Validate available balance before adding to pending
+        const available = this.calculateAvailable(balance);
+        const leaveType = await this.prisma.leaveTypeConfig.findUnique({
+            where: { id: leaveTypeId },
+        });
+
+        if (available < days && !leaveType?.allowNegativeBalance) {
+            throw new BadRequestException(
+                `رصيد الإجازة غير كافي. المتاح: ${available.toFixed(2)} يوم، المطلوب: ${days} يوم`
+            );
         }
 
         return this.prisma.leaveBalance.update({
@@ -264,7 +280,8 @@ export class LeaveBalanceService {
         for (const balance of previousBalances) {
             const available = this.calculateAvailable(balance);
 
-            if (available <= 0 || !balance.leaveType.allowCarryForward) {
+            // Issue #38: Only skip if negative OR carry forward not allowed (0 balance employees should still get new allocation)
+            if (available < 0 || !balance.leaveType.allowCarryForward) {
                 results.expired++;
                 continue;
             }

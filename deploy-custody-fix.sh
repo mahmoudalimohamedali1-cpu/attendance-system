@@ -6,7 +6,7 @@
 VPS_HOST="72.61.239.170"
 VPS_USER="root"
 VPS_PASS="GamalSaad35@#"
-PROJECT_PATH="/root/attendance-system"
+PROJECT_PATH="/var/www/attendance-system"
 LOCAL_FILE="web-admin/src/pages/custody/CustodyItemForm.tsx"
 REMOTE_FILE="${PROJECT_PATH}/web-admin/src/pages/custody/CustodyItemForm.tsx"
 

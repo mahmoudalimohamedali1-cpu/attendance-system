@@ -54,3 +54,21 @@ tmp/
 temp/
 *.tmp
 
+
+# Auto Claude data directory
+.auto-claude/
+
+# Large files (GitHub 100MB limit)
+*.zip
+*.tar.gz
+*.tar
+*.dump
+*.sql
+nul
+
+# Temp claude files
+tmpclaude-*
+
+# Dist archives
+backend/dist.tar*
+web-admin/dist.tar*

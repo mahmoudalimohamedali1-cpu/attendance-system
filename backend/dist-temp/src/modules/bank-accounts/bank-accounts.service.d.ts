@@ -1,0 +1,134 @@
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { CreateBankAccountDto } from './dto/create-bank-account.dto';
+export declare class BankAccountsService {
+    private prisma;
+    constructor(prisma: PrismaService);
+    private validateSaudiIBAN;
+    create(dto: CreateBankAccountDto): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }>;
+    findAll(companyId: string): Promise<({
+        user: {
+            id: string;
+            firstName: string;
+            lastName: string;
+            employeeCode: string | null;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    })[]>;
+    findByUser(userId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }[]>;
+    findPrimaryByUser(userId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    } | null>;
+    remove(id: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }>;
+    setPrimary(id: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }>;
+    verify(id: string, verifiedBy: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }>;
+    unverify(id: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        iban: string;
+        accountHolderName: string | null;
+        bankName: string;
+        bankCode: string | null;
+        swiftCode: string | null;
+        isPrimary: boolean;
+        isVerified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }>;
+}

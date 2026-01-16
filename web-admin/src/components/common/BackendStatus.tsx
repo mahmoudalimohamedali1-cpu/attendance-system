@@ -50,7 +50,7 @@ export const BackendStatus = () => {
         <br />
         1. تأكد أن Backend يعمل: <code>cd backend && npm run start:dev</code>
         <br />
-        2. تحقق من <code>http://localhost:3000/health</code>
+        2. تحقق من حالة الخادم (Backend)
         <br />
         3. أعد تحميل الصفحة
       </Box>

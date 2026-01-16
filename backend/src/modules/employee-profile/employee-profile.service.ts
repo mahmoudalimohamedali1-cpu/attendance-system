@@ -29,6 +29,13 @@ export class EmployeeProfileService {
                 branch: true,
                 department: true,
                 jobTitleRef: true,
+                costCenter: {
+                    select: {
+                        id: true,
+                        nameAr: true,
+                        code: true,
+                    },
+                },
                 manager: {
                     select: {
                         id: true,

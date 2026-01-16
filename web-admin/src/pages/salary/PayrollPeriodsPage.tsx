@@ -19,6 +19,7 @@ import {
     Chip,
     Grid,
     Alert,
+    MenuItem,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -35,6 +36,7 @@ interface PayrollPeriod {
     year: number;
     startDate: string;
     endDate: string;
+    frequency: 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY' | 'OTHER';
     status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'PAID' | 'CANCELLED';
     _count?: { payslips: number };
 }
@@ -49,6 +51,7 @@ export const PayrollPeriodsPage = () => {
         year: new Date().getFullYear(),
         startDate: '',
         endDate: '',
+        frequency: 'MONTHLY',
     });
     const navigate = useNavigate();
 
@@ -78,6 +81,7 @@ export const PayrollPeriodsPage = () => {
             year: now.getFullYear(),
             startDate: firstDay,
             endDate: lastDay,
+            frequency: 'MONTHLY',
         });
         setOpen(true);
     };
@@ -119,6 +123,15 @@ export const PayrollPeriodsPage = () => {
         }
     };
 
+    const getFrequencyLabel = (freq: string) => {
+        switch (freq) {
+            case 'WEEKLY': return 'أسبوعي';
+            case 'BI_WEEKLY': return 'كل أسبوعين';
+            case 'MONTHLY': return 'شهري';
+            default: return freq;
+        }
+    };
+
     return (
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -146,6 +159,7 @@ export const PayrollPeriodsPage = () => {
                         <TableHead sx={{ bgcolor: 'grey.50' }}>
                             <TableRow>
                                 <TableCell sx={{ fontWeight: 'bold' }}>الفترة</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold' }}>التكرار</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>من تاريخ</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>إلى تاريخ</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>عدد المسودات</TableCell>
@@ -161,6 +175,9 @@ export const PayrollPeriodsPage = () => {
                                             <EventNote color="primary" sx={{ fontSize: 20 }} />
                                             <Typography fontWeight="bold">{period.month} / {period.year}</Typography>
                                         </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Typography variant="body2">{getFrequencyLabel(period.frequency)}</Typography>
                                     </TableCell>
                                     <TableCell>{new Date(period.startDate).toLocaleDateString('ar-SA')}</TableCell>
                                     <TableCell>{new Date(period.endDate).toLocaleDateString('ar-SA')}</TableCell>
@@ -226,6 +243,19 @@ export const PayrollPeriodsPage = () => {
                                 value={formData.year}
                                 onChange={(e) => setFormData({ ...formData, year: Number(e.target.value) })}
                             />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                select
+                                label="تكرار دورة الرواتب"
+                                value={formData.frequency}
+                                onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                            >
+                                <MenuItem value="WEEKLY">أسبوعي (Weekly)</MenuItem>
+                                <MenuItem value="BI_WEEKLY">كل أسبوعين (Bi-weekly)</MenuItem>
+                                <MenuItem value="MONTHLY">شهري (Monthly)</MenuItem>
+                            </TextField>
                         </Grid>
                         <Grid item xs={12}>
                             <TextField

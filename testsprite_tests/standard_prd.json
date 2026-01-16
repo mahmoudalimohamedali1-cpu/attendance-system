@@ -1,0 +1,137 @@
+{
+  "product_name": "نظام الحضور والانصراف - Attendance System",
+  "version": "1.0.0",
+  "description": "Enterprise HR and Attendance Management System with full payroll integration",
+  "authentication": {
+    "test_credentials": {
+      "email": "test@test.com",
+      "password": "test123"
+    }
+  },
+  "features": [
+    {
+      "name": "Authentication",
+      "description": "Complete authentication flow including login, register, refresh, logout",
+      "endpoints": [
+        "POST /api/v1/auth/login",
+        "POST /api/v1/auth/register",
+        "POST /api/v1/auth/refresh",
+        "POST /api/v1/auth/logout",
+        "POST /api/v1/auth/forgot-password"
+      ]
+    },
+    {
+      "name": "Users Management",
+      "description": "Employee CRUD operations and profile management",
+      "endpoints": [
+        "GET /api/v1/users",
+        "GET /api/v1/users/:id",
+        "POST /api/v1/users",
+        "PUT /api/v1/users/:id",
+        "DELETE /api/v1/users/:id",
+        "GET /api/v1/users/profile"
+      ]
+    },
+    {
+      "name": "Attendance",
+      "description": "Check-in/check-out with geofencing and face recognition",
+      "endpoints": [
+        "POST /api/v1/attendance/check-in",
+        "POST /api/v1/attendance/check-out",
+        "GET /api/v1/attendance/my-records",
+        "GET /api/v1/attendance/today",
+        "GET /api/v1/attendance/report"
+      ]
+    },
+    {
+      "name": "Leave Management",
+      "description": "Leave requests, approvals, and balance tracking",
+      "endpoints": [
+        "POST /api/v1/leaves",
+        "GET /api/v1/leaves",
+        "GET /api/v1/leaves/:id",
+        "PUT /api/v1/leaves/:id",
+        "DELETE /api/v1/leaves/:id",
+        "PUT /api/v1/leaves/:id/approve",
+        "PUT /api/v1/leaves/:id/reject",
+        "GET /api/v1/leaves/balance"
+      ]
+    },
+    {
+      "name": "Branches",
+      "description": "Branch and department management",
+      "endpoints": [
+        "GET /api/v1/branches",
+        "GET /api/v1/branches/:id",
+        "POST /api/v1/branches",
+        "PUT /api/v1/branches/:id",
+        "DELETE /api/v1/branches/:id"
+      ]
+    },
+    {
+      "name": "Departments",
+      "description": "Department management",
+      "endpoints": [
+        "GET /api/v1/departments",
+        "POST /api/v1/departments",
+        "PUT /api/v1/departments/:id"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Executive summary and analytics",
+      "endpoints": [
+        "GET /api/v1/dashboard",
+        "GET /api/v1/dashboard/stats",
+        "GET /api/v1/dashboard/attendance-summary"
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "Push notifications and in-app alerts",
+      "endpoints": [
+        "GET /api/v1/notifications",
+        "PUT /api/v1/notifications/:id/read",
+        "PUT /api/v1/notifications/read-all"
+      ]
+    },
+    {
+      "name": "Settings",
+      "description": "Company and system settings",
+      "endpoints": [
+        "GET /api/v1/settings",
+        "PUT /api/v1/settings",
+        "GET /api/v1/settings/holidays"
+      ]
+    },
+    {
+      "name": "Payroll",
+      "description": "Salary calculations and payroll runs",
+      "endpoints": [
+        "GET /api/v1/payroll-runs",
+        "POST /api/v1/payroll-runs",
+        "GET /api/v1/payroll-runs/:id",
+        "PUT /api/v1/payroll-runs/:id/approve"
+      ]
+    }
+  ],
+  "tech_stack": {
+    "backend": [
+      "NestJS",
+      "TypeScript",
+      "Prisma",
+      "PostgreSQL",
+      "Redis"
+    ],
+    "frontend": [
+      "React",
+      "Vite",
+      "Ant Design",
+      "TypeScript"
+    ],
+    "testing": [
+      "Jest",
+      "TestSprite"
+    ]
+  }
+}

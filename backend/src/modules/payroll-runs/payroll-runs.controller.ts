@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Request, Res, Header } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Patch, Query, UseGuards, Request, Res, Header } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
 import { PayrollRunsService } from './payroll-runs.service';
+import { PayrollValidationService, ValidationOptions } from './payroll-validation.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -19,6 +20,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 export class PayrollRunsController {
     constructor(
         private readonly service: PayrollRunsService,
+        private readonly validationService: PayrollValidationService,
         private readonly pdfService: PdfService,
         private readonly excelService: ExcelService,
         private readonly emailService: EmailService,
@@ -59,6 +61,51 @@ export class PayrollRunsController {
     @ApiOperation({ summary: 'عرض جميع تشغيلات الرواتب' })
     findAll(@CurrentUser('companyId') companyId: string) {
         return this.service.findAll(companyId);
+    }
+
+    // ==========================================
+    // VALIDATION ENDPOINTS (STATIC)
+    // ==========================================
+
+    @Get(':id/validate')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'التحقق من صحة مسير الرواتب' })
+    @ApiQuery({ name: 'strictMode', required: false, type: Boolean })
+    @ApiQuery({ name: 'skipBalanceCheck', required: false, type: Boolean })
+    @ApiQuery({ name: 'skipGosiValidation', required: false, type: Boolean })
+    validate(
+        @Param('id') id: string,
+        @CurrentUser('companyId') companyId: string,
+        @Query('strictMode') strictMode?: string,
+        @Query('skipBalanceCheck') skipBalanceCheck?: string,
+        @Query('skipGosiValidation') skipGosiValidation?: string,
+    ) {
+        const options: ValidationOptions = {
+            strictMode: strictMode === 'true',
+            skipBalanceCheck: skipBalanceCheck === 'true',
+            skipGosiValidation: skipGosiValidation === 'true',
+        };
+        return this.validationService.validatePayrollRun(id, companyId, options);
+    }
+
+    @Get(':id/validate/quick')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'التحقق السريع قبل الإغلاق' })
+    quickValidate(
+        @Param('id') id: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.validationService.quickValidateBeforeClose(id, companyId);
+    }
+
+    @Get(':id/validate/report')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'تقرير التحقق مع الإحصائيات والتوصيات' })
+    getValidationReport(
+        @Param('id') id: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.validationService.getValidationReport(id, companyId);
     }
 
     // ==========================================

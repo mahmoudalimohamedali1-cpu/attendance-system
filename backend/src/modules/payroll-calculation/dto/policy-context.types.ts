@@ -34,6 +34,7 @@ export interface PolicyEvaluationContext {
         absentDays: number;        // Unexcused absent days
         earlyDepartureMinutes: number;
         workingHours: number;      // Total working hours
+        holidayWorkDays?: number;  // عدد أيام العمل في العطلات الرسمية
         attendanceIds?: string[];  // For eventRef tracking
     };
 

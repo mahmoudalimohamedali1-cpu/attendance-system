@@ -1,68 +1,117 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
+
+/**
+ * 🤖 AI Service - OpenAI (ChatGPT) Implementation
+ * 
+ * Switched from Claude to OpenAI for better quota management
+ * and reliability during Anthropic usage limits.
+ * 
+ * Models available:
+ * - gpt-4o (recommended - fast & smart)
+ * - gpt-4o-mini (fastest & cheapest)
+ * - gpt-4-turbo (stable)
+ */
 
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
-    private genAI: GoogleGenerativeAI | null = null;
-    // قائمة الموديلات المتاحة للتبديل في حالة الفشل - استخدمنا gemini-flash-latest لأنه الأنجح مع هذا المفتاح
-    private readonly models = ['gemini-flash-latest', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+    private openai: OpenAI | null = null;
+
+    // 🔧 Track rate limit or quota errors
+    private isRateLimited = false;
+    private rateLimitResetTime: Date | null = null;
+
+    // OpenAI models
+    private readonly models = [
+        'gpt-4o',
+        'gpt-4o-mini',
+        'gpt-4-turbo',
+    ];
 
     constructor() {
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.OPENAI_API_KEY;
         if (apiKey) {
-            this.genAI = new GoogleGenerativeAI(apiKey);
-            this.logger.log('Gemini AI initialized successfully');
+            this.openai = new OpenAI({ apiKey });
+            this.logger.log('OpenAI (ChatGPT) initialized successfully ✅');
         } else {
-            this.logger.warn('GEMINI_API_KEY not found - AI features will be disabled');
+            this.logger.warn('OPENAI_API_KEY not found - AI features will be disabled');
         }
     }
 
     isAvailable(): boolean {
-        return this.genAI !== null;
-    }
+        // Check if client exists
+        if (!this.openai) return false;
 
-    async generateContent(prompt: string, systemInstruction?: string): Promise<string> {
-        if (!this.genAI) {
-            throw new Error('AI service is not available. Please configure GEMINI_API_KEY.');
-        }
-
-        let lastError = null;
-
-        for (const modelName of this.models) {
-            try {
-                this.logger.log(`Attempting AI generation with model: ${modelName}`);
-                const model = this.genAI.getGenerativeModel({
-                    model: modelName,
-                    generationConfig: {
-                        temperature: 0.3,
-                        topP: 0.8,
-                        maxOutputTokens: 2048,
-                    },
-                    systemInstruction: systemInstruction,
-                });
-
-                const result = await model.generateContent(prompt);
-                const response = result.response;
-                const text = response.text();
-
-                if (text) {
-                    this.logger.log(`Successfully generated content using ${modelName}`);
-                    return text;
-                }
-            } catch (error: any) {
-                this.logger.warn(`Model ${modelName} failed: ${error.message}`);
-                lastError = error;
-                // جرب الموديل التالي لو فيه خطأ كوتا أو موديل غير موجود
-                if (error.message?.includes('429') || error.message?.includes('Quota') || error.message?.includes('404')) {
-                    continue;
-                }
-                throw error;
+        // Return false if we're rate limited
+        if (this.isRateLimited) {
+            // Check if rate limit has reset
+            if (this.rateLimitResetTime && new Date() > this.rateLimitResetTime) {
+                this.isRateLimited = false;
+                this.rateLimitResetTime = null;
+                this.logger.log('AI rate limit reset - service available again');
+            } else {
+                return false;
             }
         }
 
-        this.logger.error('All Gemini models failed to generate content');
-        throw lastError || new Error('Failed to generate content with Gemini');
+        return true;
+    }
+
+    async generateContent(prompt: string, systemInstruction?: string): Promise<string> {
+        if (!this.openai) {
+            throw new Error('AI service is not available. Please configure OPENAI_API_KEY.');
+        }
+
+        let lastError: any = null;
+
+        for (const modelName of this.models) {
+            try {
+                this.logger.log(`Attempting AI generation with OpenAI model: ${modelName}`);
+
+                const response = await this.openai.chat.completions.create({
+                    model: modelName,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: systemInstruction || 'أنت مساعد ذكي لنظام الموارد البشرية. أجب بالعربية بشكل مختصر ومفيد.'
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.1, // Keep it deterministic for policies
+                    max_tokens: 4096,
+                });
+
+                const content = response.choices[0]?.message?.content;
+                if (content) {
+                    this.logger.log(`Successfully generated content using OpenAI ${modelName}`);
+                    return content;
+                }
+
+                throw new Error('OpenAI returned empty response');
+            } catch (error: any) {
+                this.logger.warn(`Model ${modelName} failed: ${error.message || error}`);
+                lastError = error;
+
+                // Detect rate limit or quota errors
+                const errorMessage = error.message || '';
+                if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('limit')) {
+                    this.isRateLimited = true;
+                    // Set reset time to 1 hour
+                    this.rateLimitResetTime = new Date(Date.now() + 60 * 60 * 1000);
+                    this.logger.warn(`AI rate limited/quota exceeded - will retry after ${this.rateLimitResetTime.toISOString()}`);
+                }
+
+                // Try next model if applicable
+                continue;
+            }
+        }
+
+        this.logger.error('All OpenAI models failed to generate content');
+        throw lastError || new Error('Failed to generate content with OpenAI');
     }
 
     parseJsonResponse<T>(response: string | undefined | null): T {
@@ -84,8 +133,80 @@ export class AiService {
         try {
             return JSON.parse(cleaned) as T;
         } catch (error) {
-            this.logger.error(`Failed to parse JSON response: ${cleaned.substring(0, 200)}...`);
-            throw new Error('Failed to parse AI response as JSON');
+            this.logger.warn(`Initial JSON parse failed, attempting recovery...`);
+
+            try {
+                const jsonEndIndex = this.findJsonEnd(cleaned);
+                if (jsonEndIndex > 0) {
+                    const fixedJson = cleaned.substring(0, jsonEndIndex + 1);
+                    return JSON.parse(fixedJson) as T;
+                }
+            } catch (e) {
+                // Ignore
+            }
+
+            try {
+                const repaired = this.repairIncompleteJson(cleaned);
+                return JSON.parse(repaired) as T;
+            } catch (e) {
+                this.logger.error(`Failed to parse JSON response: ${cleaned.substring(0, 300)}...`);
+                throw new Error('Failed to parse AI response as JSON');
+            }
         }
     }
+
+    private findJsonEnd(json: string): number {
+        let braceCount = 0;
+        let inString = false;
+        let escapeNext = false;
+
+        for (let i = 0; i < json.length; i++) {
+            const char = json[i];
+            if (escapeNext) {
+                escapeNext = false;
+                continue;
+            }
+            if (char === '\\') {
+                escapeNext = true;
+                continue;
+            }
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+            if (char === '{') braceCount++;
+            if (char === '}') {
+                braceCount--;
+                if (braceCount === 0) return i;
+            }
+        }
+        return -1;
+    }
+
+    private repairIncompleteJson(json: string): string {
+        let repaired = json;
+        let braceCount = 0;
+        let bracketCount = 0;
+        let inString = false;
+
+        for (let i = 0; i < repaired.length; i++) {
+            const char = repaired[i];
+            if (char === '"' && (i === 0 || repaired[i - 1] !== '\\')) {
+                inString = !inString;
+            }
+            if (!inString) {
+                if (char === '{') braceCount++;
+                if (char === '}') braceCount--;
+                if (char === '[') bracketCount++;
+                if (char === ']') bracketCount--;
+            }
+        }
+
+        if (inString) repaired += '"';
+        while (bracketCount > 0) { repaired += ']'; bracketCount--; }
+        while (braceCount > 0) { repaired += '}'; braceCount--; }
+        return repaired;
+    }
 }
+

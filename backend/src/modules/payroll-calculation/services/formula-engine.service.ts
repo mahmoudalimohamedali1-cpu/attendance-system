@@ -1,9 +1,27 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+    Decimal,
+    toDecimal,
+    toNumber,
+    toFixed,
+    add,
+    sub,
+    mul,
+    div,
+    min as decMin,
+    max as decMax,
+    abs as decAbs,
+    round as decRound,
+    ZERO,
+} from '../../../common/utils/decimal.util';
+import { FormulaSecurityService } from '../../../common/security/formula-security.service';
 
 /**
  * Enterprise-Grade Formula Engine
- * 
+ *
  * يقيّم المعادلات الرياضية بشكل آمن بدون استخدام eval()
+ * ✅ Updated to use Decimal internally for precision
+ *
  * يدعم:
  * - العمليات الحسابية: +, -, *, /, %, ^
  * - المتغيرات: BASIC, TOTAL, GROSS, NET, etc.
@@ -13,6 +31,10 @@ import { Injectable, Logger } from '@nestjs/common';
 @Injectable()
 export class FormulaEngineService {
     private readonly logger = new Logger(FormulaEngineService.name);
+
+    constructor(
+        @Optional() private readonly securityService?: FormulaSecurityService,
+    ) {}
 
     // المتغيرات المدعومة
     private static readonly SUPPORTED_VARIABLES = [
@@ -43,19 +65,45 @@ export class FormulaEngineService {
     /**
      * تقييم معادلة مع متغيرات
      */
-    evaluate(formula: string, variables: Record<string, number>): { value: number; error?: string } {
+    evaluate(
+        formula: string,
+        variables: Record<string, number>,
+        context?: { userId?: string; companyId?: string }
+    ): { value: number; error?: string; auditId?: string } {
+        const startTime = Date.now();
+        let auditId: string | undefined;
+
         try {
             if (!formula || typeof formula !== 'string') {
                 return { value: 0, error: 'Empty formula' };
             }
 
+            // 🔒 استخدام خدمة الأمان المركزية إذا كانت متوفرة
+            if (this.securityService) {
+                const securityResult = this.securityService.analyze(formula, context);
+                auditId = securityResult.auditId;
+
+                if (!securityResult.isSecure) {
+                    const criticalThreats = securityResult.threats
+                        .filter(t => t.severity === 'CRITICAL' || t.severity === 'HIGH')
+                        .map(t => t.description)
+                        .join(', ');
+
+                    this.securityService.logExecutionResult(auditId, 'ERROR', Date.now() - startTime, criticalThreats);
+                    return { value: 0, error: `Security violation: ${criticalThreats}`, auditId };
+                }
+            }
+
             // تنظيف المعادلة
             let expression = formula.trim().toUpperCase();
 
-            // التحقق من الأمان (لا يسمح بأي كلمات برمجية)
+            // التحقق من الأمان الأساسي (fallback)
             const securityCheck = this.securityValidation(expression);
             if (!securityCheck.valid) {
-                return { value: 0, error: securityCheck.error };
+                if (this.securityService && auditId) {
+                    this.securityService.logExecutionResult(auditId, 'ERROR', Date.now() - startTime, securityCheck.error);
+                }
+                return { value: 0, error: securityCheck.error, auditId };
             }
 
             // استبدال المتغيرات بقيمها
@@ -65,13 +113,24 @@ export class FormulaEngineService {
             const result = this.evaluateExpression(expression);
 
             if (isNaN(result) || !isFinite(result)) {
-                return { value: 0, error: 'Invalid calculation result' };
+                if (this.securityService && auditId) {
+                    this.securityService.logExecutionResult(auditId, 'ERROR', Date.now() - startTime, 'Invalid calculation result');
+                }
+                return { value: 0, error: 'Invalid calculation result', auditId };
             }
 
-            return { value: Math.round(result * 100) / 100 };
+            // تسجيل نجاح التنفيذ
+            if (this.securityService && auditId) {
+                this.securityService.logExecutionResult(auditId, 'SUCCESS', Date.now() - startTime);
+            }
+
+            return { value: Math.round(result * 100) / 100, auditId };
         } catch (error) {
             this.logger.error(`Formula evaluation error: ${error.message}`, error.stack);
-            return { value: 0, error: error.message };
+            if (this.securityService && auditId) {
+                this.securityService.logExecutionResult(auditId, 'ERROR', Date.now() - startTime, error.message);
+            }
+            return { value: 0, error: error.message, auditId };
         }
     }
 
@@ -228,24 +287,25 @@ export class FormulaEngineService {
         return output;
     }
 
+    // ✅ Using Decimal internally for precision
     private evaluateRPN(tokens: string[]): number {
-        const stack: number[] = [];
+        const stack: Decimal[] = [];
         for (const token of tokens) {
-            if (/\d/.test(token)) stack.push(parseFloat(token));
+            if (/\d/.test(token)) stack.push(toDecimal(token));
             else {
-                const b = stack.pop() || 0;
-                const a = stack.pop() || 0;
+                const b = stack.pop() || ZERO;
+                const a = stack.pop() || ZERO;
                 switch (token) {
-                    case '+': stack.push(a + b); break;
-                    case '-': stack.push(a - b); break;
-                    case '*': stack.push(a * b); break;
-                    case '/': stack.push(b !== 0 ? a / b : 0); break;
-                    case '%': stack.push(a % b); break;
-                    case '^': stack.push(Math.pow(a, b)); break;
+                    case '+': stack.push(add(a, b)); break;
+                    case '-': stack.push(sub(a, b)); break;
+                    case '*': stack.push(mul(a, b)); break;
+                    case '/': stack.push(div(a, b)); break;
+                    case '%': stack.push(toDecimal(toNumber(a) % toNumber(b))); break;
+                    case '^': stack.push(toDecimal(Math.pow(toNumber(a), toNumber(b)))); break;
                 }
             }
         }
-        return stack[0] || 0;
+        return toNumber(stack[0] || ZERO);
     }
 
 

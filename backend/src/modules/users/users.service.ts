@@ -4,7 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -161,7 +161,7 @@ export class UsersService {
           faceData: { select: { faceImage: true, registeredAt: true } },
           nationality: true,
           isSaudi: true,
-          costCenter: { select: { id: true, name: true, code: true } },
+          costCenter: { select: { id: true, nameAr: true, code: true } },
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },

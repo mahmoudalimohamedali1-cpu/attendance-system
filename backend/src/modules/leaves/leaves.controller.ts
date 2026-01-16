@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Patch,
   Param,
@@ -77,6 +78,17 @@ export class LeavesController {
     return this.leavesService.createLeaveRequest(userId, companyId, createLeaveDto);
   }
 
+  @Get()
+  @ApiOperation({ summary: 'طلبات الإجازة الخاصة بي' })
+  @ApiResponse({ status: 200, description: 'قائمة طلبات الإجازة' })
+  async getLeaves(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Query() query: LeaveQueryDto,
+  ) {
+    return this.leavesService.getMyLeaveRequests(userId, companyId, query);
+  }
+
   @Get('my')
   @ApiOperation({ summary: 'طلبات الإجازة الخاصة بي' })
   @ApiResponse({ status: 200, description: 'قائمة طلبات الإجازة' })
@@ -143,7 +155,19 @@ export class LeavesController {
     @CurrentUser('id') approverId: string,
     @Body() approveDto: ApproveLeaveDto,
   ) {
-    return this.leavesService.approveLeaveRequest(id, companyId, approverId, approveDto.notes);
+    return this.leavesService.approveLeaveRequest(id, companyId, approverId, approveDto?.notes);
+  }
+
+  @Put(':id/approve')
+  @ApiOperation({ summary: 'الموافقة على طلب إجازة (PUT alias)' })
+  @ApiResponse({ status: 200, description: 'تمت الموافقة' })
+  async approveLeaveRequestPut(
+    @Param('id') id: string,
+    @CurrentUser('companyId') companyId: string,
+    @CurrentUser('id') approverId: string,
+    @Body() approveDto: ApproveLeaveDto,
+  ) {
+    return this.leavesService.approveLeaveRequest(id, companyId, approverId, approveDto?.notes);
   }
 
   @Patch(':id/reject')

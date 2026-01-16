@@ -4,7 +4,7 @@
 VPS_HOST="72.61.239.170"
 VPS_USER="root"
 VPS_PASS="GamalSaad35@#"
-PROJECT_PATH="/root/attendance-system"
+PROJECT_PATH="/var/www/attendance-system"
 
 echo "🚀 رفع إصلاح العهدة إلى VPS..."
 

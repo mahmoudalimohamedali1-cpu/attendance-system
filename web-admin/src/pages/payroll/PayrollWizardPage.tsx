@@ -25,6 +25,14 @@ import {
     TableHead,
     TableRow,
     Collapse,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    InputAdornment,
+    FormControl,
+    InputLabel,
+    Select,
 } from '@mui/material';
 import {
     PlayCircleFilled,
@@ -49,8 +57,23 @@ import {
     CalendarMonth,
     Business,
     Group,
+    Add,
+    Remove,
+    Close,
+    Search,
+    FileDownload,
+    Print,
+    Save,
+    Sort,
+    FilterList,
+    CompareArrows,
+    NotificationsActive,
+    Category,
+    Policy,
+    Gavel,
 } from '@mui/icons-material';
 import { api, API_URL } from '@/services/api.service';
+import { smartPoliciesService } from '@/services/smart-policies.service';
 import { useNavigate } from 'react-router-dom';
 
 interface PayrollPeriod {
@@ -179,6 +202,59 @@ export const PayrollWizardPage = () => {
     // Step 6: Results
     const [runResult, setRunResult] = useState<PayrollRun | null>(null);
 
+    // Dialog states for adjustments
+    const [adjustmentDialog, setAdjustmentDialog] = useState<{
+        open: boolean;
+        employeeId: string;
+        employeeName: string;
+        type: 'bonus' | 'deduction';
+    }>({ open: false, employeeId: '', employeeName: '', type: 'bonus' });
+    const [adjustmentAmount, setAdjustmentAmount] = useState('');
+    const [adjustmentReason, setAdjustmentReason] = useState('');
+
+    // Confirmation dialog for running payroll
+    const [confirmRunDialog, setConfirmRunDialog] = useState(false);
+
+    // ========== 10 New Features State ==========
+    // 1. Search/Filter employees
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // 2. Sort configuration
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
+    // 3. Group by mode
+    const [groupBy, setGroupBy] = useState<'none' | 'branch' | 'department'>('none');
+
+    // 4. Salary alerts/warnings
+    const [salaryAlerts, setSalaryAlerts] = useState<{ employeeId: string; type: string; message: string }[]>([]);
+
+    // 5. Show comparison details
+    const [showComparison, setShowComparison] = useState(false);
+
+    // 6. Draft saving
+    const [draftSaved, setDraftSaved] = useState(false);
+    const [lastDraftTime, setLastDraftTime] = useState<Date | null>(null);
+
+    // 7. Smart Policies Impact
+    const [policyImpact, setPolicyImpact] = useState<{
+        loading: boolean;
+        data: {
+            summary: {
+                totalDeductions: number;
+                totalBonuses: number;
+                netImpact: number;
+                policiesApplied: number;
+                employeesAffected: number;
+            };
+            byPolicy: Array<{
+                policyId: string;
+                policyName: string;
+                timesApplied: number;
+                totalAmount: number;
+            }>;
+        } | null;
+    }>({ loading: false, data: null });
+
     // Fetch initial data
     useEffect(() => {
         fetchPeriods();
@@ -220,6 +296,44 @@ export const PayrollWizardPage = () => {
             console.error('Failed to fetch departments', err);
         }
     };
+
+    // Fetch Smart Policies Impact
+    const fetchPolicyImpact = useCallback(async () => {
+        if (!selectedPeriodId) return;
+
+        // Get the period details to extract month and year
+        const selectedPeriod = periods.find(p => p.id === selectedPeriodId);
+        if (!selectedPeriod) return;
+
+        setPolicyImpact(prev => ({ ...prev, loading: true }));
+        try {
+            const response = await smartPoliciesService.getPayrollImpact(
+                selectedPeriod.month,
+                selectedPeriod.year
+            );
+
+            if (response.success && response.data) {
+                setPolicyImpact({
+                    loading: false,
+                    data: {
+                        summary: {
+                            totalDeductions: response.data.summary?.totalDeductions || 0,
+                            totalBonuses: response.data.summary?.totalBonuses || 0,
+                            netImpact: response.data.summary?.netImpact || 0,
+                            policiesApplied: response.data.summary?.policiesApplied || 0,
+                            employeesAffected: response.data.summary?.employeesAffected || 0,
+                        },
+                        byPolicy: response.data.summary?.byPolicy || [],
+                    },
+                });
+            } else {
+                setPolicyImpact({ loading: false, data: null });
+            }
+        } catch (err) {
+            console.error('Failed to fetch policy impact', err);
+            setPolicyImpact({ loading: false, data: null });
+        }
+    }, [selectedPeriodId, periods]);
 
     const runHealthCheck = useCallback(async () => {
         setHealthLoading(true);
@@ -497,10 +611,29 @@ export const PayrollWizardPage = () => {
             setRunStatus('جاري إنشاء قسائم الرواتب...');
             setRunLogs(prev => [...prev, '📄 إنشاء قسائم الرواتب...']);
 
-            // Actually run the payroll
+            // Actually run the payroll with excluded employees and adjustments
+            const excludedIds = Array.from(excludedEmployees);
+            const adjustmentsData = Object.entries(adjustments).map(([employeeId, items]) => ({
+                employeeId,
+                items: items.map(item => ({
+                    type: item.type,
+                    amount: item.amount,
+                    reason: item.reason,
+                })),
+            }));
+
+            if (excludedIds.length > 0) {
+                setRunLogs(prev => [...prev, `⏭️ استثناء ${excludedIds.length} موظف من المسير`]);
+            }
+            if (adjustmentsData.length > 0) {
+                setRunLogs(prev => [...prev, `📝 تطبيق تعديلات على ${adjustmentsData.length} موظف`]);
+            }
+
             const result = await api.post('/payroll-runs', {
                 periodId: selectedPeriodId,
                 branchId: selectedBranchId || undefined,
+                excludedEmployeeIds: excludedIds.length > 0 ? excludedIds : undefined,
+                adjustments: adjustmentsData.length > 0 ? adjustmentsData : undefined,
             }) as PayrollRun;
 
             clearInterval(progressInterval);
@@ -561,16 +694,16 @@ export const PayrollWizardPage = () => {
             return;
         }
 
-        // When moving FROM step 2 TO step 3 (preview), fetch preview
+        // When moving FROM step 2 TO step 3 (preview), fetch preview and policy impact
         if (activeStep === 2) {
             setActiveStep(3);
-            await fetchPreview();
+            await Promise.all([fetchPreview(), fetchPolicyImpact()]);
             return;
         }
 
-        // When on step 4, run payroll
+        // When on step 4, show confirmation dialog before running payroll
         if (activeStep === 4) {
-            await runPayroll();
+            setConfirmRunDialog(true);
             return;
         }
 
@@ -610,6 +743,267 @@ export const PayrollWizardPage = () => {
             deductions: acc.deductions + parseFloat(p.totalDeductions || 0),
             net: acc.net + parseFloat(p.netSalary || 0),
         }), { employees: 0, gross: 0, deductions: 0, net: 0 });
+    };
+
+    // Safe percentage calculation to avoid division by zero
+    const safePercentage = (current: number, previous: number): string => {
+        if (previous === 0) return current > 0 ? '+∞' : '0';
+        return ((current - previous) / previous * 100).toFixed(1);
+    };
+
+    // Handle opening adjustment dialog
+    const openAdjustmentDialog = (employeeId: string, employeeName: string, type: 'bonus' | 'deduction') => {
+        setAdjustmentDialog({ open: true, employeeId, employeeName, type });
+        setAdjustmentAmount('');
+        setAdjustmentReason('');
+    };
+
+    // Handle adding adjustment from dialog
+    const handleAddAdjustment = () => {
+        const amount = parseFloat(adjustmentAmount);
+        if (isNaN(amount) || amount <= 0) {
+            setError('يرجى إدخال مبلغ صحيح');
+            return;
+        }
+        if (!adjustmentReason.trim()) {
+            setError('يرجى إدخال سبب التعديل');
+            return;
+        }
+
+        setAdjustments(prev => ({
+            ...prev,
+            [adjustmentDialog.employeeId]: [
+                ...(prev[adjustmentDialog.employeeId] || []),
+                { type: adjustmentDialog.type, amount, reason: adjustmentReason.trim() }
+            ]
+        }));
+
+        setAdjustmentDialog({ open: false, employeeId: '', employeeName: '', type: 'bonus' });
+        setError(null);
+    };
+
+    // Handle confirming payroll run
+    const handleConfirmRun = async () => {
+        setConfirmRunDialog(false);
+        await runPayroll();
+    };
+
+    // ========== 10 New Features Functions ==========
+
+    // 1. Export to Excel
+    const exportToExcel = () => {
+        if (!previewData?.employees) return;
+
+        const data = getFilteredAndSortedEmployees().map(emp => ({
+            'رقم الموظف': emp.employeeCode,
+            'الاسم': emp.name,
+            'الفرع': emp.branch,
+            'القسم': emp.department,
+            'الراتب الأساسي': emp.baseSalary,
+            'الإجمالي': emp.gross,
+            'الخصومات': emp.deductions,
+            'التأمينات': emp.gosi,
+            'الصافي': emp.net,
+            'الحالة': excludedEmployees.has(emp.id) ? 'مستثنى' : 'مشمول',
+        }));
+
+        // Create CSV content
+        const headers = Object.keys(data[0] || {}).join(',');
+        const rows = data.map(row => Object.values(row).join(','));
+        const csv = '\uFEFF' + [headers, ...rows].join('\n'); // BOM for Arabic
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `payroll-preview-${selectedPeriodId}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // 2. Filter and Sort employees
+    const getFilteredAndSortedEmployees = useCallback(() => {
+        if (!previewData?.employees) return [];
+
+        let filtered = previewData.employees.filter(emp => {
+            if (!searchQuery) return true;
+            const query = searchQuery.toLowerCase();
+            return (
+                emp.name.toLowerCase().includes(query) ||
+                emp.employeeCode.toLowerCase().includes(query) ||
+                emp.branch.toLowerCase().includes(query) ||
+                emp.department.toLowerCase().includes(query)
+            );
+        });
+
+        // Sort
+        filtered.sort((a, b) => {
+            let aVal: any = a[sortConfig.key as keyof EmployeePreview];
+            let bVal: any = b[sortConfig.key as keyof EmployeePreview];
+
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    }, [previewData?.employees, searchQuery, sortConfig]);
+
+    // 3. Handle sort click
+    const handleSort = (key: string) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    // 4. Group employees by branch/department
+    const getGroupedEmployees = useCallback(() => {
+        const employees = getFilteredAndSortedEmployees();
+        if (groupBy === 'none') return { 'جميع الموظفين': employees };
+
+        const grouped: Record<string, EmployeePreview[]> = {};
+        employees.forEach(emp => {
+            const key = groupBy === 'branch' ? emp.branch : emp.department;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(emp);
+        });
+
+        return grouped;
+    }, [getFilteredAndSortedEmployees, groupBy]);
+
+    // 5. Detect salary alerts
+    const detectSalaryAlerts = useCallback(() => {
+        if (!previewData?.employees) return;
+
+        const alerts: { employeeId: string; type: string; message: string }[] = [];
+        const avgNet = previewData.estimatedNet / previewData.totalEmployees;
+
+        previewData.employees.forEach(emp => {
+            // Alert 1: Negative salary
+            if (emp.net < 0) {
+                alerts.push({ employeeId: emp.id, type: 'error', message: `راتب سالب: ${formatMoney(emp.net)}` });
+            }
+            // Alert 2: Salary too high (>3x average)
+            else if (emp.net > avgNet * 3) {
+                alerts.push({ employeeId: emp.id, type: 'warning', message: `راتب مرتفع جداً (${((emp.net / avgNet) * 100).toFixed(0)}% من المتوسط)` });
+            }
+            // Alert 3: Salary too low (<30% of average)
+            else if (emp.net < avgNet * 0.3 && emp.net > 0) {
+                alerts.push({ employeeId: emp.id, type: 'warning', message: `راتب منخفض جداً (${((emp.net / avgNet) * 100).toFixed(0)}% من المتوسط)` });
+            }
+            // Alert 4: High deductions (>50% of gross)
+            if (emp.deductions > emp.gross * 0.5) {
+                alerts.push({ employeeId: emp.id, type: 'warning', message: `خصومات عالية: ${((emp.deductions / emp.gross) * 100).toFixed(0)}% من الإجمالي` });
+            }
+        });
+
+        setSalaryAlerts(alerts);
+    }, [previewData]);
+
+    // Run salary alerts detection when preview data changes
+    useEffect(() => {
+        detectSalaryAlerts();
+    }, [previewData, detectSalaryAlerts]);
+
+    // 6. Save draft to localStorage
+    const saveDraft = () => {
+        const draft = {
+            selectedPeriodId,
+            selectedBranchId,
+            selectedDepartmentId,
+            excludedEmployees: Array.from(excludedEmployees),
+            adjustments,
+            activeStep,
+            savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem('payroll-wizard-draft', JSON.stringify(draft));
+        setDraftSaved(true);
+        setLastDraftTime(new Date());
+        setTimeout(() => setDraftSaved(false), 3000);
+    };
+
+    // 7. Load draft from localStorage
+    const loadDraft = () => {
+        const saved = localStorage.getItem('payroll-wizard-draft');
+        if (saved) {
+            const draft = JSON.parse(saved);
+            setSelectedPeriodId(draft.selectedPeriodId || '');
+            setSelectedBranchId(draft.selectedBranchId || '');
+            setSelectedDepartmentId(draft.selectedDepartmentId || '');
+            setExcludedEmployees(new Set(draft.excludedEmployees || []));
+            setAdjustments(draft.adjustments || {});
+            if (draft.activeStep > 0) setActiveStep(draft.activeStep);
+            setLastDraftTime(draft.savedAt ? new Date(draft.savedAt) : null);
+        }
+    };
+
+    // Load draft on mount
+    useEffect(() => {
+        loadDraft();
+    }, []);
+
+    // 8. Print preview
+    const printPreview = () => {
+        const printContent = document.getElementById('preview-table');
+        if (!printContent) return;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        printWindow.document.write(`
+            <html dir="rtl">
+            <head>
+                <title>معاينة مسير الرواتب</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+                    th { background-color: #f5f5f5; }
+                    .header { text-align: center; margin-bottom: 20px; }
+                    .summary { margin-top: 20px; padding: 10px; background: #f5f5f5; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2>معاينة مسير الرواتب</h2>
+                    <p>الفترة: ${getMonthName(periods.find(p => p.id === selectedPeriodId)?.month || 0)} ${periods.find(p => p.id === selectedPeriodId)?.year}</p>
+                </div>
+                ${printContent.outerHTML}
+                <div class="summary">
+                    <strong>الإجمالي:</strong> ${previewData?.totalEmployees} موظف |
+                    <strong>صافي الرواتب:</strong> ${formatMoney(previewData?.estimatedNet || 0)}
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+    };
+
+    // 9. Get adjustments summary
+    const getAdjustmentsSummary = () => {
+        let totalBonus = 0;
+        let totalDeduction = 0;
+        let employeesWithAdjustments = 0;
+
+        Object.entries(adjustments).forEach(([_, items]) => {
+            if (items.length > 0) employeesWithAdjustments++;
+            items.forEach(item => {
+                if (item.type === 'bonus') totalBonus += item.amount;
+                else totalDeduction += item.amount;
+            });
+        });
+
+        return { totalBonus, totalDeduction, employeesWithAdjustments };
+    };
+
+    // 10. Get employee alert
+    const getEmployeeAlert = (employeeId: string) => {
+        return salaryAlerts.find(a => a.employeeId === employeeId);
     };
 
     return (
@@ -921,9 +1315,227 @@ export const PayrollWizardPage = () => {
                             </Box>
                         ) : previewData && (
                             <>
+                                {/* ========== New Features Toolbar ========== */}
+                                <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
+                                    <Grid container spacing={2} alignItems="center">
+                                        {/* Search */}
+                                        <Grid item xs={12} md={4}>
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                placeholder="بحث بالاسم، الكود، الفرع، القسم..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                InputProps={{
+                                                    startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+                                                }}
+                                            />
+                                        </Grid>
+
+                                        {/* Group By */}
+                                        <Grid item xs={6} md={2}>
+                                            <TextField
+                                                select
+                                                fullWidth
+                                                size="small"
+                                                value={groupBy}
+                                                onChange={(e) => setGroupBy(e.target.value as any)}
+                                                label="تجميع حسب"
+                                            >
+                                                <MenuItem value="none">بدون تجميع</MenuItem>
+                                                <MenuItem value="branch">الفرع</MenuItem>
+                                                <MenuItem value="department">القسم</MenuItem>
+                                            </TextField>
+                                        </Grid>
+
+                                        {/* Action Buttons */}
+                                        <Grid item xs={6} md={6}>
+                                            <Box display="flex" gap={1} justifyContent="flex-end" flexWrap="wrap">
+                                                <Button
+                                                    size="small"
+                                                    startIcon={<FileDownload />}
+                                                    onClick={exportToExcel}
+                                                    variant="outlined"
+                                                >
+                                                    تصدير Excel
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    startIcon={<Print />}
+                                                    onClick={printPreview}
+                                                    variant="outlined"
+                                                >
+                                                    طباعة
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    startIcon={<Save />}
+                                                    onClick={saveDraft}
+                                                    variant="outlined"
+                                                    color={draftSaved ? 'success' : 'primary'}
+                                                >
+                                                    {draftSaved ? 'تم الحفظ ✓' : 'حفظ مسودة'}
+                                                </Button>
+                                                {salaryAlerts.length > 0 && (
+                                                    <Chip
+                                                        icon={<NotificationsActive />}
+                                                        label={`${salaryAlerts.length} تنبيه`}
+                                                        color="warning"
+                                                        size="small"
+                                                    />
+                                                )}
+                                            </Box>
+                                        </Grid>
+                                    </Grid>
+
+                                    {/* Smart Policies Impact Section */}
+                                    {(policyImpact.loading || policyImpact.data) && (
+                                        <Paper sx={{ mt: 2, p: 2, bgcolor: 'info.50', border: '1px solid', borderColor: 'info.200', borderRadius: 2 }}>
+                                            <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+                                                <Gavel color="info" />
+                                                <Typography variant="subtitle1" fontWeight="bold" color="info.dark">
+                                                    تأثير السياسات الذكية
+                                                </Typography>
+                                                {policyImpact.loading && <CircularProgress size={16} />}
+                                            </Box>
+
+                                            {!policyImpact.loading && policyImpact.data && (
+                                                <>
+                                                    <Grid container spacing={2}>
+                                                        <Grid item xs={6} sm={3}>
+                                                            <Box textAlign="center" p={1} bgcolor="background.paper" borderRadius={1}>
+                                                                <Typography variant="h6" fontWeight="bold" color="info.main">
+                                                                    {policyImpact.data.summary.policiesApplied}
+                                                                </Typography>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    سياسات نشطة
+                                                                </Typography>
+                                                            </Box>
+                                                        </Grid>
+                                                        <Grid item xs={6} sm={3}>
+                                                            <Box textAlign="center" p={1} bgcolor="background.paper" borderRadius={1}>
+                                                                <Typography variant="h6" fontWeight="bold" color="primary.main">
+                                                                    {policyImpact.data.summary.employeesAffected}
+                                                                </Typography>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    موظف متأثر
+                                                                </Typography>
+                                                            </Box>
+                                                        </Grid>
+                                                        <Grid item xs={6} sm={3}>
+                                                            <Box textAlign="center" p={1} bgcolor="success.50" borderRadius={1}>
+                                                                <Typography variant="h6" fontWeight="bold" color="success.main">
+                                                                    +{formatMoney(policyImpact.data.summary.totalBonuses)}
+                                                                </Typography>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    مكافآت
+                                                                </Typography>
+                                                            </Box>
+                                                        </Grid>
+                                                        <Grid item xs={6} sm={3}>
+                                                            <Box textAlign="center" p={1} bgcolor="error.50" borderRadius={1}>
+                                                                <Typography variant="h6" fontWeight="bold" color="error.main">
+                                                                    -{formatMoney(policyImpact.data.summary.totalDeductions)}
+                                                                </Typography>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    خصومات
+                                                                </Typography>
+                                                            </Box>
+                                                        </Grid>
+                                                    </Grid>
+
+                                                    {/* Policy breakdown */}
+                                                    {policyImpact.data.byPolicy.length > 0 && (
+                                                        <Box mt={2}>
+                                                            <Typography variant="body2" fontWeight="bold" mb={1}>
+                                                                تفصيل حسب السياسة:
+                                                            </Typography>
+                                                            {policyImpact.data.byPolicy.slice(0, 4).map((policy) => (
+                                                                <Box key={policy.policyId} display="flex" justifyContent="space-between" alignItems="center" py={0.5}>
+                                                                    <Chip
+                                                                        size="small"
+                                                                        label={policy.policyName}
+                                                                        variant="outlined"
+                                                                        sx={{ maxWidth: 200 }}
+                                                                    />
+                                                                    <Typography variant="body2">
+                                                                        {policy.timesApplied} مرة • {formatMoney(Math.abs(policy.totalAmount))}
+                                                                    </Typography>
+                                                                </Box>
+                                                            ))}
+                                                        </Box>
+                                                    )}
+
+                                                    {/* Net Impact Alert */}
+                                                    {Math.abs(policyImpact.data.summary.netImpact) > 0 && (
+                                                        <Alert
+                                                            severity={policyImpact.data.summary.netImpact > 0 ? 'success' : 'warning'}
+                                                            sx={{ mt: 2 }}
+                                                        >
+                                                            صافي تأثير السياسات الذكية: {policyImpact.data.summary.netImpact > 0 ? '+' : ''}{formatMoney(policyImpact.data.summary.netImpact)}
+                                                        </Alert>
+                                                    )}
+                                                </>
+                                            )}
+
+                                            {!policyImpact.loading && !policyImpact.data && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    لا توجد سياسات ذكية نشطة لهذه الفترة
+                                                </Typography>
+                                            )}
+                                        </Paper>
+                                    )}
+
+                                    {/* Alerts Summary */}
+                                    {salaryAlerts.length > 0 && (
+                                        <Alert severity="warning" sx={{ mt: 2 }}>
+                                            <AlertTitle>تنبيهات الرواتب ({salaryAlerts.length})</AlertTitle>
+                                            {salaryAlerts.slice(0, 3).map((alert, idx) => (
+                                                <Typography key={idx} variant="body2">
+                                                    • {previewData.employees?.find(e => e.id === alert.employeeId)?.name}: {alert.message}
+                                                </Typography>
+                                            ))}
+                                            {salaryAlerts.length > 3 && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    و {salaryAlerts.length - 3} تنبيهات أخرى...
+                                                </Typography>
+                                            )}
+                                        </Alert>
+                                    )}
+
+                                    {/* Adjustments Summary */}
+                                    {Object.keys(adjustments).length > 0 && (
+                                        <Alert severity="info" sx={{ mt: 2 }}>
+                                            <AlertTitle>ملخص التعديلات</AlertTitle>
+                                            <Box display="flex" gap={3}>
+                                                <Typography variant="body2">
+                                                    👥 {getAdjustmentsSummary().employeesWithAdjustments} موظف
+                                                </Typography>
+                                                {getAdjustmentsSummary().totalBonus > 0 && (
+                                                    <Typography variant="body2" color="success.main">
+                                                        ➕ مكافآت: {formatMoney(getAdjustmentsSummary().totalBonus)}
+                                                    </Typography>
+                                                )}
+                                                {getAdjustmentsSummary().totalDeduction > 0 && (
+                                                    <Typography variant="body2" color="error.main">
+                                                        ➖ خصومات: {formatMoney(getAdjustmentsSummary().totalDeduction)}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        </Alert>
+                                    )}
+
+                                    {/* Draft Info */}
+                                    {lastDraftTime && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                            آخر حفظ: {lastDraftTime.toLocaleString('ar-SA')}
+                                        </Typography>
+                                    )}
+                                </Paper>
+
                                 {/* Summary Cards */}
                                 <Grid container spacing={2} sx={{ mb: 3 }}>
-                                    <Grid item xs={6} md={2.4}>
+                                    <Grid item xs={6} md={3}>
                                         <Card sx={{ bgcolor: 'primary.50', height: '100%' }}>
                                             <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
                                                 <People color="primary" sx={{ fontSize: 28 }} />
@@ -932,46 +1544,36 @@ export const PayrollWizardPage = () => {
                                             </CardContent>
                                         </Card>
                                     </Grid>
-                                    <Grid item xs={6} md={2.4}>
-                                        <Card sx={{ bgcolor: 'grey.100', height: '100%' }}>
-                                            <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
-                                                <Typography variant="h6" fontWeight="bold" color="text.secondary">
-                                                    {formatMoney(previewData.employees?.reduce((sum, emp) => sum + (Number(emp.baseSalary) || 0), 0) || 0)}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary">إجمالي الرواتب (TOTAL)</Typography>
-                                            </CardContent>
-                                        </Card>
-                                    </Grid>
-                                    <Grid item xs={6} md={2.4}>
+                                    <Grid item xs={6} md={3}>
                                         <Card sx={{ bgcolor: 'success.50', height: '100%' }}>
                                             <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
                                                 <TrendingUp color="success" sx={{ fontSize: 28 }} />
                                                 <Typography variant="h6" fontWeight="bold" color="success.main">
                                                     {formatMoney(previewData.estimatedGross)}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">المستحقات (Earnings)</Typography>
+                                                <Typography variant="caption" color="text.secondary">إجمالي المستحقات</Typography>
                                             </CardContent>
                                         </Card>
                                     </Grid>
-                                    <Grid item xs={6} md={2.4}>
+                                    <Grid item xs={6} md={3}>
                                         <Card sx={{ bgcolor: 'error.50', height: '100%' }}>
                                             <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
                                                 <TrendingDown color="error" sx={{ fontSize: 28 }} />
                                                 <Typography variant="h6" fontWeight="bold" color="error.main">
                                                     {formatMoney(previewData.estimatedDeductions)}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">خصومات</Typography>
+                                                <Typography variant="caption" color="text.secondary">إجمالي الخصومات</Typography>
                                             </CardContent>
                                         </Card>
                                     </Grid>
-                                    <Grid item xs={12} md={2.4}>
-                                        <Card sx={{ bgcolor: 'info.50', height: '100%' }}>
+                                    <Grid item xs={6} md={3}>
+                                        <Card sx={{ bgcolor: 'info.50', height: '100%', border: '2px solid', borderColor: 'info.main' }}>
                                             <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
                                                 <AttachMoney color="info" sx={{ fontSize: 28 }} />
-                                                <Typography variant="h6" fontWeight="bold" color="info.main">
+                                                <Typography variant="h5" fontWeight="bold" color="info.main">
                                                     {formatMoney(previewData.estimatedNet)}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">صافي</Typography>
+                                                <Typography variant="caption" color="text.secondary">صافي الرواتب</Typography>
                                             </CardContent>
                                         </Card>
                                     </Grid>
@@ -994,7 +1596,7 @@ export const PayrollWizardPage = () => {
                                             </Typography>
                                             <Typography variant="body2" color={previewData.estimatedNet > previewData.previousMonth.net ? 'success.main' : 'error.main'}>
                                                 الفرق: <strong>{formatMoney(previewData.estimatedNet - previewData.previousMonth.net)}</strong>
-                                                {' '}({((previewData.estimatedNet - previewData.previousMonth.net) / previewData.previousMonth.net * 100).toFixed(1)}%)
+                                                {' '}({safePercentage(previewData.estimatedNet, previewData.previousMonth.net)}%)
                                             </Typography>
                                         </Box>
                                     </Alert>
@@ -1049,269 +1651,312 @@ export const PayrollWizardPage = () => {
                                 </Box>
 
                                 {/* Employee Preview Table - With Real Data */}
-                                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 450 }}>
+                                <TableContainer id="preview-table" component={Paper} variant="outlined" sx={{ maxHeight: 450 }}>
                                     <Table size="small" stickyHeader>
                                         <TableHead>
                                             <TableRow sx={{ bgcolor: 'grey.100' }}>
                                                 <TableCell sx={{ fontWeight: 'bold', width: 40 }}></TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold', width: 50 }}>#</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>الموظف</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>الفرع</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>إجمالي العقد (TOTAL)</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>الإجمالي</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>الخصومات</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>الصافي</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', width: 50, cursor: 'pointer' }} onClick={() => handleSort('employeeCode')}>
+                                                    # {sortConfig.key === 'employeeCode' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                                                    الموظف {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold', cursor: 'pointer' }} onClick={() => handleSort('branch')}>
+                                                    الفرع/القسم {sortConfig.key === 'branch' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'success.main', cursor: 'pointer' }} onClick={() => handleSort('gross')}>
+                                                    إجمالي المستحقات {sortConfig.key === 'gross' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'error.main', cursor: 'pointer' }} onClick={() => handleSort('deductions')}>
+                                                    الخصومات {sortConfig.key === 'deductions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main', cursor: 'pointer' }} onClick={() => handleSort('net')}>
+                                                    صافي الراتب {sortConfig.key === 'net' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                                </TableCell>
                                                 <TableCell sx={{ fontWeight: 'bold', width: 100 }}>إجراءات</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {!previewData.employees || previewData.employees.length === 0 ? (
+                                            {getFilteredAndSortedEmployees().length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={9} align="center">
-                                                        <Typography color="text.secondary">لا يوجد موظفين للعرض</Typography>
+                                                    <TableCell colSpan={8} align="center">
+                                                        <Typography color="text.secondary">
+                                                            {searchQuery ? 'لا توجد نتائج للبحث' : 'لا يوجد موظفين للعرض'}
+                                                        </Typography>
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                previewData.employees.map((emp, idx) => {
-                                                    const isExcluded = excludedEmployees.has(emp.id);
-                                                    const empAdjustments = adjustments[emp.id] || [];
-                                                    const adjustmentTotal = empAdjustments.reduce((sum, adj) =>
-                                                        sum + (adj.type === 'bonus' ? adj.amount : -adj.amount), 0
-                                                    );
-                                                    const adjustedNet = emp.net + adjustmentTotal;
-                                                    const isExpanded = expandedEmployee === emp.id;
-
-                                                    return (
-                                                        <React.Fragment key={emp.id}>
-                                                            <TableRow
-                                                                hover
-                                                                onClick={() => setExpandedEmployee(isExpanded ? null : emp.id)}
-                                                                sx={{
-                                                                    opacity: isExcluded ? 0.4 : 1,
-                                                                    bgcolor: isExcluded ? 'grey.50' : empAdjustments.length > 0 ? 'warning.50' : 'inherit',
-                                                                    textDecoration: isExcluded ? 'line-through' : 'none',
-                                                                    cursor: 'pointer',
-                                                                    '&:hover': { bgcolor: 'action.hover' },
-                                                                }}
-                                                            >
-                                                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={!isExcluded}
-                                                                        onChange={() => {
-                                                                            const newExcluded = new Set(excludedEmployees);
-                                                                            if (isExcluded) {
-                                                                                newExcluded.delete(emp.id);
-                                                                            } else {
-                                                                                newExcluded.add(emp.id);
-                                                                            }
-                                                                            setExcludedEmployees(newExcluded);
-                                                                        }}
-                                                                        title={isExcluded ? 'إعادة تضمين' : 'استثناء من المسير'}
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>{idx + 1}</TableCell>
-                                                                <TableCell>
+                                                Object.entries(getGroupedEmployees()).map(([groupName, groupEmployees]) => (
+                                                    <React.Fragment key={groupName}>
+                                                        {/* Group Header */}
+                                                        {groupBy !== 'none' && (
+                                                            <TableRow sx={{ bgcolor: 'primary.50' }}>
+                                                                <TableCell colSpan={8}>
                                                                     <Box display="flex" alignItems="center" gap={1}>
-                                                                        {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                                                                        <Box>
-                                                                            <Typography variant="body2" fontWeight={500}>
-                                                                                {emp.name}
-                                                                            </Typography>
-                                                                            <Typography variant="caption" color="text.secondary">
-                                                                                {emp.employeeCode} {emp.isSaudi && '🇸🇦'}
-                                                                            </Typography>
-                                                                        </Box>
+                                                                        <Category fontSize="small" color="primary" />
+                                                                        <Typography fontWeight="bold" color="primary">
+                                                                            {groupName} ({groupEmployees.length} موظف)
+                                                                        </Typography>
+                                                                        <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                                                                            صافي: {formatMoney(groupEmployees.reduce((s, e) => s + e.net, 0))}
+                                                                        </Typography>
                                                                     </Box>
                                                                 </TableCell>
-                                                                <TableCell>
-                                                                    <Chip
-                                                                        label={emp.branch}
-                                                                        size="small"
-                                                                        variant="outlined"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell align="right">
-                                                                    {formatMoney(emp.baseSalary)}
-                                                                </TableCell>
-                                                                <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                                                                    {formatMoney(emp.gross + (empAdjustments.filter(a => a.type === 'bonus').reduce((s, a) => s + a.amount, 0)))}
-                                                                </TableCell>
-                                                                <TableCell align="right" sx={{ color: 'error.main' }}>
-                                                                    {formatMoney(emp.deductions + (empAdjustments.filter(a => a.type === 'deduction').reduce((s, a) => s + a.amount, 0)))}
-                                                                    {emp.gosi > 0 && (
-                                                                        <Typography variant="caption" display="block" color="text.secondary">
-                                                                            GOSI: {formatMoney(emp.gosi)}
-                                                                        </Typography>
-                                                                    )}
-                                                                </TableCell>
-                                                                <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main' }}>
-                                                                    {formatMoney(adjustedNet)}
-                                                                    {adjustmentTotal !== 0 && (
-                                                                        <Typography variant="caption" display="block" color={adjustmentTotal > 0 ? 'success.main' : 'error.main'}>
-                                                                            ({adjustmentTotal > 0 ? '+' : ''}{formatMoney(adjustmentTotal)})
-                                                                        </Typography>
-                                                                    )}
-                                                                </TableCell>
-                                                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                                                    <Box display="flex" gap={0.5}>
-                                                                        <Button
-                                                                            size="small"
-                                                                            variant="outlined"
-                                                                            color="success"
-                                                                            disabled={isExcluded}
-                                                                            onClick={() => {
-                                                                                const amount = prompt('أدخل مبلغ المكافأة:');
-                                                                                if (amount && !isNaN(Number(amount))) {
-                                                                                    const reason = prompt('سبب المكافأة:') || 'مكافأة';
-                                                                                    setAdjustments(prev => ({
-                                                                                        ...prev,
-                                                                                        [emp.id]: [...(prev[emp.id] || []), { type: 'bonus', amount: Number(amount), reason }]
-                                                                                    }));
-                                                                                }
-                                                                            }}
-                                                                            sx={{ minWidth: 30, p: 0.5 }}
-                                                                            title="إضافة مكافأة"
-                                                                        >
-                                                                            +
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="small"
-                                                                            variant="outlined"
-                                                                            color="error"
-                                                                            disabled={isExcluded}
-                                                                            onClick={() => {
-                                                                                const amount = prompt('أدخل مبلغ الخصم:');
-                                                                                if (amount && !isNaN(Number(amount))) {
-                                                                                    const reason = prompt('سبب الخصم:') || 'خصم';
-                                                                                    setAdjustments(prev => ({
-                                                                                        ...prev,
-                                                                                        [emp.id]: [...(prev[emp.id] || []), { type: 'deduction', amount: Number(amount), reason }]
-                                                                                    }));
-                                                                                }
-                                                                            }}
-                                                                            sx={{ minWidth: 30, p: 0.5 }}
-                                                                            title="إضافة خصم"
-                                                                        >
-                                                                            -
-                                                                        </Button>
-                                                                        {empAdjustments.length > 0 && (
-                                                                            <Button
-                                                                                size="small"
-                                                                                variant="text"
-                                                                                color="warning"
-                                                                                onClick={() => {
-                                                                                    setAdjustments(prev => {
-                                                                                        const newAdj = { ...prev };
-                                                                                        delete newAdj[emp.id];
-                                                                                        return newAdj;
-                                                                                    });
+                                                            </TableRow>
+                                                        )}
+                                                        {groupEmployees.map((emp, idx) => {
+                                                            const isExcluded = excludedEmployees.has(emp.id);
+                                                            const empAdjustments = adjustments[emp.id] || [];
+                                                            const adjustmentTotal = empAdjustments.reduce((sum, adj) =>
+                                                                sum + (adj.type === 'bonus' ? adj.amount : -adj.amount), 0
+                                                            );
+                                                            const adjustedNet = emp.net + adjustmentTotal;
+                                                            const isExpanded = expandedEmployee === emp.id;
+
+                                                            return (
+                                                                <React.Fragment key={emp.id}>
+                                                                    <TableRow
+                                                                        hover
+                                                                        onClick={() => setExpandedEmployee(isExpanded ? null : emp.id)}
+                                                                        sx={{
+                                                                            opacity: isExcluded ? 0.4 : 1,
+                                                                            bgcolor: isExcluded ? 'grey.50' : empAdjustments.length > 0 ? 'warning.50' : 'inherit',
+                                                                            textDecoration: isExcluded ? 'line-through' : 'none',
+                                                                            cursor: 'pointer',
+                                                                            '&:hover': { bgcolor: 'action.hover' },
+                                                                        }}
+                                                                    >
+                                                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={!isExcluded}
+                                                                                onChange={() => {
+                                                                                    const newExcluded = new Set(excludedEmployees);
+                                                                                    if (isExcluded) {
+                                                                                        newExcluded.delete(emp.id);
+                                                                                    } else {
+                                                                                        newExcluded.add(emp.id);
+                                                                                    }
+                                                                                    setExcludedEmployees(newExcluded);
                                                                                 }}
-                                                                                sx={{ minWidth: 30, p: 0.5 }}
-                                                                                title="مسح التعديلات"
-                                                                            >
-                                                                                ✕
-                                                                            </Button>
-                                                                        )}
-                                                                    </Box>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                            {/* Expanded Details Row */}
-                                                            <TableRow>
-                                                                <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
-                                                                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                                                                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
-                                                                            <Grid container spacing={2}>
-                                                                                {/* Earnings */}
-                                                                                <Grid item xs={12} md={4}>
-                                                                                    <Typography variant="subtitle2" fontWeight="bold" color="success.main" gutterBottom>
-                                                                                        💰 المستحقات
-                                                                                    </Typography>
-                                                                                    <Box display="flex" justifyContent="space-between" sx={{ mb: 1, pb: 0.5, borderBottom: '1px dashed #ccc' }}>
-                                                                                        <Typography variant="body2" fontWeight="bold">إجمالي الراتب (TOTAL)</Typography>
-                                                                                        <Typography variant="body2" fontWeight="bold">{formatMoney(emp.baseSalary)}</Typography>
+                                                                                title={isExcluded ? 'إعادة تضمين' : 'استثناء من المسير'}
+                                                                            />
+                                                                        </TableCell>
+                                                                        <TableCell>{idx + 1}</TableCell>
+                                                                        <TableCell>
+                                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                                                {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                                                                                <Box>
+                                                                                    <Box display="flex" alignItems="center" gap={0.5}>
+                                                                                        <Typography variant="body2" fontWeight={500}>
+                                                                                            {emp.name}
+                                                                                        </Typography>
+                                                                                        {getEmployeeAlert(emp.id) && (
+                                                                                            <Warning
+                                                                                                fontSize="small"
+                                                                                                color={getEmployeeAlert(emp.id)?.type === 'error' ? 'error' : 'warning'}
+                                                                                                titleAccess={getEmployeeAlert(emp.id)?.message}
+                                                                                            />
+                                                                                        )}
                                                                                     </Box>
-                                                                                    {emp.earnings && emp.earnings.length > 0 ? (
-                                                                                        emp.earnings.filter(e => e.amount > 0).map((e, i) => (
-                                                                                            <Box key={i} display="flex" justifyContent="space-between">
-                                                                                                <Typography variant="body2">{e.name}</Typography>
-                                                                                                <Typography variant="body2" fontWeight={500}>{formatMoney(e.amount)}</Typography>
-                                                                                            </Box>
-                                                                                        ))
-                                                                                    ) : (
-                                                                                        <Typography variant="body2" color="text.secondary">الراتب الأساسي: {formatMoney(emp.baseSalary)}</Typography>
-                                                                                    )}
-                                                                                    {empAdjustments.filter(a => a.type === 'bonus').map((adj, i) => (
-                                                                                        <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'success.main' }}>
-                                                                                            <Typography variant="body2">+ {adj.reason}</Typography>
-                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
-                                                                                        </Box>
-                                                                                    ))}
-                                                                                </Grid>
-                                                                                {/* Deductions */}
-                                                                                <Grid item xs={12} md={4}>
-                                                                                    <Typography variant="subtitle2" fontWeight="bold" color="error.main" gutterBottom>
-                                                                                        📉 الخصومات
+                                                                                    <Typography variant="caption" color="text.secondary">
+                                                                                        {emp.employeeCode} {emp.isSaudi && '🇸🇦'}
                                                                                     </Typography>
-                                                                                    {emp.deductionItems && emp.deductionItems.length > 0 ? (
-                                                                                        emp.deductionItems.filter(d => d.amount > 0).map((d, i) => (
-                                                                                            <Box key={i} display="flex" justifyContent="space-between">
-                                                                                                <Typography variant="body2">{d.name}</Typography>
-                                                                                                <Typography variant="body2" fontWeight={500}>{formatMoney(d.amount)}</Typography>
+                                                                                </Box>
+                                                                            </Box>
+                                                                        </TableCell>
+                                                                        <TableCell>
+                                                                            <Box>
+                                                                                <Typography variant="body2">{emp.branch}</Typography>
+                                                                                <Typography variant="caption" color="text.secondary">{emp.department}</Typography>
+                                                                            </Box>
+                                                                        </TableCell>
+                                                                        <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                                                                            {formatMoney(emp.gross + (empAdjustments.filter(a => a.type === 'bonus').reduce((s, a) => s + a.amount, 0)))}
+                                                                        </TableCell>
+                                                                        <TableCell align="right" sx={{ color: 'error.main' }}>
+                                                                            {formatMoney(emp.deductions + (empAdjustments.filter(a => a.type === 'deduction').reduce((s, a) => s + a.amount, 0)))}
+                                                                            {emp.gosi > 0 && (
+                                                                                <Typography variant="caption" display="block" color="text.secondary">
+                                                                                    (GOSI: {formatMoney(emp.gosi)})
+                                                                                </Typography>
+                                                                            )}
+                                                                        </TableCell>
+                                                                        <TableCell align="right" sx={{ fontWeight: 'bold', color: 'info.main', fontSize: '1rem' }}>
+                                                                            {formatMoney(adjustedNet)}
+                                                                            {adjustmentTotal !== 0 && (
+                                                                                <Typography variant="caption" display="block" color={adjustmentTotal > 0 ? 'success.main' : 'error.main'}>
+                                                                                    ({adjustmentTotal > 0 ? '+' : ''}{formatMoney(adjustmentTotal)})
+                                                                                </Typography>
+                                                                            )}
+                                                                        </TableCell>
+                                                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                                                            <Box display="flex" gap={0.5}>
+                                                                                <Button
+                                                                                    size="small"
+                                                                                    variant="outlined"
+                                                                                    color="success"
+                                                                                    disabled={isExcluded}
+                                                                                    onClick={() => openAdjustmentDialog(emp.id, emp.name, 'bonus')}
+                                                                                    sx={{ minWidth: 30, p: 0.5 }}
+                                                                                    title="إضافة مكافأة"
+                                                                                >
+                                                                                    <Add fontSize="small" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    size="small"
+                                                                                    variant="outlined"
+                                                                                    color="error"
+                                                                                    disabled={isExcluded}
+                                                                                    onClick={() => openAdjustmentDialog(emp.id, emp.name, 'deduction')}
+                                                                                    sx={{ minWidth: 30, p: 0.5 }}
+                                                                                    title="إضافة خصم"
+                                                                                >
+                                                                                    <Remove fontSize="small" />
+                                                                                </Button>
+                                                                                {empAdjustments.length > 0 && (
+                                                                                    <Button
+                                                                                        size="small"
+                                                                                        variant="text"
+                                                                                        color="warning"
+                                                                                        onClick={() => {
+                                                                                            setAdjustments(prev => {
+                                                                                                const newAdj = { ...prev };
+                                                                                                delete newAdj[emp.id];
+                                                                                                return newAdj;
+                                                                                            });
+                                                                                        }}
+                                                                                        sx={{ minWidth: 30, p: 0.5 }}
+                                                                                        title="مسح التعديلات"
+                                                                                    >
+                                                                                        ✕
+                                                                                    </Button>
+                                                                                )}
+                                                                            </Box>
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                    {/* Expanded Details Row */}
+                                                                    <TableRow>
+                                                                        <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
+                                                                            <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                                                                                <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
+                                                                                    <Grid container spacing={2}>
+                                                                                        {/* Earnings */}
+                                                                                        <Grid item xs={12} md={4}>
+                                                                                            <Typography variant="subtitle2" fontWeight="bold" color="success.main" gutterBottom>
+                                                                                                💰 المستحقات
+                                                                                            </Typography>
+                                                                                            {emp.earnings && emp.earnings.length > 0 ? (
+                                                                                                emp.earnings.filter(e => e.amount > 0).map((e, i) => (
+                                                                                                    <Box key={i} display="flex" justifyContent="space-between">
+                                                                                                        <Typography variant="body2">{e.name}</Typography>
+                                                                                                        <Typography variant="body2" fontWeight={500}>{formatMoney(e.amount)}</Typography>
+                                                                                                    </Box>
+                                                                                                ))
+                                                                                            ) : (
+                                                                                                <Typography variant="body2" color="text.secondary">الراتب الأساسي: {formatMoney(emp.baseSalary)}</Typography>
+                                                                                            )}
+                                                                                            {empAdjustments.filter(a => a.type === 'bonus').map((adj, i) => (
+                                                                                                <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'success.main' }}>
+                                                                                                    <Typography variant="body2">+ {adj.reason}</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
+                                                                                                </Box>
+                                                                                            ))}
+                                                                                            <Divider sx={{ my: 0.5 }} />
+                                                                                            <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'success.50', p: 0.5, borderRadius: 1 }}>
+                                                                                                <Typography variant="body2" fontWeight="bold">المجموع</Typography>
+                                                                                                <Typography variant="body2" fontWeight="bold" color="success.main">{formatMoney(emp.gross)}</Typography>
                                                                                             </Box>
-                                                                                        ))
-                                                                                    ) : (
-                                                                                        <>
-                                                                                            {emp.gosi > 0 && (
+                                                                                        </Grid>
+                                                                                        {/* Deductions */}
+                                                                                        <Grid item xs={12} md={4}>
+                                                                                            <Typography variant="subtitle2" fontWeight="bold" color="error.main" gutterBottom>
+                                                                                                📉 الخصومات
+                                                                                            </Typography>
+                                                                                            {emp.deductionItems && emp.deductionItems.length > 0 ? (
+                                                                                                emp.deductionItems.filter(d => d.amount > 0).map((d, i) => (
+                                                                                                    <Box key={i} display="flex" justifyContent="space-between">
+                                                                                                        <Typography variant="body2">{d.name}</Typography>
+                                                                                                        <Typography variant="body2" fontWeight={500}>{formatMoney(d.amount)}</Typography>
+                                                                                                    </Box>
+                                                                                                ))
+                                                                                            ) : (
+                                                                                                <>
+                                                                                                    {emp.gosi > 0 && (
+                                                                                                        <Box display="flex" justifyContent="space-between">
+                                                                                                            <Typography variant="body2">GOSI (موظف)</Typography>
+                                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosi)}</Typography>
+                                                                                                        </Box>
+                                                                                                    )}
+                                                                                                    {emp.advances > 0 && (
+                                                                                                        <Box display="flex" justifyContent="space-between">
+                                                                                                            <Typography variant="body2">سلف</Typography>
+                                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(emp.advances)}</Typography>
+                                                                                                        </Box>
+                                                                                                    )}
+                                                                                                    {emp.deductions === 0 && emp.gosi === 0 && emp.advances === 0 && (
+                                                                                                        <Typography variant="body2" color="text.secondary">لا توجد خصومات</Typography>
+                                                                                                    )}
+                                                                                                </>
+                                                                                            )}
+                                                                                            {empAdjustments.filter(a => a.type === 'deduction').map((adj, i) => (
+                                                                                                <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'error.main' }}>
+                                                                                                    <Typography variant="body2">- {adj.reason}</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
+                                                                                                </Box>
+                                                                                            ))}
+                                                                                            {emp.deductions > 0 && (
+                                                                                                <>
+                                                                                                    <Divider sx={{ my: 0.5 }} />
+                                                                                                    <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'error.50', p: 0.5, borderRadius: 1 }}>
+                                                                                                        <Typography variant="body2" fontWeight="bold">المجموع</Typography>
+                                                                                                        <Typography variant="body2" fontWeight="bold" color="error.main">{formatMoney(emp.deductions)}</Typography>
+                                                                                                    </Box>
+                                                                                                </>
+                                                                                            )}
+                                                                                        </Grid>
+                                                                                        {/* Summary */}
+                                                                                        <Grid item xs={12} md={4}>
+                                                                                            <Typography variant="subtitle2" fontWeight="bold" color="info.main" gutterBottom>
+                                                                                                📊 الملخص
+                                                                                            </Typography>
+                                                                                            <Box display="flex" justifyContent="space-between">
+                                                                                                <Typography variant="body2">راتب العقد</Typography>
+                                                                                                <Typography variant="body2" fontWeight={500}>{formatMoney(emp.baseSalary)}</Typography>
+                                                                                            </Box>
+                                                                                            <Box display="flex" justifyContent="space-between">
+                                                                                                <Typography variant="body2">المسمى الوظيفي</Typography>
+                                                                                                <Typography variant="body2" fontWeight={500}>{emp.jobTitle || 'غير محدد'}</Typography>
+                                                                                            </Box>
+                                                                                            {emp.isSaudi && (
                                                                                                 <Box display="flex" justifyContent="space-between">
-                                                                                                    <Typography variant="body2">GOSI (موظف)</Typography>
-                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosi)}</Typography>
+                                                                                                    <Typography variant="body2">الجنسية</Typography>
+                                                                                                    <Chip label="سعودي 🇸🇦" size="small" color="success" />
                                                                                                 </Box>
                                                                                             )}
-                                                                                            {emp.advances > 0 && (
+                                                                                            {emp.gosiEmployer > 0 && (
                                                                                                 <Box display="flex" justifyContent="space-between">
-                                                                                                    <Typography variant="body2">سلف</Typography>
-                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(emp.advances)}</Typography>
+                                                                                                    <Typography variant="body2">GOSI (صاحب العمل)</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosiEmployer)}</Typography>
                                                                                                 </Box>
                                                                                             )}
-                                                                                        </>
-                                                                                    )}
-                                                                                    {empAdjustments.filter(a => a.type === 'deduction').map((adj, i) => (
-                                                                                        <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'error.main' }}>
-                                                                                            <Typography variant="body2">- {adj.reason}</Typography>
-                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
-                                                                                        </Box>
-                                                                                    ))}
-                                                                                </Grid>
-                                                                                {/* Summary */}
-                                                                                <Grid item xs={12} md={4}>
-                                                                                    <Typography variant="subtitle2" fontWeight="bold" color="info.main" gutterBottom>
-                                                                                        📊 الملخص
-                                                                                    </Typography>
-                                                                                    <Box display="flex" justifyContent="space-between">
-                                                                                        <Typography variant="body2">القسم</Typography>
-                                                                                        <Typography variant="body2" fontWeight={500}>{emp.department || 'غير محدد'}</Typography>
-                                                                                    </Box>
-                                                                                    {emp.gosiEmployer > 0 && (
-                                                                                        <Box display="flex" justifyContent="space-between">
-                                                                                            <Typography variant="body2">GOSI (صاحب العمل)</Typography>
-                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosiEmployer)}</Typography>
-                                                                                        </Box>
-                                                                                    )}
-                                                                                    <Divider sx={{ my: 1 }} />
-                                                                                    <Box display="flex" justifyContent="space-between">
-                                                                                        <Typography variant="body2" fontWeight="bold">الصافي النهائي</Typography>
-                                                                                        <Typography variant="body2" fontWeight="bold" color="info.main">{formatMoney(adjustedNet)}</Typography>
-                                                                                    </Box>
-                                                                                </Grid>
-                                                                            </Grid>
-                                                                        </Box>
-                                                                    </Collapse>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        </React.Fragment>
-                                                    );
-                                                })
+                                                                                            <Divider sx={{ my: 1 }} />
+                                                                                            <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'info.50', p: 1, borderRadius: 1 }}>
+                                                                                                <Typography variant="body1" fontWeight="bold">صافي الراتب</Typography>
+                                                                                                <Typography variant="body1" fontWeight="bold" color="info.main">{formatMoney(adjustedNet)}</Typography>
+                                                                                            </Box>
+                                                                                        </Grid>
+                                                                                    </Grid>
+                                                                                </Box>
+                                                                            </Collapse>
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                </React.Fragment>
+                                                            );
+                                                        })}
+                                                    </React.Fragment>
+                                                ))
                                             )}
                                         </TableBody>
                                     </Table>
@@ -1539,6 +2184,152 @@ export const PayrollWizardPage = () => {
                     </Button>
                 </Box>
             )}
+
+            {/* Adjustment Dialog */}
+            <Dialog
+                open={adjustmentDialog.open}
+                onClose={() => setAdjustmentDialog({ open: false, employeeId: '', employeeName: '', type: 'bonus' })}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        {adjustmentDialog.type === 'bonus' ? (
+                            <>
+                                <Add color="success" />
+                                <Typography>إضافة مكافأة</Typography>
+                            </>
+                        ) : (
+                            <>
+                                <Remove color="error" />
+                                <Typography>إضافة خصم</Typography>
+                            </>
+                        )}
+                    </Box>
+                    <Button
+                        size="small"
+                        onClick={() => setAdjustmentDialog({ open: false, employeeId: '', employeeName: '', type: 'bonus' })}
+                    >
+                        <Close />
+                    </Button>
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ pt: 1 }}>
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                            {adjustmentDialog.type === 'bonus' ? 'إضافة مكافأة للموظف' : 'إضافة خصم على الموظف'}:
+                            <strong> {adjustmentDialog.employeeName}</strong>
+                        </Alert>
+                        <TextField
+                            fullWidth
+                            label="المبلغ (ر.س)"
+                            type="number"
+                            value={adjustmentAmount}
+                            onChange={(e) => setAdjustmentAmount(e.target.value)}
+                            sx={{ mb: 2 }}
+                            InputProps={{
+                                startAdornment: <InputAdornment position="start">ر.س</InputAdornment>,
+                            }}
+                            autoFocus
+                        />
+                        <TextField
+                            fullWidth
+                            label="السبب"
+                            value={adjustmentReason}
+                            onChange={(e) => setAdjustmentReason(e.target.value)}
+                            multiline
+                            rows={2}
+                            placeholder={adjustmentDialog.type === 'bonus' ? 'مثال: مكافأة أداء متميز' : 'مثال: خصم غياب بدون عذر'}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button
+                        onClick={() => setAdjustmentDialog({ open: false, employeeId: '', employeeName: '', type: 'bonus' })}
+                    >
+                        إلغاء
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color={adjustmentDialog.type === 'bonus' ? 'success' : 'error'}
+                        onClick={handleAddAdjustment}
+                        startIcon={adjustmentDialog.type === 'bonus' ? <Add /> : <Remove />}
+                    >
+                        {adjustmentDialog.type === 'bonus' ? 'إضافة المكافأة' : 'إضافة الخصم'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Confirmation Dialog */}
+            <Dialog
+                open={confirmRunDialog}
+                onClose={() => setConfirmRunDialog(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <Warning />
+                        <Typography variant="h6">تأكيد تشغيل مسير الرواتب</Typography>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ pt: 2 }}>
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            <AlertTitle>هل أنت متأكد من تشغيل مسير الرواتب؟</AlertTitle>
+                            سيتم إنشاء قسائم رواتب لجميع الموظفين المحددين.
+                        </Alert>
+
+                        {previewData && (
+                            <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 2 }}>
+                                <Typography variant="subtitle2" gutterBottom fontWeight="bold">
+                                    ملخص المسير:
+                                </Typography>
+                                <Box display="flex" justifyContent="space-between" mb={1}>
+                                    <Typography variant="body2">عدد الموظفين:</Typography>
+                                    <Typography variant="body2" fontWeight="bold">
+                                        {previewData.totalEmployees - excludedEmployees.size}
+                                    </Typography>
+                                </Box>
+                                <Box display="flex" justifyContent="space-between" mb={1}>
+                                    <Typography variant="body2">صافي الرواتب التقديري:</Typography>
+                                    <Typography variant="body2" fontWeight="bold" color="primary">
+                                        {formatMoney(previewData.estimatedNet)}
+                                    </Typography>
+                                </Box>
+                                {excludedEmployees.size > 0 && (
+                                    <Box display="flex" justifyContent="space-between" mb={1}>
+                                        <Typography variant="body2" color="warning.main">موظفين مستثنين:</Typography>
+                                        <Typography variant="body2" fontWeight="bold" color="warning.main">
+                                            {excludedEmployees.size}
+                                        </Typography>
+                                    </Box>
+                                )}
+                                {Object.keys(adjustments).length > 0 && (
+                                    <Box display="flex" justifyContent="space-between">
+                                        <Typography variant="body2" color="info.main">تعديلات مُعلقة:</Typography>
+                                        <Typography variant="body2" fontWeight="bold" color="info.main">
+                                            {Object.keys(adjustments).length} موظف
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setConfirmRunDialog(false)}>
+                        إلغاء
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleConfirmRun}
+                        startIcon={<PlayCircleFilled />}
+                    >
+                        تأكيد وتشغيل المسير
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

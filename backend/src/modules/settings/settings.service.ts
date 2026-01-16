@@ -2,6 +2,39 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 
+// نوع التطبيق للعطلات
+type HolidayApplicationType = 'ALL' | 'BRANCH' | 'DEPARTMENT' | 'SPECIFIC_EMPLOYEES' | 'EXCLUDE_EMPLOYEES';
+
+// واجهة بيانات العطلة للموظف
+export interface EmployeeHolidayInfo {
+  isHoliday: boolean;
+  holiday?: {
+    id: string;
+    name: string;
+    nameEn?: string;
+    isPaid: boolean;
+    countAsWorkDay: boolean;
+    overtimeMultiplier: number;
+  };
+}
+
+// واجهة إنشاء العطلة
+export interface CreateHolidayData {
+  name: string;
+  nameEn?: string;
+  date: Date;
+  isRecurring?: boolean;
+  isPaid?: boolean;
+  applicationType?: HolidayApplicationType;
+  countAsWorkDay?: boolean;
+  overtimeMultiplier?: number;
+  notes?: string;
+  assignments?: {
+    type: 'BRANCH' | 'DEPARTMENT' | 'EMPLOYEE';
+    ids: string[];
+  };
+}
+
 @Injectable()
 export class SettingsService {
   constructor(
@@ -78,7 +111,11 @@ export class SettingsService {
     return results;
   }
 
-  // Holiday management
+  // ==================== Holiday Management ====================
+
+  /**
+   * الحصول على جميع العطلات مع التعيينات
+   */
   async getHolidays(companyId: string, year?: number) {
     const where: any = { companyId };
 
@@ -93,50 +130,266 @@ export class SettingsService {
 
     return this.prisma.holiday.findMany({
       where,
+      include: {
+        assignments: true,
+      },
       orderBy: { date: 'asc' },
     });
   }
 
-  async createHoliday(data: { name: string; nameEn?: string; date: Date; isRecurring?: boolean }, companyId: string) {
-    return this.prisma.holiday.create({
-      data: { ...data, companyId },
+  /**
+   * إنشاء عطلة جديدة مع التعيينات
+   */
+  async createHoliday(data: CreateHolidayData, companyId: string) {
+    const { assignments, ...holidayData } = data;
+
+    return this.prisma.$transaction(async (tx) => {
+      // إنشاء العطلة
+      const holiday = await tx.holiday.create({
+        data: {
+          ...holidayData,
+          companyId,
+          overtimeMultiplier: data.overtimeMultiplier || 2.0,
+        },
+      });
+
+      // إنشاء التعيينات إذا وجدت
+      if (assignments && assignments.ids.length > 0) {
+        const assignmentData = assignments.ids.map(id => ({
+          holidayId: holiday.id,
+          assignmentType: assignments.type,
+          branchId: assignments.type === 'BRANCH' ? id : null,
+          departmentId: assignments.type === 'DEPARTMENT' ? id : null,
+          employeeId: assignments.type === 'EMPLOYEE' ? id : null,
+        }));
+
+        await tx.holidayAssignment.createMany({
+          data: assignmentData,
+        });
+      }
+
+      // إرجاع العطلة مع التعيينات
+      return tx.holiday.findUnique({
+        where: { id: holiday.id },
+        include: { assignments: true },
+      });
     });
   }
 
-  async updateHoliday(id: string, companyId: string, data: Partial<{ name: string; nameEn?: string; date: Date; isRecurring?: boolean }>) {
-    return this.prisma.holiday.update({
-      where: { id, companyId },
-      data,
+  /**
+   * تحديث عطلة مع التعيينات
+   */
+  async updateHoliday(
+    id: string,
+    companyId: string,
+    data: Partial<CreateHolidayData>
+  ) {
+    const { assignments, ...holidayData } = data;
+
+    return this.prisma.$transaction(async (tx) => {
+      // تحديث بيانات العطلة
+      const updateData: any = {};
+      if (holidayData.name !== undefined) updateData.name = holidayData.name;
+      if (holidayData.nameEn !== undefined) updateData.nameEn = holidayData.nameEn;
+      if (holidayData.date !== undefined) updateData.date = holidayData.date;
+      if (holidayData.isRecurring !== undefined) updateData.isRecurring = holidayData.isRecurring;
+      if (holidayData.isPaid !== undefined) updateData.isPaid = holidayData.isPaid;
+      if (holidayData.applicationType !== undefined) updateData.applicationType = holidayData.applicationType;
+      if (holidayData.countAsWorkDay !== undefined) updateData.countAsWorkDay = holidayData.countAsWorkDay;
+      if (holidayData.overtimeMultiplier !== undefined) updateData.overtimeMultiplier = holidayData.overtimeMultiplier;
+      if (holidayData.notes !== undefined) updateData.notes = holidayData.notes;
+
+      await tx.holiday.update({
+        where: { id, companyId },
+        data: updateData,
+      });
+
+      // تحديث التعيينات إذا تم تمريرها
+      if (assignments !== undefined) {
+        // حذف التعيينات القديمة
+        await tx.holidayAssignment.deleteMany({
+          where: { holidayId: id },
+        });
+
+        // إنشاء التعيينات الجديدة
+        if (assignments && assignments.ids.length > 0) {
+          const assignmentData = assignments.ids.map(assignmentId => ({
+            holidayId: id,
+            assignmentType: assignments.type,
+            branchId: assignments.type === 'BRANCH' ? assignmentId : null,
+            departmentId: assignments.type === 'DEPARTMENT' ? assignmentId : null,
+            employeeId: assignments.type === 'EMPLOYEE' ? assignmentId : null,
+          }));
+
+          await tx.holidayAssignment.createMany({
+            data: assignmentData,
+          });
+        }
+      }
+
+      return tx.holiday.findUnique({
+        where: { id },
+        include: { assignments: true },
+      });
     });
   }
 
+  /**
+   * حذف عطلة (التعيينات تحذف تلقائياً بسبب onDelete: Cascade)
+   */
   async deleteHoliday(id: string, companyId: string) {
     return this.prisma.holiday.delete({
       where: { id, companyId },
     });
   }
 
-  async isHoliday(date: Date): Promise<boolean> {
+  /**
+   * التحقق إذا كان التاريخ عطلة (بسيط - للتوافق مع الكود القديم)
+   */
+  async isHoliday(date: Date, companyId?: string): Promise<boolean> {
+    const holidayInfo = await this.getEmployeeHolidayInfo(date, undefined, companyId);
+    return holidayInfo.isHoliday;
+  }
+
+  /**
+   * الحصول على معلومات العطلة للموظف (تفصيلي)
+   * يتحقق من العطلات العامة والعطلات المخصصة للموظف/القسم/الفرع
+   */
+  async getEmployeeHolidayInfo(
+    date: Date,
+    employeeId?: string,
+    companyId?: string
+  ): Promise<EmployeeHolidayInfo> {
     const targetDate = new Date(date);
     targetDate.setHours(0, 0, 0, 0);
 
-    const holiday = await this.prisma.holiday.findFirst({
-      where: {
-        OR: [
-          { date: targetDate },
-          {
-            isRecurring: true,
-            date: {
-              // Check if same day and month (ignoring year)
-              gte: new Date(0, targetDate.getMonth(), targetDate.getDate()),
-              lte: new Date(0, targetDate.getMonth(), targetDate.getDate()),
-            },
-          },
-        ],
+    const targetMonth = targetDate.getMonth() + 1;
+    const targetDay = targetDate.getDate();
+
+    // Build where clause
+    const whereClause: any = {};
+    if (companyId) {
+      whereClause.companyId = companyId;
+    }
+
+    // البحث عن العطلات في هذا التاريخ
+    const holidays = await this.prisma.holiday.findMany({
+      where: whereClause,
+      include: {
+        assignments: true,
       },
     });
 
-    return !!holiday;
+    // البحث عن عطلة تطابق التاريخ
+    for (const holiday of holidays) {
+      const holidayDate = new Date(holiday.date);
+      const isDateMatch = holiday.isRecurring
+        ? (holidayDate.getMonth() + 1 === targetMonth && holidayDate.getDate() === targetDay)
+        : (holidayDate.getTime() === targetDate.getTime());
+
+      if (!isDateMatch) continue;
+
+      // التحقق إذا كانت العطلة تنطبق على الموظف
+      const applies = await this.doesHolidayApplyToEmployee(holiday, employeeId);
+
+      if (applies) {
+        return {
+          isHoliday: true,
+          holiday: {
+            id: holiday.id,
+            name: holiday.name,
+            nameEn: holiday.nameEn || undefined,
+            isPaid: holiday.isPaid,
+            countAsWorkDay: holiday.countAsWorkDay,
+            overtimeMultiplier: Number(holiday.overtimeMultiplier),
+          },
+        };
+      }
+    }
+
+    return { isHoliday: false };
+  }
+
+  /**
+   * التحقق إذا كانت العطلة تنطبق على موظف معين
+   */
+  private async doesHolidayApplyToEmployee(
+    holiday: any,
+    employeeId?: string
+  ): Promise<boolean> {
+    // إذا لم يتم تحديد موظف، نفترض أن العطلة تنطبق على الجميع
+    if (!employeeId) {
+      return holiday.applicationType === 'ALL';
+    }
+
+    switch (holiday.applicationType) {
+      case 'ALL':
+        return true;
+
+      case 'BRANCH':
+        // التحقق إذا كان الموظف في أحد الفروع المحددة
+        const employeeBranch = await this.prisma.user.findUnique({
+          where: { id: employeeId },
+          select: { branchId: true },
+        });
+        if (!employeeBranch?.branchId) return false;
+        return holiday.assignments.some(
+          (a: any) => a.assignmentType === 'BRANCH' && a.branchId === employeeBranch.branchId
+        );
+
+      case 'DEPARTMENT':
+        // التحقق إذا كان الموظف في أحد الأقسام المحددة
+        const employeeDept = await this.prisma.user.findUnique({
+          where: { id: employeeId },
+          select: { departmentId: true },
+        });
+        if (!employeeDept?.departmentId) return false;
+        return holiday.assignments.some(
+          (a: any) => a.assignmentType === 'DEPARTMENT' && a.departmentId === employeeDept.departmentId
+        );
+
+      case 'SPECIFIC_EMPLOYEES':
+        // التحقق إذا كان الموظف في قائمة الموظفين المحددين
+        return holiday.assignments.some(
+          (a: any) => a.assignmentType === 'EMPLOYEE' && a.employeeId === employeeId
+        );
+
+      case 'EXCLUDE_EMPLOYEES':
+        // العطلة تنطبق على الجميع ماعدا الموظفين المحددين
+        const isExcluded = holiday.assignments.some(
+          (a: any) => a.assignmentType === 'EMPLOYEE' && a.employeeId === employeeId
+        );
+        return !isExcluded;
+
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * الحصول على العطلات المطبقة على موظف معين في فترة زمنية
+   */
+  async getEmployeeHolidaysInPeriod(
+    employeeId: string,
+    startDate: Date,
+    endDate: Date,
+    companyId: string
+  ): Promise<Array<{ date: Date; holiday: EmployeeHolidayInfo['holiday'] }>> {
+    const holidays: Array<{ date: Date; holiday: EmployeeHolidayInfo['holiday'] }> = [];
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      const holidayInfo = await this.getEmployeeHolidayInfo(currentDate, employeeId, companyId);
+      if (holidayInfo.isHoliday && holidayInfo.holiday) {
+        holidays.push({
+          date: new Date(currentDate),
+          holiday: holidayInfo.holiday,
+        });
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return holidays;
   }
 
   /**

@@ -1,0 +1,59 @@
+﻿src/modules/contracts/contracts.service.ts(114,17): error TS2322: Type 'string' is not assignable to type 'PayrollFrequency | undefined'.
+src/modules/contracts/contracts.service.ts(173,13): error TS2322: Type '{ qiwaStatus?: QiwaAuthStatus | undefined; qiwaContractId?: string | undefined; notes?: string | undefined; additionalTerms?: string | undefined; documentUrl?: string | undefined; ... 15 more ...; type?: ContractType | undefined; }' is not assignable to type '(Without<ContractUpdateInput, ContractUncheckedUpdateInput> & ContractUncheckedUpdateInput) | (Without<...> & ContractUpdateInput)'.
+  Type '{ qiwaStatus?: QiwaAuthStatus | undefined; qiwaContractId?: string | undefined; notes?: string | undefined; additionalTerms?: string | undefined; documentUrl?: string | undefined; ... 15 more ...; type?: ContractType | undefined; }' is not assignable to type 'Without<ContractUncheckedUpdateInput, ContractUpdateInput> & ContractUpdateInput'.
+    Types of property 'salaryCycle' are incompatible.
+      Type 'string | undefined' is not assignable to type 'PayrollFrequency | EnumPayrollFrequencyFieldUpdateOperationsInput | undefined'.
+        Type 'string' is not assignable to type 'PayrollFrequency | EnumPayrollFrequencyFieldUpdateOperationsInput | undefined'.
+src/modules/logistics/logistics.controller.ts(12,30): error TS2307: Cannot find module '../auth/jwt-auth.guard' or its corresponding type declarations.
+src/modules/logistics/logistics.controller.ts(30,20): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(37,22): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(53,25): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(60,26): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(76,30): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(83,32): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(100,9): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.controller.ts(116,9): error TS7006: Parameter 'req' implicitly has an 'any' type.
+src/modules/logistics/logistics.module.ts(4,30): error TS2307: Cannot find module '../../prisma/prisma.module' or its corresponding type declarations.
+src/modules/logistics/logistics.service.ts(2,31): error TS2307: Cannot find module '../../prisma/prisma.service' or its corresponding type declarations.
+src/modules/payroll-calculation/payroll-calculation.controller.ts(56,28): error TS1016: A required parameter cannot follow an optional parameter.
+src/modules/payroll-calculation/payroll-calculation.service.ts(411,34): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(422,65): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(432,66): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(432,79): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(453,30): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(884,29): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(921,29): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(922,30): error TS2552: Cannot find name 'baseSalary'. Did you mean 'otBaseSalary'?
+src/modules/payroll-calculation/payroll-calculation.service.ts(929,52): error TS2304: Cannot find name 'daysInMonthGeneral'.
+src/modules/payroll-calculation/payroll-calculation.service.ts(929,87): error TS2304: Cannot find name 'daysInMonthGeneral'.
+src/modules/payroll-calculation/payroll-calculation.service.ts(989,13): error TS18004: No value exists in scope for the shorthand property 'baseSalary'. Either declare one or provide an initializer.
+src/modules/payroll-calculation/payroll-calculation.service.ts(992,26): error TS2304: Cannot find name 'daysInMonthGeneral'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(358,56): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/modules/smart-policies/features/advanced-analytics.service.ts(461,17): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(519,47): error TS2339: Property 'employee' does not exist on type 'PrismaService'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(784,21): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(788,25): error TS2353: Object literal may only specify known properties, and 'amount' does not exist in type 'SmartPolicyExecutionSumAggregateInputType'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(792,33): error TS18048: 'data._sum' is possibly 'undefined'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(799,36): error TS18048: 'data._count' is possibly 'undefined'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(799,48): error TS2339: Property 'employeeId' does not exist on type 'true | { id?: number | undefined; policyId?: number | undefined; employeeId?: number | undefined; employeeName?: number | undefined; triggerEvent?: number | undefined; triggerSubEvent?: number | undefined; ... 10 more ...; _all?: number | undefined; }'.
+  Property 'employeeId' does not exist on type 'true'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(843,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(846,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(849,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(852,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(893,21): error TS2353: Object literal may only specify known properties, and 'result' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(901,21): error TS2353: Object literal may only specify known properties, and 'result' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(903,25): error TS2353: Object literal may only specify known properties, and 'amount' does not exist in type 'SmartPolicyExecutionAvgAggregateInputType'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(914,48): error TS18048: 'impactData._avg' is possibly 'undefined'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(930,17): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(934,41): error TS2353: Object literal may only specify known properties, and 'amount' does not exist in type 'SmartPolicyExecutionSelect<DefaultArgs>'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(981,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(984,26): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(1040,21): error TS2353: Object literal may only specify known properties, and 'companyId' does not exist in type 'SmartPolicyExecutionWhereInput'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(1044,25): error TS2353: Object literal may only specify known properties, and 'amount' does not exist in type 'SmartPolicyExecutionSumAggregateInputType'.
+src/modules/smart-policies/features/advanced-analytics.service.ts(1050,30): error TS18048: 'stats._sum' is possibly 'undefined'.
+src/modules/smart-policies/features/advanced-reporting.service.ts(696,17): error TS2353: Object literal may only specify known properties, and 'employee' does not exist in type 'SmartPolicyExecutionInclude<DefaultArgs>'.
+src/modules/smart-policies/features/advanced-reporting.service.ts(706,33): error TS2339: Property 'amount' does not exist on type '{ id: string; payrollPeriod: string | null; employeeId: string; triggerEvent: string; triggerSubEvent: string | null; employeeName: string; triggerData: JsonValue; conditionsMet: boolean; ... 7 more ...; policyId: string; }'.
+src/modules/smart-policies/features/advanced-reporting.service.ts(718,38): error TS2551: Property 'policy' does not exist on type '{ id: string; payrollPeriod: string | null; employeeId: string; triggerEvent: string; triggerSubEvent: string | null; employeeName: string; triggerData: JsonValue; conditionsMet: boolean; ... 7 more ...; policyId: string; }'. Did you mean 'policyId'?
+src/modules/smart-policies/features/advanced-reporting.service.ts(732,31): error TS2551: Property 'employee' does not exist on type '{ id: string; payrollPeriod: string | null; employeeId: string; triggerEvent: string; triggerSubEvent: string | null; employeeName: string; triggerData: JsonValue; conditionsMet: boolean; ... 7 more ...; policyId: string; }'. Did you mean 'employeeId'?
+src/modules/smart-policies/features/policy-marketplace.service.ts(427,17): error TS2561: Object literal may only specify known properties, but 'scope' does not exist in type 'Without<SmartPolicyCreateInput, SmartPolicyUncheckedCreateInput> & SmartPolicyUncheckedCreateInput'. Did you mean to write 'scopeId'?

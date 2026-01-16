@@ -28,6 +28,8 @@ import '../../features/profile/presentation/pages/change_password_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/disciplinary/presentation/pages/disciplinary_list_page.dart';
 import '../../features/disciplinary/presentation/pages/disciplinary_detail_page.dart';
+import '../../features/tasks/presentation/pages/my_tasks_page.dart';
+import '../../features/tasks/presentation/pages/task_details_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -222,6 +224,23 @@ class AppRouter {
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
                   return DisciplinaryDetailPage(caseId: id);
+                },
+              ),
+            ],
+          ),
+          // My Tasks routes
+          GoRoute(
+            path: '/my-tasks',
+            name: 'my-tasks',
+            builder: (context, state) => const MyTasksPage(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                name: 'task-details',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return TaskDetailsPage(taskId: id);
                 },
               ),
             ],

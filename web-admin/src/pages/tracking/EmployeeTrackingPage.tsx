@@ -35,6 +35,8 @@ import {
     ListItem,
     ListItemText,
     Divider,
+    Tabs,
+    Tab,
 } from '@mui/material';
 import {
     MyLocation as LocationIcon,
@@ -47,6 +49,8 @@ import {
     AccessTime as TimeIcon,
     ExitToApp as ExitIcon,
     Map as MapIcon,
+    ViewModule as CardsIcon,
+    Assessment as ReportIcon,
 } from '@mui/icons-material';
 
 import {
@@ -54,6 +58,9 @@ import {
     ActiveEmployee,
     GeofenceExitEvent,
 } from '@/services/location-tracking.service';
+import LiveMapView, { Branch } from '@/components/tracking/LiveMapView';
+import { api } from '@/services/api.service';
+import TrackingReportsPanel from './TrackingReportsPanel';
 
 // مكون كارت الموظف
 const EmployeeCard = ({
@@ -194,6 +201,8 @@ export const EmployeeTrackingPage = () => {
     const [exitEvents, setExitEvents] = useState<GeofenceExitEvent[]>([]);
     const [showExitsDialog, setShowExitsDialog] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [viewMode, setViewMode] = useState<'cards' | 'map' | 'reports'>('cards');
+    const [branches, setBranches] = useState<Branch[]>([]);
 
     const fetchEmployees = useCallback(async () => {
         try {
@@ -209,12 +218,29 @@ export const EmployeeTrackingPage = () => {
         }
     }, []);
 
+    // Fetch branches for map
+    const fetchBranches = useCallback(async () => {
+        try {
+            const data = await api.get<any[]>('/branches');
+            setBranches(data.map(b => ({
+                id: b.id,
+                name: b.name,
+                latitude: b.latitude || 24.7136,
+                longitude: b.longitude || 46.6753,
+                geofenceRadius: b.geofenceRadius || 100,
+            })));
+        } catch (err) {
+            console.error('Error fetching branches:', err);
+        }
+    }, []);
+
     useEffect(() => {
         fetchEmployees();
+        fetchBranches();
         // تحديث كل 30 ثانية
         const interval = setInterval(fetchEmployees, 30000);
         return () => clearInterval(interval);
-    }, [fetchEmployees]);
+    }, [fetchEmployees, fetchBranches]);
 
     const handleViewExits = async (userId: string) => {
         try {
@@ -348,41 +374,99 @@ export const EmployeeTrackingPage = () => {
                 </Grid>
             </Grid>
 
-            {/* البحث */}
-            <TextField
-                fullWidth
-                placeholder="ابحث بالاسم أو رقم الموظف..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                    startAdornment: (
-                        <InputAdornment position="start">
-                            <SearchIcon />
-                        </InputAdornment>
-                    ),
-                }}
-                sx={{ mb: 3 }}
-            />
+            {/* View Mode Tabs */}
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Tabs
+                    value={viewMode}
+                    onChange={(_, v) => setViewMode(v)}
+                    sx={{
+                        bgcolor: 'background.paper',
+                        borderRadius: 2,
+                        '& .MuiTab-root': { minHeight: 48 }
+                    }}
+                >
+                    <Tab
+                        value="cards"
+                        icon={<CardsIcon />}
+                        iconPosition="start"
+                        label="البطاقات"
+                    />
+                    <Tab
+                        value="map"
+                        icon={<MapIcon />}
+                        iconPosition="start"
+                        label="الخريطة"
+                    />
+                    <Tab
+                        value="reports"
+                        icon={<ReportIcon />}
+                        iconPosition="start"
+                        label="التقارير"
+                    />
+                </Tabs>
 
-            {/* قائمة الموظفين */}
-            {filteredEmployees.length === 0 ? (
-                <Paper sx={{ p: 4, textAlign: 'center' }}>
-                    <Typography variant="h6" color="text.secondary">
-                        لا يوجد موظفين حاضرين حالياً
-                    </Typography>
-                </Paper>
-            ) : (
-                <Grid container spacing={3}>
-                    {filteredEmployees.map((employee) => (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={employee.id}>
-                            <EmployeeCard
-                                employee={employee}
-                                onViewHistory={handleViewHistory}
-                                onViewExits={handleViewExits}
-                            />
+                <TextField
+                    placeholder="ابحث بالاسم أو رقم الموظف..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    size="small"
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon />
+                            </InputAdornment>
+                        ),
+                    }}
+                    sx={{ flexGrow: 1, maxWidth: 400 }}
+                />
+            </Box>
+
+            {/* Map View */}
+            {viewMode === 'map' && (
+                <LiveMapView
+                    employees={filteredEmployees.map(emp => ({
+                        ...emp,
+                        lastLocation: emp.lastLocation ? {
+                            ...emp.lastLocation,
+                            updatedAt: new Date(emp.lastLocation.updatedAt),
+                        } : undefined,
+                        checkInTime: new Date(emp.checkInTime),
+                    }))}
+                    branches={branches}
+                    selectedEmployeeId={selectedEmployee}
+                    onEmployeeClick={(id) => setSelectedEmployee(id)}
+                    height={500}
+                />
+            )}
+
+            {/* Cards View */}
+            {viewMode === 'cards' && (
+                <>
+                    {filteredEmployees.length === 0 ? (
+                        <Paper sx={{ p: 4, textAlign: 'center' }}>
+                            <Typography variant="h6" color="text.secondary">
+                                لا يوجد موظفين حاضرين حالياً
+                            </Typography>
+                        </Paper>
+                    ) : (
+                        <Grid container spacing={3}>
+                            {filteredEmployees.map((employee) => (
+                                <Grid item xs={12} sm={6} md={4} lg={3} key={employee.id}>
+                                    <EmployeeCard
+                                        employee={employee}
+                                        onViewHistory={handleViewHistory}
+                                        onViewExits={handleViewExits}
+                                    />
+                                </Grid>
+                            ))}
                         </Grid>
-                    ))}
-                </Grid>
+                    )}
+                </>
+            )}
+
+            {/* Reports View */}
+            {viewMode === 'reports' && (
+                <TrackingReportsPanel />
             )}
 
             {/* Dialog أحداث الخروج */}

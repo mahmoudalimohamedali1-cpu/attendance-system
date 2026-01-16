@@ -2,7 +2,8 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SmartPolicyTriggerService } from "../smart-policies/smart-policy-trigger.service";
-import { User, NotificationType, CustodyItemStatus, CustodyAssignmentStatus, CustodyReturnStatus, CustodyTransferStatus, CustodyMaintenanceStatus, CustodyCondition, MaintenanceType, SmartPolicyTrigger } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { User, NotificationType, CustodyItemStatus, CustodyAssignmentStatus, CustodyReturnStatus, CustodyTransferStatus, CustodyMaintenanceStatus, CustodyCondition, MaintenanceType, SmartPolicyTrigger, AuditAction } from '@prisma/client';
 import {
     CreateCategoryCto, UpdateCategoryCto,
     CreateItemDto, UpdateItemDto,
@@ -20,6 +21,7 @@ export class CustodyService {
         private readonly prisma: PrismaService,
         private readonly notificationsService: NotificationsService,
         private readonly smartPolicyTrigger: SmartPolicyTriggerService,
+        private readonly auditService: AuditService,
     ) { }
 
     // ==================== Categories ====================
@@ -38,8 +40,16 @@ export class CustodyService {
             },
         });
 
-        // TODO: Add audit logging
-        // await this.auditService.log('CREATE', 'CustodyCategory', category.id, userId, null, { name: category.name });
+        // Audit: تسجيل إنشاء فئة عهد
+        await this.auditService.log(
+            AuditAction.CREATE,
+            'CustodyCategory',
+            category.id,
+            userId,
+            null,
+            { name: category.name, nameEn: category.nameEn },
+            `إنشاء فئة عهد جديدة: ${category.name}`,
+        );
 
         return category;
     }
@@ -65,8 +75,16 @@ export class CustodyService {
             data: dto,
         });
 
-        // TODO: Add audit logging
-        // await this.auditService.log('UPDATE', 'CustodyCategory', categoryId, userId, existing, updated);
+        // Audit: تسجيل تحديث فئة عهد
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyCategory',
+            categoryId,
+            userId,
+            { name: existing.name, nameEn: existing.nameEn, requiresApproval: existing.requiresApproval },
+            { name: updated.name, nameEn: updated.nameEn, requiresApproval: updated.requiresApproval },
+            `تحديث فئة عهد: ${updated.name}`,
+        );
 
         return updated;
     }
@@ -78,7 +96,9 @@ export class CustodyService {
         });
         if (!existing) throw new NotFoundException('الفئة غير موجودة');
 
-        if (existing._count.items > 0) {
+        const isSoftDelete = existing._count.items > 0;
+
+        if (isSoftDelete) {
             // Soft delete
             await this.prisma.custodyCategory.update({
                 where: { id: categoryId },
@@ -88,8 +108,18 @@ export class CustodyService {
             await this.prisma.custodyCategory.delete({ where: { id: categoryId } });
         }
 
-        // TODO: Add audit logging
-        // await this.auditService.log('DELETE', 'CustodyCategory', categoryId, userId, { name: existing.name });
+        // Audit: تسجيل حذف فئة عهد
+        await this.auditService.log(
+            AuditAction.DELETE,
+            'CustodyCategory',
+            categoryId,
+            userId,
+            { name: existing.name, nameEn: existing.nameEn, itemCount: existing._count.items },
+            null,
+            isSoftDelete
+                ? `إلغاء تفعيل فئة عهد: ${existing.name} (لديها ${existing._count.items} عناصر)`
+                : `حذف فئة عهد نهائياً: ${existing.name}`,
+        );
 
         return { success: true };
     }
@@ -140,8 +170,22 @@ export class CustodyService {
             include: { category: true, branch: true },
         });
 
-        // TODO: Add audit logging
-        // await this.auditService.log('CREATE', 'CustodyItem', item.id, userId, null, { code: item.code, name: item.name });
+        // Audit: تسجيل إنشاء عهدة جديدة
+        await this.auditService.log(
+            AuditAction.CREATE,
+            'CustodyItem',
+            item.id,
+            userId,
+            null,
+            {
+                code: item.code,
+                name: item.name,
+                serialNumber: item.serialNumber,
+                category: item.category?.name,
+                purchasePrice: item.purchasePrice,
+            },
+            `إنشاء عهدة جديدة: ${item.code} - ${item.name}`,
+        );
 
         return item;
     }
@@ -220,8 +264,26 @@ export class CustodyService {
             include: { category: true, branch: true },
         });
 
-        // TODO: Add audit logging
-        // await this.auditService.log('UPDATE', 'CustodyItem', itemId, userId, { code: existing.code }, { code: updated.code });
+        // Audit: تسجيل تحديث عهدة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyItem',
+            itemId,
+            userId,
+            {
+                code: existing.code,
+                name: existing.name,
+                status: existing.status,
+                condition: existing.condition,
+            },
+            {
+                code: updated.code,
+                name: updated.name,
+                status: updated.status,
+                condition: updated.condition,
+            },
+            `تحديث عهدة: ${updated.code} - ${updated.name}`,
+        );
 
         return updated;
     }
@@ -241,8 +303,21 @@ export class CustodyService {
             data: { status: CustodyItemStatus.DISPOSED },
         });
 
-        // TODO: Add audit logging
-        // await this.auditService.log('DELETE', 'CustodyItem', itemId, userId, { code: existing.code, name: existing.name });
+        // Audit: تسجيل التخلص من عهدة
+        await this.auditService.log(
+            AuditAction.DELETE,
+            'CustodyItem',
+            itemId,
+            userId,
+            {
+                code: existing.code,
+                name: existing.name,
+                serialNumber: existing.serialNumber,
+                status: existing.status,
+            },
+            { status: CustodyItemStatus.DISPOSED },
+            `التخلص من عهدة: ${existing.code} - ${existing.name}`,
+        );
 
         return { success: true };
     }
@@ -304,6 +379,23 @@ export class CustodyService {
             '📦 عهدة جديدة',
             `تم تسليمك عهدة: ${item.name}`,
             { type: 'custody', assignmentId: assignment.id },
+        );
+
+        // Audit: تسجيل تسليم عهدة
+        await this.auditService.log(
+            AuditAction.CREATE,
+            'CustodyAssignment',
+            assignment.id,
+            userId,
+            null,
+            {
+                itemCode: item.code,
+                itemName: item.name,
+                employeeId: employee.id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                status: assignment.status,
+            },
+            `تسليم عهدة ${item.code} إلى ${employee.firstName} ${employee.lastName}`,
         );
 
         return assignment;
@@ -370,13 +462,24 @@ export class CustodyService {
             { type: 'custody', assignmentId: assignment.id },
         );
 
+        // Audit: تسجيل اعتماد تسليم العهدة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyAssignment',
+            dto.assignmentId,
+            userId,
+            { status: CustodyAssignmentStatus.PENDING },
+            { status: CustodyAssignmentStatus.APPROVED },
+            `اعتماد تسليم عهدة ${assignment.custodyItem.code} إلى ${assignment.employee.firstName} ${assignment.employee.lastName}`,
+        );
+
         return { success: true };
     }
 
     async rejectAssignment(companyId: string, userId: string, dto: RejectAssignmentDto) {
         const assignment = await this.prisma.custodyAssignment.findFirst({
             where: { id: dto.assignmentId, companyId, status: CustodyAssignmentStatus.PENDING },
-            include: { custodyItem: true },
+            include: { custodyItem: true, employee: true },
         });
         if (!assignment) throw new NotFoundException('طلب التسليم غير موجود');
 
@@ -399,6 +502,17 @@ export class CustodyService {
             { type: 'custody', assignmentId: assignment.id },
         );
 
+        // Audit: تسجيل رفض تسليم العهدة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyAssignment',
+            dto.assignmentId,
+            userId,
+            { status: CustodyAssignmentStatus.PENDING },
+            { status: CustodyAssignmentStatus.REJECTED, reason: dto.reason },
+            `رفض تسليم عهدة ${assignment.custodyItem.code} إلى ${assignment.employee.firstName} ${assignment.employee.lastName} - السبب: ${dto.reason}`,
+        );
+
         return { success: true };
     }
 
@@ -410,6 +524,7 @@ export class CustodyService {
                 employeeId,
                 status: { in: [CustodyAssignmentStatus.APPROVED, CustodyAssignmentStatus.DELIVERED] },
             },
+            include: { custodyItem: true, employee: true },
         });
         if (!assignment) throw new NotFoundException('العهدة غير موجودة');
 
@@ -421,6 +536,17 @@ export class CustodyService {
                 status: CustodyAssignmentStatus.DELIVERED,
             },
         });
+
+        // Audit: تسجيل توقيع الموظف على استلام العهدة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyAssignment',
+            dto.assignmentId,
+            employeeId,
+            { signed: false },
+            { signed: true, signatureDate: new Date() },
+            `توقيع استلام عهدة ${assignment.custodyItem.code} من قبل ${assignment.employee.firstName} ${assignment.employee.lastName}`,
+        );
 
         return { success: true };
     }
@@ -435,7 +561,7 @@ export class CustodyService {
                 employeeId,
                 status: CustodyAssignmentStatus.DELIVERED,
             },
-            include: { custodyItem: true },
+            include: { custodyItem: true, employee: true },
         });
         if (!assignment) throw new NotFoundException('العهدة غير مسلمة لك');
 
@@ -452,6 +578,23 @@ export class CustodyService {
             },
             include: { custodyItem: true },
         });
+
+        // Audit: تسجيل طلب إرجاع عهدة
+        await this.auditService.log(
+            AuditAction.CREATE,
+            'CustodyReturn',
+            returnRequest.id,
+            employeeId,
+            null,
+            {
+                itemCode: assignment.custodyItem.code,
+                itemName: assignment.custodyItem.name,
+                returnReason: dto.returnReason,
+                conditionOnReturn: dto.conditionOnReturn,
+                hasDamage: !!dto.damageDescription,
+            },
+            `طلب إرجاع عهدة ${assignment.custodyItem.code} من قبل ${assignment.employee.firstName} ${assignment.employee.lastName}`,
+        );
 
         // Notify HR/Admin
         // TODO: Get HR users and notify them
@@ -533,6 +676,24 @@ export class CustodyService {
             { type: 'custody', returnId: dto.returnId },
         );
 
+        // Audit: تسجيل مراجعة طلب إرجاع العهدة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyReturn',
+            dto.returnId,
+            userId,
+            { status: CustodyReturnStatus.PENDING },
+            {
+                status: isApproved ? CustodyReturnStatus.COMPLETED : CustodyReturnStatus.REJECTED,
+                reviewNotes: dto.reviewNotes,
+                chargeEmployee: dto.chargeEmployee,
+                estimatedCost: dto.estimatedCost,
+            },
+            isApproved
+                ? `قبول إرجاع عهدة ${returnRequest.custodyItem.code}`
+                : `رفض إرجاع عهدة ${returnRequest.custodyItem.code} - ${dto.reviewNotes || ''}`,
+        );
+
         return { success: true };
     }
 
@@ -581,6 +742,23 @@ export class CustodyService {
             '🔄 طلب تحويل عهدة',
             `تم طلب تحويل عهدة: ${transfer.custodyItem.name} إليك`,
             { type: 'custody', transferId: transfer.id },
+        );
+
+        // Audit: تسجيل طلب تحويل عهدة
+        await this.auditService.log(
+            AuditAction.CREATE,
+            'CustodyTransfer',
+            transfer.id,
+            user.id,
+            null,
+            {
+                itemCode: transfer.custodyItem.code,
+                itemName: transfer.custodyItem.name,
+                fromEmployee: `${currentAssignment.employee.firstName} ${currentAssignment.employee.lastName}`,
+                toEmployee: `${toEmployee.firstName} ${toEmployee.lastName}`,
+                reason: dto.reason,
+            },
+            `طلب تحويل عهدة ${transfer.custodyItem.code} من ${currentAssignment.employee.firstName} ${currentAssignment.employee.lastName} إلى ${toEmployee.firstName} ${toEmployee.lastName}`,
         );
 
         return transfer;
@@ -654,6 +832,17 @@ export class CustodyService {
             { type: 'custody', transferId: dto.transferId },
         );
 
+        // Audit: تسجيل قبول تحويل العهدة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyTransfer',
+            dto.transferId,
+            userId,
+            { status: CustodyTransferStatus.PENDING },
+            { status: CustodyTransferStatus.COMPLETED },
+            `قبول تحويل عهدة ${transfer.custodyItem.code}`,
+        );
+
         return { success: true };
     }
 
@@ -676,6 +865,17 @@ export class CustodyService {
             '❌ تم رفض تحويل العهدة',
             `تم رفض تحويل العهدة: ${transfer.custodyItem.name} - ${dto.reason}`,
             { type: 'custody', transferId: dto.transferId },
+        );
+
+        // Audit: تسجيل رفض تحويل العهدة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyTransfer',
+            dto.transferId,
+            userId,
+            { status: CustodyTransferStatus.PENDING },
+            { status: CustodyTransferStatus.REJECTED, reason: dto.reason },
+            `رفض تحويل عهدة ${transfer.custodyItem.code} - السبب: ${dto.reason}`,
         );
 
         return { success: true };
@@ -710,6 +910,24 @@ export class CustodyService {
             where: { id: dto.custodyItemId },
             data: { status: CustodyItemStatus.IN_MAINTENANCE },
         });
+
+        // Audit: تسجيل طلب صيانة عهدة
+        await this.auditService.log(
+            AuditAction.CREATE,
+            'CustodyMaintenance',
+            maintenance.id,
+            userId,
+            null,
+            {
+                itemCode: item.code,
+                itemName: item.name,
+                type: dto.type,
+                description: dto.description,
+                estimatedCost: dto.estimatedCost,
+                vendor: dto.vendor,
+            },
+            `طلب صيانة عهدة ${item.code} - ${item.name} (${dto.type})`,
+        );
 
         return maintenance;
     }
@@ -763,6 +981,25 @@ export class CustodyService {
                 },
             });
         }
+
+        // Audit: تسجيل تحديث حالة الصيانة
+        await this.auditService.log(
+            AuditAction.UPDATE,
+            'CustodyMaintenance',
+            maintenanceId,
+            userId,
+            {
+                status: existing.status,
+                actualCost: existing.actualCost,
+            },
+            {
+                status: dto.status,
+                actualCost: dto.actualCost,
+                result: dto.result,
+                conditionAfter: dto.conditionAfter,
+            },
+            `تحديث صيانة عهدة ${existing.custodyItem.code} - الحالة: ${dto.status}`,
+        );
 
         return updated;
     }

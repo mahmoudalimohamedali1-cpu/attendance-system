@@ -36,8 +36,14 @@ sshpass -p 'GamalSaad35@#' ssh root@72.61.239.170 "cd /var/www/attendance-system
 ### Frontend (web-admin)
 ```bash
 cd web-admin && npm run build
-sshpass -p 'GamalSaad35@#' rsync -avz --delete web-admin/dist/ root@72.61.239.170:/var/www/attendance-system/web-admin/dist/
+scp -r web-admin/dist root@72.61.239.170:/var/www/attendance-system/web-admin/
+ssh root@72.61.239.170 "chmod -R 755 /var/www/attendance-system/web-admin/dist/"
 ```
+
+### ✅ Deployment Checklist
+1. رفع مجلد `dist` بالكامل
+2. تشغيل `chmod -R 755` على مجلد dist
+3. للـ Prisma: استخدم `npx prisma@5.22.0` (VPS عنده Prisma 7 الجديد)
 
 ## 🔐 نظام الصلاحيات
 

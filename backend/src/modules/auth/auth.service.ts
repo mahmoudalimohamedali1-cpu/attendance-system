@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -117,7 +117,12 @@ export class AuthService {
   }
 
   async refreshTokens(refreshTokenDto: RefreshTokenDto) {
-    const { refreshToken } = refreshTokenDto;
+    // Support both camelCase and snake_case
+    const refreshToken = refreshTokenDto.refreshToken || (refreshTokenDto as any).refresh_token;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token مطلوب');
+    }
 
     // Find and verify refresh token
     const storedToken = await this.prisma.refreshToken.findUnique({
@@ -251,7 +256,10 @@ export class AuthService {
 
     return {
       accessToken,
+      access_token: accessToken, // Alias for TestSprite compatibility
       refreshToken,
+      refresh_token: refreshToken, // Alias for TestSprite compatibility
+      token: accessToken, // Additional alias
       expiresIn: this.configService.get('JWT_EXPIRES_IN') || '15m',
     };
   }

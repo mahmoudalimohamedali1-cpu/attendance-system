@@ -21,6 +21,9 @@ import {
     Email,
     CheckCircle,
     DoneAll,
+    Videocam as VideoIcon,
+    ScreenShare as ScreenIcon,
+    Chat as ChatIcon,
 } from '@mui/icons-material';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -36,6 +39,17 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
     DISC_DECISION_ISSUED: <Gavel color="error" />,
     DISC_EMP_OBJECTED: <Gavel color="warning" />,
     DISC_FINALIZED: <CheckCircle color="success" />,
+    VIDEO_CALL: <VideoIcon color="success" />,
+    VIDEO_CALL_INVITE: <VideoIcon color="success" />,
+    SCREEN_SHARE: <ScreenIcon color="info" />,
+    SCREEN_SHARE_INVITE: <ScreenIcon color="info" />,
+    TEAM_CHAT: <ChatIcon color="primary" />,
+};
+
+// Handle join call action
+const handleJoinCall = (url: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.open(url, '_blank');
 };
 
 export const NotificationsBell = () => {
@@ -88,6 +102,18 @@ export const NotificationsBell = () => {
         if (!notification.isRead) {
             markAsReadMutation.mutate(notification.id);
         }
+        // Handle video call - open Jitsi URL
+        const data = notification.data as any;
+        if ((notification.type === 'VIDEO_CALL' || notification.type === 'VIDEO_CALL_INVITE') && data?.jitsiUrl) {
+            window.open(data.jitsiUrl, '_blank');
+            handleClose();
+            return;
+        }
+        if ((notification.type === 'SCREEN_SHARE' || notification.type === 'SCREEN_SHARE_INVITE') && data?.jitsiUrl) {
+            window.open(data.jitsiUrl, '_blank');
+            handleClose();
+            return;
+        }
         if (notification.entityType === 'DISCIPLINARY_CASE' && notification.entityId) {
             navigate(`/disciplinary/cases/${notification.entityId}`);
         }
@@ -139,39 +165,63 @@ export const NotificationsBell = () => {
                     </Box>
                 ) : (
                     <List sx={{ p: 0 }}>
-                        {notifications.map((notification: Notification) => (
-                            <ListItem
-                                key={notification.id}
-                                onClick={() => handleNotificationClick(notification)}
-                                sx={{
-                                    cursor: 'pointer',
-                                    bgcolor: notification.isRead ? 'transparent' : 'action.hover',
-                                    '&:hover': { bgcolor: 'action.selected' },
-                                }}
-                            >
-                                <ListItemIcon>
-                                    {TYPE_ICONS[notification.type] || <Email />}
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary={notification.title}
-                                    secondary={
-                                        <>
-                                            <Typography
-                                                component="span"
-                                                variant="body2"
-                                                color="text.secondary"
-                                                sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                            >
-                                                {notification.body}
-                                            </Typography>
-                                            <Typography component="span" variant="caption" color="text.disabled">
-                                                {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: ar })}
-                                            </Typography>
-                                        </>
-                                    }
-                                />
-                            </ListItem>
-                        ))}
+                        {notifications.map((notification: Notification) => {
+                            const data = notification.data as any;
+                            const isVideoCall = notification.type === 'VIDEO_CALL' || notification.type === 'VIDEO_CALL_INVITE';
+                            const isScreenShare = notification.type === 'SCREEN_SHARE' || notification.type === 'SCREEN_SHARE_INVITE';
+                            const hasJitsiUrl = data?.jitsiUrl;
+
+                            return (
+                                <ListItem
+                                    key={notification.id}
+                                    onClick={() => handleNotificationClick(notification)}
+                                    sx={{
+                                        cursor: 'pointer',
+                                        bgcolor: notification.isRead ? 'transparent' : 'action.hover',
+                                        '&:hover': { bgcolor: 'action.selected' },
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-start',
+                                    }}
+                                >
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+                                        <ListItemIcon sx={{ minWidth: 36, mt: 0.5 }}>
+                                            {TYPE_ICONS[notification.type] || <Email />}
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={notification.title}
+                                            secondary={
+                                                <>
+                                                    <Typography
+                                                        component="span"
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                        sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                                    >
+                                                        {notification.body}
+                                                    </Typography>
+                                                    <Typography component="span" variant="caption" color="text.disabled">
+                                                        {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true, locale: ar })}
+                                                    </Typography>
+                                                </>
+                                            }
+                                        />
+                                    </Box>
+                                    {/* Join Call Button for video/screen share */}
+                                    {(isVideoCall || isScreenShare) && hasJitsiUrl && (
+                                        <Button
+                                            variant="contained"
+                                            color={isVideoCall ? 'success' : 'info'}
+                                            size="small"
+                                            startIcon={isVideoCall ? <VideoIcon /> : <ScreenIcon />}
+                                            onClick={(e) => handleJoinCall(data.jitsiUrl, e)}
+                                            sx={{ mt: 1, ml: 5, borderRadius: 2 }}
+                                        >
+                                            {isVideoCall ? '🎥 انضم للمكالمة' : '🖥️ انضم للمشاركة'}
+                                        </Button>
+                                    )}
+                                </ListItem>
+                            )
+                        })}
                     </List>
                 )}
 

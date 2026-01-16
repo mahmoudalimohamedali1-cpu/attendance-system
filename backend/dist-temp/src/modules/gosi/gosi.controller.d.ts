@@ -1,0 +1,103 @@
+import { GosiService } from './gosi.service';
+import { GosiCalculationService } from './gosi-calculation.service';
+import { CreateGosiConfigDto } from './dto/create-gosi-config.dto';
+export declare class GosiController {
+    private readonly service;
+    private readonly calculationService;
+    constructor(service: GosiService, calculationService: GosiCalculationService);
+    create(dto: CreateGosiConfigDto, companyId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        companyId: string | null;
+        version: number;
+        effectiveDate: Date;
+        endDate: Date | null;
+        isActive: boolean;
+        employeeRate: import("@prisma/client/runtime/library").Decimal;
+        employerRate: import("@prisma/client/runtime/library").Decimal;
+        sanedRate: import("@prisma/client/runtime/library").Decimal;
+        hazardRate: import("@prisma/client/runtime/library").Decimal;
+        maxCapAmount: import("@prisma/client/runtime/library").Decimal;
+        minBaseSalary: import("@prisma/client/runtime/library").Decimal;
+        isSaudiOnly: boolean;
+        includeAllowances: boolean;
+        notes: string | null;
+    }>;
+    getActiveConfig(companyId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        companyId: string | null;
+        version: number;
+        effectiveDate: Date;
+        endDate: Date | null;
+        isActive: boolean;
+        employeeRate: import("@prisma/client/runtime/library").Decimal;
+        employerRate: import("@prisma/client/runtime/library").Decimal;
+        sanedRate: import("@prisma/client/runtime/library").Decimal;
+        hazardRate: import("@prisma/client/runtime/library").Decimal;
+        maxCapAmount: import("@prisma/client/runtime/library").Decimal;
+        minBaseSalary: import("@prisma/client/runtime/library").Decimal;
+        isSaudiOnly: boolean;
+        includeAllowances: boolean;
+        notes: string | null;
+    } | null>;
+    findAll(companyId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        companyId: string | null;
+        version: number;
+        effectiveDate: Date;
+        endDate: Date | null;
+        isActive: boolean;
+        employeeRate: import("@prisma/client/runtime/library").Decimal;
+        employerRate: import("@prisma/client/runtime/library").Decimal;
+        sanedRate: import("@prisma/client/runtime/library").Decimal;
+        hazardRate: import("@prisma/client/runtime/library").Decimal;
+        maxCapAmount: import("@prisma/client/runtime/library").Decimal;
+        minBaseSalary: import("@prisma/client/runtime/library").Decimal;
+        isSaudiOnly: boolean;
+        includeAllowances: boolean;
+        notes: string | null;
+    }[]>;
+    update(id: string, dto: Partial<CreateGosiConfigDto>, companyId: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        companyId: string | null;
+        version: number;
+        effectiveDate: Date;
+        endDate: Date | null;
+        isActive: boolean;
+        employeeRate: import("@prisma/client/runtime/library").Decimal;
+        employerRate: import("@prisma/client/runtime/library").Decimal;
+        sanedRate: import("@prisma/client/runtime/library").Decimal;
+        hazardRate: import("@prisma/client/runtime/library").Decimal;
+        maxCapAmount: import("@prisma/client/runtime/library").Decimal;
+        minBaseSalary: import("@prisma/client/runtime/library").Decimal;
+        isSaudiOnly: boolean;
+        includeAllowances: boolean;
+        notes: string | null;
+    }>;
+    getReport(runId: string, companyId: string): Promise<{
+        report: {
+            employeeId: string;
+            employeeCode: string;
+            employeeName: string;
+            isSaudi: boolean;
+            nationality: string | null;
+            baseSalary: number;
+            employeeShare: number;
+            employerShare: number;
+            totalContribution: number;
+        }[];
+        totals: {
+            totalEmployees: number;
+            totalEmployeeShare: number;
+            totalEmployerShare: number;
+            grandTotal: number;
+        };
+    }>;
+}

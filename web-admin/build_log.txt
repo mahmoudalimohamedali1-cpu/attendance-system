@@ -1,154 +1,67 @@
-vite v5.4.21 building for production...
+﻿
+> attendance-admin-dashboard@1.0.0 build
+> vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
 transforming...
-✓ 13531 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                                      1.29 kB │ gzip:   0.66 kB
-dist/assets/index-Dv7bAVkL.css                       0.77 kB │ gzip:   0.46 kB
-dist/chunks/styled-CJ5zwsaQ.js                       0.07 kB │ gzip:   0.09 kB
-dist/chunks/PlayArrow-e93tKYY8.js                    0.12 kB │ gzip:   0.14 kB
-dist/chunks/Add-j3eDZ9th.js                          0.14 kB │ gzip:   0.15 kB
-dist/chunks/Send-ClDHEDZk.js                         0.14 kB │ gzip:   0.15 kB
-dist/chunks/Download-DWkN6rYL.js                     0.15 kB │ gzip:   0.16 kB
-dist/chunks/FileDownload-BpTBBqek.js                 0.15 kB │ gzip:   0.16 kB
-dist/chunks/Warning-CBeiaiSZ.js                      0.15 kB │ gzip:   0.15 kB
-dist/chunks/Check-CcSyebCa.js                        0.16 kB │ gzip:   0.16 kB
-dist/chunks/AccountTree-BeVau1iY.js                  0.17 kB │ gzip:   0.17 kB
-dist/chunks/ArrowBack-BHY6UpGe.js                    0.17 kB │ gzip:   0.17 kB
-dist/chunks/ArrowForward-B8qEmFW8.js                 0.17 kB │ gzip:   0.17 kB
-dist/chunks/api-wDr9LdOO.js                          0.18 kB │ gzip:   0.15 kB
-dist/chunks/Delete-4NlQFOLf.js                       0.18 kB │ gzip:   0.17 kB
-dist/chunks/TrendingUp-iDkj-amx.js                   0.18 kB │ gzip:   0.18 kB
-dist/chunks/TrendingDown-DLOQu1PS.js                 0.18 kB │ gzip:   0.17 kB
-dist/chunks/AccountBalance-D-bNVufR.js               0.19 kB │ gzip:   0.18 kB
-dist/chunks/Star-9K-xOIF9.js                         0.19 kB │ gzip:   0.18 kB
-dist/chunks/Error-DPOtSBVI.js                        0.20 kB │ gzip:   0.18 kB
-dist/chunks/PlayCircleFilled-gHtFPmkX.js             0.20 kB │ gzip:   0.18 kB
-dist/chunks/AddCircle-xLXMcTXa.js                    0.21 kB │ gzip:   0.19 kB
-dist/chunks/Close-DgRmicpp.js                        0.21 kB │ gzip:   0.17 kB
-dist/chunks/Close-CPYx1azA.js                        0.21 kB │ gzip:   0.17 kB
-dist/chunks/Login-CfRxUi3A.js                        0.21 kB │ gzip:   0.19 kB
-dist/chunks/Smartphone-BoPuM-zS.js                   0.21 kB │ gzip:   0.19 kB
-dist/chunks/useControlled-M0MtiEDV.js                0.23 kB │ gzip:   0.21 kB
-dist/chunks/ContentCopy-BWDxSCfh.js                  0.23 kB │ gzip:   0.20 kB
-dist/chunks/PhoneAndroid-cO5jqoT6.js                 0.24 kB │ gzip:   0.21 kB
-dist/chunks/Edit-BZ6mAs--.js                         0.24 kB │ gzip:   0.20 kB
-dist/chunks/Save--kGGWn-S.js                         0.24 kB │ gzip:   0.21 kB
-dist/chunks/HourglassEmpty-DzrAaZIP.js               0.24 kB │ gzip:   0.22 kB
-dist/chunks/PersonAdd-vokYKNbA.js                    0.25 kB │ gzip:   0.21 kB
-dist/chunks/Work-CMQjo62x.js                         0.25 kB │ gzip:   0.20 kB
-dist/chunks/LocationOn-DolfSJcF.js                   0.26 kB │ gzip:   0.20 kB
-dist/chunks/KeyboardArrowRight-DLTlqzqK.js           0.27 kB │ gzip:   0.20 kB
-dist/chunks/Cancel-D18gGJ--.js                       0.27 kB │ gzip:   0.21 kB
-dist/chunks/Build-5mSpq2si.js                        0.27 kB │ gzip:   0.22 kB
-dist/chunks/StarBorder-CA913T-j.js                   0.29 kB │ gzip:   0.24 kB
-dist/chunks/CloudUpload-DpB5WC64.js                  0.29 kB │ gzip:   0.24 kB
-dist/chunks/CloudDownload-BP5beHH-.js                0.29 kB │ gzip:   0.24 kB
-dist/chunks/Refresh-BwVNDJ8F.js                      0.30 kB │ gzip:   0.25 kB
-dist/chunks/CalendarMonth-gP1SrXOn.js                0.31 kB │ gzip:   0.23 kB
-dist/chunks/Visibility-BPCcKlzp.js                   0.32 kB │ gzip:   0.23 kB
-dist/chunks/Receipt-C3NmTbBo.js                      0.32 kB │ gzip:   0.20 kB
-dist/chunks/Schedule-BQqTewNM.js                     0.32 kB │ gzip:   0.24 kB
-dist/chunks/Lock-DIoeSH9n.js                         0.33 kB │ gzip:   0.24 kB
-dist/chunks/History-Cue9GtjF.js                      0.33 kB │ gzip:   0.26 kB
-dist/chunks/Search-CMfhwgRD.js                       0.33 kB │ gzip:   0.25 kB
-dist/chunks/LockOpen-DlbBNZtt.js                     0.34 kB │ gzip:   0.25 kB
-dist/chunks/EventBusy-D7tJdNZ7.js                    0.34 kB │ gzip:   0.25 kB
-dist/chunks/AttachFile-DcqLnZTV.js                   0.36 kB │ gzip:   0.26 kB
-dist/chunks/Group-CHVUSxmV.js                        0.39 kB │ gzip:   0.26 kB
-dist/chunks/BeachAccess-BZZLPPjF.js                  0.40 kB │ gzip:   0.29 kB
-dist/chunks/PictureAsPdf-BEdNoCZD.js                 0.41 kB │ gzip:   0.28 kB
-dist/chunks/SupervisorAccount-BFmlMRE9.js            0.43 kB │ gzip:   0.30 kB
-dist/chunks/AttachMoney-pidjVY4E.js                  0.46 kB │ gzip:   0.32 kB
-dist/chunks/Face-CO2C9Wnv.js                         0.51 kB │ gzip:   0.30 kB
-dist/chunks/Card-DvS8dXHN.js                         0.59 kB │ gzip:   0.39 kB
-dist/chunks/DialogTitle-DtA65qHt.js                  0.61 kB │ gzip:   0.42 kB
-dist/chunks/AlertTitle-BOdv51jl.js                   0.63 kB │ gzip:   0.41 kB
-dist/chunks/CardContent-CVJYQ4wX.js                  0.63 kB │ gzip:   0.40 kB
-dist/chunks/index-CTHIzfm0.js                        0.79 kB │ gzip:   0.51 kB
-dist/chunks/ThumbUp-C45EBdKE.js                      0.87 kB │ gzip:   0.49 kB
-dist/chunks/disciplinary.service-2tfjjW3q.js         1.09 kB │ gzip:   0.42 kB
-dist/chunks/TableHead-DDun-Zhu.js                    1.25 kB │ gzip:   0.57 kB
-dist/chunks/custody.service-CkX5maOw.js              1.26 kB │ gzip:   0.44 kB
-dist/chunks/colorManipulator-DqvfZRAh.js             1.28 kB │ gzip:   0.71 kB
-dist/chunks/InputAdornment-B9LyPGn9.js               1.95 kB │ gzip:   0.99 kB
-dist/chunks/Checkbox-0rpODeZG.js                     2.52 kB │ gzip:   1.17 kB
-dist/chunks/PermissionAuditPage-CwBZhMlL.js          2.72 kB │ gzip:   1.40 kB
-dist/chunks/useThemeProps-0mej_YTy.js                2.99 kB │ gzip:   1.39 kB
-dist/chunks/PayrollRunNewPage-kKYfNAnz.js            3.23 kB │ gzip:   1.62 kB
-dist/chunks/NotificationsPage-WH43M9DB.js            3.76 kB │ gzip:   1.80 kB
-dist/chunks/TextField-Dg0zk2JE.js                    3.95 kB │ gzip:   1.68 kB
-dist/chunks/Switch-Bh0BgZMF.js                       4.24 kB │ gzip:   1.63 kB
-dist/chunks/CustodyReturns-UJjsFk5t.js               4.35 kB │ gzip:   1.94 kB
-dist/chunks/InputLabel-Ci9YCkFr.js                   4.49 kB │ gzip:   1.68 kB
-dist/chunks/CustodyCategories-8C6xPLSg.js            4.64 kB │ gzip:   1.96 kB
-dist/chunks/CreateInvestigationDialog-DyTKy3uM.js    4.65 kB │ gzip:   2.08 kB
-dist/chunks/Alert-EGMAEgKq.js                        4.97 kB │ gzip:   1.99 kB
-dist/chunks/AuditLogsPage-DNQQys4l.js                5.00 kB │ gzip:   2.28 kB
-dist/chunks/Grid-CZajblHZ.js                         5.08 kB │ gzip:   1.98 kB
-dist/chunks/LinearProgress-CJzdNGsA.js               5.29 kB │ gzip:   1.77 kB
-dist/chunks/Link-DoOtmNFU.js                         5.55 kB │ gzip:   2.34 kB
-dist/chunks/ExceptionsCenterPage-tF33UeqK.js         5.57 kB │ gzip:   2.33 kB
-dist/chunks/SubmissionTimelinePage-BY63Y3H7.js       5.74 kB │ gzip:   2.41 kB
-dist/chunks/TableRow-ByxNpsTr.js                     5.88 kB │ gzip:   2.08 kB
-dist/chunks/CustodyMaintenancePage-CWkk6PSD.js       6.01 kB │ gzip:   2.23 kB
-dist/chunks/LoanPaymentsPage-bN1bibXK.js             6.06 kB │ gzip:   2.41 kB
-dist/chunks/DialogContent-Cb-rV1ek.js                6.08 kB │ gzip:   2.16 kB
-dist/chunks/CustodyItemForm-BSborrYR.js              6.15 kB │ gzip:   2.36 kB
-dist/chunks/RetroPayPage-A_vQLNCI.js                 6.18 kB │ gzip:   2.51 kB
-dist/chunks/TablePagination-BGJPonTX.js              6.32 kB │ gzip:   2.43 kB
-dist/chunks/LoginPage-D2CoUUdL.js                    6.39 kB │ gzip:   2.93 kB
-dist/chunks/AttendancePage-B_4VdOGc.js               6.49 kB │ gzip:   2.46 kB
-dist/chunks/DisciplinaryEmployeePage-CUgIeUw-.js     6.57 kB │ gzip:   2.79 kB
-dist/chunks/CustodyAssign-BNInmUWa.js                6.62 kB │ gzip:   2.62 kB
-dist/chunks/Snackbar-kPvgR2Qz.js                     6.69 kB │ gzip:   2.60 kB
-dist/chunks/FormControlLabel-CBvAJiJb.js             6.73 kB │ gzip:   2.81 kB
-dist/chunks/CustodyItemsList-DB3R49X3.js             6.90 kB │ gzip:   2.96 kB
-dist/chunks/CustodyDashboard-jzeWgU7k.js             6.90 kB │ gzip:   2.47 kB
-dist/chunks/DisciplinaryManagerPage-CUjX7i9F.js      7.12 kB │ gzip:   3.06 kB
-dist/chunks/DevicesPage-BSsgcTOv.js                  7.32 kB │ gzip:   2.83 kB
-dist/chunks/CompaniesPage-BKKJ6plO.js                7.46 kB │ gzip:   2.62 kB
-dist/chunks/JobTitlesPage-Bt2nTfJL.js                8.19 kB │ gzip:   3.06 kB
-dist/chunks/DisciplinaryHRPage-Ox9QD-xC.js           8.21 kB │ gzip:   3.63 kB
-dist/chunks/EosCalculatorPage-KJmu5n8o.js            8.29 kB │ gzip:   3.46 kB
-dist/chunks/CustodyItemDetail-CBxddH_y.js            8.29 kB │ gzip:   3.08 kB
-dist/chunks/Tooltip-OlI2_BrE.js                      8.50 kB │ gzip:   3.32 kB
-dist/chunks/Chip-BhGDxBxG.js                         9.36 kB │ gzip:   2.76 kB
-dist/chunks/Stepper-YmsICXoY.js                      9.44 kB │ gzip:   2.92 kB
-dist/chunks/WpsTrackingPage-DQRJVx32.js              9.58 kB │ gzip:   3.01 kB
-dist/chunks/ComplianceOverviewPage-vYXY6WoX.js      10.04 kB │ gzip:   3.20 kB
-dist/chunks/WpsExportPage-C7m5yjJH.js               10.66 kB │ gzip:   3.99 kB
-dist/chunks/RaisesPage-CbesQti0.js                  11.34 kB │ gzip:   3.81 kB
-dist/chunks/AdvancesPage-CqEB431q.js                11.74 kB │ gzip:   3.88 kB
-dist/chunks/PayrollDashboardPage-CenpKl0L.js        11.90 kB │ gzip:   4.22 kB
-dist/chunks/EmployeeImportPage-ClnDmM8R.js          11.92 kB │ gzip:   4.51 kB
-dist/chunks/GosiPage-DUuWJWm8.js                    12.53 kB │ gzip:   4.12 kB
-dist/chunks/SettingsPage-qDhvdUbG.js                12.84 kB │ gzip:   4.17 kB
-dist/chunks/format-2MASsJXI.js                      13.09 kB │ gzip:   3.48 kB
-dist/chunks/DataUpdatesPage-RhOCa8-q.js             13.28 kB │ gzip:   4.12 kB
-dist/chunks/PayrollRunDetailsPage-BN4E8LIM.js       13.81 kB │ gzip:   4.64 kB
-dist/chunks/MudadPage-Dk0Z8bR6.js                   15.18 kB │ gzip:   4.92 kB
-dist/chunks/PoliciesPage-ItL3exEU.js                15.20 kB │ gzip:   4.48 kB
-dist/chunks/Tabs-BIOWuwez.js                        15.61 kB │ gzip:   5.57 kB
-dist/chunks/LettersPage-CF20Ts5j.js                 15.74 kB │ gzip:   4.95 kB
-dist/chunks/PayslipsPage-DvB-a9I5.js                15.93 kB │ gzip:   4.60 kB
-dist/chunks/PermissionsPage-TCIzBHRO.js             16.67 kB │ gzip:   5.99 kB
-dist/chunks/BranchesPage-D3yHzkHq.js                18.08 kB │ gzip:   5.87 kB
-dist/chunks/BankAccountsPage-C5Q6A4TA.js            18.35 kB │ gzip:   5.50 kB
-dist/chunks/LeavesPage-DFD6keZE.js                  18.57 kB │ gzip:   5.38 kB
-dist/chunks/ContractsPage-CuR9KYRd.js               21.83 kB │ gzip:   5.89 kB
-dist/chunks/UsersPage-CpTDQZQT.js                   22.77 kB │ gzip:   7.19 kB
-dist/chunks/Autocomplete-Cbvn09Gn.js                24.18 kB │ gzip:   8.43 kB
-dist/chunks/Popper-BYIOItu0.js                      24.69 kB │ gzip:   9.22 kB
-dist/chunks/DisciplinaryCaseDetail-DyXmZ9de.js      27.26 kB │ gzip:   8.84 kB
-dist/chunks/PayrollWizardPage-CJODGsCT.js           29.20 kB │ gzip:   8.66 kB
-dist/chunks/SalaryPage-C6M2UTFU.js                  31.50 kB │ gzip:   8.72 kB
-dist/chunks/ReportsPage-g9ch6r5n.js                 32.86 kB │ gzip:  11.79 kB
-dist/chunks/Select-BMq4O0ML.js                      33.10 kB │ gzip:  10.02 kB
-dist/chunks/AdapterDateFns-B1TS7iEN.js              37.23 kB │ gzip:   8.93 kB
-dist/chunks/DashboardPage-CSm23wDW.js               51.93 kB │ gzip:  10.48 kB
-dist/chunks/EmployeeProfilePage-C8cLgn6h.js         63.63 kB │ gzip:  17.54 kB
-dist/chunks/DatePicker-BchalYv_.js                 152.39 kB │ gzip:  45.14 kB
-dist/chunks/PieChart-T1E6pj1-.js                   397.91 kB │ gzip: 107.15 kB
-dist/js/index-mfuDWkN_.js                          482.84 kB │ gzip: 155.28 kB
-✓ built in 10m 40s
+[32mΓ£ô[39m 500 modules transformed.
+node.exe : [31mx[39m Build failed in 
+898ms
+At C:\Program Files\nodejs\npm.ps1:29 
+char:3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecifi 
+   ed: ([31mx[39m Build failed in 898  
+  ms:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeComm 
+   andError
+ 
+[31merror during build:
+[31m[vite]: Rollup failed to resolve 
+import "antd" from "C:/Users/Administrato
+r/Downloads/attendance system/attendance-
+system/web-admin/src/pages/custody-audit/
+CustodyAuditPage.tsx".
+This is most likely unintended because 
+it can break your application at runtime.
+If you do want to externalize this 
+module explicitly add it to
+`build.rollupOptions.external`[31m
+    at viteWarn (file:///C:/Users/Adminis
+trator/Downloads/attendance%20system/atte
+ndance-system/web-admin/node_modules/vite
+/dist/node/chunks/dep-BK3b2jBa.js:65855:1
+7)
+    at onwarn (file:///C:/Users/Administr
+ator/Downloads/attendance%20system/attend
+ance-system/web-admin/node_modules/@vitej
+s/plugin-react-swc/index.js:90:7)
+    at onRollupWarning (file:///C:/Users/
+Administrator/Downloads/attendance%20syst
+em/attendance-system/web-admin/node_modul
+es/vite/dist/node/chunks/dep-BK3b2jBa.js:
+65885:5)
+    at onwarn (file:///C:/Users/Administr
+ator/Downloads/attendance%20system/attend
+ance-system/web-admin/node_modules/vite/d
+ist/node/chunks/dep-BK3b2jBa.js:65550:7)
+    at file:///C:/Users/Administrator/Dow
+nloads/attendance%20system/attendance-sys
+tem/web-admin/node_modules/rollup/dist/es
+/shared/node-entry.js:21046:13
+    at Object.logger [as onLog] (file:///
+C:/Users/Administrator/Downloads/attendan
+ce%20system/attendance-system/web-admin/n
+ode_modules/rollup/dist/es/shared/node-en
+try.js:22919:9)
+    at 
+ModuleLoader.handleInvalidResolvedId (fil
+e:///C:/Users/Administrator/Downloads/att
+endance%20system/attendance-system/web-ad
+min/node_modules/rollup/dist/es/shared/no
+de-entry.js:21663:26)
+    at file:///C:/Users/Administrator/Dow
+nloads/attendance%20system/attendance-sys
+tem/web-admin/node_modules/rollup/dist/es
+/shared/node-entry.js:21621:26[39m

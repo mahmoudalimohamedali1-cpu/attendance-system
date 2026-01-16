@@ -5,7 +5,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // استخدام متغير البيئة - ويرجع للقيمة الافتراضية إذا لم يكن موجود
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api/v1';
 export const API_URL = API_BASE_URL;
 
 class ApiService {
@@ -20,7 +20,7 @@ class ApiService {
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 30000,
+      timeout: 120000, // 2 minutes for AI requests
       headers: {
         'Content-Type': 'application/json',
       },
