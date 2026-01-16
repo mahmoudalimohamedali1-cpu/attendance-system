@@ -1,14 +1,26 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { WorkforcePlanningService } from './workforce-planning.service';
 import { DemandForecastingService } from './services/demand-forecasting.service';
 import { ScheduleOptimizerService } from './services/schedule-optimizer.service';
 import { CoverageAnalyzerService } from './services/coverage-analyzer.service';
+import { BusinessMetricsService } from './services/business-metrics.service';
 import { ForecastRequestDto, ForecastResponseDto } from './dto/forecast.dto';
 import { OptimizeScheduleRequestDto, OptimizeScheduleResponseDto } from './dto/schedule-optimization.dto';
 import { CoverageAnalysisRequestDto, CoverageAnalysisResponseDto } from './dto/coverage-analysis.dto';
 import { CreateScenarioRequestDto, ScenarioResponseDto } from './dto/scenario.dto';
 import { ScenarioQueryDto } from './dto/scenario-query.dto';
+import {
+    CreateBusinessMetricDto,
+    UpdateBusinessMetricDto,
+    BulkCreateMetricsDto,
+    BusinessMetricQueryDto,
+    BusinessMetricResponseDto,
+    MetricsSummaryDto,
+    MetricsTrendDto,
+    BusinessMetricsAnalysisDto,
+    MetricType,
+} from './dto/business-metrics.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -24,6 +36,7 @@ export class WorkforcePlanningController {
         private readonly demandForecastingService: DemandForecastingService,
         private readonly scheduleOptimizerService: ScheduleOptimizerService,
         private readonly coverageAnalyzerService: CoverageAnalyzerService,
+        private readonly businessMetricsService: BusinessMetricsService,
     ) { }
 
     @Get('forecast')
@@ -100,5 +113,127 @@ export class WorkforcePlanningController {
         @Body() requestDto: CreateScenarioRequestDto,
     ): Promise<ScenarioResponseDto> {
         return this.service.createScenario(companyId, userId, requestDto);
+    }
+
+    // ==================== Business Metrics CRUD Endpoints ====================
+
+    @Get('business-metrics')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get business metrics with optional filtering' })
+    @ApiResponse({ status: 200, description: 'List of business metrics', type: [BusinessMetricResponseDto] })
+    async getBusinessMetrics(
+        @CurrentUser('companyId') companyId: string,
+        @Query() query: BusinessMetricQueryDto,
+    ): Promise<BusinessMetricResponseDto[]> {
+        return this.businessMetricsService.getMetrics(companyId, query);
+    }
+
+    @Get('business-metrics/summary')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get business metrics summary for a date range' })
+    @ApiQuery({ name: 'startDate', type: String, required: true, example: '2024-01-01' })
+    @ApiQuery({ name: 'endDate', type: String, required: true, example: '2024-12-31' })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiResponse({ status: 200, description: 'Metrics summary by type', type: [MetricsSummaryDto] })
+    async getBusinessMetricsSummary(
+        @CurrentUser('companyId') companyId: string,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+        @Query('branchId') branchId?: string,
+    ): Promise<MetricsSummaryDto[]> {
+        return this.businessMetricsService.getMetricsSummary(companyId, startDate, endDate, branchId);
+    }
+
+    @Get('business-metrics/trends')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get business metrics trends over time' })
+    @ApiQuery({ name: 'metricType', enum: MetricType, required: true })
+    @ApiQuery({ name: 'startDate', type: String, required: true, example: '2024-01-01' })
+    @ApiQuery({ name: 'endDate', type: String, required: true, example: '2024-12-31' })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiResponse({ status: 200, description: 'Metrics trends', type: [MetricsTrendDto] })
+    async getBusinessMetricsTrends(
+        @CurrentUser('companyId') companyId: string,
+        @Query('metricType') metricType: MetricType,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+        @Query('branchId') branchId?: string,
+    ): Promise<MetricsTrendDto[]> {
+        return this.businessMetricsService.getMetricsTrends(companyId, metricType, startDate, endDate, branchId);
+    }
+
+    @Get('business-metrics/analyze')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Analyze business metrics and workforce correlation using AI' })
+    @ApiQuery({ name: 'startDate', type: String, required: true, example: '2024-01-01' })
+    @ApiQuery({ name: 'endDate', type: String, required: true, example: '2024-12-31' })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiResponse({ status: 200, description: 'AI-powered metrics analysis', type: BusinessMetricsAnalysisDto })
+    async analyzeBusinessMetrics(
+        @CurrentUser('companyId') companyId: string,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+        @Query('branchId') branchId?: string,
+    ): Promise<BusinessMetricsAnalysisDto> {
+        return this.businessMetricsService.analyzeMetrics(companyId, startDate, endDate, branchId);
+    }
+
+    @Get('business-metrics/:id')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get a specific business metric by ID' })
+    @ApiParam({ name: 'id', description: 'Business metric ID' })
+    @ApiResponse({ status: 200, description: 'Business metric details', type: BusinessMetricResponseDto })
+    async getBusinessMetric(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') metricId: string,
+    ): Promise<BusinessMetricResponseDto> {
+        return this.businessMetricsService.getMetric(companyId, metricId);
+    }
+
+    @Post('business-metrics')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Create a new business metric' })
+    @ApiResponse({ status: 201, description: 'Created business metric', type: BusinessMetricResponseDto })
+    async createBusinessMetric(
+        @CurrentUser('companyId') companyId: string,
+        @Body() dto: CreateBusinessMetricDto,
+    ): Promise<BusinessMetricResponseDto> {
+        return this.businessMetricsService.createMetric(companyId, dto);
+    }
+
+    @Post('business-metrics/bulk')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Bulk create business metrics' })
+    @ApiResponse({ status: 201, description: 'Bulk creation result' })
+    async bulkCreateBusinessMetrics(
+        @CurrentUser('companyId') companyId: string,
+        @Body() dto: BulkCreateMetricsDto,
+    ): Promise<{ created: number; failed: number }> {
+        return this.businessMetricsService.bulkCreateMetrics(companyId, dto);
+    }
+
+    @Put('business-metrics/:id')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Update a business metric' })
+    @ApiParam({ name: 'id', description: 'Business metric ID' })
+    @ApiResponse({ status: 200, description: 'Updated business metric', type: BusinessMetricResponseDto })
+    async updateBusinessMetric(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') metricId: string,
+        @Body() dto: UpdateBusinessMetricDto,
+    ): Promise<BusinessMetricResponseDto> {
+        return this.businessMetricsService.updateMetric(companyId, metricId, dto);
+    }
+
+    @Delete('business-metrics/:id')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Delete a business metric' })
+    @ApiParam({ name: 'id', description: 'Business metric ID' })
+    @ApiResponse({ status: 200, description: 'Metric deleted successfully' })
+    async deleteBusinessMetric(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') metricId: string,
+    ): Promise<void> {
+        return this.businessMetricsService.deleteMetric(companyId, metricId);
     }
 }
