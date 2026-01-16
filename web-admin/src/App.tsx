@@ -63,6 +63,7 @@ const SmartPoliciesPage = lazy(() => import('./pages/smart-policies/SmartPolicie
 const EmployeeTrackingPage = lazy(() => import('./pages/tracking/EmployeeTrackingPage'));
 const OrgStructurePage = lazy(() => import('./pages/org-structure/OrgStructurePage'));
 const IntegrationsMarketplacePage = lazy(() => import('@/pages/integrations/IntegrationsMarketplacePage'));
+const IntegrationDetailPage = lazy(() => import('@/pages/integrations/IntegrationDetailPage'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -361,6 +362,11 @@ function App() {
           <Route path="integrations" element={
             <Suspense fallback={<PageLoader />}>
               <IntegrationsMarketplacePage />
+            </Suspense>
+          } />
+          <Route path="integrations/:id" element={
+            <Suspense fallback={<PageLoader />}>
+              <IntegrationDetailPage />
             </Suspense>
           } />
           <Route path="custody">
