@@ -54,7 +54,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [5/5] Deploying on VPS...
-ssh -i C:\Users\Administrator\.ssh\id_rsa root@72.61.239.170 "cd /var/www/attendance-system/backend && git stash && git pull origin main && npm run build && pm2 restart backend && echo '=== DEPLOY SUCCESS! ===' || echo '=== VPS BUILD FAILED ==='"
+ssh -i C:\Users\Administrator\.ssh\id_rsa root@72.61.239.170 "cd /var/www/attendance-system && git stash && git pull origin main && cd backend && npx prisma generate && npm run build && pm2 restart backend && echo '=== DEPLOY SUCCESS! ===' || echo '=== VPS BUILD FAILED ==='"
 
 echo.
 echo ========================================
