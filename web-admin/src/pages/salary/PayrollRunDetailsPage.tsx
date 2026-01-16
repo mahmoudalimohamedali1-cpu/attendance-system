@@ -42,6 +42,7 @@ import {
     AttachMoney,
     Search,
     Receipt,
+    Assessment,
 } from '@mui/icons-material';
 import { api, API_URL } from '@/services/api.service';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -515,7 +516,7 @@ export const PayrollRunDetailsPage = () => {
                                             if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
                                         }}
                                     >
-                                        📊 عرض خطوات الحساب ({selectedPayslip.calculationTrace.length} خطوة)
+                                        <Assessment fontSize="small" /> عرض خطوات الحساب ({selectedPayslip.calculationTrace.length} خطوة)
                                     </Typography>
                                     <Box id="trace-content" sx={{ display: 'none', bgcolor: 'grey.50', p: 2, borderRadius: 1, maxHeight: 300, overflow: 'auto' }}>
                                         {selectedPayslip.calculationTrace.map((step: any, idx: number) => (
