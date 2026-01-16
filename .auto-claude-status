@@ -3,7 +3,7 @@
   "spec": "020-predictive-workforce-planning",
   "state": "building",
   "subtasks": {
-    "completed": 10,
+    "completed": 11,
     "total": 16,
     "in_progress": 1,
     "failed": 0
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 12,
+    "number": 13,
     "started_at": "2026-01-16T12:02:31.236718"
   },
-  "last_update": "2026-01-16T12:42:04.533827"
+  "last_update": "2026-01-16T12:45:04.423973"
 }
