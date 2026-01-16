@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { QiwaService } from './qiwa.service';
 
 @ApiTags('قوى - Qiwa')
@@ -16,15 +17,22 @@ export class QiwaController {
     @Get('contracts')
     @RequirePermission('QIWA_EXPORT')
     @ApiOperation({ summary: 'تصدير العقود بصيغة متوافقة مع قوى' })
-    getContracts(@Request() req: any, @Query('status') status?: string) {
-        return this.qiwaService.exportContracts(req.user.companyId, status);
+    getContracts(
+        @CurrentUser('companyId') companyId: string,
+        @Query('status') status?: string,
+    ) {
+        return this.qiwaService.exportContracts(companyId, status);
     }
 
     @Get('contracts/csv')
     @RequirePermission('QIWA_EXPORT')
     @ApiOperation({ summary: 'تحميل ملف CSV للعقود' })
-    async downloadContractsCsv(@Request() req: any, @Res() res: Response, @Query('status') status?: string) {
-        const csv = await this.qiwaService.exportContractsCsv(req.user.companyId, status);
+    async downloadContractsCsv(
+        @CurrentUser('companyId') companyId: string,
+        @Res() res: Response,
+        @Query('status') status?: string,
+    ) {
+        const csv = await this.qiwaService.exportContractsCsv(companyId, status);
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', 'attachment; filename=qiwa-contracts.csv');
@@ -34,29 +42,44 @@ export class QiwaController {
     @Get('contracts/stats')
     @RequirePermission('QIWA_EXPORT')
     @ApiOperation({ summary: 'إحصائيات العقود' })
-    getStats(@Request() req: any) {
-        return this.qiwaService.getContractStats(req.user.companyId);
+    getStats(@CurrentUser('companyId') companyId: string) {
+        return this.qiwaService.getContractStats(companyId);
     }
 
     @Get('contracts/actions-required')
     @RequirePermission('QIWA_EXPORT')
     @ApiOperation({ summary: 'العقود التي تحتاج إجراء (انتهاء قريب)' })
-    getActionsRequired(@Request() req: any) {
-        return this.qiwaService.getContractsRequiringAction(req.user.companyId);
+    getActionsRequired(@CurrentUser('companyId') companyId: string) {
+        return this.qiwaService.getContractsRequiringAction(companyId);
     }
 
-    @Post('contracts/register')
+    @Get('contracts/pending-sync')
+    @RequirePermission('QIWA_EXPORT')
+    @ApiOperation({ summary: 'العقود التي تحتاج توثيق في قوى' })
+    getContractsPendingSync(@CurrentUser('companyId') companyId: string) {
+        return this.qiwaService.getContractsPendingQiwa(companyId);
+    }
+
+    @Post('contracts/register/:id')
     @RequirePermission('QIWA_REGISTER')
     @ApiOperation({ summary: 'تسجيل عقد في منصة قوى' })
-    registerContract(@Request() req: any, @Body() body: { contractId: string }) {
-        return this.qiwaService.registerContract(body.contractId, req.user.companyId, req.user.userId);
+    registerContract(
+        @Param('id') contractId: string,
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('id') userId: string,
+    ) {
+        return this.qiwaService.registerContract(contractId, companyId, userId);
     }
 
-    @Post('contracts/sync')
+    @Post('contracts/sync/:id')
     @RequirePermission('QIWA_REGISTER')
     @ApiOperation({ summary: 'مزامنة حالة العقد من منصة قوى' })
-    syncContract(@Request() req: any, @Body() body: { contractId: string }) {
-        return this.qiwaService.syncContractStatus(body.contractId, req.user.companyId, req.user.userId);
+    syncContract(
+        @Param('id') contractId: string,
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('id') userId: string,
+    ) {
+        return this.qiwaService.syncContractStatus(contractId, companyId, userId);
     }
 }
 
