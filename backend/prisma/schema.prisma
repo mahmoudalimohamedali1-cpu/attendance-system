@@ -84,6 +84,14 @@ model Company {
   onboardingTemplates  OnboardingTemplate[]
   onboardingProcesses  OnboardingProcess[]
 
+  // نظام التخطيط الاستباقي للقوى العاملة (Predictive Workforce Planning)
+  workforceDemandForecasts WorkforceDemandForecast[]
+  optimalSchedules         OptimalSchedule[]
+  coverageGaps             CoverageGap[]
+  whatIfScenarios          WhatIfScenario[]
+  businessMetrics          BusinessMetric[]
+  costOptimizations        CostOptimization[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -646,6 +654,13 @@ model Branch {
   policies     Policy[] // سياسات على مستوى الفرع
   custodyItems CustodyItem[] // العهد في هذا الفرع
 
+  // التخطيط الاستباقي للقوى العاملة
+  workforceDemandForecasts WorkforceDemandForecast[]
+  optimalSchedules         OptimalSchedule[]
+  coverageGaps             CoverageGap[]
+  businessMetrics          BusinessMetric[]
+  costOptimizations        CostOptimization[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -668,6 +683,12 @@ model Department {
 
   users    User[]
   policies Policy[] // سياسات على مستوى القسم
+
+  // التخطيط الاستباقي للقوى العاملة
+  workforceDemandForecasts WorkforceDemandForecast[]
+  optimalSchedules         OptimalSchedule[]
+  coverageGaps             CoverageGap[]
+  costOptimizations        CostOptimization[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3511,4 +3532,366 @@ model OnboardingTask {
 
   @@index([processId, status])
   @@map("onboarding_tasks")
+}
+
+// ==================== نظام التخطيط الاستباقي للقوى العاملة (Predictive Workforce Planning) ====================
+
+// نوع الفترة الزمنية للتوقعات
+enum ForecastPeriodType {
+  DAILY    // يومي
+  WEEKLY   // أسبوعي
+  MONTHLY  // شهري
+  QUARTERLY // ربع سنوي
+}
+
+// حالة التوقع
+enum ForecastStatus {
+  DRAFT      // مسودة
+  ACTIVE     // نشط
+  ARCHIVED   // مؤرشف
+  SUPERSEDED // تم الاستبدال بتوقع أحدث
+}
+
+// نوع السيناريو
+enum ScenarioType {
+  HIRE         // توظيف موظفين جدد
+  TERMINATE    // إنهاء خدمات
+  SCHEDULE_CHANGE // تغيير الجداول
+  COST_REDUCTION  // تخفيض التكاليف
+  EXPANSION       // توسع في الأعمال
+}
+
+// حالة السيناريو
+enum ScenarioStatus {
+  DRAFT        // مسودة
+  ANALYZING    // قيد التحليل
+  COMPLETED    // مكتمل
+  IMPLEMENTED  // تم التنفيذ
+  REJECTED     // مرفوض
+}
+
+// مستوى شدة الفجوة
+enum GapSeverity {
+  LOW       // منخفضة
+  MEDIUM    // متوسطة
+  HIGH      // عالية
+  CRITICAL  // حرجة
+}
+
+// حالة الفجوة
+enum GapStatus {
+  IDENTIFIED  // تم تحديدها
+  NOTIFIED    // تم الإشعار
+  RESOLVING   // قيد الحل
+  RESOLVED    // تم الحل
+  IGNORED     // تم تجاهلها
+}
+
+// نوع المقياس التجاري
+enum MetricType {
+  SALES        // المبيعات
+  PRODUCTION   // الإنتاج
+  ORDERS       // الطلبات
+  TRAFFIC      // حركة العملاء
+  WORKLOAD     // حجم العمل
+  CUSTOM       // مخصص
+}
+
+// نوع توصية التحسين
+enum OptimizationType {
+  SCHEDULE_ADJUSTMENT  // تعديل الجداول
+  HEADCOUNT_CHANGE     // تغيير عدد الموظفين
+  SHIFT_RESTRUCTURE    // إعادة هيكلة المناوبات
+  OVERTIME_REDUCTION   // تقليل العمل الإضافي
+  COST_SAVING          // توفير التكاليف
+}
+
+// حالة توصية التحسين
+enum OptimizationStatus {
+  PENDING      // بانتظار المراجعة
+  REVIEWED     // تمت المراجعة
+  APPROVED     // معتمدة
+  IMPLEMENTED  // تم التنفيذ
+  REJECTED     // مرفوضة
+}
+
+// توقعات الطلب على القوى العاملة
+model WorkforceDemandForecast {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  branchId     String?  @map("branch_id")
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  departmentId String?  @map("department_id")
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  // معلومات التوقع
+  periodType   ForecastPeriodType @default(MONTHLY) @map("period_type")
+  startDate    DateTime           @map("start_date") @db.Date
+  endDate      DateTime           @map("end_date") @db.Date
+  status       ForecastStatus     @default(ACTIVE)
+
+  // بيانات التوقع
+  predictedHeadcount  Int     @map("predicted_headcount")  // العدد المتوقع من الموظفين
+  currentHeadcount    Int     @map("current_headcount")    // العدد الحالي
+  requiredHeadcount   Int     @map("required_headcount")   // العدد المطلوب
+  confidenceScore     Decimal @default(0) @db.Decimal(5, 2) @map("confidence_score") // درجة الثقة 0-100
+
+  // التحليل
+  historicalData Json?   @map("historical_data") // بيانات تاريخية مستخدمة في التوقع
+  seasonalFactors Json?  @map("seasonal_factors") // عوامل موسمية
+  aiInsights     String? @db.Text @map("ai_insights") // رؤى الذكاء الاصطناعي
+
+  // التكاليف المتوقعة
+  estimatedLaborCost Decimal? @db.Decimal(12, 2) @map("estimated_labor_cost")
+
+  // ملاحظات
+  notes String? @db.Text
+
+  createdBy String  @map("created_by") // معرف المستخدم الذي أنشأ التوقع
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, startDate])
+  @@index([branchId, startDate])
+  @@index([status])
+  @@map("workforce_demand_forecasts")
+}
+
+// جداول العمل المثلى المولدة بالذكاء الاصطناعي
+model OptimalSchedule {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  branchId     String?  @map("branch_id")
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  departmentId String?  @map("department_id")
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  // معلومات الجدول
+  name        String
+  description String?  @db.Text
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+
+  // القيود والمعايير
+  constraints Json  // قيود مثل ساعات العمل القصوى، الحد الأدنى للراحة، إلخ
+
+  // الجدول المولد
+  scheduleData Json  @map("schedule_data") // بيانات الجدول التفصيلية
+
+  // مقاييس الأداء
+  coverageScore      Decimal @default(0) @db.Decimal(5, 2) @map("coverage_score") // درجة التغطية 0-100
+  costEfficiency     Decimal @default(0) @db.Decimal(5, 2) @map("cost_efficiency") // كفاءة التكلفة 0-100
+  employeeSatisfaction Decimal? @default(0) @db.Decimal(5, 2) @map("employee_satisfaction") // رضا الموظفين
+
+  // التكاليف
+  estimatedCost Decimal  @db.Decimal(12, 2) @map("estimated_cost")
+  currentCost   Decimal? @db.Decimal(12, 2) @map("current_cost")
+  costSavings   Decimal? @db.Decimal(12, 2) @map("cost_savings")
+
+  // الحالة
+  isImplemented Boolean  @default(false) @map("is_implemented")
+  implementedAt DateTime? @map("implemented_at")
+
+  // رؤى الذكاء الاصطناعي
+  aiRecommendations String? @db.Text @map("ai_recommendations")
+
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, startDate])
+  @@index([branchId, startDate])
+  @@index([isImplemented])
+  @@map("optimal_schedules")
+}
+
+// فجوات التغطية المحددة
+model CoverageGap {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  branchId     String?  @map("branch_id")
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  departmentId String?  @map("department_id")
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  // معلومات الفجوة
+  date      DateTime    @map("date") @db.Date
+  startTime String      @map("start_time") // HH:mm
+  endTime   String      @map("end_time")   // HH:mm
+
+  severity  GapSeverity @default(MEDIUM)
+  status    GapStatus   @default(IDENTIFIED)
+
+  // التحليل
+  requiredEmployees Int @map("required_employees") // عدد الموظفين المطلوب
+  availableEmployees Int @map("available_employees") // عدد الموظفين المتاح
+  gapSize           Int @map("gap_size") // حجم الفجوة
+
+  // التأثير
+  estimatedImpact String? @db.Text @map("estimated_impact") // تأثير الفجوة على العمليات
+  businessMetrics Json?   @map("business_metrics") // مقاييس العمل المتأثرة
+
+  // التوصيات
+  recommendations String? @db.Text // توصيات لسد الفجوة
+
+  // الإجراءات المتخذة
+  actionTaken   String?   @db.Text @map("action_taken")
+  resolvedBy    String?   @map("resolved_by")
+  resolvedAt    DateTime? @map("resolved_at")
+
+  // الإشعارات
+  notificationsSent Boolean @default(false) @map("notifications_sent")
+  notifiedAt        DateTime? @map("notified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, date, severity])
+  @@index([branchId, date])
+  @@index([status])
+  @@map("coverage_gaps")
+}
+
+// سيناريوهات "ماذا لو" للتخطيط
+model WhatIfScenario {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // معلومات السيناريو
+  name        String
+  description String?  @db.Text
+  type        ScenarioType
+  status      ScenarioStatus @default(DRAFT)
+
+  // المعاملات
+  parameters Json  // معاملات السيناريو (مثل: عدد الموظفين الجدد، نسبة التغيير، إلخ)
+
+  // فترة التطبيق
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
+  // النتائج المتوقعة
+  baselineCost     Decimal @db.Decimal(12, 2) @map("baseline_cost")      // التكلفة الأساسية
+  projectedCost    Decimal @db.Decimal(12, 2) @map("projected_cost")     // التكلفة المتوقعة
+  costDifference   Decimal @db.Decimal(12, 2) @map("cost_difference")    // فرق التكلفة
+
+  baselineCoverage     Decimal @default(0) @db.Decimal(5, 2) @map("baseline_coverage")     // التغطية الأساسية
+  projectedCoverage    Decimal @default(0) @db.Decimal(5, 2) @map("projected_coverage")    // التغطية المتوقعة
+
+  // التحليل
+  impactAnalysis String? @db.Text @map("impact_analysis") // تحليل التأثير
+  risks          String? @db.Text                        // المخاطر المحتملة
+  benefits       String? @db.Text                        // الفوائد المتوقعة
+
+  // رؤى الذكاء الاصطناعي
+  aiInsights String? @db.Text @map("ai_insights")
+
+  // التنفيذ
+  isImplemented Boolean   @default(false) @map("is_implemented")
+  implementedAt DateTime? @map("implemented_at")
+  implementedBy String?   @map("implemented_by")
+
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@index([type])
+  @@map("what_if_scenarios")
+}
+
+// مقاييس الأعمال للتكامل مع التوقعات
+model BusinessMetric {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  branchId String?  @map("branch_id")
+  branch   Branch?  @relation(fields: [branchId], references: [id])
+
+  // معلومات المقياس
+  metricType MetricType
+  metricName String     @map("metric_name")
+
+  // القيمة والتاريخ
+  date  DateTime @db.Date
+  value Decimal  @db.Decimal(12, 2)
+
+  // بيانات إضافية
+  metadata Json? // بيانات وصفية إضافية
+
+  // المصدر
+  source String? // مصدر البيانات (نظام المبيعات، نظام الإنتاج، إلخ)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, branchId, metricType, date])
+  @@index([companyId, date])
+  @@index([branchId, date])
+  @@index([metricType, date])
+  @@map("business_metrics")
+}
+
+// توصيات تحسين التكلفة
+model CostOptimization {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  branchId     String?  @map("branch_id")
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  departmentId String?  @map("department_id")
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  // معلومات التوصية
+  title           String
+  description     String  @db.Text
+  optimizationType OptimizationType @map("optimization_type")
+  status          OptimizationStatus @default(PENDING)
+
+  // التأثير المالي
+  currentCost       Decimal @db.Decimal(12, 2) @map("current_cost")
+  optimizedCost     Decimal @db.Decimal(12, 2) @map("optimized_cost")
+  potentialSavings  Decimal @db.Decimal(12, 2) @map("potential_savings")
+  savingsPercentage Decimal @db.Decimal(5, 2) @map("savings_percentage")
+
+  // التفاصيل
+  analysisData    Json    @map("analysis_data") // بيانات التحليل التفصيلية
+  recommendations String  @db.Text              // توصيات التنفيذ
+
+  // المتطلبات والمخاطر
+  requirements String? @db.Text // متطلبات التنفيذ
+  risks        String? @db.Text // المخاطر المحتملة
+
+  // الأولوية (1 = أعلى أولوية)
+  priority Int @default(5)
+
+  // رؤى الذكاء الاصطناعي
+  aiReasoning String? @db.Text @map("ai_reasoning")
+
+  // المراجعة والتنفيذ
+  reviewedBy    String?   @map("reviewed_by")
+  reviewedAt    DateTime? @map("reviewed_at")
+  implementedBy String?   @map("implemented_by")
+  implementedAt DateTime? @map("implemented_at")
+
+  // الملاحظات بعد التنفيذ
+  actualSavings Decimal? @db.Decimal(12, 2) @map("actual_savings")
+  feedback      String?  @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status])
+  @@index([branchId, status])
+  @@index([priority, status])
+  @@map("cost_optimizations")
 }
