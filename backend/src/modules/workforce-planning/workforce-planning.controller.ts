@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { WorkforcePlanningService } from './workforce-planning.service';
 import { DemandForecastingService } from './services/demand-forecasting.service';
 import { ScheduleOptimizerService } from './services/schedule-optimizer.service';
 import { CoverageAnalyzerService } from './services/coverage-analyzer.service';
 import { BusinessMetricsService } from './services/business-metrics.service';
+import { CoverageGapAlertService, AlertPriority, CoverageGapAlert, AlertGenerationResponse } from './services/coverage-gap-alert.service';
 import { ForecastRequestDto, ForecastResponseDto } from './dto/forecast.dto';
 import { OptimizeScheduleRequestDto, OptimizeScheduleResponseDto } from './dto/schedule-optimization.dto';
 import { CoverageAnalysisRequestDto, CoverageAnalysisResponseDto } from './dto/coverage-analysis.dto';
@@ -37,6 +38,7 @@ export class WorkforcePlanningController {
         private readonly scheduleOptimizerService: ScheduleOptimizerService,
         private readonly coverageAnalyzerService: CoverageAnalyzerService,
         private readonly businessMetricsService: BusinessMetricsService,
+        private readonly coverageGapAlertService: CoverageGapAlertService,
     ) { }
 
     @Get('forecast')
@@ -235,5 +237,164 @@ export class WorkforcePlanningController {
         @Param('id') metricId: string,
     ): Promise<void> {
         return this.businessMetricsService.deleteMetric(companyId, metricId);
+    }
+
+    // ==================== Coverage Gap Alerts Endpoints ====================
+
+    @Get('coverage-gap-alerts')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get active coverage gap alerts' })
+    @ApiQuery({ name: 'priority', enum: AlertPriority, required: false })
+    @ApiQuery({ name: 'departmentId', type: String, required: false })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiQuery({ name: 'startDate', type: String, required: false, example: '2024-02-01' })
+    @ApiQuery({ name: 'endDate', type: String, required: false, example: '2024-02-28' })
+    @ApiResponse({ status: 200, description: 'List of active alerts' })
+    async getActiveAlerts(
+        @CurrentUser('companyId') companyId: string,
+        @Query('priority') priority?: AlertPriority,
+        @Query('departmentId') departmentId?: string,
+        @Query('branchId') branchId?: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+    ): Promise<CoverageGapAlert[]> {
+        return this.coverageGapAlertService.getActiveAlerts(companyId, {
+            priority,
+            departmentId,
+            branchId,
+            startDate,
+            endDate,
+        });
+    }
+
+    @Post('coverage-gap-alerts/generate')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Generate coverage gap alerts for a specific date' })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                date: { type: 'string', example: '2024-02-15' },
+                branchId: { type: 'string', required: false },
+                departmentId: { type: 'string', required: false },
+                notifyImmediately: { type: 'boolean', default: false },
+                thresholds: {
+                    type: 'object',
+                    properties: {
+                        criticalBelow: { type: 'number', example: 50 },
+                        highBelow: { type: 'number', example: 70 },
+                        mediumBelow: { type: 'number', example: 85 },
+                    },
+                },
+            },
+            required: ['date'],
+        },
+    })
+    @ApiResponse({ status: 201, description: 'Alerts generated successfully' })
+    async generateAlerts(
+        @CurrentUser('companyId') companyId: string,
+        @Body() body: {
+            date: string;
+            branchId?: string;
+            departmentId?: string;
+            notifyImmediately?: boolean;
+            thresholds?: {
+                criticalBelow?: number;
+                highBelow?: number;
+                mediumBelow?: number;
+            };
+        },
+    ): Promise<AlertGenerationResponse> {
+        return this.coverageGapAlertService.generateAlerts(companyId, body);
+    }
+
+    @Get('coverage-gap-alerts/upcoming')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Check for coverage gaps in upcoming days' })
+    @ApiQuery({ name: 'daysAhead', type: Number, required: false, example: 7 })
+    @ApiResponse({ status: 200, description: 'Upcoming alerts for the next N days' })
+    async checkUpcomingGaps(
+        @CurrentUser('companyId') companyId: string,
+        @Query('daysAhead') daysAhead?: string,
+    ): Promise<AlertGenerationResponse[]> {
+        return this.coverageGapAlertService.checkUpcomingGaps(
+            companyId,
+            daysAhead ? parseInt(daysAhead) : 7,
+        );
+    }
+
+    @Post('coverage-gap-alerts/automated-detection')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'Run automated gap detection and send notifications' })
+    @ApiResponse({ status: 200, description: 'Automated detection completed' })
+    async runAutomatedDetection(
+        @CurrentUser('companyId') companyId: string,
+    ): Promise<{
+        todayAlerts: AlertGenerationResponse;
+        upcomingAlerts: AlertGenerationResponse[];
+        summary: {
+            totalAlerts: number;
+            criticalCount: number;
+            highCount: number;
+            notificationsSent: number;
+        };
+    }> {
+        return this.coverageGapAlertService.runAutomatedDetection(companyId);
+    }
+
+    @Get('coverage-gap-alerts/statistics')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get coverage gap alert statistics' })
+    @ApiQuery({ name: 'startDate', type: String, required: true, example: '2024-01-01' })
+    @ApiQuery({ name: 'endDate', type: String, required: true, example: '2024-12-31' })
+    @ApiResponse({ status: 200, description: 'Alert statistics' })
+    async getAlertStatistics(
+        @CurrentUser('companyId') companyId: string,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+    ): Promise<{
+        totalAlerts: number;
+        byPriority: Record<AlertPriority, number>;
+        byDepartment: Record<string, number>;
+        averageCoveragePercentage: number;
+        mostAffectedDepartments: Array<{ departmentName: string; alertCount: number }>;
+    }> {
+        return this.coverageGapAlertService.getAlertStatistics(companyId, startDate, endDate);
+    }
+
+    @Patch('coverage-gap-alerts/:id/acknowledge')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Acknowledge a coverage gap alert' })
+    @ApiParam({ name: 'id', description: 'Alert ID' })
+    @ApiResponse({ status: 200, description: 'Alert acknowledged' })
+    async acknowledgeAlert(
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('sub') userId: string,
+        @Param('id') alertId: string,
+    ): Promise<{ success: boolean; message: string }> {
+        return this.coverageGapAlertService.acknowledgeAlert(companyId, alertId, userId);
+    }
+
+    @Patch('coverage-gap-alerts/:id/resolve')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Resolve a coverage gap alert' })
+    @ApiParam({ name: 'id', description: 'Alert ID' })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                resolution: { type: 'string', description: 'Resolution notes' },
+            },
+            required: ['resolution'],
+        },
+    })
+    @ApiResponse({ status: 200, description: 'Alert resolved' })
+    async resolveAlert(
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('sub') userId: string,
+        @Param('id') alertId: string,
+        @Body() body: { resolution: string },
+    ): Promise<{ success: boolean; message: string }> {
+        return this.coverageGapAlertService.resolveAlert(companyId, alertId, userId, body.resolution);
     }
 }
