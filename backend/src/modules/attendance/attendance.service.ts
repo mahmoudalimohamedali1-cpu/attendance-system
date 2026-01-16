@@ -8,12 +8,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { GeofenceService } from './services/geofence.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { TimezoneService } from '../../common/services/timezone.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { AttendanceStatus, NotificationType } from '@prisma/client';
 import { SmartPolicyTrigger } from '@prisma/client';
 import { SmartPolicyTriggerService } from '../smart-policies/smart-policy-trigger.service';
+import { toZonedTime } from 'date-fns-tz';
 
 @Injectable()
 export class AttendanceService {
@@ -23,6 +25,7 @@ export class AttendanceService {
     private notificationsService: NotificationsService,
     private permissionsService: PermissionsService,
     private smartPolicyTrigger: SmartPolicyTriggerService,
+    private timezoneService: TimezoneService,
   ) { }
 
   async checkIn(userId: string, checkInDto: CheckInDto) {
@@ -42,12 +45,10 @@ export class AttendanceService {
       throw new BadRequestException('لم يتم تعيين فرع للموظف');
     }
 
-    // Check if work from home is enabled for today
-    // استخدام التوقيت المحلي (UTC+2)
-    const nowForDate = new Date();
-    const localDate = new Date(nowForDate.getTime() + (2 * 60 * 60 * 1000)); // UTC+2 (Egypt/Saudi)
-    // إنشاء تاريخ اليوم في UTC (بدون وقت)
-    const today = new Date(Date.UTC(localDate.getUTCFullYear(), localDate.getUTCMonth(), localDate.getUTCDate()));
+    // Get branch timezone and calculate today's date in that timezone
+    // جلب المنطقة الزمنية للفرع وحساب تاريخ اليوم
+    const timezone = await this.timezoneService.getBranchTimezone(user.branch.id);
+    const today = this.getTodayInTimezone(timezone);
 
     const workFromHomeRecord = await this.prisma.workFromHome.findUnique({
       where: {
@@ -107,12 +108,13 @@ export class AttendanceService {
       throw new BadRequestException('تم تسجيل الحضور مسبقاً لهذا اليوم');
     }
 
-    // Parse work times
+    // Parse work times and get current time in branch timezone
+    // حساب الوقت الحالي في المنطقة الزمنية للفرع
     const workStartTime = this.parseTime(
       user.department?.workStartTime || user.branch.workStartTime,
     );
     const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = this.getCurrentMinutesInTimezone(timezone);
     const startMinutes = workStartTime.hours * 60 + workStartTime.minutes;
 
     // Check early check-in restriction
@@ -329,6 +331,11 @@ export class AttendanceService {
     console.log('User faceRegistered:', user.faceRegistered);
     console.log('User faceData exists:', !!user.faceData);
 
+    // Get branch timezone and calculate today's date
+    // جلب المنطقة الزمنية للفرع وحساب تاريخ اليوم
+    const timezone = await this.timezoneService.getBranchTimezone(user.branch.id);
+    const today = this.getTodayInTimezone(timezone);
+
     // Check mock location
     if (isMockLocation) {
       await this.logSuspiciousAttempt(userId, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
@@ -388,11 +395,6 @@ export class AttendanceService {
       }
     }
 
-    // استخدام التوقيت المحلي
-    const nowCheckOut = new Date();
-    const localDateCheckOut = new Date(nowCheckOut.getTime() + (2 * 60 * 60 * 1000)); // UTC+2
-    const today = new Date(Date.UTC(localDateCheckOut.getUTCFullYear(), localDateCheckOut.getUTCMonth(), localDateCheckOut.getUTCDate()));
-
     // Get today's attendance
     const attendance = await this.prisma.attendance.findUnique({
       where: {
@@ -438,12 +440,13 @@ export class AttendanceService {
       }
     }
 
-    // Calculate working time and early leave
+    // Calculate working time and early leave in branch timezone
+    // حساب الوقت الحالي في المنطقة الزمنية للفرع
     const workEndTime = this.parseTime(
       user.department?.workEndTime || user.branch.workEndTime,
     );
     const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = this.getCurrentMinutesInTimezone(timezone);
     const endMinutes = workEndTime.hours * 60 + workEndTime.minutes;
 
     let earlyLeaveMinutes = 0;
@@ -506,10 +509,10 @@ export class AttendanceService {
   }
 
   async getTodayAttendance(userId: string, companyId: string) {
-    // استخدام التوقيت المحلي
-    const nowToday = new Date();
-    const localDateToday = new Date(nowToday.getTime() + (2 * 60 * 60 * 1000)); // UTC+2
-    const today = new Date(Date.UTC(localDateToday.getUTCFullYear(), localDateToday.getUTCMonth(), localDateToday.getUTCDate()));
+    // Get user's timezone through their branch
+    // جلب المنطقة الزمنية للموظف عبر فرعه
+    const timezone = await this.timezoneService.getCompanyTimezoneByUserId(userId);
+    const today = this.getTodayInTimezone(timezone);
 
     const attendance = await this.prisma.attendance.findFirst({
       where: {
@@ -736,6 +739,32 @@ export class AttendanceService {
   private parseTime(timeStr: string): { hours: number; minutes: number } {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return { hours, minutes };
+  }
+
+  /**
+   * الحصول على تاريخ اليوم في منطقة زمنية معينة (بدون وقت)
+   * Get today's date in a specific timezone (without time)
+   */
+  private getTodayInTimezone(timezone: string): Date {
+    const now = new Date();
+    const zonedDate = toZonedTime(now, timezone);
+    // إرجاع تاريخ UTC بدون وقت للمقارنة مع قاعدة البيانات
+    // Return UTC date without time for database comparison
+    return new Date(Date.UTC(
+      zonedDate.getFullYear(),
+      zonedDate.getMonth(),
+      zonedDate.getDate()
+    ));
+  }
+
+  /**
+   * الحصول على الوقت الحالي بالدقائق في منطقة زمنية معينة
+   * Get current time in minutes in a specific timezone
+   */
+  private getCurrentMinutesInTimezone(timezone: string): number {
+    const now = new Date();
+    const zonedDate = toZonedTime(now, timezone);
+    return zonedDate.getHours() * 60 + zonedDate.getMinutes();
   }
 
   private async logSuspiciousAttempt(

@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "019-implement-company-timezone-loading",
+  "state": "building",
+  "subtasks": {
+    "completed": 1,
+    "total": 6,
+    "in_progress": 1,
+    "failed": 0
+  },
+  "phase": {
+    "current": "Backend Timezone Service",
+    "id": null,
+    "total": 2
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 3,
+    "started_at": "2026-01-16T10:22:12.155492"
+  },
+  "last_update": "2026-01-16T10:30:11.091507"
+}
