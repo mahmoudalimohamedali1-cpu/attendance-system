@@ -53,8 +53,8 @@ export const ComplianceWarnings = ({ showAll = true, maxItems = 10 }: Compliance
     refetch();
   };
 
-  const getWarningIcon = (level: WarningLevel) => {
-    switch (level) {
+  const getWarningIcon = (severity: WarningLevel) => {
+    switch (severity) {
       case 'CRITICAL':
       case 'ERROR':
         return <ErrorIcon sx={{ color: 'error.main', fontSize: 24 }} />;
@@ -67,8 +67,8 @@ export const ComplianceWarnings = ({ showAll = true, maxItems = 10 }: Compliance
     }
   };
 
-  const getSeverityBgColor = (level: WarningLevel): string => {
-    switch (level) {
+  const getSeverityBgColor = (severity: WarningLevel): string => {
+    switch (severity) {
       case 'CRITICAL':
       case 'ERROR':
         return 'error.50';
@@ -89,7 +89,7 @@ export const ComplianceWarnings = ({ showAll = true, maxItems = 10 }: Compliance
       WARNING: 2,
       INFO: 3,
     };
-    return severityOrder[a.level] - severityOrder[b.level];
+    return severityOrder[a.severity] - severityOrder[b.severity];
   });
 
   // Limit warnings if needed
@@ -195,7 +195,7 @@ export const ComplianceWarnings = ({ showAll = true, maxItems = 10 }: Compliance
                 {index > 0 && <Divider sx={{ my: 1 }} />}
                 <ListItem
                   sx={{
-                    bgcolor: getSeverityBgColor(warning.level),
+                    bgcolor: getSeverityBgColor(warning.severity),
                     borderRadius: 2,
                     mb: 1,
                     alignItems: 'flex-start',
@@ -206,13 +206,13 @@ export const ComplianceWarnings = ({ showAll = true, maxItems = 10 }: Compliance
                 >
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%', gap: 2 }}>
                     <ListItemIcon sx={{ minWidth: 'auto', mt: 0.5 }}>
-                      {getWarningIcon(warning.level)}
+                      {getWarningIcon(warning.severity)}
                     </ListItemIcon>
                     <Box sx={{ flex: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Chip
-                          label={warningLevelLabels[warning.level]}
-                          color={warningLevelColors[warning.level]}
+                          label={warningLevelLabels[warning.severity]}
+                          color={warningLevelColors[warning.severity]}
                           size="small"
                         />
                         <Chip
@@ -228,17 +228,17 @@ export const ComplianceWarnings = ({ showAll = true, maxItems = 10 }: Compliance
                             <Typography component="span" variant="body2" display="block" sx={{ mb: 1 }}>
                               {warning.message}
                             </Typography>
-                            {warning.affectedContracts.length > 0 && (
+                            {warning.affectedContracts && warning.affectedContracts.length > 0 && (
                               <Box sx={{ mt: 1 }}>
                                 <Typography component="span" variant="caption" color="text.secondary">
                                   العقود المتأثرة ({warning.affectedContracts.length}):
                                 </Typography>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                  {warning.affectedContracts.slice(0, 3).map((contract) => (
+                                  {warning.affectedContracts.slice(0, 3).map((contractId) => (
                                     <Chip
-                                      key={contract.contractId}
+                                      key={contractId}
                                       icon={<Description />}
-                                      label={`${contract.employeeName} (${contract.employeeCode})`}
+                                      label={contractId}
                                       size="small"
                                       variant="outlined"
                                       sx={{ fontSize: '0.7rem' }}

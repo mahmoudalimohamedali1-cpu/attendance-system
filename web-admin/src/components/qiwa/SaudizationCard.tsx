@@ -92,10 +92,10 @@ export const SaudizationCard = ({ targetRatio = 75, showDetails = true }: Saudiz
     );
   }
 
-  const { ratio, targetRatio: target, totalEmployees, saudiEmployees, nonSaudiEmployees, deficit, isCompliant } = saudizationData;
-  const progressValue = Math.min(ratio, 100);
-  const statusColor = getProgressColor(ratio, target);
-  const statusText = qiwaService.getSaudizationStatusText(ratio, target);
+  const { saudizationRatio, targetRatio: target, totalEmployees, saudiEmployees, nonSaudiEmployees, deficitCount, isCompliant } = saudizationData;
+  const progressValue = Math.min(saudizationRatio, 100);
+  const statusColor = getProgressColor(saudizationRatio, target);
+  const statusText = qiwaService.getSaudizationStatusText(saudizationRatio, target);
 
   return (
     <Card sx={{ height: '100%' }}>
@@ -146,7 +146,7 @@ export const SaudizationCard = ({ targetRatio = 75, showDetails = true }: Saudiz
               }}
             >
               <Typography variant="h4" component="div" fontWeight="bold" color={`${statusColor}.main`}>
-                {qiwaService.formatRatio(ratio)}
+                {qiwaService.formatRatio(saudizationRatio)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 الحالية
@@ -166,7 +166,7 @@ export const SaudizationCard = ({ targetRatio = 75, showDetails = true }: Saudiz
 
           {/* Status Chip */}
           <Chip
-            icon={getStatusIcon(isCompliant, ratio, target)}
+            icon={getStatusIcon(isCompliant, saudizationRatio, target)}
             label={statusText}
             color={statusColor}
             size="small"
@@ -224,13 +224,13 @@ export const SaudizationCard = ({ targetRatio = 75, showDetails = true }: Saudiz
               </Grid>
 
               {/* Deficit */}
-              {deficit > 0 && (
+              {deficitCount > 0 && (
                 <Grid item xs={6}>
                   <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'warning.50', borderRadius: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                       <TrendDownIcon sx={{ color: 'warning.main', fontSize: 20 }} />
                       <Typography variant="h6" fontWeight="bold" color="warning.main">
-                        {deficit}
+                        {deficitCount}
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="text.secondary">
@@ -241,7 +241,7 @@ export const SaudizationCard = ({ targetRatio = 75, showDetails = true }: Saudiz
               )}
 
               {/* Compliant - No Deficit */}
-              {deficit === 0 && isCompliant && (
+              {deficitCount === 0 && isCompliant && (
                 <Grid item xs={6}>
                   <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.50', borderRadius: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>

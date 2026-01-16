@@ -10,9 +10,9 @@ export interface SaudizationRatio {
     totalEmployees: number;
     saudiEmployees: number;
     nonSaudiEmployees: number;
-    ratio: number;
+    saudizationRatio: number;
     targetRatio: number;
-    deficit: number;
+    deficitCount: number;
     isCompliant: boolean;
 }
 
@@ -48,16 +48,13 @@ export type WarningType =
 export interface ComplianceWarning {
     id: string;
     type: WarningType;
-    level: WarningLevel;
+    severity: WarningLevel;
     title: string;
     message: string;
-    affectedContracts: Array<{
-        contractId: string;
-        contractNumber?: string;
-        employeeName: string;
-        employeeCode: string;
-    }>;
+    affectedCount: number;
+    affectedContracts?: string[];
     actionRequired: string;
+    metadata?: Record<string, any>;
     createdAt: string;
 }
 
@@ -192,7 +189,7 @@ class QiwaService {
 
     // Utility Methods
     getWarningsByLevel(warnings: ComplianceWarning[], level: WarningLevel): ComplianceWarning[] {
-        return warnings.filter(w => w.level === level);
+        return warnings.filter(w => w.severity === level);
     }
 
     getWarningsByType(warnings: ComplianceWarning[], type: WarningType): ComplianceWarning[] {
@@ -200,15 +197,17 @@ class QiwaService {
     }
 
     getCriticalWarningsCount(warnings: ComplianceWarning[]): number {
-        return warnings.filter(w => w.level === 'CRITICAL' || w.level === 'ERROR').length;
+        return warnings.filter(w => w.severity === 'CRITICAL' || w.severity === 'ERROR').length;
     }
 
     getTotalAffectedContracts(warnings: ComplianceWarning[]): number {
         const contractIds = new Set<string>();
         warnings.forEach(warning => {
-            warning.affectedContracts.forEach(contract => {
-                contractIds.add(contract.contractId);
-            });
+            if (warning.affectedContracts) {
+                warning.affectedContracts.forEach(contractId => {
+                    contractIds.add(contractId);
+                });
+            }
         });
         return contractIds.size;
     }
