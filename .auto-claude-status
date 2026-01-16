@@ -1,10 +1,10 @@
 {
   "active": true,
   "spec": "020-predictive-workforce-planning",
-  "state": "planning",
+  "state": "building",
   "subtasks": {
-    "completed": 0,
-    "total": 0,
+    "completed": 2,
+    "total": 16,
     "in_progress": 1,
     "failed": 0
   },
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 2,
+    "number": 4,
     "started_at": "2026-01-16T12:02:31.236718"
   },
-  "last_update": "2026-01-16T12:06:26.077542"
+  "last_update": "2026-01-16T12:14:08.036948"
 }
