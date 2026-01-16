@@ -15,6 +15,7 @@ export interface Company {
     phone?: string;
     address?: string;
     logo?: string;
+    timezone?: string;
     isActive: boolean;
     createdAt: string;
     _count?: {
@@ -31,6 +32,7 @@ export interface CreateCompanyDto {
     email?: string;
     phone?: string;
     address?: string;
+    timezone?: string;
 }
 
 class CompaniesService {

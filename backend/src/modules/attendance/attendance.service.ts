@@ -16,6 +16,7 @@ import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { AttendanceStatus, NotificationType } from '@prisma/client';
 import { SmartPolicyTrigger } from '@prisma/client';
 import { SmartPolicyTriggerService } from '../smart-policies/smart-policy-trigger.service';
+import { toZonedTime } from 'date-fns-tz';
 
 @Injectable()
 export class AttendanceService {
@@ -50,9 +51,10 @@ export class AttendanceService {
       throw new BadRequestException('لم يتم تعيين فرع للموظف');
     }
 
-    // Check if work from home is enabled for today
-    // Use TimezoneService for proper timezone handling
-    const today = this.timezoneService.getLocalToday();
+    // Get branch timezone and calculate today's date in that timezone
+    // جلب المنطقة الزمنية للفرع وحساب تاريخ اليوم
+    const timezone = await this.timezoneService.getBranchTimezone(user.branch.id);
+    const today = this.getTodayInTimezone(timezone);
 
     const workFromHomeRecord = await this.prisma.workFromHome.findUnique({
       where: {
@@ -119,12 +121,13 @@ export class AttendanceService {
       throw new BadRequestException('يوجد سجل حضور غير مكتمل، يرجى التواصل مع الدعم');
     }
 
-    // Parse work times
+    // Parse work times and get current time in branch timezone
+    // حساب الوقت الحالي في المنطقة الزمنية للفرع
     const workStartTime = this.parseTime(
       user.department?.workStartTime || user.branch.workStartTime,
     );
     const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = this.getCurrentMinutesInTimezone(timezone);
     const startMinutes = workStartTime.hours * 60 + workStartTime.minutes;
 
     // Check early check-in restriction
@@ -356,6 +359,11 @@ export class AttendanceService {
     console.log('User faceRegistered:', user.faceRegistered);
     console.log('User faceData exists:', !!user.faceData);
 
+    // Get branch timezone and calculate today's date
+    // جلب المنطقة الزمنية للفرع وحساب تاريخ اليوم
+    const timezone = await this.timezoneService.getBranchTimezone(user.branch.id);
+    const today = this.getTodayInTimezone(timezone);
+
     // Check mock location
     if (isMockLocation) {
       await this.logSuspiciousAttempt(userId, user.companyId as string, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
@@ -413,9 +421,7 @@ export class AttendanceService {
       }
     }
 
-    // Use TimezoneService for proper timezone handling
-    const today = this.timezoneService.getLocalToday();
-
+    // today already calculated at start of checkOut using branch timezone
     // Get today's attendance
     const attendance = await this.prisma.attendance.findUnique({
       where: {
@@ -462,12 +468,13 @@ export class AttendanceService {
       }
     }
 
-    // Calculate working time and early leave
+    // Calculate working time and early leave in branch timezone
+    // حساب الوقت الحالي في المنطقة الزمنية للفرع
     const workEndTime = this.parseTime(
       user.department?.workEndTime || user.branch.workEndTime,
     );
     const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = this.getCurrentMinutesInTimezone(timezone);
     const endMinutes = workEndTime.hours * 60 + workEndTime.minutes;
 
     let earlyLeaveMinutes = 0;
@@ -533,8 +540,10 @@ export class AttendanceService {
   }
 
   async getTodayAttendance(userId: string, companyId: string) {
-    // Use TimezoneService for proper timezone handling
-    const today = this.timezoneService.getLocalToday();
+    // Get user's timezone through their branch
+    // جلب المنطقة الزمنية للموظف عبر فرعه
+    const timezone = await this.timezoneService.getCompanyTimezoneByUserId(userId);
+    const today = this.getTodayInTimezone(timezone);
 
     const attendance = await this.prisma.attendance.findFirst({
       where: {
@@ -715,7 +724,7 @@ export class AttendanceService {
               department: { select: { name: true } },
             },
           },
-          branch: { select: { name: true } },
+          branch: { select: { name: true, timezone: true } },
         },
         orderBy: { date: 'desc' },
         skip: (page - 1) * limit,
@@ -763,6 +772,32 @@ export class AttendanceService {
   private parseTime(timeStr: string): { hours: number; minutes: number } {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return { hours, minutes };
+  }
+
+  /**
+   * الحصول على تاريخ اليوم في منطقة زمنية معينة (بدون وقت)
+   * Get today's date in a specific timezone (without time)
+   */
+  private getTodayInTimezone(timezone: string): Date {
+    const now = new Date();
+    const zonedDate = toZonedTime(now, timezone);
+    // إرجاع تاريخ UTC بدون وقت للمقارنة مع قاعدة البيانات
+    // Return UTC date without time for database comparison
+    return new Date(Date.UTC(
+      zonedDate.getFullYear(),
+      zonedDate.getMonth(),
+      zonedDate.getDate()
+    ));
+  }
+
+  /**
+   * الحصول على الوقت الحالي بالدقائق في منطقة زمنية معينة
+   * Get current time in minutes in a specific timezone
+   */
+  private getCurrentMinutesInTimezone(timezone: string): number {
+    const now = new Date();
+    const zonedDate = toZonedTime(now, timezone);
+    return zonedDate.getHours() * 60 + zonedDate.getMinutes();
   }
 
   private async logSuspiciousAttempt(
