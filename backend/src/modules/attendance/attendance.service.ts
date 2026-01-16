@@ -82,6 +82,7 @@ export class AttendanceService {
         if (!integrityVerdict.isValid || integrityVerdict.riskLevel === 'HIGH' || integrityVerdict.riskLevel === 'CRITICAL') {
           await this.logSuspiciousAttempt(
             userId,
+            user.companyId as string,
             'INTEGRITY_FAILED',
             latitude,
             longitude,
@@ -113,6 +114,7 @@ export class AttendanceService {
       // If client couldn't get integrity token, log it
       await this.logSuspiciousAttempt(
         userId,
+        user.companyId as string,
         'INTEGRITY_CHECK_UNAVAILABLE',
         latitude,
         longitude,
@@ -390,7 +392,6 @@ export class AttendanceService {
 
   async checkOut(userId: string, checkOutDto: CheckOutDto) {
     const { latitude, longitude, isMockLocation, deviceInfo, faceEmbedding } = checkOutDto;
-<<<<<<< HEAD
 
     console.log('=== CHECK-OUT REQUEST ===');
     console.log('userId:', userId);
@@ -414,10 +415,6 @@ export class AttendanceService {
     const today = this.getTodayInTimezone(timezone);
 
     // Check mock location
-=======
-    const user = await this.prisma.user.findFirst({ where: { id: userId, companyId: checkOutDto.companyId }, include: { branch: true, department: true, faceData: true } });
-    if (!user || !user.branch) throw new NotFoundException('المستخدم أو الفرع غير موجود');
->>>>>>> origin/auto-claude/011-complete-google-play-integrity-api-verification
     if (isMockLocation) {
       await this.logSuspiciousAttempt(userId, user.companyId as string, 'MOCK_LOCATION', latitude, longitude, deviceInfo);
       throw new ForbiddenException('تم رصد استخدام موقع وهمي. لا يمكن تسجيل الانصراف.');
@@ -429,6 +426,7 @@ export class AttendanceService {
         if (!integrityVerdict.isValid || integrityVerdict.riskLevel === 'HIGH' || integrityVerdict.riskLevel === 'CRITICAL') {
           await this.logSuspiciousAttempt(
             userId,
+            user.companyId as string,
             'INTEGRITY_FAILED',
             latitude,
             longitude,
@@ -458,6 +456,7 @@ export class AttendanceService {
       // If client couldn't get integrity token, log it
       await this.logSuspiciousAttempt(
         userId,
+        user.companyId as string,
         'INTEGRITY_CHECK_UNAVAILABLE',
         latitude,
         longitude,
