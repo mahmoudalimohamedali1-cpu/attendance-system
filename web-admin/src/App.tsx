@@ -63,6 +63,7 @@ const SmartPoliciesPage = lazy(() => import('./pages/smart-policies/SmartPolicie
 const EmployeeTrackingPage = lazy(() => import('./pages/tracking/EmployeeTrackingPage'));
 const OrgStructurePage = lazy(() => import('./pages/org-structure/OrgStructurePage'));
 const WorkforcePlanningDashboard = lazy(() => import('./pages/workforce-planning/WorkforcePlanningDashboard'));
+const ForecastView = lazy(() => import('./pages/workforce-planning/ForecastView'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -358,11 +359,18 @@ function App() {
               <OrgStructurePage />
             </Suspense>
           } />
-          <Route path="workforce-planning" element={
-            <Suspense fallback={<PageLoader />}>
-              <WorkforcePlanningDashboard />
-            </Suspense>
-          } />
+          <Route path="workforce-planning">
+            <Route index element={
+              <Suspense fallback={<PageLoader />}>
+                <WorkforcePlanningDashboard />
+              </Suspense>
+            } />
+            <Route path="forecast" element={
+              <Suspense fallback={<PageLoader />}>
+                <ForecastView />
+              </Suspense>
+            } />
+          </Route>
           <Route path="custody">
             <Route index element={
               <Suspense fallback={<PageLoader />}>
