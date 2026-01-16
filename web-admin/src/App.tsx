@@ -45,6 +45,7 @@ const WpsTrackingPage = lazy(() => import('./pages/wps-tracking/WpsTrackingPage'
 const MudadPage = lazy(() => import('./pages/mudad/MudadPage'));
 const GosiPage = lazy(() => import('./pages/gosi/GosiPage'));
 const QiwaPage = lazy(() => import('./pages/qiwa/QiwaPage'));
+const QiwaDashboardPage = lazy(() => import('./pages/qiwa/QiwaDashboardPage'));
 const DisciplinaryHRPage = lazy(() => import('./pages/disciplinary/DisciplinaryHRPage').then(m => ({ default: m.DisciplinaryHRPage })));
 const DisciplinaryManagerPage = lazy(() => import('./pages/disciplinary/DisciplinaryManagerPage').then(m => ({ default: m.DisciplinaryManagerPage })));
 const DisciplinaryEmployeePage = lazy(() => import('./pages/disciplinary/DisciplinaryEmployeePage').then(m => ({ default: m.DisciplinaryEmployeePage })));
@@ -373,6 +374,11 @@ function App() {
           <Route path="qiwa" element={
             <Suspense fallback={<PageLoader />}>
               <QiwaPage />
+            </Suspense>
+          } />
+          <Route path="qiwa/dashboard" element={
+            <Suspense fallback={<PageLoader />}>
+              <QiwaDashboardPage />
             </Suspense>
           } />
           <Route path="disciplinary" element={

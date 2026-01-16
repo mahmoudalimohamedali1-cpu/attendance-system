@@ -1,13 +1,18 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { QiwaController } from './qiwa.controller';
 import { QiwaService } from './qiwa.service';
+import { QiwaApiService } from './services/qiwa-api.service';
+import { SaudizationService } from './services/saudization.service';
+import { ComplianceWarningsService } from './services/compliance-warnings.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-    imports: [PrismaModule, PermissionsModule],
+    imports: [PrismaModule, PermissionsModule, AuditModule, ConfigModule],
     controllers: [QiwaController],
-    providers: [QiwaService],
-    exports: [QiwaService],
+    providers: [QiwaService, QiwaApiService, SaudizationService, ComplianceWarningsService],
+    exports: [QiwaService, QiwaApiService, SaudizationService, ComplianceWarningsService],
 })
 export class QiwaModule { }

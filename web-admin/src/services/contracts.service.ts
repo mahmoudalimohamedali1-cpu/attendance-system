@@ -4,6 +4,7 @@
  */
 
 import { api } from './api.service';
+import type { RegisterContractResponse, SyncContractResponse } from './qiwa.service';
 
 export type ContractType = 'PERMANENT' | 'FIXED_TERM' | 'PART_TIME' | 'SEASONAL' | 'PROBATION';
 export type ContractStatus = 'DRAFT' | 'PENDING_EMPLOYEE' | 'PENDING_EMPLOYER' | 'PENDING_QIWA' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED' | 'RENEWED' | 'SUSPENDED' | 'REJECTED';
@@ -245,6 +246,16 @@ class ContractsService {
     // ===== قوى =====
     async updateQiwaStatus(id: string, data: { qiwaContractId?: string; qiwaStatus: QiwaAuthStatus; rejectReason?: string }): Promise<Contract> {
         const response = await api.patch(`${this.basePath}/${id}/qiwa-status`, data) as { data: Contract } | Contract;
+        return (response as any).data || response;
+    }
+
+    async registerToQiwa(id: string): Promise<RegisterContractResponse> {
+        const response = await api.post(`/qiwa/contracts/register/${id}`, {}) as { data: RegisterContractResponse } | RegisterContractResponse;
+        return (response as any).data || response;
+    }
+
+    async syncQiwaStatus(id: string): Promise<SyncContractResponse> {
+        const response = await api.post(`/qiwa/contracts/sync/${id}`, {}) as { data: SyncContractResponse } | SyncContractResponse;
         return (response as any).data || response;
     }
 

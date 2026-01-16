@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 export interface QiwaContractExport {
     contractNumber: string;
@@ -35,7 +36,10 @@ export interface QiwaContractExport {
 
 @Injectable()
 export class QiwaService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private auditService: AuditService,
+    ) { }
 
     /**
      * تصدير العقود بصيغة متوافقة مع قوى
@@ -161,6 +165,245 @@ export class QiwaService {
         // Add BOM for Arabic support in Excel
         const bom = '\uFEFF';
         return bom + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    }
+
+    /**
+     * تسجيل عقد في منصة قوى
+     */
+    async registerContract(contractId: string, companyId: string, userId?: string) {
+        // جلب العقد مع بيانات الموظف
+        const contract = await this.prisma.contract.findFirst({
+            where: { id: contractId, user: { companyId } },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        nationalId: true,
+                        iqamaNumber: true,
+                        isSaudi: true,
+                        profession: true,
+                    },
+                },
+            },
+        });
+
+        if (!contract) {
+            throw new NotFoundException('العقد غير موجود');
+        }
+
+        // التحقق من جاهزية العقد للتسجيل
+        this.validateContractForQiwa(contract);
+
+        // تحضير بيانات التسجيل
+        const qiwaData = {
+            contractNumber: contract.contractNumber,
+            employeeName: `${contract.user.firstName} ${contract.user.lastName}`,
+            nationalId: contract.user.nationalId || contract.user.iqamaNumber,
+            isSaudi: contract.user.isSaudi,
+            contractType: String(contract.type),
+            startDate: contract.startDate,
+            endDate: contract.endDate,
+            jobTitle: contract.contractJobTitle || contract.user.profession,
+            basicSalary: contract.basicSalary ? Number(contract.basicSalary) : null,
+            totalSalary: contract.totalSalary ? Number(contract.totalSalary) : null,
+        };
+
+        // محاكاة استدعاء API قوى (سيتم استبداله بالاستدعاء الحقيقي لاحقاً)
+        const qiwaResponse = await this.simulateQiwaApiCall(qiwaData);
+
+        // تحديث العقد بمعرف قوى والحالة
+        const updatedContract = await this.prisma.contract.update({
+            where: { id: contractId },
+            data: {
+                qiwaContractId: qiwaResponse.contractId,
+                qiwaStatus: 'PENDING',
+                status: contract.status === 'DRAFT' ? 'PENDING_QIWA' : contract.status,
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        nationalId: true,
+                        iqamaNumber: true,
+                    },
+                },
+            },
+        });
+
+        // تسجيل في سجل المراجعة
+        await this.auditService.log(
+            'UPDATE',
+            'Contract',
+            contractId,
+            userId,
+            { qiwaStatus: contract.qiwaStatus },
+            { qiwaStatus: 'PENDING', qiwaContractId: qiwaResponse.contractId },
+            `تسجيل عقد في منصة قوى: ${contract.contractNumber}`,
+        );
+
+        return {
+            success: true,
+            contract: updatedContract,
+            qiwaContractId: qiwaResponse.contractId,
+            message: 'تم تسجيل العقد في منصة قوى بنجاح',
+        };
+    }
+
+    /**
+     * التحقق من جاهزية العقد للتسجيل في قوى
+     */
+    private validateContractForQiwa(contract: any): void {
+        const errors: string[] = [];
+
+        // التحقق من الحقول المطلوبة
+        if (!contract.contractNumber) errors.push('رقم العقد مطلوب');
+        if (!contract.startDate) errors.push('تاريخ بداية العقد مطلوب');
+        if (!contract.contractJobTitle && !contract.user.profession) {
+            errors.push('المسمى الوظيفي مطلوب');
+        }
+        if (!contract.user.nationalId && !contract.user.iqamaNumber) {
+            errors.push('رقم الهوية أو الإقامة مطلوب');
+        }
+        if (!contract.basicSalary && !contract.totalSalary) {
+            errors.push('الراتب الأساسي مطلوب');
+        }
+
+        // التحقق من التوقيعات
+        if (!contract.employeeSignature) {
+            errors.push('توقيع الموظف مطلوب');
+        }
+        if (!contract.employerSignature) {
+            errors.push('توقيع صاحب العمل مطلوب');
+        }
+
+        // التحقق من أن العقد غير مسجل مسبقاً
+        if (contract.qiwaContractId && contract.qiwaStatus === 'AUTHENTICATED') {
+            errors.push('العقد مسجل ومصدق في قوى بالفعل');
+        }
+
+        if (errors.length > 0) {
+            throw new BadRequestException({
+                message: 'العقد غير جاهز للتسجيل في قوى',
+                errors,
+            });
+        }
+    }
+
+    /**
+     * مزامنة حالة العقد من منصة قوى
+     */
+    async syncContractStatus(contractId: string, companyId: string, userId?: string) {
+        // جلب العقد مع بيانات الموظف
+        const contract = await this.prisma.contract.findFirst({
+            where: { id: contractId, user: { companyId } },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        nationalId: true,
+                        iqamaNumber: true,
+                    },
+                },
+            },
+        });
+
+        if (!contract) {
+            throw new NotFoundException('العقد غير موجود');
+        }
+
+        // التحقق من أن العقد مسجل في قوى
+        if (!contract.qiwaContractId) {
+            throw new BadRequestException('العقد غير مسجل في منصة قوى');
+        }
+
+        // جلب الحالة من قوى (محاكاة - سيتم استبداله بالاستدعاء الحقيقي لاحقاً)
+        const qiwaStatus = await this.simulateQiwaStatusCheck(contract.qiwaContractId);
+
+        const oldQiwaStatus = contract.qiwaStatus;
+
+        // تحديث حالة العقد
+        const updatedContract = await this.prisma.contract.update({
+            where: { id: contractId },
+            data: {
+                qiwaStatus: qiwaStatus.status,
+                ...(qiwaStatus.status === 'AUTHENTICATED' && contract.status === 'PENDING_QIWA' && {
+                    status: 'ACTIVE',
+                }),
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        nationalId: true,
+                        iqamaNumber: true,
+                    },
+                },
+            },
+        });
+
+        // تسجيل في سجل المراجعة
+        await this.auditService.log(
+            'UPDATE',
+            'Contract',
+            contractId,
+            userId,
+            { qiwaStatus: oldQiwaStatus },
+            { qiwaStatus: qiwaStatus.status },
+            `مزامنة حالة العقد من منصة قوى: ${contract.contractNumber}`,
+        );
+
+        return {
+            success: true,
+            contract: updatedContract,
+            previousStatus: oldQiwaStatus,
+            newStatus: qiwaStatus.status,
+            message: 'تم مزامنة حالة العقد من منصة قوى بنجاح',
+        };
+    }
+
+    /**
+     * محاكاة استدعاء API قوى (مؤقت - للتطوير)
+     */
+    private async simulateQiwaApiCall(data: any): Promise<{ contractId: string; status: string }> {
+        // محاكاة تأخير الشبكة
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // إرجاع معرف عقد وهمي
+        const qiwaContractId = `QIWA-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        return {
+            contractId: qiwaContractId,
+            status: 'PENDING',
+        };
+    }
+
+    /**
+     * محاكاة فحص حالة العقد من قوى (مؤقت - للتطوير)
+     */
+    private async simulateQiwaStatusCheck(qiwaContractId: string): Promise<{ status: string; lastUpdated: Date }> {
+        // محاكاة تأخير الشبكة
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // محاكاة حالات مختلفة بناءً على معرف العقد
+        const statuses = ['PENDING', 'AUTHENTICATED', 'REJECTED'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+        return {
+            status: randomStatus,
+            lastUpdated: new Date(),
+        };
     }
 
     /**
