@@ -51,5 +51,12 @@ export class QiwaController {
     registerContract(@Request() req: any, @Body() body: { contractId: string }) {
         return this.qiwaService.registerContract(body.contractId, req.user.companyId, req.user.userId);
     }
+
+    @Post('contracts/sync')
+    @RequirePermission('QIWA_REGISTER')
+    @ApiOperation({ summary: 'مزامنة حالة العقد من منصة قوى' })
+    syncContract(@Request() req: any, @Body() body: { contractId: string }) {
+        return this.qiwaService.syncContractStatus(body.contractId, req.user.companyId, req.user.userId);
+    }
 }
 
