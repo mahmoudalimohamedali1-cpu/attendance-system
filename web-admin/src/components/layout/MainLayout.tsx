@@ -44,6 +44,7 @@ import {
   MyLocation as LocationIcon,
   AccountTree,
   AutoAwesome,
+  Extension,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
@@ -104,6 +105,7 @@ const allMenuItems: MenuItem[] = [
   { text: 'الصلاحيات', icon: <Security />, path: '/permissions', requiredRole: 'ADMIN' },
   { text: 'السياسات', icon: <Security />, path: '/policies', requiredRole: 'ADMIN' },
   { text: 'السياسات الذكية', icon: <AutoAwesome />, path: '/smart-policies', requiredRole: 'ADMIN' },
+  { text: 'التكاملات', icon: <Extension />, path: '/integrations', requiredRole: 'ADMIN' },
   { text: 'الإعدادات', icon: <Settings />, path: '/settings', requiredRole: 'ADMIN' },
 ];
 
