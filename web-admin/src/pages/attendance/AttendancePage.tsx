@@ -30,9 +30,8 @@ import {
   Login,
   Logout,
 } from '@mui/icons-material';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
 import { api } from '@/services/api.service';
+import { formatTimeWithTimezone, formatDisplayDateWithTimezone } from '@/utils/date.utils';
 
 interface Attendance {
   id: string;
@@ -51,6 +50,7 @@ interface Attendance {
   };
   branch: {
     name: string;
+    timezone: string;
   };
 }
 
@@ -108,9 +108,8 @@ export const AttendancePage = () => {
     }
   };
 
-  const formatTime = (time: string | null) => {
-    if (!time) return '-';
-    return format(new Date(time), 'hh:mm a', { locale: ar });
+  const formatTime = (time: string | null, timezone?: string) => {
+    return formatTimeWithTimezone(time, timezone);
   };
 
   const formatMinutes = (minutes: number) => {
@@ -273,12 +272,12 @@ export const AttendancePage = () => {
                           </Box>
                         </TableCell>
                         <TableCell>
-                          {format(new Date(record.date), 'dd/MM/yyyy', { locale: ar })}
+                          {formatDisplayDateWithTimezone(record.date, record.branch?.timezone)}
                         </TableCell>
                         <TableCell>
                           <Chip
                             icon={<Login />}
-                            label={formatTime(record.checkInTime)}
+                            label={formatTime(record.checkInTime, record.branch?.timezone)}
                             size="small"
                             color={record.checkInTime ? 'success' : 'default'}
                             variant="outlined"
@@ -287,7 +286,7 @@ export const AttendancePage = () => {
                         <TableCell>
                           <Chip
                             icon={<Logout />}
-                            label={formatTime(record.checkOutTime)}
+                            label={formatTime(record.checkOutTime, record.branch?.timezone)}
                             size="small"
                             color={record.checkOutTime ? 'info' : 'default'}
                             variant="outlined"
