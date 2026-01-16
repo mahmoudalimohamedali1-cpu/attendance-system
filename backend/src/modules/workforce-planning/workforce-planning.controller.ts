@@ -2,7 +2,9 @@ import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { WorkforcePlanningService } from './workforce-planning.service';
 import { DemandForecastingService } from './services/demand-forecasting.service';
+import { ScheduleOptimizerService } from './services/schedule-optimizer.service';
 import { ForecastRequestDto, ForecastResponseDto } from './dto/forecast.dto';
+import { OptimizeScheduleRequestDto, OptimizeScheduleResponseDto } from './dto/schedule-optimization.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -16,6 +18,7 @@ export class WorkforcePlanningController {
     constructor(
         private readonly service: WorkforcePlanningService,
         private readonly demandForecastingService: DemandForecastingService,
+        private readonly scheduleOptimizerService: ScheduleOptimizerService,
     ) { }
 
     @Get('forecast')
@@ -37,5 +40,15 @@ export class WorkforcePlanningController {
         @Body() requestDto: ForecastRequestDto,
     ): Promise<ForecastResponseDto> {
         return this.demandForecastingService.generateForecast(companyId, requestDto);
+    }
+
+    @Post('optimize-schedule')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Generate optimized work schedule' })
+    async optimizeSchedule(
+        @CurrentUser('companyId') companyId: string,
+        @Body() requestDto: OptimizeScheduleRequestDto,
+    ): Promise<OptimizeScheduleResponseDto> {
+        return this.scheduleOptimizerService.optimizeSchedule(companyId, requestDto);
     }
 }

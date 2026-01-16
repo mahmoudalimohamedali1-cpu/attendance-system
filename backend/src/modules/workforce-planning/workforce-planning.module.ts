@@ -2,13 +2,14 @@ import { Module } from '@nestjs/common';
 import { WorkforcePlanningController } from './workforce-planning.controller';
 import { WorkforcePlanningService } from './workforce-planning.service';
 import { DemandForecastingService } from './services/demand-forecasting.service';
+import { ScheduleOptimizerService } from './services/schedule-optimizer.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
     imports: [PrismaModule, AiModule],
     controllers: [WorkforcePlanningController],
-    providers: [WorkforcePlanningService, DemandForecastingService],
-    exports: [WorkforcePlanningService, DemandForecastingService],
+    providers: [WorkforcePlanningService, DemandForecastingService, ScheduleOptimizerService],
+    exports: [WorkforcePlanningService, DemandForecastingService, ScheduleOptimizerService],
 })
 export class WorkforcePlanningModule { }
