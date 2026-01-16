@@ -7,7 +7,6 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { PermissionsModule } from "../permissions/permissions.module";
 import { SmartPoliciesModule } from "../smart-policies/smart-policies.module";
 import { SettingsModule } from "../settings/settings.module";
-import { TimezoneService } from "../../common/services/timezone.service";
 
 @Module({
   imports: [NotificationsModule, PermissionsModule, forwardRef(() => SmartPoliciesModule), SettingsModule],

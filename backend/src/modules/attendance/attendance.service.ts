@@ -16,7 +16,6 @@ import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { AttendanceStatus, NotificationType } from '@prisma/client';
 import { SmartPolicyTrigger } from '@prisma/client';
 import { SmartPolicyTriggerService } from '../smart-policies/smart-policy-trigger.service';
-import { toZonedTime } from 'date-fns-tz';
 
 @Injectable()
 export class AttendanceService {
@@ -780,14 +779,19 @@ export class AttendanceService {
    */
   private getTodayInTimezone(timezone: string): Date {
     const now = new Date();
-    const zonedDate = toZonedTime(now, timezone);
-    // إرجاع تاريخ UTC بدون وقت للمقارنة مع قاعدة البيانات
+    // Use Intl.DateTimeFormat to get date parts in target timezone
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(now);
+    const year = parseInt(parts.find(p => p.type === 'year')?.value || '2024');
+    const month = parseInt(parts.find(p => p.type === 'month')?.value || '1') - 1;
+    const day = parseInt(parts.find(p => p.type === 'day')?.value || '1');
     // Return UTC date without time for database comparison
-    return new Date(Date.UTC(
-      zonedDate.getFullYear(),
-      zonedDate.getMonth(),
-      zonedDate.getDate()
-    ));
+    return new Date(Date.UTC(year, month, day));
   }
 
   /**
@@ -796,8 +800,16 @@ export class AttendanceService {
    */
   private getCurrentMinutesInTimezone(timezone: string): number {
     const now = new Date();
-    const zonedDate = toZonedTime(now, timezone);
-    return zonedDate.getHours() * 60 + zonedDate.getMinutes();
+    // Use Intl.DateTimeFormat to get time parts in target timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const timeStr = formatter.format(now);
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
   }
 
   private async logSuspiciousAttempt(
