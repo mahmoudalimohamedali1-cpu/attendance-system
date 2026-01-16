@@ -3,8 +3,10 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { WorkforcePlanningService } from './workforce-planning.service';
 import { DemandForecastingService } from './services/demand-forecasting.service';
 import { ScheduleOptimizerService } from './services/schedule-optimizer.service';
+import { CoverageAnalyzerService } from './services/coverage-analyzer.service';
 import { ForecastRequestDto, ForecastResponseDto } from './dto/forecast.dto';
 import { OptimizeScheduleRequestDto, OptimizeScheduleResponseDto } from './dto/schedule-optimization.dto';
+import { CoverageAnalysisRequestDto, CoverageAnalysisResponseDto } from './dto/coverage-analysis.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,6 +21,7 @@ export class WorkforcePlanningController {
         private readonly service: WorkforcePlanningService,
         private readonly demandForecastingService: DemandForecastingService,
         private readonly scheduleOptimizerService: ScheduleOptimizerService,
+        private readonly coverageAnalyzerService: CoverageAnalyzerService,
     ) { }
 
     @Get('forecast')
@@ -50,5 +53,28 @@ export class WorkforcePlanningController {
         @Body() requestDto: OptimizeScheduleRequestDto,
     ): Promise<OptimizeScheduleResponseDto> {
         return this.scheduleOptimizerService.optimizeSchedule(companyId, requestDto);
+    }
+
+    @Get('coverage-gaps')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Analyze workforce coverage gaps' })
+    @ApiQuery({ name: 'date', type: String, required: true, example: '2024-02-01' })
+    @ApiQuery({ name: 'analysisType', enum: ['DAILY', 'WEEKLY', 'MONTHLY'], required: false })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiQuery({ name: 'departmentId', type: String, required: false })
+    async getCoverageGaps(
+        @CurrentUser('companyId') companyId: string,
+        @Query('date') date: string,
+        @Query('analysisType') analysisType?: string,
+        @Query('branchId') branchId?: string,
+        @Query('departmentId') departmentId?: string,
+    ): Promise<CoverageAnalysisResponseDto> {
+        const requestDto: CoverageAnalysisRequestDto = {
+            date,
+            analysisType: analysisType as any,
+            branchId,
+            departmentId,
+        };
+        return this.coverageAnalyzerService.analyzeCoverage(companyId, requestDto);
     }
 }
