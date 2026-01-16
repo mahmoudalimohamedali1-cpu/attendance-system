@@ -6,6 +6,7 @@ import { ScheduleOptimizerService } from './services/schedule-optimizer.service'
 import { CoverageAnalyzerService } from './services/coverage-analyzer.service';
 import { BusinessMetricsService } from './services/business-metrics.service';
 import { CoverageGapAlertService, AlertPriority, CoverageGapAlert, AlertGenerationResponse } from './services/coverage-gap-alert.service';
+import { CostOptimizationService } from './services/cost-optimization.service';
 import { ForecastRequestDto, ForecastResponseDto } from './dto/forecast.dto';
 import { OptimizeScheduleRequestDto, OptimizeScheduleResponseDto } from './dto/schedule-optimization.dto';
 import { CoverageAnalysisRequestDto, CoverageAnalysisResponseDto } from './dto/coverage-analysis.dto';
@@ -22,6 +23,16 @@ import {
     BusinessMetricsAnalysisDto,
     MetricType,
 } from './dto/business-metrics.dto';
+import {
+    GenerateCostOptimizationDto,
+    CostOptimizationQueryDto,
+    UpdateOptimizationStatusDto,
+    CostOptimizationRecommendationDto,
+    CostOptimizationSummaryDto,
+    AIOptimizationAnalysisDto,
+    OptimizationType,
+    OptimizationStatus,
+} from './dto/cost-optimization.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -39,6 +50,7 @@ export class WorkforcePlanningController {
         private readonly coverageAnalyzerService: CoverageAnalyzerService,
         private readonly businessMetricsService: BusinessMetricsService,
         private readonly coverageGapAlertService: CoverageGapAlertService,
+        private readonly costOptimizationService: CostOptimizationService,
     ) { }
 
     @Get('forecast')
@@ -396,5 +408,83 @@ export class WorkforcePlanningController {
         @Body() body: { resolution: string },
     ): Promise<{ success: boolean; message: string }> {
         return this.coverageGapAlertService.resolveAlert(companyId, alertId, userId, body.resolution);
+    }
+
+    // ==================== Cost Optimization Endpoints ====================
+
+    @Get('cost-optimization')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get cost optimization recommendations with filtering' })
+    @ApiQuery({ name: 'optimizationType', enum: OptimizationType, required: false })
+    @ApiQuery({ name: 'status', enum: OptimizationStatus, required: false })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiQuery({ name: 'departmentId', type: String, required: false })
+    @ApiQuery({ name: 'minPriority', type: Number, required: false, example: 2 })
+    @ApiResponse({ status: 200, description: 'List of cost optimization recommendations', type: [CostOptimizationRecommendationDto] })
+    async getCostOptimizations(
+        @CurrentUser('companyId') companyId: string,
+        @Query() query: CostOptimizationQueryDto,
+    ): Promise<CostOptimizationRecommendationDto[]> {
+        return this.costOptimizationService.getRecommendations(companyId, query);
+    }
+
+    @Get('cost-optimization/summary')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get cost optimization summary' })
+    @ApiQuery({ name: 'branchId', type: String, required: false })
+    @ApiResponse({ status: 200, description: 'Cost optimization summary', type: CostOptimizationSummaryDto })
+    async getCostOptimizationSummary(
+        @CurrentUser('companyId') companyId: string,
+        @Query('branchId') branchId?: string,
+    ): Promise<CostOptimizationSummaryDto> {
+        return this.costOptimizationService.getSummary(companyId, branchId);
+    }
+
+    @Get('cost-optimization/:id')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Get a specific cost optimization recommendation' })
+    @ApiParam({ name: 'id', description: 'Recommendation ID' })
+    @ApiResponse({ status: 200, description: 'Cost optimization recommendation details', type: CostOptimizationRecommendationDto })
+    async getCostOptimization(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') recommendationId: string,
+    ): Promise<CostOptimizationRecommendationDto> {
+        return this.costOptimizationService.getRecommendation(companyId, recommendationId);
+    }
+
+    @Post('cost-optimization/generate')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Generate AI-powered cost optimization recommendations' })
+    @ApiResponse({ status: 201, description: 'AI-powered cost optimization analysis', type: AIOptimizationAnalysisDto })
+    async generateCostOptimizations(
+        @CurrentUser('companyId') companyId: string,
+        @Body() dto: GenerateCostOptimizationDto,
+    ): Promise<AIOptimizationAnalysisDto> {
+        return this.costOptimizationService.generateOptimizations(companyId, dto);
+    }
+
+    @Patch('cost-optimization/:id/status')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Update cost optimization recommendation status' })
+    @ApiParam({ name: 'id', description: 'Recommendation ID' })
+    @ApiResponse({ status: 200, description: 'Updated recommendation', type: CostOptimizationRecommendationDto })
+    async updateCostOptimizationStatus(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') recommendationId: string,
+        @Body() dto: UpdateOptimizationStatusDto,
+    ): Promise<CostOptimizationRecommendationDto> {
+        return this.costOptimizationService.updateStatus(companyId, recommendationId, dto);
+    }
+
+    @Delete('cost-optimization/:id')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'Delete a cost optimization recommendation' })
+    @ApiParam({ name: 'id', description: 'Recommendation ID' })
+    @ApiResponse({ status: 200, description: 'Recommendation deleted successfully' })
+    async deleteCostOptimization(
+        @CurrentUser('companyId') companyId: string,
+        @Param('id') recommendationId: string,
+    ): Promise<void> {
+        return this.costOptimizationService.deleteRecommendation(companyId, recommendationId);
     }
 }

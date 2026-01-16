@@ -6,6 +6,7 @@ import { ScheduleOptimizerService } from './services/schedule-optimizer.service'
 import { CoverageAnalyzerService } from './services/coverage-analyzer.service';
 import { CoverageGapAlertService } from './services/coverage-gap-alert.service';
 import { BusinessMetricsService } from './services/business-metrics.service';
+import { CostOptimizationService } from './services/cost-optimization.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -20,6 +21,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         CoverageAnalyzerService,
         CoverageGapAlertService,
         BusinessMetricsService,
+        CostOptimizationService,
     ],
     exports: [
         WorkforcePlanningService,
@@ -28,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         CoverageAnalyzerService,
         CoverageGapAlertService,
         BusinessMetricsService,
+        CostOptimizationService,
     ],
 })
 export class WorkforcePlanningModule {}
