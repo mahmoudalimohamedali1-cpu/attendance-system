@@ -3,23 +3,23 @@
   "spec": "020-predictive-workforce-planning",
   "state": "building",
   "subtasks": {
-    "completed": 4,
+    "completed": 7,
     "total": 16,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Backend API & Services",
+    "current": "Frontend Dashboard",
     "id": null,
-    "total": 7
+    "total": 6
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 6,
+    "number": 9,
     "started_at": "2026-01-16T12:02:31.236718"
   },
-  "last_update": "2026-01-16T12:21:16.858444"
+  "last_update": "2026-01-16T12:31:49.364981"
 }
