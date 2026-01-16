@@ -64,6 +64,7 @@ const EmployeeTrackingPage = lazy(() => import('./pages/tracking/EmployeeTrackin
 const OrgStructurePage = lazy(() => import('./pages/org-structure/OrgStructurePage'));
 const WorkforcePlanningDashboard = lazy(() => import('./pages/workforce-planning/WorkforcePlanningDashboard'));
 const ForecastView = lazy(() => import('./pages/workforce-planning/ForecastView'));
+const ScheduleOptimizer = lazy(() => import('./pages/workforce-planning/ScheduleOptimizer'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -368,6 +369,11 @@ function App() {
             <Route path="forecast" element={
               <Suspense fallback={<PageLoader />}>
                 <ForecastView />
+              </Suspense>
+            } />
+            <Route path="optimize" element={
+              <Suspense fallback={<PageLoader />}>
+                <ScheduleOptimizer />
               </Suspense>
             } />
           </Route>
