@@ -19,6 +19,7 @@ import {
     WorkOutline,
     CheckCircle,
     Cancel,
+    Flag,
 } from '@mui/icons-material';
 
 interface ProfileHeaderProps {
@@ -198,7 +199,8 @@ export const ProfileHeader = ({
                                     )}
                                     {profile.isSaudi !== undefined && (
                                         <Chip
-                                            label={profile.isSaudi ? '🇸🇦 سعودي' : profile.nationality || 'غير سعودي'}
+                                            icon={profile.isSaudi ? <Flag /> : undefined}
+                                            label={profile.isSaudi ? 'سعودي' : profile.nationality || 'غير سعودي'}
                                             variant="outlined"
                                             size="small"
                                             color={profile.isSaudi ? 'success' : 'default'}
