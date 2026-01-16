@@ -145,13 +145,10 @@ export class ComplianceWarningsService {
                 },
                 OR: [
                     { qiwaStatus: 'NOT_SUBMITTED' },
-                    { qiwaStatus: null },
+                    { qiwaStatus: { equals: null as any } },
                 ],
             },
-            select: {
-                id: true,
-                contractNumber: true,
-                endDate: true,
+            include: {
                 user: {
                     select: {
                         firstName: true,
@@ -198,7 +195,7 @@ export class ComplianceWarningsService {
                 status: 'ACTIVE',
                 OR: [
                     { qiwaStatus: 'NOT_SUBMITTED' },
-                    { qiwaStatus: null },
+                    { qiwaStatus: { equals: null as any } },
                 ],
             },
             select: {

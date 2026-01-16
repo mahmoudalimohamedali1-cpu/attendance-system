@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { QiwaAuthStatus } from '@prisma/client';
 
 export interface QiwaContractExport {
     contractNumber: string;
@@ -334,7 +335,7 @@ export class QiwaService {
         const updatedContract = await this.prisma.contract.update({
             where: { id: contractId },
             data: {
-                qiwaStatus: qiwaStatus.status,
+                qiwaStatus: qiwaStatus.status as QiwaAuthStatus,
                 ...(qiwaStatus.status === 'AUTHENTICATED' && contract.status === 'PENDING_QIWA' && {
                     status: 'ACTIVE',
                 }),
