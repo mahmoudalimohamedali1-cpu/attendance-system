@@ -66,6 +66,7 @@ const WorkforcePlanningDashboard = lazy(() => import('./pages/workforce-planning
 const ForecastView = lazy(() => import('./pages/workforce-planning/ForecastView'));
 const ScheduleOptimizer = lazy(() => import('./pages/workforce-planning/ScheduleOptimizer'));
 const ScenarioModeling = lazy(() => import('./pages/workforce-planning/ScenarioModeling'));
+const CoverageAnalysisPage = lazy(() => import('./pages/workforce-planning/CoverageAnalysisPage'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -380,6 +381,11 @@ function App() {
             <Route path="scenarios" element={
               <Suspense fallback={<PageLoader />}>
                 <ScenarioModeling />
+              </Suspense>
+            } />
+            <Route path="coverage" element={
+              <Suspense fallback={<PageLoader />}>
+                <CoverageAnalysisPage />
               </Suspense>
             } />
           </Route>
