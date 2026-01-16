@@ -49,6 +49,8 @@ import {
     CalendarMonth,
     Business,
     Group,
+    Groups,
+    Flag,
 } from '@mui/icons-material';
 import { api, API_URL } from '@/services/api.service';
 import { useNavigate } from 'react-router-dom';
@@ -1003,8 +1005,8 @@ export const PayrollWizardPage = () => {
                                 {/* Branch Distribution */}
                                 {previewData.byBranch.length > 1 && (
                                     <Box sx={{ mb: 3 }}>
-                                        <Typography variant="subtitle2" gutterBottom fontWeight="bold">
-                                            📊 توزيع حسب الفرع
+                                        <Typography variant="subtitle2" gutterBottom fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
+                                            <Assessment fontSize="small" color="primary" /> توزيع حسب الفرع
                                         </Typography>
                                         <Grid container spacing={1}>
                                             {previewData.byBranch.map((branch, idx) => (
@@ -1023,8 +1025,8 @@ export const PayrollWizardPage = () => {
 
                                 {/* Employee Table Header */}
                                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                                    <Typography variant="subtitle1" fontWeight="bold">
-                                        👥 تفاصيل الموظفين ({previewData.employees?.filter(e => !excludedEmployees.has(e.id)).length || previewData.totalEmployees})
+                                    <Typography variant="subtitle1" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
+                                        <Groups color="primary" /> تفاصيل الموظفين ({previewData.employees?.filter(e => !excludedEmployees.has(e.id)).length || previewData.totalEmployees})
                                         {excludedEmployees.size > 0 && (
                                             <Chip
                                                 label={`${excludedEmployees.size} مستثنى`}
@@ -1118,8 +1120,8 @@ export const PayrollWizardPage = () => {
                                                                             <Typography variant="body2" fontWeight={500}>
                                                                                 {emp.name}
                                                                             </Typography>
-                                                                            <Typography variant="caption" color="text.secondary">
-                                                                                {emp.employeeCode} {emp.isSaudi && '🇸🇦'}
+                                                                            <Typography variant="caption" color="text.secondary" display="flex" alignItems="center" gap={0.5}>
+                                                                                {emp.employeeCode} {emp.isSaudi && <Flag fontSize="small" color="success" />}
                                                                             </Typography>
                                                                         </Box>
                                                                     </Box>
