@@ -39,20 +39,29 @@ import {
     Info as InfoIcon,
     Science as TestIcon,
     Preview as PreviewIcon,
+    AccessTime,
+    BeachAccess,
+    Business,
+    Payments,
+    Cake,
+    Description,
+    Warning,
+    Assessment,
+    Build,
 } from '@mui/icons-material';
 import { smartPoliciesService, SmartPolicy, ParsedPolicyRule, SmartPolicyStatus } from '../../services/smart-policies.service';
 
 // ترجمة الـ trigger events
-const triggerEventLabels: Record<string, string> = {
-    ATTENDANCE: '🕐 الحضور والانصراف',
-    LEAVE: '🏖️ الإجازات',
-    CUSTODY: '📦 العهد',
-    PAYROLL: '💰 الرواتب',
-    ANNIVERSARY: '🎂 ذكرى التوظيف',
-    CONTRACT: '📄 العقود',
-    DISCIPLINARY: '⚠️ الجزاءات',
-    PERFORMANCE: '📊 الأداء',
-    CUSTOM: '🔧 مخصص',
+const triggerEventLabels: Record<string, { icon: JSX.Element; text: string }> = {
+    ATTENDANCE: { icon: <AccessTime fontSize="small" />, text: 'الحضور والانصراف' },
+    LEAVE: { icon: <BeachAccess fontSize="small" />, text: 'الإجازات' },
+    CUSTODY: { icon: <Business fontSize="small" />, text: 'العهد' },
+    PAYROLL: { icon: <Payments fontSize="small" />, text: 'الرواتب' },
+    ANNIVERSARY: { icon: <Cake fontSize="small" />, text: 'ذكرى التوظيف' },
+    CONTRACT: { icon: <Description fontSize="small" />, text: 'العقود' },
+    DISCIPLINARY: { icon: <Warning fontSize="small" />, text: 'الجزاءات' },
+    PERFORMANCE: { icon: <Assessment fontSize="small" />, text: 'الأداء' },
+    CUSTOM: { icon: <Build fontSize="small" />, text: 'مخصص' },
 };
 
 // ترجمة حالات السياسة
@@ -235,8 +244,9 @@ export default function SmartPoliciesPage() {
             <Box sx={{ mb: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Box>
-                        <Typography variant="h4" fontWeight="bold" gutterBottom>
-                            🤖 السياسات الذكية
+                        <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <SparkleIcon sx={{ fontSize: 36 }} color="primary" />
+                            السياسات الذكية
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
                             اكتب السياسة بالعربي والذكاء الاصطناعي هيفهمها ويطبقها تلقائياً
@@ -340,7 +350,8 @@ export default function SmartPoliciesPage() {
                                                 {policy.name || 'سياسة بدون اسم'}
                                             </Typography>
                                             <Chip
-                                                label={triggerEventLabels[policy.triggerEvent] || policy.triggerEvent}
+                                                icon={triggerEventLabels[policy.triggerEvent]?.icon}
+                                                label={triggerEventLabels[policy.triggerEvent]?.text || policy.triggerEvent}
                                                 size="small"
                                                 sx={{ mt: 0.5 }}
                                             />
@@ -504,7 +515,8 @@ export default function SmartPoliciesPage() {
                                         <Grid item xs={12}>
                                             <Typography variant="subtitle2" color="text.secondary">الحدث المُفعِّل:</Typography>
                                             <Chip
-                                                label={triggerEventLabels[parsedRule.trigger.event] || parsedRule.trigger.event}
+                                                icon={triggerEventLabels[parsedRule.trigger.event]?.icon}
+                                                label={triggerEventLabels[parsedRule.trigger.event]?.text || parsedRule.trigger.event}
                                                 color="primary"
                                             />
                                         </Grid>
@@ -605,7 +617,11 @@ export default function SmartPoliciesPage() {
 
                                 <Grid item xs={6}>
                                     <Typography variant="subtitle2" color="text.secondary">الحدث المُفعِّل:</Typography>
-                                    <Chip label={triggerEventLabels[selectedPolicy.triggerEvent]} color="primary" />
+                                    <Chip
+                                        icon={triggerEventLabels[selectedPolicy.triggerEvent]?.icon}
+                                        label={triggerEventLabels[selectedPolicy.triggerEvent]?.text || selectedPolicy.triggerEvent}
+                                        color="primary"
+                                    />
                                 </Grid>
 
                                 <Grid item xs={6}>
