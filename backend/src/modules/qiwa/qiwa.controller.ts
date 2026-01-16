@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Request, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -43,6 +43,13 @@ export class QiwaController {
     @ApiOperation({ summary: 'العقود التي تحتاج إجراء (انتهاء قريب)' })
     getActionsRequired(@Request() req: any) {
         return this.qiwaService.getContractsRequiringAction(req.user.companyId);
+    }
+
+    @Post('contracts/register')
+    @RequirePermission('QIWA_REGISTER')
+    @ApiOperation({ summary: 'تسجيل عقد في منصة قوى' })
+    registerContract(@Request() req: any, @Body() body: { contractId: string }) {
+        return this.qiwaService.registerContract(body.contractId, req.user.companyId, req.user.userId);
     }
 }
 

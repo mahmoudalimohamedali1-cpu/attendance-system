@@ -5,9 +5,10 @@ import { QiwaService } from './qiwa.service';
 import { QiwaApiService } from './services/qiwa-api.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-    imports: [PrismaModule, PermissionsModule, ConfigModule],
+    imports: [PrismaModule, PermissionsModule, AuditModule, ConfigModule],
     controllers: [QiwaController],
     providers: [QiwaService, QiwaApiService],
     exports: [QiwaService, QiwaApiService],
