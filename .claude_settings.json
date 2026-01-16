@@ -11,6 +11,7 @@
       "Edit(./**)",
       "Glob(./**)",
       "Grep(./**)",
+<<<<<<< HEAD
       "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\019-implement-company-timezone-loading/**)",
       "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\019-implement-company-timezone-loading/**)",
       "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\019-implement-company-timezone-loading/**)",
@@ -19,6 +20,16 @@
       "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\019-implement-company-timezone-loading\\.auto-claude\\specs\\019-implement-company-timezone-loading/**)",
       "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\019-implement-company-timezone-loading\\.auto-claude\\specs\\019-implement-company-timezone-loading/**)",
       "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\019-implement-company-timezone-loading\\.auto-claude\\specs\\019-implement-company-timezone-loading/**)",
+=======
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Glob(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Grep(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification/**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification\\.auto-claude\\specs\\011-complete-google-play-integrity-api-verification/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification\\.auto-claude\\specs\\011-complete-google-play-integrity-api-verification/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\011-complete-google-play-integrity-api-verification\\.auto-claude\\specs\\011-complete-google-play-integrity-api-verification/**)",
+>>>>>>> origin/auto-claude/011-complete-google-play-integrity-api-verification
       "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
       "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
       "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude/**)",
