@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, Avatar, AvatarGroup, Chip } from '@mui/material';
+import { People } from '@mui/icons-material';
 import { GlassCard, PulseIndicator } from '@/components/premium';
 
 interface TeamMember {
@@ -37,7 +38,7 @@ const statusColors = {
  */
 export const TeamAvailability: React.FC<TeamAvailabilityProps> = ({
     members,
-    title = '👥 حالة الفريق',
+    title,
     maxVisible = 6,
 }) => {
     const onlineCount = members.filter((m) => m.status === 'online').length;
@@ -57,9 +58,12 @@ export const TeamAvailability: React.FC<TeamAvailabilityProps> = ({
     return (
         <GlassCard sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6" fontWeight="bold">
-                    {title}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <People />
+                    <Typography variant="h6" fontWeight="bold">
+                        {title || 'حالة الفريق'}
+                    </Typography>
+                </Box>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <Chip
                         size="small"
