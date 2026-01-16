@@ -693,7 +693,7 @@ export class AttendanceService {
               department: { select: { name: true } },
             },
           },
-          branch: { select: { name: true } },
+          branch: { select: { name: true, timezone: true } },
         },
         orderBy: { date: 'desc' },
         skip: (page - 1) * limit,
