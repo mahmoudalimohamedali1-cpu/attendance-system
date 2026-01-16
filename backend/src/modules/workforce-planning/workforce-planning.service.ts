@@ -8,7 +8,9 @@ import {
     ScenarioResponseDto,
     ScenarioImpactAnalysis,
     ScenarioType,
+    ScenarioStatus,
 } from './dto/scenario.dto';
+import { ScenarioQueryDto } from './dto/scenario-query.dto';
 
 @Injectable()
 export class WorkforcePlanningService {
@@ -36,6 +38,66 @@ export class WorkforcePlanningService {
         };
 
         return this.demandForecastingService.generateForecast(companyId, requestDto);
+    }
+
+    /**
+     * Get all what-if scenarios for a company
+     */
+    async getScenarios(companyId: string, query: ScenarioQueryDto): Promise<ScenarioResponseDto[]> {
+        this.logger.debug(`Fetching scenarios for company ${companyId} with filters: ${JSON.stringify(query)}`);
+
+        const where: any = { companyId };
+
+        if (query.type) {
+            where.type = query.type;
+        }
+
+        if (query.status) {
+            where.status = query.status;
+        }
+
+        const scenarios = await this.prisma.whatIfScenario.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+        });
+
+        return scenarios.map((scenario) => this.mapScenarioDbToResponse(scenario));
+    }
+
+    /**
+     * Map database scenario to response DTO (for list endpoints)
+     */
+    private mapScenarioDbToResponse(scenario: any): ScenarioResponseDto {
+        const impact: ScenarioImpactAnalysis = {
+            baselineCost: Number(scenario.baselineCost) || 0,
+            projectedCost: Number(scenario.projectedCost) || 0,
+            costDifference: Number(scenario.costDifference) || 0,
+            costChangePercentage: scenario.baselineCost
+                ? ((Number(scenario.costDifference) / Number(scenario.baselineCost)) * 100)
+                : 0,
+            baselineCoverage: Number(scenario.baselineCoverage) || 0,
+            projectedCoverage: Number(scenario.projectedCoverage) || 0,
+            coverageChange: (Number(scenario.projectedCoverage) || 0) - (Number(scenario.baselineCoverage) || 0),
+            impactAnalysis: scenario.impactAnalysis || '',
+            risks: scenario.risks ? scenario.risks.split('\n').filter((r: string) => r.trim()) : [],
+            benefits: scenario.benefits ? scenario.benefits.split('\n').filter((b: string) => b.trim()) : [],
+            aiInsights: scenario.aiInsights || '',
+        };
+
+        return {
+            id: scenario.id,
+            companyId: scenario.companyId,
+            name: scenario.name,
+            description: scenario.description,
+            type: scenario.type as ScenarioType,
+            status: scenario.status as ScenarioStatus,
+            startDate: scenario.startDate.toISOString().split('T')[0],
+            endDate: scenario.endDate.toISOString().split('T')[0],
+            parameters: scenario.parameters as any,
+            impact,
+            createdAt: scenario.createdAt,
+            createdBy: scenario.createdBy,
+        };
     }
 
     /**

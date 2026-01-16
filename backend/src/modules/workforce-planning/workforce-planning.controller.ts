@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { WorkforcePlanningService } from './workforce-planning.service';
 import { DemandForecastingService } from './services/demand-forecasting.service';
 import { ScheduleOptimizerService } from './services/schedule-optimizer.service';
@@ -8,6 +8,7 @@ import { ForecastRequestDto, ForecastResponseDto } from './dto/forecast.dto';
 import { OptimizeScheduleRequestDto, OptimizeScheduleResponseDto } from './dto/schedule-optimization.dto';
 import { CoverageAnalysisRequestDto, CoverageAnalysisResponseDto } from './dto/coverage-analysis.dto';
 import { CreateScenarioRequestDto, ScenarioResponseDto } from './dto/scenario.dto';
+import { ScenarioQueryDto } from './dto/scenario-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -77,6 +78,17 @@ export class WorkforcePlanningController {
             departmentId,
         };
         return this.coverageAnalyzerService.analyzeCoverage(companyId, requestDto);
+    }
+
+    @Get('scenarios')
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'List all what-if scenarios for a company' })
+    @ApiResponse({ status: 200, description: 'List of scenarios', type: [ScenarioResponseDto] })
+    async getScenarios(
+        @CurrentUser('companyId') companyId: string,
+        @Query() query: ScenarioQueryDto,
+    ): Promise<ScenarioResponseDto[]> {
+        return this.service.getScenarios(companyId, query);
     }
 
     @Post('scenario')
