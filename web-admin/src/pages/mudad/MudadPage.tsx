@@ -51,10 +51,17 @@ import {
     Search,
     Add,
     ArrowForward,
+    TableChart,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api.service';
+import { API_CONFIG } from '@/config/api';
 import { format } from 'date-fns';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
+import 'dayjs/locale/ar';
 
 // PayrollRun type for selection
 interface PayrollRun {
@@ -167,6 +174,12 @@ export default function MudadPage() {
     const [yearFilter, setYearFilter] = useState(new Date().getFullYear());
     const [statusFilter, setStatusFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [startDate, setStartDate] = useState<Dayjs | null>(() => {
+        return dayjs().startOf('month');
+    });
+    const [endDate, setEndDate] = useState<Dayjs | null>(() => {
+        return dayjs();
+    });
 
     // Fetch submissions
     const { data: submissions, isLoading } = useQuery<MudadSubmission[]>({
@@ -288,6 +301,26 @@ export default function MudadPage() {
         navigator.clipboard.writeText(hash);
     };
 
+    const handleExportExcel = async () => {
+        try {
+            const startDateStr = startDate?.format('YYYY-MM-DD') || '';
+            const endDateStr = endDate?.format('YYYY-MM-DD') || '';
+            const response = await fetch(`${API_CONFIG.BASE_URL}/mudad/export/excel?startDate=${startDateStr}&endDate=${endDateStr}&status=${statusFilter}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                },
+            });
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mudad-report-${startDateStr}-${endDateStr}.xlsx`;
+            a.click();
+        } catch (err) {
+            // Export failed
+        }
+    };
+
     const filteredSubmissions = submissions?.filter(s => {
         if (!searchQuery) return true;
         return s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -307,6 +340,13 @@ export default function MudadPage() {
                     </Typography>
                 </Box>
                 <Box display="flex" gap={2}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<TableChart />}
+                        onClick={handleExportExcel}
+                    >
+                        تصدير Excel
+                    </Button>
                     <Button
                         variant="outlined"
                         startIcon={<Refresh />}
@@ -370,44 +410,62 @@ export default function MudadPage() {
 
             {/* Filters */}
             <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-                <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} sm={3}>
-                        <FormControl fullWidth size="small">
-                            <InputLabel>السنة</InputLabel>
-                            <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value as number)} label="السنة">
-                                {[2024, 2025, 2026].map(y => (
-                                    <MenuItem key={y} value={y}>{y}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ar">
+                    <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} sm={6} md={3}>
+                            <DatePicker
+                                label="من تاريخ"
+                                value={startDate}
+                                onChange={(newValue) => setStartDate(newValue)}
+                                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                            <DatePicker
+                                label="إلى تاريخ"
+                                value={endDate}
+                                onChange={(newValue) => setEndDate(newValue)}
+                                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={4} md={2}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>السنة</InputLabel>
+                                <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value as number)} label="السنة">
+                                    {[2024, 2025, 2026].map(y => (
+                                        <MenuItem key={y} value={y}>{y}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={4} md={2}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>الحالة</InputLabel>
+                                <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="الحالة">
+                                    <MenuItem value="">الكل</MenuItem>
+                                    <MenuItem value="PENDING">قيد الانتظار</MenuItem>
+                                    <MenuItem value="PREPARED">تم التجهيز</MenuItem>
+                                    <MenuItem value="SUBMITTED">تم الإرسال</MenuItem>
+                                    <MenuItem value="ACCEPTED">مقبول</MenuItem>
+                                    <MenuItem value="REJECTED">مرفوض</MenuItem>
+                                    <MenuItem value="RESUBMIT_REQUIRED">إعادة إرسال</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={12} sm={4} md={2}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="بحث بالمعرف..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start"><Search /></InputAdornment>
+                                }}
+                            />
+                        </Grid>
                     </Grid>
-                    <Grid item xs={12} sm={3}>
-                        <FormControl fullWidth size="small">
-                            <InputLabel>الحالة</InputLabel>
-                            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="الحالة">
-                                <MenuItem value="">الكل</MenuItem>
-                                <MenuItem value="PENDING">قيد الانتظار</MenuItem>
-                                <MenuItem value="PREPARED">تم التجهيز</MenuItem>
-                                <MenuItem value="SUBMITTED">تم الإرسال</MenuItem>
-                                <MenuItem value="ACCEPTED">مقبول</MenuItem>
-                                <MenuItem value="REJECTED">مرفوض</MenuItem>
-                                <MenuItem value="RESUBMIT_REQUIRED">إعادة إرسال</MenuItem>
-                            </Select>
-                        </FormControl>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            placeholder="بحث بالمعرف..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            InputProps={{
-                                startAdornment: <InputAdornment position="start"><Search /></InputAdornment>
-                            }}
-                        />
-                    </Grid>
-                </Grid>
+                </LocalizationProvider>
             </Paper>
 
             {/* Table */}
