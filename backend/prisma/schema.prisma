@@ -452,6 +452,7 @@ model User {
   RoleLevel                 RoleLevel?                   @relation(fields: [roleLevelId], references: [id])
   workFromHome              WorkFromHome[]
   debts                     EmployeeDebtLedger[]         @relation("EmployeeDebts")
+  employeeSkills            EmployeeSkill[]              @relation("EmployeeSkills")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -2539,6 +2540,29 @@ model EmployeeDocument {
   @@index([companyId, type])
   @@index([expiryDate])
   @@map("employee_documents")
+}
+
+model EmployeeSkill {
+  id               String           @id @default(uuid())
+  companyId        String           @map("company_id")
+  userId           String           @map("user_id")
+  skillName        String           @map("skill_name")
+  skillNameAr      String?          @map("skill_name_ar")
+  category         String?
+  proficiencyLevel ProficiencyLevel @default(BEGINNER) @map("proficiency_level")
+  yearsExperience  Int?             @map("years_experience")
+  isVerified       Boolean          @default(false) @map("is_verified")
+  verifiedById     String?          @map("verified_by_id")
+  verifiedAt       DateTime?        @map("verified_at")
+  notes            String?
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  user             User             @relation("EmployeeSkills", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([companyId, category])
+  @@index([skillName])
+  @@map("employee_skills")
 }
 
 model PayrollLedger {
@@ -5717,6 +5741,13 @@ enum DocumentType {
   DRIVING_LICENSE
   QUALIFICATION
   OTHER
+}
+
+enum ProficiencyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
 }
 
 enum OnboardingType {
