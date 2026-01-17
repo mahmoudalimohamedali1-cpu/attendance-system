@@ -26,6 +26,9 @@ import {
     CreateSkillDto,
     UpdateSkillDto,
     ProficiencyLevelEnum,
+    CreateProfileUpdateRequestDto,
+    ReviewProfileUpdateDto,
+    ProfileUpdateRequestQueryDto,
 } from './dto/profile.dto';
 
 @Controller('employee-profile')
@@ -405,6 +408,102 @@ export class EmployeeProfileController {
             user.id,
             skillName,
             minProficiency as any,
+        );
+    }
+
+    // ============ Profile Update Request Endpoints ============
+
+    /**
+     * GET /employee-profile/update-requests/pending
+     * جلب طلبات تحديث البيانات المعلقة (للـ HR/Admin)
+     */
+    @Get('update-requests/pending')
+    async getPendingProfileUpdateRequests(
+        @Query() query: ProfileUpdateRequestQueryDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getPendingProfileUpdateRequests(
+            user.companyId,
+            user.id,
+            query.page ?? 1,
+            query.limit ?? 20,
+        );
+    }
+
+    /**
+     * PATCH /employee-profile/update-requests/:requestId/review
+     * مراجعة طلب تحديث البيانات (موافقة/رفض) - للـ HR/Admin
+     */
+    @Patch('update-requests/:requestId/review')
+    async reviewProfileUpdateRequest(
+        @Param('requestId', ParseUUIDPipe) requestId: string,
+        @Body() dto: ReviewProfileUpdateDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.reviewProfileUpdate(
+            requestId,
+            user.companyId,
+            user.id,
+            dto.status as 'APPROVED' | 'REJECTED',
+            dto.reviewNote,
+            dto.rejectionReason,
+        );
+    }
+
+    /**
+     * DELETE /employee-profile/update-requests/:requestId
+     * إلغاء طلب تحديث البيانات من قبل الموظف
+     */
+    @Delete('update-requests/:requestId')
+    async cancelProfileUpdateRequest(
+        @Param('requestId', ParseUUIDPipe) requestId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.cancelProfileUpdateRequest(
+            requestId,
+            user.id,
+            user.companyId,
+        );
+    }
+
+    /**
+     * GET /employee-profile/:id/update-requests
+     * جلب طلبات تحديث البيانات للموظف
+     */
+    @Get(':id/update-requests')
+    async getMyProfileUpdateRequests(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Query() query: ProfileUpdateRequestQueryDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getMyProfileUpdateRequests(
+            userId,
+            user.companyId,
+            query.status,
+        );
+    }
+
+    /**
+     * POST /employee-profile/:id/update-requests
+     * إنشاء طلب تحديث بيانات جديد
+     */
+    @Post(':id/update-requests')
+    async createProfileUpdateRequest(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Body() dto: CreateProfileUpdateRequestDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.createProfileUpdateRequest(
+            userId,
+            user.companyId,
+            user.id,
+            {
+                fieldName: dto.fieldName,
+                requestedValue: dto.requestedValue,
+                reason: dto.reason,
+                reasonAr: dto.reasonAr,
+                supportingDocuments: dto.supportingDocuments,
+            },
         );
     }
 }
