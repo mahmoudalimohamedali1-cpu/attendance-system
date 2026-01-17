@@ -47,7 +47,6 @@
     "exceljs": "^4.4.0",
     "firebase-admin": "^12.0.0",
     "geolib": "^3.3.4",
-    "googleapis": "^134.0.0",
     "ioredis": "^5.8.2",
     "nodemailer": "^6.10.1",
     "openai": "^6.15.0",
