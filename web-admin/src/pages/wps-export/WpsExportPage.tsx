@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Box,
     Paper,
@@ -37,6 +38,7 @@ import {
     FileDownload as FileIcon,
     Warning as WarningIcon,
     AddCircle as AddIcon,
+    Send as SendIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { api, API_URL } from '@/services/api.service';
@@ -83,8 +85,16 @@ interface EmployeeWithoutBank {
     email?: string;
 }
 
+// Helper function for month names
+const getMonthName = (month: number) => {
+    const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    return months[month - 1] || '';
+};
+
 export default function WpsExportPage() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
     const [selectedRunId, setSelectedRunId] = useState<string>('');
     const [validation, setValidation] = useState<WpsValidation | null>(null);
@@ -96,11 +106,29 @@ export default function WpsExportPage() {
     const [error, setError] = useState<string | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewContent, setPreviewContent] = useState<string>('');
+    const [mudadDialogOpen, setMudadDialogOpen] = useState(false);
 
     useEffect(() => {
         fetchPayrollRuns();
         fetchMissingBank();
     }, []);
+
+    // Create MUDAD submission mutation
+    const createMudadMutation = useMutation({
+        mutationFn: async (data: { payrollRunId: string; month: number; year: number }) => {
+            return api.post('/mudad', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mudad'] });
+            queryClient.invalidateQueries({ queryKey: ['mudad-stats'] });
+            setMudadDialogOpen(false);
+            // Navigate to MUDAD page to see the created submission
+            navigate('/mudad');
+        },
+        onError: (error: any) => {
+            setError(error.response?.data?.message || 'فشل في إنشاء تقديم مُدد');
+        },
+    });
 
     const fetchPayrollRuns = async () => {
         try {
@@ -516,15 +544,38 @@ export default function WpsExportPage() {
                                 </Grid>
 
                                 {summary && summary.recordCount > 0 && (
-                                    <Box textAlign="center" mt={2}>
+                                    <>
+                                        <Box textAlign="center" mt={2}>
+                                            <Button
+                                                variant="text"
+                                                size="small"
+                                                onClick={handlePreview}
+                                            >
+                                                معاينة محتوى الملف
+                                            </Button>
+                                        </Box>
+
+                                        {/* Create MUDAD Submission Button */}
+                                        <Divider sx={{ my: 3 }} />
+                                        <Alert severity="info" sx={{ mb: 2 }}>
+                                            <Typography variant="body2" fontWeight="bold" gutterBottom>
+                                                الخطوة التالية: إنشاء تقديم مُدد
+                                            </Typography>
+                                            <Typography variant="caption">
+                                                بعد تصدير ملف WPS، يمكنك إنشاء تقديم مُدد للإبلاغ عن الأجور لوزارة الموارد البشرية
+                                            </Typography>
+                                        </Alert>
                                         <Button
-                                            variant="text"
-                                            size="small"
-                                            onClick={handlePreview}
+                                            variant="contained"
+                                            color="success"
+                                            startIcon={<SendIcon />}
+                                            onClick={() => setMudadDialogOpen(true)}
+                                            fullWidth
+                                            size="large"
                                         >
-                                            معاينة محتوى الملف
+                                            إنشاء تقديم مُدد
                                         </Button>
-                                    </Box>
+                                    </>
                                 )}
                             </>
                         )}
@@ -599,6 +650,102 @@ export default function WpsExportPage() {
                     <Button onClick={() => setPreviewOpen(false)}>إغلاق</Button>
                     <Button variant="contained" onClick={() => handleDownload('csv')}>
                         تنزيل الملف
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Create MUDAD Submission Dialog */}
+            <Dialog open={mudadDialogOpen} onClose={() => setMudadDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <SendIcon color="success" />
+                        إنشاء تقديم مُدد
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {selectedRunId && payrollRuns.length > 0 && (() => {
+                        const selectedRun = payrollRuns.find(r => r.id === selectedRunId);
+                        return selectedRun ? (
+                            <>
+                                <Alert severity="info" sx={{ mb: 3 }}>
+                                    سيتم إنشاء تقديم مُدد لدورة الرواتب التالية:
+                                </Alert>
+                                <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                الفترة
+                                            </Typography>
+                                            <Typography variant="h6" fontWeight="bold">
+                                                {getMonthName(selectedRun.period.month)} {selectedRun.period.year}
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                تاريخ البداية
+                                            </Typography>
+                                            <Typography variant="body1">
+                                                {new Date(selectedRun.period.startDate).toLocaleDateString('ar-SA')}
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                تاريخ النهاية
+                                            </Typography>
+                                            <Typography variant="body1">
+                                                {new Date(selectedRun.period.endDate).toLocaleDateString('ar-SA')}
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={6}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                حالة الدورة
+                                            </Typography>
+                                            <Chip label={selectedRun.status} size="small" color="success" />
+                                        </Grid>
+                                        {selectedRun._count?.payslips && (
+                                            <Grid item xs={6}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    عدد الموظفين
+                                                </Typography>
+                                                <Typography variant="body1" fontWeight="bold">
+                                                    {selectedRun._count.payslips}
+                                                </Typography>
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </Paper>
+                                <Alert severity="warning" sx={{ mt: 2 }}>
+                                    <Typography variant="caption">
+                                        تأكد من تصدير ملف WPS قبل إنشاء التقديم
+                                    </Typography>
+                                </Alert>
+                            </>
+                        ) : null;
+                    })()}
+                    {error && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {error}
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setMudadDialogOpen(false)}>إلغاء</Button>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        disabled={!selectedRunId || createMudadMutation.isPending}
+                        onClick={() => {
+                            const selectedRun = payrollRuns.find(r => r.id === selectedRunId);
+                            if (selectedRun) {
+                                createMudadMutation.mutate({
+                                    payrollRunId: selectedRun.id,
+                                    month: selectedRun.period.month,
+                                    year: selectedRun.period.year,
+                                });
+                            }
+                        }}
+                    >
+                        {createMudadMutation.isPending ? 'جارٍ الإنشاء...' : 'إنشاء التقديم'}
                     </Button>
                 </DialogActions>
             </Dialog>
