@@ -81,12 +81,13 @@ model Company {
   geofenceExitEvents   GeofenceExitEvent[]
 
   // نظام الترحيب (Onboarding)
-  onboardingTemplates  OnboardingTemplate[]
-  onboardingProcesses  OnboardingProcess[]
+  onboardingTemplates OnboardingTemplate[]
+  onboardingProcesses OnboardingProcess[]
 
   // التحليلات التنبؤية (AI Predictive Analytics)
-  absencePredictions    AbsencePrediction[]
-  predictionAccuracies  PredictionAccuracy[]
+  absencePredictions   AbsencePrediction[]
+  predictionAccuracies PredictionAccuracy[]
+  absencePatterns      AbsencePattern[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -170,7 +171,7 @@ model PayrollSettings {
   // ========== إعدادات إضافية ==========
   roundSalaryToNearest       Int @default(0) @map("round_salary_to_nearest") // تقريب الراتب (0 = بدون تقريب)
   defaultWorkingDaysPerMonth Int @default(30) @map("default_working_days_per_month")
-  leaveDailyRateDivisor       Int @default(30) @map("leave_daily_rate_divisor") // مقسم الراتب اليومي للإجازات
+  leaveDailyRateDivisor      Int @default(30) @map("leave_daily_rate_divisor") // مقسم الراتب اليومي للإجازات
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1188,8 +1189,8 @@ enum NotificationType {
   DISC_EMP_OBJECTED
   DISC_FINALIZED
   // Location tracking notifications
-  EMP_EXIT_GEOFENCE       // موظف خرج من نطاق الشركة
-  EMP_RETURN_GEOFENCE     // موظف عاد إلى نطاق الشركة
+  EMP_EXIT_GEOFENCE // موظف خرج من نطاق الشركة
+  EMP_RETURN_GEOFENCE // موظف عاد إلى نطاق الشركة
 }
 
 model Notification {
@@ -2239,99 +2240,99 @@ model PolicyRule {
 
 // نوع الحدث المُفعِّل
 enum SmartPolicyTrigger {
-  ATTENDANCE   // حضور، انصراف، تأخير، غياب
-  LEAVE        // طلب إجازة، موافقة، رفض
-  CUSTODY      // تسليم عهدة، إرجاع عهدة
-  PAYROLL      // حساب الرواتب الشهري
-  ANNIVERSARY  // ذكرى توظيف
-  CONTRACT     // بداية/نهاية عقد
+  ATTENDANCE // حضور، انصراف، تأخير، غياب
+  LEAVE // طلب إجازة، موافقة، رفض
+  CUSTODY // تسليم عهدة، إرجاع عهدة
+  PAYROLL // حساب الرواتب الشهري
+  ANNIVERSARY // ذكرى توظيف
+  CONTRACT // بداية/نهاية عقد
   DISCIPLINARY // مخالفة، تحقيق
-  PERFORMANCE  // أداء
-  CUSTOM       // أي حدث آخر
+  PERFORMANCE // أداء
+  CUSTOM // أي حدث آخر
 }
 
 // حالة السياسة الذكية
 enum SmartPolicyStatus {
-  DRAFT       // مسودة (لم تُراجع بعد)
-  PENDING     // بانتظار الموافقة
-  ACTIVE      // مفعّلة
-  PAUSED      // موقوفة مؤقتاً
-  ARCHIVED    // مؤرشفة
+  DRAFT // مسودة (لم تُراجع بعد)
+  PENDING // بانتظار الموافقة
+  ACTIVE // مفعّلة
+  PAUSED // موقوفة مؤقتاً
+  ARCHIVED // مؤرشفة
 }
 
 // نوع الإجراء
 enum SmartPolicyActionType {
-  ADD_TO_PAYROLL       // إضافة مبلغ للراتب
-  DEDUCT_FROM_PAYROLL  // خصم من الراتب
-  SEND_NOTIFICATION    // إرسال إشعار
-  ALERT_HR             // تنبيه الموارد البشرية
-  CREATE_RECORD        // إنشاء سجل
+  ADD_TO_PAYROLL // إضافة مبلغ للراتب
+  DEDUCT_FROM_PAYROLL // خصم من الراتب
+  SEND_NOTIFICATION // إرسال إشعار
+  ALERT_HR // تنبيه الموارد البشرية
+  CREATE_RECORD // إنشاء سجل
 }
 
 model SmartPolicy {
-  id          String   @id @default(uuid())
-  companyId   String   @map("company_id")
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   // النص الأصلي (ما كتبه المستخدم بالعربي/العامية)
   originalText String @map("original_text") @db.Text
-  
+
   // اسم السياسة (اختياري - يُستخرج من الـ AI أو يُدخله المستخدم)
   name        String?
   description String? @db.Text
-  
+
   // الحدث المُفعِّل
   triggerEvent    SmartPolicyTrigger @map("trigger_event")
   triggerSubEvent String?            @map("trigger_sub_event") // مثال: RETURNED, APPROVED
-  
+
   // القاعدة المحللة بالذكاء الاصطناعي (JSON كامل)
   parsedRule Json @map("parsed_rule")
-  
+
   // الشروط المحللة (للبحث السريع)
   conditions Json @default("[]")
-  
+
   // الإجراءات المحللة
   actions Json @default("[]")
-  
+
   // النطاق: لمن تُطبق السياسة
-  scopeType   String  @default("ALL") @map("scope_type") // ALL, EMPLOYEE, DEPARTMENT, BRANCH, JOB_TITLE
-  scopeId     String? @map("scope_id")     // معرف الهدف (إن وُجد)
-  scopeName   String? @map("scope_name")   // اسم الهدف (للعرض)
-  
+  scopeType String  @default("ALL") @map("scope_type") // ALL, EMPLOYEE, DEPARTMENT, BRANCH, JOB_TITLE
+  scopeId   String? @map("scope_id") // معرف الهدف (إن وُجد)
+  scopeName String? @map("scope_name") // اسم الهدف (للعرض)
+
   // الحالة والتفعيل
   status   SmartPolicyStatus @default(DRAFT)
   isActive Boolean           @default(false) @map("is_active")
-  
+
   // الأولوية (الأعلى تُنفذ أولاً)
   priority Int @default(0)
-  
+
   // تاريخ الصلاحية
   effectiveFrom DateTime? @map("effective_from")
   effectiveTo   DateTime? @map("effective_to")
-  
+
   // شرح الـ AI للقاعدة (بالعربي)
   aiExplanation String? @map("ai_explanation") @db.Text
-  
+
   // هل الـ AI طلب توضيح؟
   clarificationNeeded String? @map("clarification_needed") @db.Text
-  
+
   // إحصائيات التنفيذ
   executionCount    Int       @default(0) @map("execution_count")
   lastExecutedAt    DateTime? @map("last_executed_at")
   totalAmountPaid   Decimal   @default(0) @map("total_amount_paid") @db.Decimal(12, 2)
   totalAmountDeduct Decimal   @default(0) @map("total_amount_deduct") @db.Decimal(12, 2)
-  
+
   // من أنشأها وراجعها
   createdById  String?   @map("created_by_id")
   approvedById String?   @map("approved_by_id")
   approvedAt   DateTime? @map("approved_at")
-  
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  
+
   // سجل التنفيذات
   executions SmartPolicyExecution[]
-  
+
   @@index([companyId, status, isActive])
   @@index([companyId, triggerEvent])
   @@index([status, isActive])
@@ -2343,34 +2344,34 @@ model SmartPolicyExecution {
   id       String      @id @default(uuid())
   policyId String      @map("policy_id")
   policy   SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  
+
   // الموظف المتأثر
   employeeId   String @map("employee_id")
   employeeName String @map("employee_name")
-  
+
   // الحدث الذي أطلق التنفيذ
   triggerEvent    String  @map("trigger_event")
   triggerSubEvent String? @map("trigger_sub_event")
   triggerData     Json?   @map("trigger_data") // بيانات الحدث (مثل: تاريخ إرجاع العهدة)
-  
+
   // نتيجة فحص الشروط
   conditionsMet Boolean @map("conditions_met")
   conditionsLog Json?   @map("conditions_log") // تفاصيل فحص كل شرط
-  
+
   // الإجراء المُنفذ
   actionType   String?  @map("action_type") // ADD_TO_PAYROLL, DEDUCT_FROM_PAYROLL, etc.
   actionValue  Decimal? @map("action_value") @db.Decimal(10, 2)
   actionResult Json?    @map("action_result") // نتيجة الإجراء
-  
+
   // هل نجح التنفيذ؟
   isSuccess    Boolean @map("is_success")
   errorMessage String? @map("error_message") @db.Text
-  
+
   // ربط بالراتب (إن وُجد)
   payrollPeriod String? @map("payroll_period") // YYYY-MM
-  
+
   executedAt DateTime @default(now()) @map("executed_at")
-  
+
   @@index([policyId, executedAt])
   @@index([employeeId, executedAt])
   @@index([triggerEvent])
@@ -3288,10 +3289,10 @@ model PayrollLedger {
   totalGross     Decimal @default(0) @map("total_gross") @db.Decimal(12, 2)
   totalDeduction Decimal @default(0) @map("total_deduction") @db.Decimal(12, 2)
   totalNet       Decimal @default(0) @map("total_net") @db.Decimal(12, 2)
-  
+
   // Employer Cost (Taxes, GOSI, Benefits)
   totalEmployerContribution Decimal @default(0) @map("total_employer_contribution") @db.Decimal(12, 2)
-  
+
   status String @default("DRAFT") // DRAFT, POSTED, REVERSED
 
   entries JournalEntry[]
@@ -3307,14 +3308,14 @@ model JournalEntry {
   ledgerId String        @map("ledger_id")
   ledger   PayrollLedger @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
 
-  accountCode String  @map("account_code") // e.g., 5101 (Basic Salary Account)
-  accountName String  @map("account_name")
-  
+  accountCode String @map("account_code") // e.g., 5101 (Basic Salary Account)
+  accountName String @map("account_name")
+
   debit  Decimal @default(0) @db.Decimal(12, 2)
   credit Decimal @default(0) @db.Decimal(12, 2)
 
   description String?
-  
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("payroll_journal_entries")
@@ -3330,20 +3331,20 @@ model EmployeeLocationLog {
   userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id])
 
-  latitude   Decimal  @db.Decimal(10, 8)
-  longitude  Decimal  @db.Decimal(11, 8)
-  accuracy   Float?   // دقة GPS بالمتر
-  
+  latitude  Decimal @db.Decimal(10, 8)
+  longitude Decimal @db.Decimal(11, 8)
+  accuracy  Float? // دقة GPS بالمتر
+
   // حالة الموقع
   isInsideGeofence   Boolean @default(true) @map("is_inside_geofence")
   distanceFromBranch Int?    @map("distance_from_branch") // بالمتر
-  
+
   // معلومات إضافية
   batteryLevel Float?  @map("battery_level")
   deviceInfo   String? @map("device_info")
-  
+
   createdAt DateTime @default(now()) @map("created_at")
-  
+
   @@index([userId, createdAt])
   @@index([companyId, createdAt])
   @@index([userId, isInsideGeofence])
@@ -3359,29 +3360,29 @@ model GeofenceExitEvent {
   user         User       @relation(fields: [userId], references: [id])
   attendanceId String     @map("attendance_id")
   attendance   Attendance @relation(fields: [attendanceId], references: [id])
-  
+
   // موقع الخروج
-  exitLatitude       Decimal  @db.Decimal(10, 8) @map("exit_latitude")
-  exitLongitude      Decimal  @db.Decimal(11, 8) @map("exit_longitude")
-  distanceFromBranch Int      @map("distance_from_branch")
-  
+  exitLatitude       Decimal @map("exit_latitude") @db.Decimal(10, 8)
+  exitLongitude      Decimal @map("exit_longitude") @db.Decimal(11, 8)
+  distanceFromBranch Int     @map("distance_from_branch")
+
   // وقت الخروج والعودة
   exitTime   DateTime  @map("exit_time")
   returnTime DateTime? @map("return_time")
-  
+
   // موقع العودة (اختياري)
-  returnLatitude  Decimal? @db.Decimal(10, 8) @map("return_latitude")
-  returnLongitude Decimal? @db.Decimal(11, 8) @map("return_longitude")
-  
+  returnLatitude  Decimal? @map("return_latitude") @db.Decimal(10, 8)
+  returnLongitude Decimal? @map("return_longitude") @db.Decimal(11, 8)
+
   // مدة الخروج بالدقائق
   durationMinutes Int? @map("duration_minutes")
-  
+
   // هل تم إرسال إشعار؟
   notificationSent Boolean @default(false) @map("notification_sent")
-  
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  
+
   @@index([userId, exitTime])
   @@index([attendanceId])
   @@index([companyId, exitTime])
@@ -3392,9 +3393,9 @@ model GeofenceExitEvent {
 
 // نوع عملية الترحيب
 enum OnboardingType {
-  JOINING      // انضمام موظف جديد
-  OFFBOARDING  // إنهاء خدمة
-  RETURN       // عودة من إجازة طويلة
+  JOINING // انضمام موظف جديد
+  OFFBOARDING // إنهاء خدمة
+  RETURN // عودة من إجازة طويلة
 }
 
 // نوع المسؤول عن المهمة
@@ -3424,18 +3425,18 @@ enum OnboardingTaskStatus {
 
 // قوالب سير العمل للترحيب
 model OnboardingTemplate {
-  id        String   @id @default(uuid())
-  companyId String   @map("company_id")
-  company   Company  @relation(fields: [companyId], references: [id])
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
 
   name        String
-  nameEn      String?  @map("name_en")
+  nameEn      String?        @map("name_en")
   description String?
   type        OnboardingType @default(JOINING)
-  isActive    Boolean  @default(true)
+  isActive    Boolean        @default(true)
 
-  tasks       OnboardingTemplateTask[]
-  processes   OnboardingProcess[]
+  tasks     OnboardingTemplateTask[]
+  processes OnboardingProcess[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3446,18 +3447,18 @@ model OnboardingTemplate {
 
 // مهام القالب
 model OnboardingTemplateTask {
-  id         String   @id @default(uuid())
-  templateId String   @map("template_id")
+  id         String             @id @default(uuid())
+  templateId String             @map("template_id")
   template   OnboardingTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   title       String
-  titleEn     String?  @map("title_en")
+  titleEn     String? @map("title_en")
   description String?
 
-  assigneeType   AssigneeType @default(HR)
-  dueDays        Int          @default(1)  // عدد الأيام من تاريخ البدء
-  priority       Int          @default(1)  // ترتيب الأولوية
-  requiresPhoto  Boolean      @default(false) @map("requires_photo")
+  assigneeType  AssigneeType @default(HR)
+  dueDays       Int          @default(1) // عدد الأيام من تاريخ البدء
+  priority      Int          @default(1) // ترتيب الأولوية
+  requiresPhoto Boolean      @default(false) @map("requires_photo")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -3467,22 +3468,22 @@ model OnboardingTemplateTask {
 
 // عملية الترحيب الفعلية للموظف
 model OnboardingProcess {
-  id        String   @id @default(uuid())
-  companyId String   @map("company_id")
-  company   Company  @relation(fields: [companyId], references: [id])
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id])
 
-  userId     String @map("user_id")
-  user       User   @relation(fields: [userId], references: [id])
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
 
-  templateId String @map("template_id")
+  templateId String             @map("template_id")
   template   OnboardingTemplate @relation(fields: [templateId], references: [id])
 
   type        OnboardingType
   status      OnboardingProcessStatus @default(IN_PROGRESS)
-  startDate   DateTime @default(now()) @map("start_date")
-  completedAt DateTime? @map("completed_at")
+  startDate   DateTime                @default(now()) @map("start_date")
+  completedAt DateTime?               @map("completed_at")
 
-  tasks       OnboardingTask[]
+  tasks OnboardingTask[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3494,25 +3495,25 @@ model OnboardingProcess {
 
 // المهام الفعلية للموظف
 model OnboardingTask {
-  id        String   @id @default(uuid())
-  processId String   @map("process_id")
+  id        String            @id @default(uuid())
+  processId String            @map("process_id")
   process   OnboardingProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
 
   title       String
-  titleEn     String?  @map("title_en")
+  titleEn     String? @map("title_en")
   description String?
 
   assigneeId   String?      @map("assignee_id")
   assigneeType AssigneeType
 
   status      OnboardingTaskStatus @default(PENDING)
-  dueDate     DateTime     @map("due_date")
-  completedAt DateTime?    @map("completed_at")
-  completedBy String?      @map("completed_by")
+  dueDate     DateTime             @map("due_date")
+  completedAt DateTime?            @map("completed_at")
+  completedBy String?              @map("completed_by")
 
   // توثيق بالصورة
-  photoUrl    String?      @map("photo_url")
-  notes       String?
+  photoUrl String? @map("photo_url")
+  notes    String?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3533,11 +3534,11 @@ enum RiskLevel {
 
 // نموذج التنبؤ بالغياب
 model AbsencePrediction {
-  id        String   @id @default(uuid())
-  companyId String   @map("company_id")
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // تاريخ التنبؤ
   predictionDate DateTime @map("prediction_date") @db.Date
@@ -3563,9 +3564,9 @@ model AbsencePrediction {
 // ========== دقة النموذج (Model Accuracy Tracking) ==========
 
 model PredictionAccuracy {
-  id        String   @id @default(uuid())
-  companyId String   @map("company_id")
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // إصدار النموذج
   modelVersion String @map("model_version")
@@ -3588,4 +3589,34 @@ model PredictionAccuracy {
   @@index([companyId, evaluatedAt])
   @@index([modelVersion])
   @@map("prediction_accuracies")
+}
+
+// ========== أنماط الغياب (Absence Patterns) ==========
+
+model AbsencePattern {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // نوع النمط
+  patternType String @map("pattern_type") // MONDAY_ABSENCE, POST_HOLIDAY, SEASONAL, etc.
+
+  // وصف النمط
+  description String @db.Text
+
+  // الموظفون المتأثرون (JSON array of user IDs)
+  affectedEmployees Json @map("affected_employees")
+
+  // مستوى الثقة (0.0000 - 1.0000)
+  confidence Decimal @db.Decimal(5, 4)
+
+  // تاريخ اكتشاف النمط
+  detectedAt DateTime @map("detected_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, detectedAt])
+  @@index([patternType])
+  @@map("absence_patterns")
 }
