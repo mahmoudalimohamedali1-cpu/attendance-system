@@ -100,7 +100,7 @@ export const EmergencyContactsSection = ({ userId }: EmergencyContactsSectionPro
         enabled: !!userId,
     });
 
-    const contacts: EmergencyContact[] = contactsData || [];
+    const contacts: EmergencyContact[] = Array.isArray(contactsData) ? contactsData : [];
 
     // Mutation لإنشاء جهة اتصال
     const createMutation = useMutation({
