@@ -9,6 +9,6 @@ import { MudadValidatorService } from './validators/mudad-validator.service';
     imports: [PrismaModule, forwardRef(() => WpsTrackingModule)],
     controllers: [WpsExportController],
     providers: [WpsExportService, MudadValidatorService],
-    exports: [WpsExportService],
+    exports: [WpsExportService, MudadValidatorService],
 })
 export class WpsExportModule { }

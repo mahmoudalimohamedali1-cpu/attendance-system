@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { MudadStatus, SubmissionEntityType } from '@prisma/client';
 import { StatusLogService } from '../../common/services/status-log.service';
 import { StateMachineService } from '../../common/services/state-machine.service';
+import { MudadValidatorService } from '../wps-export/validators/mudad-validator.service';
 
 interface CreateMudadSubmissionDto {
     payrollRunId: string;
@@ -24,6 +25,7 @@ export class MudadService {
         private prisma: PrismaService,
         private statusLogService: StatusLogService,
         private stateMachineService: StateMachineService,
+        private mudadValidator: MudadValidatorService,
     ) { }
 
     /**
@@ -45,6 +47,20 @@ export class MudadService {
         if (!run) throw new NotFoundException('مسيرة الرواتب غير موجودة');
         if (run.status !== 'LOCKED' && run.status !== 'PAID') {
             throw new BadRequestException('يجب إقفال مسيرة الرواتب قبل التقديم لمُدد');
+        }
+
+        // التحقق من صحة البيانات قبل التقديم لمُدد
+        const validation = await this.mudadValidator.validateForMudad(dto.payrollRunId, companyId);
+
+        if (!validation.readyForSubmission) {
+            const errorMessages = validation.issues
+                .filter(issue => issue.severity === 'ERROR')
+                .map(issue => issue.messageAr || issue.message)
+                .join(', ');
+
+            throw new BadRequestException(
+                `لا يمكن التقديم لمُدد. يوجد ${validation.summary.errors} أخطاء في البيانات: ${errorMessages}`
+            );
         }
 
         // حساب المبلغ الإجمالي وعدد الموظفين
