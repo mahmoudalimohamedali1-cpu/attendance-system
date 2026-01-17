@@ -347,10 +347,11 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     Emitter<ProfileState> emit,
   ) async {
     try {
-      final response = await apiClient.dio.get('/employee-profile/documents');
+      final response = await apiClient.dio.get('/employee-profile/${event.userId}/documents');
 
       if (response.statusCode == 200 && response.data != null) {
-        final documentsData = response.data['data'] as List<dynamic>? ?? [];
+        final data = response.data['data'];
+        final documentsData = (data is Map ? data['documents'] : data) as List<dynamic>? ?? [];
         _cachedDocuments = documentsData
             .map((doc) => _parseProfileDocument(doc as Map<String, dynamic>))
             .toList();
@@ -390,13 +391,13 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           event.filePath,
           filename: event.filePath.split('/').last,
         ),
-        'documentType': event.documentType,
+        'type': event.documentType,
         if (event.title != null) 'title': event.title,
         if (event.expiryDate != null) 'expiryDate': event.expiryDate!.toIso8601String(),
       });
 
       final response = await apiClient.dio.post(
-        '/employee-profile/documents',
+        '/employee-profile/${event.userId}/documents',
         data: formData,
       );
 
@@ -455,7 +456,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
     try {
       final response = await apiClient.dio.delete(
-        '/employee-profile/documents/${event.documentId}',
+        '/employee-profile/${event.userId}/documents/${event.documentId}',
       );
 
       if (response.statusCode == 200) {
@@ -497,7 +498,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     Emitter<ProfileState> emit,
   ) async {
     try {
-      final response = await apiClient.dio.get('/employee-profile/emergency-contacts');
+      final response = await apiClient.dio.get('/employee-profile/${event.userId}/emergency-contacts');
 
       if (response.statusCode == 200 && response.data != null) {
         final contactsData = response.data['data'] as List<dynamic>? ?? [];
@@ -548,7 +549,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
     try {
       final response = await apiClient.dio.post(
-        '/employee-profile/emergency-contacts',
+        '/employee-profile/${event.userId}/emergency-contacts',
         data: {
           'name': event.name,
           'phone': event.phone,
@@ -610,7 +611,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
     try {
       final response = await apiClient.dio.patch(
-        '/employee-profile/emergency-contacts/${event.contactId}',
+        '/employee-profile/${event.userId}/emergency-contacts/${event.contactId}',
         data: {
           'name': event.name,
           'phone': event.phone,
@@ -674,7 +675,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
     try {
       final response = await apiClient.dio.delete(
-        '/employee-profile/emergency-contacts/${event.contactId}',
+        '/employee-profile/${event.userId}/emergency-contacts/${event.contactId}',
       );
 
       if (response.statusCode == 200) {

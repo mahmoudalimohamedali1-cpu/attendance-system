@@ -67,17 +67,24 @@ class ChangePasswordEvent extends ProfileEvent {
 
 /// Event to load profile documents
 class LoadDocumentsEvent extends ProfileEvent {
-  const LoadDocumentsEvent();
+  final String userId;
+
+  const LoadDocumentsEvent({required this.userId});
+
+  @override
+  List<Object?> get props => [userId];
 }
 
 /// Event to upload a document
 class UploadDocumentEvent extends ProfileEvent {
+  final String userId;
   final String filePath;
   final String documentType;
   final String? title;
   final DateTime? expiryDate;
 
   const UploadDocumentEvent({
+    required this.userId,
     required this.filePath,
     required this.documentType,
     this.title,
@@ -85,48 +92,58 @@ class UploadDocumentEvent extends ProfileEvent {
   });
 
   @override
-  List<Object?> get props => [filePath, documentType, title, expiryDate];
+  List<Object?> get props => [userId, filePath, documentType, title, expiryDate];
 }
 
 /// Event to delete a document
 class DeleteDocumentEvent extends ProfileEvent {
+  final String userId;
   final String documentId;
 
-  const DeleteDocumentEvent({required this.documentId});
+  const DeleteDocumentEvent({required this.userId, required this.documentId});
 
   @override
-  List<Object?> get props => [documentId];
+  List<Object?> get props => [userId, documentId];
 }
 
 /// Event to load emergency contacts
 class LoadEmergencyContactsEvent extends ProfileEvent {
-  const LoadEmergencyContactsEvent();
+  final String userId;
+
+  const LoadEmergencyContactsEvent({required this.userId});
+
+  @override
+  List<Object?> get props => [userId];
 }
 
 /// Event to add emergency contact
 class AddEmergencyContactEvent extends ProfileEvent {
+  final String userId;
   final String name;
   final String phone;
   final String relationship;
 
   const AddEmergencyContactEvent({
+    required this.userId,
     required this.name,
     required this.phone,
     required this.relationship,
   });
 
   @override
-  List<Object?> get props => [name, phone, relationship];
+  List<Object?> get props => [userId, name, phone, relationship];
 }
 
 /// Event to update emergency contact
 class UpdateEmergencyContactEvent extends ProfileEvent {
+  final String userId;
   final String contactId;
   final String name;
   final String phone;
   final String relationship;
 
   const UpdateEmergencyContactEvent({
+    required this.userId,
     required this.contactId,
     required this.name,
     required this.phone,
@@ -134,17 +151,18 @@ class UpdateEmergencyContactEvent extends ProfileEvent {
   });
 
   @override
-  List<Object?> get props => [contactId, name, phone, relationship];
+  List<Object?> get props => [userId, contactId, name, phone, relationship];
 }
 
 /// Event to delete emergency contact
 class DeleteEmergencyContactEvent extends ProfileEvent {
+  final String userId;
   final String contactId;
 
-  const DeleteEmergencyContactEvent({required this.contactId});
+  const DeleteEmergencyContactEvent({required this.userId, required this.contactId});
 
   @override
-  List<Object?> get props => [contactId];
+  List<Object?> get props => [userId, contactId];
 }
 
 /// Event to clear any profile error state

@@ -67,10 +67,14 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    // Get the user ID from auth state first
+    final authState = context.read<AuthBloc>().state;
+    final userId = authState is AuthAuthenticated ? authState.user.id : '';
+
     return BlocProvider(
       create: (context) => getIt<ProfileBloc>()
-        ..add(const LoadDocumentsEvent())
-        ..add(const LoadEmergencyContactsEvent()),
+        ..add(LoadDocumentsEvent(userId: userId))
+        ..add(LoadEmergencyContactsEvent(userId: userId)),
       child: Scaffold(
         appBar: AppBar(
           title: Text(context.tr('profile')),
@@ -298,7 +302,7 @@ class _DocumentsTab extends StatelessWidget {
 
         return RefreshIndicator(
           onRefresh: () async {
-            context.read<ProfileBloc>().add(const LoadDocumentsEvent());
+            context.read<ProfileBloc>().add(LoadDocumentsEvent(userId: userId));
           },
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -702,7 +706,7 @@ class _EmergencyContactsTab extends StatelessWidget {
 
         return RefreshIndicator(
           onRefresh: () async {
-            context.read<ProfileBloc>().add(const LoadEmergencyContactsEvent());
+            context.read<ProfileBloc>().add(LoadEmergencyContactsEvent(userId: userId));
           },
           child: contacts.isEmpty
               ? SingleChildScrollView(
