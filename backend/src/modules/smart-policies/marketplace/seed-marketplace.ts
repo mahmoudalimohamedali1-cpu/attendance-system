@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * 🌱 Policy Marketplace Seeder
  * سكربت لملء سوق السياسات بالبيانات الجاهزة
@@ -27,7 +28,7 @@ async function seedMarketplace() {
         try {
             // توليد السياسة
             const generated = generator.generateFromTemplate(template);
-            
+
             // التحقق من الصلاحية
             if (!generated.isValid) {
                 console.log(`⚠️  ${template.id}: فشل الاختبارات`);

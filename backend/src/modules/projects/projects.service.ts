@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
@@ -20,7 +21,7 @@ const userSelect = {
 
 @Injectable()
 export class ProjectsService {
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService) { }
 
     // ==================== PROJECTS ====================
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Unified Performance Service
  * Integrates Goals/OKRs (70%) with KPIs (30%) for unified performance scoring

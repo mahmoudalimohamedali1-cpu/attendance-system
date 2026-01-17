@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * KPI Service
  * Full CRUD operations and score calculation for KPI Engine

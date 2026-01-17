@@ -1593,7 +1593,7 @@ export class AiAgentToolsService {
             data: {
                 title,
                 assignee: { connect: { id: assignee.id } },
-                createdBy: { connect: { id: context.userId } },
+                createdById: context.userId,
                 company: { connect: { id: context.companyId } },
                 status: 'PENDING' as any,
                 priority: (priority || 'MEDIUM') as any,

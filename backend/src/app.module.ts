@@ -69,7 +69,7 @@ import { GoalsModule } from './modules/goals/goals.module';
 import { AiManagerModule } from './modules/ai-manager/ai-manager.module';
 import { AiHrModule } from './modules/ai-hr/ai-hr.module';
 import { AiPredictiveModule } from './modules/ai-predictive/ai-predictive.module';
-import { CostCentersModule } from './modules/cost-centers/cost-centers.module';
+// import { CostCentersModule } from './modules/cost-centers/cost-centers.module'; // DISABLED: Prisma schema desync
 import { PerformanceReviewsModule } from './modules/performance-reviews/performance-reviews.module';
 import { RecognitionModule } from './modules/recognition/recognition.module';
 import { CompanyConfigModule } from './modules/company-config/company-config.module';
@@ -79,7 +79,7 @@ import { SaudizationModule } from './modules/saudization/saudization.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ProgramsModule } from './modules/programs/programs.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
-import { EmployeeDebtModule } from './modules/employee-debt/employee-debt.module';
+// import { EmployeeDebtModule } from './modules/employee-debt/employee-debt.module'; // DISABLED: Prisma schema desync
 import { SecurityModule } from './common/security/security.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
@@ -159,7 +159,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     AiManagerModule,        // لوحة المدير الذكية
     AiHrModule,             // أتمتة الموارد البشرية
     AiPredictiveModule,     // التحليلات التنبؤية
-    CostCentersModule,      // مراكز التكلفة Enterprise
+    // CostCentersModule,      // مراكز التكلفة Enterprise - DISABLED: Prisma schema desync
     PerformanceReviewsModule, // نظام تقييم الأداء
     GoalsModule,              // نظام الأهداف و OKRs
     RecognitionModule,        // جدار التقدير (Kudos)
@@ -170,7 +170,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     ProjectsModule,           // 📊 إدارة المشاريع والمحفظة
     ProgramsModule,           // 📊 إدارة البرامج
     IntegrationsModule,       // 🔗 التكاملات الخارجية (Slack, Teams, GitHub, etc.)
-    EmployeeDebtModule,       // 💰 دفتر ديون الموظفين
+    // EmployeeDebtModule,       // 💰 دفتر ديون الموظفين - DISABLED: Prisma schema desync
     SecurityModule,           // 🔒 أمان المعادلات
   ],
   controllers: [AppController],

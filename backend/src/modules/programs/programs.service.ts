@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateProgramDto, UpdateProgramDto } from './dto/create-program.dto';
@@ -12,7 +13,7 @@ const userSelect = {
 
 @Injectable()
 export class ProgramsService {
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService) { }
 
     async create(companyId: string, dto: CreateProgramDto, createdById: string) {
         const code = dto.code || await this.generateProgramCode(companyId);

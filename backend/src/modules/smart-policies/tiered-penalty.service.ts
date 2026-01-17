@@ -348,9 +348,14 @@ export class TieredPenaltyService {
      * التحقق مما إذا كان يجب إعادة تعيين العداد
      */
     private shouldReset(tracker: {
-        resetPeriod: OccurrenceResetPeriod;
-        lastResetAt: Date;
+        resetPeriod: OccurrenceResetPeriod | null;
+        lastResetAt: Date | null;
     }): boolean {
+        // If no reset period or no last reset date, don't reset
+        if (!tracker.resetPeriod || !tracker.lastResetAt) {
+            return false;
+        }
+
         const now = new Date();
         const lastReset = new Date(tracker.lastResetAt);
 

@@ -140,7 +140,7 @@ export class ConversationStorageService {
 
         // Clear from database
         try {
-            await this.prisma.aiConversation.deleteMany({
+            await this.prisma.aIConversation.deleteMany({
                 where: { userId, companyId },
             });
         } catch (err: any) {
@@ -153,7 +153,7 @@ export class ConversationStorageService {
      */
     private async loadFromDb(userId: string, companyId: string): Promise<ConversationSession | null> {
         try {
-            const record = await this.prisma.aiConversation.findFirst({
+            const record = await this.prisma.aIConversation.findFirst({
                 where: {
                     userId,
                     companyId,
@@ -191,7 +191,7 @@ export class ConversationStorageService {
      */
     private async saveToDb(session: ConversationSession): Promise<void> {
         try {
-            await this.prisma.aiConversation.upsert({
+            await this.prisma.aIConversation.upsert({
                 where: { id: session.id },
                 create: {
                     id: session.id,
@@ -238,7 +238,7 @@ export class ConversationStorageService {
      */
     async cleanupOldRecords(): Promise<number> {
         try {
-            const result = await this.prisma.aiConversation.deleteMany({
+            const result = await this.prisma.aIConversation.deleteMany({
                 where: {
                     expiresAt: { lt: new Date() },
                 },
