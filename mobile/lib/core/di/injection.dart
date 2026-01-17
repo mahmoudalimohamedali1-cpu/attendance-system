@@ -49,6 +49,7 @@ import '../../features/notifications/domain/repositories/notifications_repositor
 import '../../features/notifications/presentation/bloc/notifications_bloc.dart';
 
 import '../../features/settings/presentation/bloc/settings_bloc.dart';
+import '../../features/profile/presentation/bloc/profile_bloc.dart';
 
 final getIt = GetIt.instance;
 
@@ -297,6 +298,13 @@ Future<void> configureDependencies() async {
   getIt.registerFactory<SettingsBloc>(
     () => SettingsBloc(getIt<StorageService>()),
   );
-  
+
+  getIt.registerFactory<ProfileBloc>(
+    () => ProfileBloc(
+      storageService: getIt<StorageService>(),
+      apiClient: getIt<ApiClient>(),
+    ),
+  );
+
   print('✅ All Blocs registered');
 }
