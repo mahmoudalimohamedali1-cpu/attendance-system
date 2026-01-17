@@ -21,6 +21,8 @@ import {
     RequestOnBehalfDto,
     UploadDocumentDto,
     AttendanceQueryDto,
+    CreateEmergencyContactDto,
+    UpdateEmergencyContactDto,
 } from './dto/profile.dto';
 
 @Controller('employee-profile')
@@ -213,5 +215,75 @@ export class EmployeeProfileController {
     ) {
         // التحقق من أن المستند ينتمي للموظف والشركة
         return this.profileService.deleteDocument(userId, docId, user.companyId, user.id);
+    }
+
+    // ============ Emergency Contacts Endpoints ============
+
+    /**
+     * GET /employee-profile/:id/emergency-contacts
+     * جلب جهات الاتصال الطارئة للموظف
+     */
+    @Get(':id/emergency-contacts')
+    async getEmergencyContacts(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getEmergencyContacts(userId, user.companyId, user.id);
+    }
+
+    /**
+     * POST /employee-profile/:id/emergency-contacts
+     * إضافة جهة اتصال طارئة جديدة
+     */
+    @Post(':id/emergency-contacts')
+    async createEmergencyContact(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Body() dto: CreateEmergencyContactDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.createEmergencyContact(
+            userId,
+            user.companyId,
+            user.id,
+            dto,
+        );
+    }
+
+    /**
+     * PATCH /employee-profile/:id/emergency-contacts/:contactId
+     * تحديث جهة اتصال طارئة
+     */
+    @Patch(':id/emergency-contacts/:contactId')
+    async updateEmergencyContact(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('contactId', ParseUUIDPipe) contactId: string,
+        @Body() dto: UpdateEmergencyContactDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.updateEmergencyContact(
+            userId,
+            contactId,
+            user.companyId,
+            user.id,
+            dto,
+        );
+    }
+
+    /**
+     * DELETE /employee-profile/:id/emergency-contacts/:contactId
+     * حذف جهة اتصال طارئة
+     */
+    @Delete(':id/emergency-contacts/:contactId')
+    async deleteEmergencyContact(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('contactId', ParseUUIDPipe) contactId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.deleteEmergencyContact(
+            userId,
+            contactId,
+            user.companyId,
+            user.id,
+        );
     }
 }
