@@ -37,6 +37,7 @@ import {
     AccessTime,
     Save,
     Hub,
+    Psychology,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import { useAuthStore } from '@/store/auth.store';
@@ -52,6 +53,7 @@ import { FinancialTab } from './components/tabs/FinancialTab';
 import { DocumentsTab } from './components/tabs/DocumentsTab';
 import { DisciplinaryTab } from './components/tabs/DisciplinaryTab';
 import { CustodyTab } from './components/tabs/CustodyTab';
+import { SkillsTab } from './components/tabs/SkillsTab';
 import { RequestOnBehalfModal } from './components/RequestOnBehalfModal';
 import { AddCircleOutline } from '@mui/icons-material';
 
@@ -216,6 +218,7 @@ export const EmployeeProfilePage = () => {
         { label: 'الإجازات', icon: <Flight fontSize="small" /> },
         { label: 'المالية', icon: <AttachMoney fontSize="small" /> },
         { label: 'الوثائق', icon: <Description fontSize="small" /> },
+        { label: 'المهارات', icon: <Psychology fontSize="small" /> },
         { label: 'التأديبية', icon: <Gavel fontSize="small" /> },
         { label: 'العهد', icon: <Inventory fontSize="small" /> },
     ];
@@ -599,8 +602,9 @@ export const EmployeeProfilePage = () => {
                     {activeTab === 4 && <LeavesTab leaveData={leaveData} />}
                     {activeTab === 5 && <FinancialTab userId={id!} salaryInfo={salaryInfo} profile={profile} />}
                     {activeTab === 6 && <DocumentsTab userId={id!} documentsData={documentsData} />}
-                    {activeTab === 7 && <DisciplinaryTab profile={profile} />}
-                    {activeTab === 8 && <CustodyTab profile={profile} />}
+                    {activeTab === 7 && <SkillsTab userId={id!} />}
+                    {activeTab === 8 && <DisciplinaryTab profile={profile} />}
+                    {activeTab === 9 && <CustodyTab profile={profile} />}
                 </Box>
             </Box>
 
