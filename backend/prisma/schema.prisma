@@ -84,6 +84,9 @@ model Company {
   onboardingTemplates  OnboardingTemplate[]
   onboardingProcesses  OnboardingProcess[]
 
+  // التحليلات التنبؤية (AI Predictive Analytics)
+  absencePredictions AbsencePrediction[]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -364,6 +367,9 @@ model User {
 
   // نظام الترحيب (Onboarding)
   onboardingProcesses OnboardingProcess[]
+
+  // التحليلات التنبؤية (AI Predictive Analytics)
+  absencePredictions AbsencePrediction[]
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -3512,4 +3518,43 @@ model OnboardingTask {
 
   @@index([processId, status])
   @@map("onboarding_tasks")
+}
+
+// ==================== AI Predictive Absence Analytics ====================
+
+// مستوى المخاطر
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// نموذج التنبؤ بالغياب
+model AbsencePrediction {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // تاريخ التنبؤ
+  predictionDate DateTime @map("prediction_date") @db.Date
+
+  // احتمالية الغياب (0-100)
+  absenceLikelihood Decimal @map("absence_likelihood") @db.Decimal(5, 2)
+
+  // مستوى المخاطر
+  riskLevel RiskLevel @map("risk_level")
+
+  // العوامل المساهمة (JSON)
+  contributingFactors Json @map("contributing_factors")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, predictionDate])
+  @@index([userId, predictionDate])
+  @@index([riskLevel])
+  @@map("absence_predictions")
 }
