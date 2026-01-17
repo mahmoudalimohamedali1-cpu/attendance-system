@@ -212,6 +212,6 @@ export class EmployeeProfileController {
         @CurrentUser() user: any,
     ) {
         // التحقق من أن المستند ينتمي للموظف والشركة
-        return this.profileService.deleteDocument(userId, docId, user.companyId);
+        return this.profileService.deleteDocument(userId, docId, user.companyId, user.id);
     }
 }

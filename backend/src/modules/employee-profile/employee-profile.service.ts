@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { DocumentType } from '@prisma/client';
+import { DocumentType, ProficiencyLevel } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
     UpdateProfileDto,
@@ -1174,6 +1174,418 @@ export class EmployeeProfileService {
         }
 
         return { message: 'تم حذف جهة الاتصال بنجاح' };
+    }
+
+    // ============ Skills Management Methods ============
+
+    /**
+     * جلب مهارات الموظف
+     */
+    async getSkills(userId: string, companyId: string, requesterId: string, category?: string) {
+        // التحقق من الصلاحيات
+        await this.checkAccess(userId, companyId, requesterId);
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // بناء شرط البحث
+        const whereClause: any = {
+            userId,
+            companyId,
+        };
+
+        if (category) {
+            whereClause.category = category;
+        }
+
+        // جلب المهارات
+        const skills = await this.prisma.employeeSkill.findMany({
+            where: whereClause,
+            orderBy: [
+                { category: 'asc' },
+                { proficiencyLevel: 'desc' },
+                { skillName: 'asc' },
+            ],
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                    },
+                },
+            },
+        });
+
+        // تجميع حسب الفئة
+        const byCategory: Record<string, typeof skills> = {};
+        skills.forEach((skill) => {
+            const cat = skill.category || 'غير مصنف';
+            if (!byCategory[cat]) {
+                byCategory[cat] = [];
+            }
+            byCategory[cat].push(skill);
+        });
+
+        // إحصائيات المهارات
+        const stats = {
+            totalSkills: skills.length,
+            verifiedSkills: skills.filter((s) => s.isVerified).length,
+            expertSkills: skills.filter((s) => s.proficiencyLevel === 'EXPERT').length,
+            advancedSkills: skills.filter((s) => s.proficiencyLevel === 'ADVANCED').length,
+            intermediateSkills: skills.filter((s) => s.proficiencyLevel === 'INTERMEDIATE').length,
+            beginnerSkills: skills.filter((s) => s.proficiencyLevel === 'BEGINNER').length,
+            categories: Object.keys(byCategory).length,
+        };
+
+        return {
+            skills,
+            byCategory,
+            stats,
+            totalCount: skills.length,
+        };
+    }
+
+    /**
+     * إضافة مهارة جديدة للموظف
+     */
+    async addSkill(
+        userId: string,
+        companyId: string,
+        requesterId: string,
+        data: {
+            skillName: string;
+            skillNameAr?: string;
+            category?: string;
+            proficiencyLevel?: ProficiencyLevel;
+            yearsExperience?: number;
+            notes?: string;
+        },
+    ) {
+        // التحقق من صلاحية التعديل
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من صحة اسم المهارة
+        if (!data.skillName || data.skillName.trim() === '') {
+            throw new BadRequestException('اسم المهارة مطلوب');
+        }
+
+        // التحقق من عدم وجود نفس المهارة مسبقاً
+        const existingSkill = await this.prisma.employeeSkill.findFirst({
+            where: {
+                userId,
+                companyId,
+                skillName: {
+                    equals: data.skillName.trim(),
+                    mode: 'insensitive',
+                },
+            },
+        });
+
+        if (existingSkill) {
+            throw new BadRequestException('هذه المهارة موجودة بالفعل');
+        }
+
+        // التحقق من صحة مستوى الخبرة
+        if (data.proficiencyLevel) {
+            const validLevels: ProficiencyLevel[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'];
+            if (!validLevels.includes(data.proficiencyLevel)) {
+                throw new BadRequestException('مستوى الإتقان غير صالح');
+            }
+        }
+
+        // التحقق من سنوات الخبرة
+        if (data.yearsExperience !== undefined && data.yearsExperience < 0) {
+            throw new BadRequestException('سنوات الخبرة لا يمكن أن تكون قيمة سالبة');
+        }
+
+        // إنشاء المهارة
+        const skill = await this.prisma.employeeSkill.create({
+            data: {
+                companyId,
+                userId,
+                skillName: data.skillName.trim(),
+                skillNameAr: data.skillNameAr?.trim(),
+                category: data.category?.trim(),
+                proficiencyLevel: data.proficiencyLevel || 'BEGINNER',
+                yearsExperience: data.yearsExperience,
+                notes: data.notes?.trim(),
+            },
+        });
+
+        return skill;
+    }
+
+    /**
+     * تحديث مهارة الموظف
+     */
+    async updateSkill(
+        userId: string,
+        skillId: string,
+        companyId: string,
+        requesterId: string,
+        data: {
+            skillName?: string;
+            skillNameAr?: string;
+            category?: string;
+            proficiencyLevel?: ProficiencyLevel;
+            yearsExperience?: number;
+            notes?: string;
+            isVerified?: boolean;
+        },
+    ) {
+        // التحقق من صلاحية التعديل
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من وجود المهارة
+        const existingSkill = await this.prisma.employeeSkill.findFirst({
+            where: { id: skillId, userId, companyId },
+        });
+
+        if (!existingSkill) {
+            throw new NotFoundException('المهارة غير موجودة');
+        }
+
+        // تحضير بيانات التحديث
+        const updateData: any = {};
+
+        if (data.skillName !== undefined) {
+            if (data.skillName.trim() === '') {
+                throw new BadRequestException('اسم المهارة لا يمكن أن يكون فارغاً');
+            }
+
+            // التحقق من عدم وجود نفس المهارة مسبقاً (باستثناء المهارة الحالية)
+            const duplicateSkill = await this.prisma.employeeSkill.findFirst({
+                where: {
+                    userId,
+                    companyId,
+                    skillName: {
+                        equals: data.skillName.trim(),
+                        mode: 'insensitive',
+                    },
+                    NOT: { id: skillId },
+                },
+            });
+
+            if (duplicateSkill) {
+                throw new BadRequestException('هذه المهارة موجودة بالفعل');
+            }
+
+            updateData.skillName = data.skillName.trim();
+        }
+
+        if (data.skillNameAr !== undefined) updateData.skillNameAr = data.skillNameAr?.trim();
+        if (data.category !== undefined) updateData.category = data.category?.trim();
+
+        if (data.proficiencyLevel !== undefined) {
+            const validLevels: ProficiencyLevel[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'];
+            if (!validLevels.includes(data.proficiencyLevel)) {
+                throw new BadRequestException('مستوى الإتقان غير صالح');
+            }
+            updateData.proficiencyLevel = data.proficiencyLevel;
+        }
+
+        if (data.yearsExperience !== undefined) {
+            if (data.yearsExperience < 0) {
+                throw new BadRequestException('سنوات الخبرة لا يمكن أن تكون قيمة سالبة');
+            }
+            updateData.yearsExperience = data.yearsExperience;
+        }
+
+        if (data.notes !== undefined) updateData.notes = data.notes?.trim();
+
+        // التحقق من صلاحية التحقق من المهارة (فقط ADMIN/HR)
+        if (data.isVerified !== undefined) {
+            const requester = await this.prisma.user.findUnique({
+                where: { id: requesterId },
+                select: { role: true, isSuperAdmin: true },
+            });
+
+            if (requester && (requester.role === 'ADMIN' || requester.role === 'HR' || requester.isSuperAdmin)) {
+                updateData.isVerified = data.isVerified;
+                if (data.isVerified) {
+                    updateData.verifiedById = requesterId;
+                    updateData.verifiedAt = new Date();
+                } else {
+                    updateData.verifiedById = null;
+                    updateData.verifiedAt = null;
+                }
+            }
+        }
+
+        // تحديث المهارة
+        const updatedSkill = await this.prisma.employeeSkill.update({
+            where: { id: skillId },
+            data: updateData,
+        });
+
+        return updatedSkill;
+    }
+
+    /**
+     * حذف مهارة الموظف
+     */
+    async removeSkill(
+        userId: string,
+        skillId: string,
+        companyId: string,
+        requesterId: string,
+    ) {
+        // التحقق من صلاحية التعديل
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من وجود المهارة
+        const existingSkill = await this.prisma.employeeSkill.findFirst({
+            where: { id: skillId, userId, companyId },
+        });
+
+        if (!existingSkill) {
+            throw new NotFoundException('المهارة غير موجودة');
+        }
+
+        // حذف المهارة
+        await this.prisma.employeeSkill.delete({
+            where: { id: skillId },
+        });
+
+        return { message: 'تم حذف المهارة بنجاح' };
+    }
+
+    /**
+     * جلب جميع فئات المهارات للشركة
+     */
+    async getSkillCategories(companyId: string, requesterId: string) {
+        // التحقق من صلاحيات المستخدم
+        const requester = await this.prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { role: true, isSuperAdmin: true, companyId: true },
+        });
+
+        if (!requester || requester.companyId !== companyId) {
+            throw new ForbiddenException('غير مصرح لك');
+        }
+
+        // جلب الفئات الفريدة
+        const skills = await this.prisma.employeeSkill.findMany({
+            where: { companyId },
+            select: { category: true },
+            distinct: ['category'],
+        });
+
+        const categories = skills
+            .map((s) => s.category)
+            .filter((c): c is string => c !== null && c !== undefined && c.trim() !== '')
+            .sort();
+
+        return {
+            categories,
+            totalCount: categories.length,
+        };
+    }
+
+    /**
+     * جلب الموظفين بمهارة معينة (للمدير/HR)
+     */
+    async getEmployeesWithSkill(
+        companyId: string,
+        requesterId: string,
+        skillName: string,
+        minProficiency?: ProficiencyLevel,
+    ) {
+        // التحقق من صلاحيات المستخدم
+        const requester = await this.prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { role: true, isSuperAdmin: true, companyId: true },
+        });
+
+        if (!requester || requester.companyId !== companyId) {
+            throw new ForbiddenException('غير مصرح لك');
+        }
+
+        if (!['ADMIN', 'HR', 'MANAGER'].includes(requester.role) && !requester.isSuperAdmin) {
+            throw new ForbiddenException('غير مصرح لك بالوصول لهذه البيانات');
+        }
+
+        // بناء شرط البحث
+        const whereClause: any = {
+            companyId,
+            skillName: {
+                contains: skillName,
+                mode: 'insensitive',
+            },
+        };
+
+        // تصفية حسب مستوى الإتقان الأدنى
+        if (minProficiency) {
+            const proficiencyOrder: ProficiencyLevel[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'];
+            const minIndex = proficiencyOrder.indexOf(minProficiency);
+            if (minIndex >= 0) {
+                whereClause.proficiencyLevel = {
+                    in: proficiencyOrder.slice(minIndex),
+                };
+            }
+        }
+
+        const employeeSkills = await this.prisma.employeeSkill.findMany({
+            where: whereClause,
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        avatar: true,
+                        jobTitle: true,
+                        department: {
+                            select: { name: true },
+                        },
+                    },
+                },
+            },
+            orderBy: [
+                { proficiencyLevel: 'desc' },
+                { yearsExperience: 'desc' },
+            ],
+        });
+
+        return {
+            employees: employeeSkills,
+            totalCount: employeeSkills.length,
+        };
     }
 
     /**
