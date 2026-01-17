@@ -287,6 +287,40 @@ export class AiPredictiveService {
     }
 
     /**
+     * 🎯 الحصول على توقع غياب موظف محدد مع الشرح
+     */
+    async getEmployeePredictionWithExplanation(userId: string, companyId: string, targetDate?: Date): Promise<{
+        success: boolean;
+        prediction: any;
+        explanation: any;
+        generatedAt: Date;
+    }> {
+        try {
+            this.logger.log(`Getting employee prediction with explanation for user: ${userId}`);
+
+            // الحصول على توقع الموظف
+            const prediction = await this.absencePredictionService.predictEmployeeAbsence(
+                userId,
+                companyId,
+                targetDate || new Date(),
+            );
+
+            // توليد الشرح
+            const explanation = await this.explainabilityService.explainPrediction(prediction);
+
+            return {
+                success: true,
+                prediction,
+                explanation,
+                generatedAt: new Date(),
+            };
+        } catch (error) {
+            this.logger.error(`Error getting employee prediction with explanation: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
      * 🔍 الحصول على الأنماط المكتشفة
      */
     async getAbsencePatterns(companyId: string, patternType?: string, limit: number = 20): Promise<{
