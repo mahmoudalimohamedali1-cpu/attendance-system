@@ -96,6 +96,7 @@ const PayrollAuditPage = lazy(() => import('./pages/enterprise-payroll/PayrollAu
 const PayrollSimulationPage = lazy(() => import('./pages/enterprise-payroll/PayrollSimulationPage'));
 const EmployeeDebtPage = lazy(() => import('./pages/employee-debt/EmployeeDebtPage'));
 const CustodyAuditPage = lazy(() => import('./pages/custody-audit/CustodyAuditPage'));
+const AiPredictivePage = lazy(() => import('./pages/ai-predictive/AiPredictivePage'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -454,6 +455,11 @@ function App() {
           <Route path="genius-ai" element={
             <Suspense fallback={<PageLoader />}>
               <GeniusAiPage />
+            </Suspense>
+          } />
+          <Route path="ai-predictive" element={
+            <Suspense fallback={<PageLoader />}>
+              <AiPredictivePage />
             </Suspense>
           } />
           <Route path="cost-centers" element={
