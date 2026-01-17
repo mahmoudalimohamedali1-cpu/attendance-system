@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { MlTrainingService } from './services/ml-training.service';
+import { AbsencePredictionService } from './services/absence-prediction.service';
+import { PatternDetectionService } from './services/pattern-detection.service';
+import { ExplainabilityService } from './services/explainability.service';
 
 @Injectable()
 export class AiPredictiveService {
@@ -9,6 +13,10 @@ export class AiPredictiveService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly aiService: AiService,
+        private readonly mlTrainingService: MlTrainingService,
+        private readonly absencePredictionService: AbsencePredictionService,
+        private readonly patternDetectionService: PatternDetectionService,
+        private readonly explainabilityService: ExplainabilityService,
     ) { }
 
     /**
@@ -246,6 +254,174 @@ export class AiPredictiveService {
         } catch (error) {
             this.logger.error(`AI predictions error: ${error.message}`);
             return '❌ لم نتمكن من تحليل التوقعات حالياً';
+        }
+    }
+
+    /**
+     * 🎯 الحصول على توقعات غياب الموظفين
+     */
+    async getEmployeeAbsencePredictions(companyId: string, targetDate?: Date): Promise<{
+        success: boolean;
+        predictions: any[];
+        count: number;
+        generatedAt: Date;
+    }> {
+        try {
+            this.logger.log(`Getting employee absence predictions for company: ${companyId}`);
+
+            const predictions = await this.absencePredictionService.predictAllEmployees(
+                companyId,
+                targetDate || new Date(),
+            );
+
+            return {
+                success: true,
+                predictions,
+                count: predictions.length,
+                generatedAt: new Date(),
+            };
+        } catch (error) {
+            this.logger.error(`Error getting employee predictions: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * 🔍 الحصول على الأنماط المكتشفة
+     */
+    async getAbsencePatterns(companyId: string, patternType?: string, limit: number = 20): Promise<{
+        success: boolean;
+        patterns: any[];
+        count: number;
+        detectedAt: Date;
+    }> {
+        try {
+            this.logger.log(`Getting absence patterns for company: ${companyId}`);
+
+            let patterns;
+            if (patternType) {
+                patterns = await this.patternDetectionService.getPatternsByType(companyId, patternType);
+            } else {
+                patterns = await this.patternDetectionService.getStoredPatterns(companyId, limit);
+            }
+
+            // إذا لم تكن هناك أنماط محفوظة، قم بالكشف عن أنماط جديدة
+            if (!patterns || patterns.length === 0) {
+                this.logger.log('No stored patterns found, detecting new patterns...');
+                patterns = await this.patternDetectionService.detectAllPatterns(companyId);
+            }
+
+            return {
+                success: true,
+                patterns,
+                count: patterns.length,
+                detectedAt: new Date(),
+            };
+        } catch (error) {
+            this.logger.error(`Error getting absence patterns: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * 🤖 تدريب نموذج التعلم الآلي
+     */
+    async trainModel(companyId: string) {
+        try {
+            this.logger.log(`Training ML model for company: ${companyId}`);
+
+            const result = await this.mlTrainingService.trainModel(companyId);
+
+            return {
+                success: result.success,
+                message: result.message,
+                modelVersion: result.modelVersion,
+                accuracy: result.accuracy,
+                trainedAt: new Date(),
+            };
+        } catch (error) {
+            this.logger.error(`Error training model: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * 📊 الحصول على دقة النموذج
+     */
+    async getModelAccuracy(companyId: string) {
+        try {
+            this.logger.log(`Getting model accuracy for company: ${companyId}`);
+
+            const accuracy = await this.mlTrainingService.getLatestAccuracy(companyId);
+
+            if (!accuracy) {
+                return {
+                    success: false,
+                    message: 'لم يتم تدريب النموذج بعد',
+                    accuracy: null,
+                };
+            }
+
+            return {
+                success: true,
+                accuracy: accuracy.accuracy,
+                precision: accuracy.precision,
+                recall: accuracy.recall,
+                f1Score: accuracy.f1Score,
+                modelVersion: accuracy.modelVersion,
+                evaluatedAt: accuracy.evaluatedAt,
+            };
+        } catch (error) {
+            this.logger.error(`Error getting model accuracy: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * 💡 الحصول على التوصيات
+     */
+    async getRecommendations(companyId: string) {
+        try {
+            this.logger.log(`Getting recommendations for company: ${companyId}`);
+
+            // الحصول على توقعات الموظفين
+            const predictions = await this.absencePredictionService.predictAllEmployees(
+                companyId,
+                new Date(),
+            );
+
+            // توليد شرح شامل مع التوصيات
+            const explanation = await this.explainabilityService.explainBatchPredictions(
+                predictions,
+            );
+
+            // الحصول على الأنماط
+            const patterns = await this.patternDetectionService.getStoredPatterns(companyId, 5);
+
+            // توليد توصيات إضافية بناءً على الأنماط
+            const patternRecommendations: string[] = [];
+            if (patterns && patterns.length > 0) {
+                for (const pattern of patterns) {
+                    if (pattern.insights && pattern.insights.length > 0) {
+                        patternRecommendations.push(...pattern.insights);
+                    }
+                }
+            }
+
+            return {
+                success: true,
+                overview: explanation.overview,
+                insights: explanation.insights,
+                recommendations: patternRecommendations.slice(0, 5),
+                riskDistribution: {
+                    high: explanation.highRiskCount,
+                    medium: explanation.mediumRiskCount,
+                    low: explanation.lowRiskCount,
+                },
+            };
+        } catch (error) {
+            this.logger.error(`Error getting recommendations: ${error.message}`);
+            throw error;
         }
     }
 }
