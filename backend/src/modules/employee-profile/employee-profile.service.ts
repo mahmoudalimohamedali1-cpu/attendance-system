@@ -927,6 +927,255 @@ export class EmployeeProfileService {
         return { message: 'تم حذف المستند بنجاح' };
     }
 
+    // ============ Emergency Contacts Methods ============
+
+    /**
+     * جلب جهات الاتصال الطارئة للموظف
+     */
+    async getEmergencyContacts(userId: string, companyId: string, requesterId: string) {
+        // التحقق من الصلاحيات
+        await this.checkAccess(userId, companyId, requesterId);
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        const contacts = await this.prisma.emergencyContact.findMany({
+            where: { userId },
+            orderBy: { priority: 'asc' },
+        });
+
+        return {
+            contacts,
+            totalCount: contacts.length,
+            maxContacts: 3,
+            canAddMore: contacts.length < 3,
+        };
+    }
+
+    /**
+     * إضافة جهة اتصال طارئة جديدة
+     */
+    async createEmergencyContact(
+        userId: string,
+        companyId: string,
+        requesterId: string,
+        data: {
+            name: string;
+            nameAr?: string;
+            relationship: string;
+            phone: string;
+            alternatePhone?: string;
+            email?: string;
+            priority?: number;
+            address?: string;
+            city?: string;
+            country?: string;
+        },
+    ) {
+        // التحقق من صلاحية التعديل
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من عدم تجاوز الحد الأقصى (3 جهات اتصال)
+        const existingContacts = await this.prisma.emergencyContact.count({
+            where: { userId },
+        });
+
+        if (existingContacts >= 3) {
+            throw new BadRequestException('لا يمكن إضافة أكثر من 3 جهات اتصال طارئة');
+        }
+
+        // التحقق من صحة رقم الهاتف
+        if (!data.phone || data.phone.trim() === '') {
+            throw new BadRequestException('رقم الهاتف مطلوب');
+        }
+
+        // التحقق من صحة الاسم
+        if (!data.name || data.name.trim() === '') {
+            throw new BadRequestException('اسم جهة الاتصال مطلوب');
+        }
+
+        // التحقق من صحة نوع العلاقة
+        if (!data.relationship || data.relationship.trim() === '') {
+            throw new BadRequestException('نوع العلاقة مطلوب');
+        }
+
+        // تعيين الأولوية التلقائية
+        const priority = data.priority ?? existingContacts + 1;
+
+        // إنشاء جهة الاتصال الطارئة
+        const contact = await this.prisma.emergencyContact.create({
+            data: {
+                userId,
+                name: data.name.trim(),
+                nameAr: data.nameAr?.trim(),
+                relationship: data.relationship.trim(),
+                phone: data.phone.trim(),
+                alternatePhone: data.alternatePhone?.trim(),
+                email: data.email?.trim(),
+                priority,
+                address: data.address?.trim(),
+                city: data.city?.trim(),
+                country: data.country?.trim(),
+            },
+        });
+
+        return contact;
+    }
+
+    /**
+     * تحديث جهة اتصال طارئة
+     */
+    async updateEmergencyContact(
+        userId: string,
+        contactId: string,
+        companyId: string,
+        requesterId: string,
+        data: {
+            name?: string;
+            nameAr?: string;
+            relationship?: string;
+            phone?: string;
+            alternatePhone?: string;
+            email?: string;
+            priority?: number;
+            address?: string;
+            city?: string;
+            country?: string;
+            isActive?: boolean;
+        },
+    ) {
+        // التحقق من صلاحية التعديل
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من وجود جهة الاتصال
+        const existingContact = await this.prisma.emergencyContact.findFirst({
+            where: { id: contactId, userId },
+        });
+
+        if (!existingContact) {
+            throw new NotFoundException('جهة الاتصال غير موجودة');
+        }
+
+        // تحضير بيانات التحديث
+        const updateData: any = {};
+
+        if (data.name !== undefined) {
+            if (data.name.trim() === '') {
+                throw new BadRequestException('اسم جهة الاتصال لا يمكن أن يكون فارغاً');
+            }
+            updateData.name = data.name.trim();
+        }
+
+        if (data.nameAr !== undefined) updateData.nameAr = data.nameAr?.trim();
+
+        if (data.relationship !== undefined) {
+            if (data.relationship.trim() === '') {
+                throw new BadRequestException('نوع العلاقة لا يمكن أن يكون فارغاً');
+            }
+            updateData.relationship = data.relationship.trim();
+        }
+
+        if (data.phone !== undefined) {
+            if (data.phone.trim() === '') {
+                throw new BadRequestException('رقم الهاتف لا يمكن أن يكون فارغاً');
+            }
+            updateData.phone = data.phone.trim();
+        }
+
+        if (data.alternatePhone !== undefined) updateData.alternatePhone = data.alternatePhone?.trim();
+        if (data.email !== undefined) updateData.email = data.email?.trim();
+        if (data.priority !== undefined) updateData.priority = data.priority;
+        if (data.address !== undefined) updateData.address = data.address?.trim();
+        if (data.city !== undefined) updateData.city = data.city?.trim();
+        if (data.country !== undefined) updateData.country = data.country?.trim();
+        if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+        // تحديث جهة الاتصال
+        const updatedContact = await this.prisma.emergencyContact.update({
+            where: { id: contactId },
+            data: updateData,
+        });
+
+        return updatedContact;
+    }
+
+    /**
+     * حذف جهة اتصال طارئة
+     */
+    async deleteEmergencyContact(
+        userId: string,
+        contactId: string,
+        companyId: string,
+        requesterId: string,
+    ) {
+        // التحقق من صلاحية التعديل
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من وجود جهة الاتصال
+        const existingContact = await this.prisma.emergencyContact.findFirst({
+            where: { id: contactId, userId },
+        });
+
+        if (!existingContact) {
+            throw new NotFoundException('جهة الاتصال غير موجودة');
+        }
+
+        // حذف جهة الاتصال
+        await this.prisma.emergencyContact.delete({
+            where: { id: contactId },
+        });
+
+        // إعادة ترتيب الأولويات للجهات المتبقية
+        const remainingContacts = await this.prisma.emergencyContact.findMany({
+            where: { userId },
+            orderBy: { priority: 'asc' },
+        });
+
+        for (let i = 0; i < remainingContacts.length; i++) {
+            if (remainingContacts[i].priority !== i + 1) {
+                await this.prisma.emergencyContact.update({
+                    where: { id: remainingContacts[i].id },
+                    data: { priority: i + 1 },
+                });
+            }
+        }
+
+        return { message: 'تم حذف جهة الاتصال بنجاح' };
+    }
+
     /**
      * جلب المستندات المنتهية أو قاربت على الانتهاء لجميع الموظفين (للمدير/HR)
      */
