@@ -26,6 +26,15 @@ export class WpsExportController {
         return this.wpsExportService.validateExportReadiness(payrollRunId, companyId);
     }
 
+    @Get(':payrollRunId/validate-mudad')
+    @ApiOperation({ summary: 'التحقق من صحة البيانات للتقديم إلى نظام مُدد' })
+    async validateMudad(
+        @Param('payrollRunId') payrollRunId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.wpsExportService.validateForMudad(payrollRunId, companyId);
+    }
+
     @Get(':payrollRunId/csv')
     @ApiOperation({ summary: 'تصدير ملف WPS بصيغة CSV' })
     async exportCsv(
