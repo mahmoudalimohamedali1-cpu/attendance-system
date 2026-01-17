@@ -23,6 +23,9 @@ import {
     AttendanceQueryDto,
     CreateEmergencyContactDto,
     UpdateEmergencyContactDto,
+    CreateSkillDto,
+    UpdateSkillDto,
+    ProficiencyLevelEnum,
 } from './dto/profile.dto';
 
 @Controller('employee-profile')
@@ -284,6 +287,124 @@ export class EmployeeProfileController {
             contactId,
             user.companyId,
             user.id,
+        );
+    }
+
+    // ============ Skills Endpoints ============
+
+    /**
+     * GET /employee-profile/:id/skills
+     * جلب مهارات الموظف
+     */
+    @Get(':id/skills')
+    async getSkills(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Query('category') category: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getSkills(
+            userId,
+            user.companyId,
+            user.id,
+            category,
+        );
+    }
+
+    /**
+     * POST /employee-profile/:id/skills
+     * إضافة مهارة جديدة للموظف
+     */
+    @Post(':id/skills')
+    async addSkill(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Body() dto: CreateSkillDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.addSkill(
+            userId,
+            user.companyId,
+            user.id,
+            {
+                skillName: dto.skillName,
+                skillNameAr: dto.skillNameAr,
+                category: dto.category,
+                proficiencyLevel: dto.proficiencyLevel as any,
+                yearsExperience: dto.yearsExperience,
+                notes: dto.notes,
+            },
+        );
+    }
+
+    /**
+     * PATCH /employee-profile/:id/skills/:skillId
+     * تحديث مهارة الموظف
+     */
+    @Patch(':id/skills/:skillId')
+    async updateSkill(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('skillId', ParseUUIDPipe) skillId: string,
+        @Body() dto: UpdateSkillDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.updateSkill(
+            userId,
+            skillId,
+            user.companyId,
+            user.id,
+            {
+                skillName: dto.skillName,
+                skillNameAr: dto.skillNameAr,
+                category: dto.category,
+                proficiencyLevel: dto.proficiencyLevel as any,
+                yearsExperience: dto.yearsExperience,
+                notes: dto.notes,
+                isVerified: dto.isVerified,
+            },
+        );
+    }
+
+    /**
+     * DELETE /employee-profile/:id/skills/:skillId
+     * حذف مهارة الموظف
+     */
+    @Delete(':id/skills/:skillId')
+    async removeSkill(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('skillId', ParseUUIDPipe) skillId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.removeSkill(
+            userId,
+            skillId,
+            user.companyId,
+            user.id,
+        );
+    }
+
+    /**
+     * GET /employee-profile/skills/categories
+     * جلب جميع فئات المهارات للشركة
+     */
+    @Get('skills/categories')
+    async getSkillCategories(@CurrentUser() user: any) {
+        return this.profileService.getSkillCategories(user.companyId, user.id);
+    }
+
+    /**
+     * GET /employee-profile/skills/search
+     * البحث عن موظفين بمهارة معينة (للمدير/HR)
+     */
+    @Get('skills/search')
+    async searchEmployeesBySkill(
+        @Query('skillName') skillName: string,
+        @Query('minProficiency') minProficiency: ProficiencyLevelEnum,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getEmployeesWithSkill(
+            user.companyId,
+            user.id,
+            skillName,
+            minProficiency as any,
         );
     }
 }
