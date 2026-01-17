@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Request, Res } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -32,6 +33,28 @@ export class MudadController {
     getStats(@Request() req: any, @Query('year') year?: string) {
         const y = year ? parseInt(year) : new Date().getFullYear();
         return this.mudadService.getStats(req.user.companyId, y);
+    }
+
+    @Get('export')
+    @RequirePermission('MUDAD_VIEW')
+    @ApiOperation({ summary: 'تصدير سجل تقديمات مُدد' })
+    async export(
+        @Request() req: any,
+        @Res() res: Response,
+        @Query('year') year?: string,
+        @Query('format') format?: string,
+    ) {
+        const y = year ? parseInt(year) : undefined;
+        const buffer = await this.mudadService.exportSubmissionHistory(
+            req.user.companyId,
+            y,
+            format || 'excel',
+        );
+
+        const fileName = `mudad-submissions-${y || 'all'}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.send(buffer);
     }
 
     @Get(':id')
