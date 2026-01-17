@@ -593,7 +593,7 @@ export const EmployeeProfilePage = () => {
                     }}
                 >
                     {activeTab === 0 && <DashboardContent />}
-                    {activeTab === 1 && <PersonalInfoTab profile={profile} />}
+                    {activeTab === 1 && <PersonalInfoTab profile={profile} userId={id} />}
                     {activeTab === 2 && <EmploymentTab profile={profile} />}
                     {activeTab === 3 && <AttendanceTab userId={id!} stats={attendanceStats} />}
                     {activeTab === 4 && <LeavesTab leaveData={leaveData} />}

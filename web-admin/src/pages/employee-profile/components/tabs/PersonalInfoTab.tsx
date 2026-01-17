@@ -1,5 +1,6 @@
 import { Box, Grid, Typography } from '@mui/material';
 import { Person, Badge, Flight, ContactPhone } from '@mui/icons-material';
+import { EmergencyContactsSection } from '../EmergencyContactsSection';
 
 // Design Theme Colors
 const theme = {
@@ -13,6 +14,7 @@ const theme = {
 
 interface PersonalInfoTabProps {
     profile: any;
+    userId?: string;
 }
 
 // Info Card Component
@@ -50,8 +52,9 @@ const InfoRow = ({ label, value }: { label: string; value: string | number | nul
     </Box>
 );
 
-export const PersonalInfoTab = ({ profile }: PersonalInfoTabProps) => {
+export const PersonalInfoTab = ({ profile, userId }: PersonalInfoTabProps) => {
     const p = profile as any;
+    const profileUserId = userId || p?.id;
 
     const formatDate = (date: string | Date | null) => {
         if (!date) return '-';
@@ -125,6 +128,13 @@ export const PersonalInfoTab = ({ profile }: PersonalInfoTabProps) => {
                     <InfoRow label="رقم FCM" value={p.fcmToken ? 'مسجل' : 'غير مسجل'} />
                 </InfoCard>
             </Grid>
+
+            {/* Emergency Contacts - جهات الاتصال الطارئة */}
+            {profileUserId && (
+                <Grid item xs={12}>
+                    <EmergencyContactsSection userId={profileUserId} />
+                </Grid>
+            )}
         </Grid>
     );
 };
