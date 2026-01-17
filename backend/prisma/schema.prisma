@@ -85,7 +85,8 @@ model Company {
   onboardingProcesses  OnboardingProcess[]
 
   // التحليلات التنبؤية (AI Predictive Analytics)
-  absencePredictions AbsencePrediction[]
+  absencePredictions    AbsencePrediction[]
+  predictionAccuracies  PredictionAccuracy[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3557,4 +3558,34 @@ model AbsencePrediction {
   @@index([userId, predictionDate])
   @@index([riskLevel])
   @@map("absence_predictions")
+}
+
+// ========== دقة النموذج (Model Accuracy Tracking) ==========
+
+model PredictionAccuracy {
+  id        String   @id @default(uuid())
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // إصدار النموذج
+  modelVersion String @map("model_version")
+
+  // مقاييس الأداء
+  accuracy  Decimal @db.Decimal(5, 4) // 0.0000 - 1.0000
+  precision Decimal @db.Decimal(5, 4) // 0.0000 - 1.0000
+  recall    Decimal @db.Decimal(5, 4) // 0.0000 - 1.0000
+  f1Score   Decimal @map("f1_score") @db.Decimal(5, 4) // 0.0000 - 1.0000
+
+  // تاريخ التقييم
+  evaluatedAt DateTime @map("evaluated_at")
+
+  // عدد التنبؤات المستخدمة في التقييم
+  predictionCount Int @map("prediction_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, evaluatedAt])
+  @@index([modelVersion])
+  @@map("prediction_accuracies")
 }
