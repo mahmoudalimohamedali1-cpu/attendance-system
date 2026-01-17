@@ -35,6 +35,8 @@ import {
     StepLabel,
     Tooltip,
     InputAdornment,
+    Collapse,
+    Divider,
 } from '@mui/material';
 import {
     CloudUpload,
@@ -52,6 +54,10 @@ import {
     Add,
     ArrowForward,
     TableChart,
+    Info,
+    ExpandMore,
+    ExpandLess,
+    BugReport,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api.service';
@@ -62,6 +68,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ar';
+import { wpsExportService, MudadValidationResult } from '@/services/wps.service';
 
 // PayrollRun type for selection
 interface PayrollRun {
@@ -166,6 +173,7 @@ export default function MudadPage() {
     const [attachDialogOpen, setAttachDialogOpen] = useState(false);
     const [logsDrawerOpen, setLogsDrawerOpen] = useState(false);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [validationDialogOpen, setValidationDialogOpen] = useState(false);
     const [selectedRunId, setSelectedRunId] = useState('');
     const [newStatus, setNewStatus] = useState('');
     const [reason, setReason] = useState('');
@@ -174,6 +182,7 @@ export default function MudadPage() {
     const [yearFilter, setYearFilter] = useState(new Date().getFullYear());
     const [statusFilter, setStatusFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [startDate, setStartDate] = useState<Dayjs | null>(() => {
         return dayjs().startOf('month');
     });
@@ -219,6 +228,16 @@ export default function MudadPage() {
             const response = await api.get('/payroll-runs?status=LOCKED');
             return (response as any)?.data || response || [];
         },
+    });
+
+    // Fetch validation results for selected submission
+    const { data: validationResults, isLoading: validationLoading } = useQuery<MudadValidationResult>({
+        queryKey: ['mudad-validation', selectedSubmission?.payrollRunId],
+        queryFn: async () => {
+            if (!selectedSubmission?.payrollRunId) throw new Error('No payroll run ID');
+            return wpsExportService.validateForMudad(selectedSubmission.payrollRunId);
+        },
+        enabled: !!selectedSubmission?.payrollRunId && validationDialogOpen,
     });
 
     // Create submission mutation
@@ -299,6 +318,28 @@ export default function MudadPage() {
 
     const handleCopyHash = (hash: string) => {
         navigator.clipboard.writeText(hash);
+    };
+
+    const handleOpenValidation = (submission: MudadSubmission) => {
+        setSelectedSubmission(submission);
+        setValidationDialogOpen(true);
+    };
+
+    const handleToggleRow = (submissionId: string) => {
+        setExpandedRow(expandedRow === submissionId ? null : submissionId);
+    };
+
+    const getSeverityColor = (severity: 'ERROR' | 'WARNING' | 'INFO'): 'error' | 'warning' | 'info' => {
+        return severity.toLowerCase() as 'error' | 'warning' | 'info';
+    };
+
+    const getSeverityIcon = (severity: 'ERROR' | 'WARNING' | 'INFO') => {
+        switch (severity) {
+            case 'ERROR': return <ErrorIcon fontSize="small" />;
+            case 'WARNING': return <Warning fontSize="small" />;
+            case 'INFO': return <Info fontSize="small" />;
+            default: return <Info fontSize="small" />;
+        }
     };
 
     const handleExportExcel = async () => {
@@ -531,6 +572,13 @@ export default function MudadPage() {
                                     {format(new Date(submission.updatedAt), 'dd/MM/yyyy HH:mm')}
                                 </TableCell>
                                 <TableCell align="center">
+                                    {submission.payrollRunId && (
+                                        <Tooltip title="عرض التحذيرات والأخطاء">
+                                            <IconButton size="small" color="warning" onClick={() => handleOpenValidation(submission)}>
+                                                <BugReport />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
                                     <Tooltip title="إرفاق WPS">
                                         <IconButton size="small" color="primary" onClick={() => handleOpenAttachDialog(submission)}>
                                             <AttachFile />
@@ -823,6 +871,200 @@ export default function MudadPage() {
                     </List>
                 </Box>
             </Drawer>
+
+            {/* Validation Warnings Dialog */}
+            <Dialog
+                open={validationDialogOpen}
+                onClose={() => setValidationDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                        <Box display="flex" alignItems="center" gap={1}>
+                            <BugReport color="warning" />
+                            تحذيرات وأخطاء التحقق من صحة البيانات
+                        </Box>
+                        <IconButton onClick={() => setValidationDialogOpen(false)}>
+                            <Close />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
+                <DialogContent>
+                    {selectedSubmission && (
+                        <Alert severity="info" sx={{ mb: 3 }}>
+                            الفترة: {getMonthName(selectedSubmission.month)} {selectedSubmission.year}
+                        </Alert>
+                    )}
+
+                    {validationLoading && (
+                        <Box display="flex" justifyContent="center" py={4}>
+                            <CircularProgress />
+                        </Box>
+                    )}
+
+                    {!validationLoading && validationResults && (
+                        <Box>
+                            {/* Summary */}
+                            <Grid container spacing={2} mb={3}>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.50' }}>
+                                        <Typography variant="h4" fontWeight="bold" color="error.main">
+                                            {validationResults.summary.errors}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">أخطاء</Typography>
+                                    </Paper>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50' }}>
+                                        <Typography variant="h4" fontWeight="bold" color="warning.main">
+                                            {validationResults.summary.warnings}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">تحذيرات</Typography>
+                                    </Paper>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.50' }}>
+                                        <Typography variant="h4" fontWeight="bold" color="info.main">
+                                            {validationResults.summary.info}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">معلومات</Typography>
+                                    </Paper>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                    <Paper sx={{ p: 2, textAlign: 'center', bgcolor: validationResults.readyForSubmission ? 'success.50' : 'grey.100' }}>
+                                        <Typography variant="h4" fontWeight="bold" color={validationResults.readyForSubmission ? 'success.main' : 'text.secondary'}>
+                                            {validationResults.readyForSubmission ? <CheckCircle /> : <ErrorIcon />}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {validationResults.readyForSubmission ? 'جاهز للتقديم' : 'غير جاهز'}
+                                        </Typography>
+                                    </Paper>
+                                </Grid>
+                            </Grid>
+
+                            {/* Status Alert */}
+                            {!validationResults.readyForSubmission && validationResults.summary.errors > 0 && (
+                                <Alert severity="error" sx={{ mb: 2 }}>
+                                    يحتوي ملف WPS على أخطاء يجب إصلاحها قبل التقديم لمُدد
+                                </Alert>
+                            )}
+                            {validationResults.readyForSubmission && validationResults.summary.warnings > 0 && (
+                                <Alert severity="warning" sx={{ mb: 2 }}>
+                                    يمكن التقديم ولكن يُنصح بمراجعة التحذيرات
+                                </Alert>
+                            )}
+                            {validationResults.readyForSubmission && validationResults.summary.warnings === 0 && (
+                                <Alert severity="success" sx={{ mb: 2 }}>
+                                    البيانات جاهزة للتقديم لنظام مُدد - لا توجد أخطاء
+                                </Alert>
+                            )}
+
+                            {/* Issues List */}
+                            {validationResults.issues.length > 0 ? (
+                                <Box>
+                                    <Typography variant="subtitle1" fontWeight="bold" mb={2}>
+                                        قائمة المشاكل ({validationResults.issues.length})
+                                    </Typography>
+                                    <List>
+                                        {validationResults.issues.map((issue, index) => (
+                                            <ListItem
+                                                key={index}
+                                                sx={{
+                                                    flexDirection: 'column',
+                                                    alignItems: 'stretch',
+                                                    mb: 1,
+                                                    bgcolor: 'grey.50',
+                                                    borderRadius: 1,
+                                                    border: 1,
+                                                    borderColor: `${getSeverityColor(issue.severity)}.200`,
+                                                }}
+                                            >
+                                                <Box display="flex" alignItems="flex-start" gap={1}>
+                                                    <Box sx={{ color: `${getSeverityColor(issue.severity)}.main`, mt: 0.5 }}>
+                                                        {getSeverityIcon(issue.severity)}
+                                                    </Box>
+                                                    <Box flex={1}>
+                                                        <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                                            <Chip
+                                                                label={issue.severity}
+                                                                size="small"
+                                                                color={getSeverityColor(issue.severity)}
+                                                            />
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {issue.code}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Typography variant="body2" fontWeight="bold" mb={0.5}>
+                                                            {issue.messageAr}
+                                                        </Typography>
+                                                        {issue.employeeCode && (
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                الموظف: {issue.employeeName || issue.employeeCode}
+                                                            </Typography>
+                                                        )}
+                                                        {issue.field && (
+                                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                                الحقل: {issue.field}
+                                                            </Typography>
+                                                        )}
+                                                        {(issue.expected || issue.actual) && (
+                                                            <Box mt={1}>
+                                                                {issue.expected && (
+                                                                    <Typography variant="caption" display="block">
+                                                                        المتوقع: {issue.expected}
+                                                                    </Typography>
+                                                                )}
+                                                                {issue.actual && (
+                                                                    <Typography variant="caption" display="block">
+                                                                        الفعلي: {issue.actual}
+                                                                    </Typography>
+                                                                )}
+                                                            </Box>
+                                                        )}
+                                                        {issue.suggestion && (
+                                                            <Alert severity="info" sx={{ mt: 1, py: 0.5 }}>
+                                                                <Typography variant="caption">
+                                                                    <strong>الحل المقترح:</strong> {issue.suggestion}
+                                                                </Typography>
+                                                            </Alert>
+                                                        )}
+                                                    </Box>
+                                                </Box>
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </Box>
+                            ) : (
+                                <Alert severity="success">
+                                    لا توجد مشاكل - البيانات صحيحة ومطابقة لمتطلبات نظام مُدد
+                                </Alert>
+                            )}
+                        </Box>
+                    )}
+
+                    {!validationLoading && !validationResults && !selectedSubmission?.payrollRunId && (
+                        <Alert severity="warning">
+                            لا يوجد ملف WPS مرتبط بهذا التقديم. يرجى إرفاق ملف WPS أولاً.
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setValidationDialogOpen(false)}>إغلاق</Button>
+                    {validationResults?.readyForSubmission && (
+                        <Button
+                            variant="contained"
+                            color="success"
+                            startIcon={<CheckCircle />}
+                            onClick={() => {
+                                setValidationDialogOpen(false);
+                            }}
+                        >
+                            جاهز للتقديم
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

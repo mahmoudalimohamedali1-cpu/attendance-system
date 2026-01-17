@@ -27,11 +27,47 @@ export interface EmployeeWithoutBank {
     employeeCode: string;
 }
 
+export interface MudadValidationIssue {
+    code: string;
+    severity: 'ERROR' | 'WARNING' | 'INFO';
+    message: string;
+    messageAr: string;
+    field?: string;
+    employeeCode?: string;
+    employeeName?: string;
+    expected?: number | string;
+    actual?: number | string;
+    suggestion?: string;
+}
+
+export interface MudadValidationResult {
+    isValid: boolean;
+    canProceed: boolean;
+    readyForSubmission: boolean;
+    issues: MudadValidationIssue[];
+    summary: {
+        errors: number;
+        warnings: number;
+        info: number;
+        totalEmployees: number;
+        validEmployees: number;
+        totalAmount: number;
+    };
+    validatedAt: Date;
+    payrollRunId: string;
+    period: string;
+}
+
 class WpsExportService {
     private readonly basePath = '/wps-export';
 
     async validate(payrollRunId: string): Promise<WpsValidation> {
         const response = await api.get(`${this.basePath}/${payrollRunId}/validate`) as WpsValidation | { data: WpsValidation };
+        return (response as any).data || response;
+    }
+
+    async validateForMudad(payrollRunId: string): Promise<MudadValidationResult> {
+        const response = await api.get(`${this.basePath}/${payrollRunId}/validate-mudad`) as MudadValidationResult | { data: MudadValidationResult };
         return (response as any).data || response;
     }
 
