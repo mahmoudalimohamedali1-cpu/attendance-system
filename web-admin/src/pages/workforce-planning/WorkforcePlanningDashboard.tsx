@@ -23,6 +23,7 @@ import {
     Schedule,
     BusinessCenter,
     Refresh,
+    Assessment,
 } from '@mui/icons-material';
 import { getForecast, ForecastRequestDto } from '@/api/workforce-planning';
 
@@ -244,6 +245,16 @@ export default function WorkforcePlanningDashboard() {
                             onClick={() => navigate('/workforce-planning/scenarios')}
                         >
                             محاكاة السيناريوهات
+                        </Button>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                        <Button
+                            fullWidth
+                            variant="outlined"
+                            startIcon={<Assessment />}
+                            onClick={() => navigate('/workforce-planning/business-metrics')}
+                        >
+                            مؤشرات الأعمال
                         </Button>
                     </Grid>
                 </Grid>
