@@ -652,8 +652,48 @@ export class PayrollCalculationService {
         // 3. حساب الوقت الإضافي (Overtime) مع المعاملات المختلفة
         // ✅ Using Decimal for all overtime calculations
         const daysInPeriodOT = this.getDaysInPeriod(startDate, endDate, settings.overtimeCalcBase as any);
-        const otBaseSalary = settings.overtimeMethod === 'BASED_ON_TOTAL' ? totalSalary :
-            (settings.overtimeMethod === 'BASED_ON_BASIC_ONLY' ? baseSalary : baseSalary);
+
+        // ✅ حساب أساس الوقت الإضافي بناءً على الطريقة المختارة
+        let otBaseSalary: Decimal = baseSalary;
+        const overtimeMethod = settings.overtimeMethod || 'BASED_ON_BASIC_ONLY';
+
+        switch (overtimeMethod) {
+            case 'BASED_ON_BASIC_ONLY':
+                // الوقت الإضافي يُحسب على الراتب الأساسي فقط
+                otBaseSalary = baseSalary;
+                break;
+
+            case 'BASED_ON_TOTAL':
+                // الوقت الإضافي يُحسب على إجمالي الراتب (الأساسي + جميع البدلات)
+                otBaseSalary = totalSalary;
+                break;
+
+            case 'BASED_ON_SHIFTS':
+                // الوقت الإضافي يُحسب على الراتب الأساسي + بدل السكن (إن وجد)
+                // هذا هو الأكثر شيوعاً في نظام العمل السعودي
+                const housingAllowance = ctx.HOUSING || ctx.HOUSING_ALLOWANCE || ctx.HRA || ZERO;
+                otBaseSalary = add(baseSalary, housingAllowance);
+                break;
+
+            case 'BASED_ON_ELIGIBLE_COMPONENTS':
+                // الوقت الإضافي يُحسب على البدلات المحددة كـ "خاضعة للإضافي" فقط
+                // نجمع فقط المكونات التي لها علامة gosiEligible (أو يمكن إضافة علامة overtimeEligible)
+                let eligibleTotal: Decimal = baseSalary; // الأساسي دائماً مؤهل
+                for (const line of calculatedLines) {
+                    // نضيف البدلات المؤهلة للتأمينات (GOSI) كمعيار للأهلية للإضافي
+                    if (line.gosiEligible && line.type !== 'BASIC') {
+                        eligibleTotal = add(eligibleTotal, line.amount);
+                    }
+                }
+                otBaseSalary = eligibleTotal;
+                break;
+
+            default:
+                // الافتراضي: الراتب الأساسي
+                otBaseSalary = baseSalary;
+        }
+
+        this.logger.debug(`Overtime calculation method: ${overtimeMethod}, base salary: ${toFixed(otBaseSalary)} SAR`);
 
         const otHourlyRate = calcHourlyRate(otBaseSalary, daysInPeriodOT, 8);
 

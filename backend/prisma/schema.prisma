@@ -168,6 +168,112 @@ model PayrollSettings {
   defaultWorkingDaysPerMonth Int @default(30) @map("default_working_days_per_month")
   leaveDailyRateDivisor      Int @default(30) @map("leave_daily_rate_divisor") // مقسم الراتب اليومي للإجازات
 
+  // ========== إعدادات الوقت الإضافي ==========
+  overtimeMultiplier          Decimal? @map("overtime_multiplier") @db.Decimal(3, 2)
+  gracePeriodMinutes          Int?     @default(15) @map("grace_period_minutes")
+  weekendOvertimeMultiplier   Decimal? @map("weekend_overtime_multiplier") @db.Decimal(3, 2)
+  holidayOvertimeMultiplier   Decimal? @map("holiday_overtime_multiplier") @db.Decimal(3, 2)
+  nightShiftAllowancePercent  Decimal? @map("night_shift_allowance_percent") @db.Decimal(5, 2)
+  maxDeductionPercent         Decimal? @map("max_deduction_percent") @db.Decimal(5, 2)
+  minNetSalary                Decimal? @map("min_net_salary") @db.Decimal(10, 2)
+  autoLockDay                 Int?     @map("auto_lock_day")
+
+  // ========== إعدادات العملة ==========
+  defaultCurrency       String?  @map("default_currency")
+  enableMultiCurrency   Boolean? @default(false) @map("enable_multi_currency")
+
+  // ========== إعدادات المكافآت والعمولات ==========
+  enableBonusTracking      Boolean? @default(false) @map("enable_bonus_tracking")
+  bonusCalculationMethod   String?  @map("bonus_calculation_method")
+  enableCommission         Boolean? @default(false) @map("enable_commission")
+  commissionCalculationBase String? @map("commission_calculation_base")
+
+  // ========== إعدادات البدلات ==========
+  enableAllowanceCategories Boolean? @default(false) @map("enable_allowance_categories")
+  maxAllowancePercent       Decimal? @map("max_allowance_percent") @db.Decimal(5, 2)
+
+  // ========== إعدادات الضرائب ==========
+  enableTaxCalculation   Boolean? @default(false) @map("enable_tax_calculation")
+  taxCalculationMethod   String?  @map("tax_calculation_method")
+
+  // ========== إعدادات السلفة والقروض ==========
+  enableSalaryAdvance     Boolean? @default(false) @map("enable_salary_advance")
+  maxAdvancePercent       Decimal? @map("max_advance_percent") @db.Decimal(5, 2)
+  enableLoanDeduction     Boolean? @default(false) @map("enable_loan_deduction")
+  maxLoanDeductionPercent Decimal? @map("max_loan_deduction_percent") @db.Decimal(5, 2)
+
+  // ========== إعدادات الموافقات ==========
+  enableApprovalWorkflow Boolean? @default(false) @map("enable_approval_workflow")
+  approvalLevels         Int?     @map("approval_levels")
+
+  // ========== إعدادات التحويل البنكي ==========
+  enableBankTransfer Boolean? @default(false) @map("enable_bank_transfer")
+  defaultBankCode    String?  @map("default_bank_code")
+
+  // ========== إعدادات الأجر بأثر رجعي ==========
+  enableRetroactivePay   Boolean? @default(false) @map("enable_retroactive_pay")
+  retroactiveMonthsLimit Int?     @map("retroactive_months_limit")
+
+  // ========== إعدادات نهاية الخدمة ==========
+  enableEosCalculation Boolean? @default(false) @map("enable_eos_calculation")
+  eosCalculationMethod String?  @map("eos_calculation_method")
+
+  // ========== إعدادات التأمينات الاجتماعية (GOSI) ==========
+  enableGosiCalculation Boolean? @default(false) @map("enable_gosi_calculation")
+  gosiEmployeePercent   Decimal? @map("gosi_employee_percent") @db.Decimal(5, 2)
+  gosiEmployerPercent   Decimal? @map("gosi_employer_percent") @db.Decimal(5, 2)
+  gosiMaxSalary         Decimal? @map("gosi_max_salary") @db.Decimal(10, 2)
+
+  // ========== إعدادات SANED ==========
+  enableSanedCalculation Boolean? @default(false) @map("enable_saned_calculation")
+  sanedEmployeePercent   Decimal? @map("saned_employee_percent") @db.Decimal(5, 2)
+  sanedEmployerPercent   Decimal? @map("saned_employer_percent") @db.Decimal(5, 2)
+  hazardRatePercent      Decimal? @map("hazard_rate_percent") @db.Decimal(5, 2)
+
+  // ========== إعدادات صرف الإجازات ==========
+  enableVacationEncashment Boolean? @default(false) @map("enable_vacation_encashment")
+  vacationEncashmentMethod String?  @map("vacation_encashment_method")
+
+  // ========== إعدادات جزاءات الحضور ==========
+  enableAttendancePenalty   Boolean? @default(false) @map("enable_attendance_penalty")
+  lateDeductionMethod       String?  @map("late_deduction_method")
+  lateThresholdMinutes      Int?     @map("late_threshold_minutes")
+  absenceDeductionMethod    String?  @map("absence_deduction_method")
+  absenceProgressiveRate    Decimal? @map("absence_progressive_rate") @db.Decimal(5, 2)
+
+  // ========== إعدادات الانصراف المبكر ==========
+  enableEarlyDeparturePenalty     Boolean? @default(false) @map("enable_early_departure_penalty")
+  earlyDepartureDeductionMethod   String?  @map("early_departure_deduction_method")
+  earlyDepartureThresholdMinutes  Int?     @map("early_departure_threshold_minutes")
+
+  // ========== إعدادات التأخير التراكمي ==========
+  enableCumulativeLateDeduction Boolean? @default(false) @map("enable_cumulative_late_deduction")
+  lateCountForDayDeduction      Int?     @map("late_count_for_day_deduction")
+
+  // ========== إعدادات قسيمة الراتب الإلكترونية ==========
+  enablePayslipEmail Boolean? @default(false) @map("enable_payslip_email")
+  payslipLanguage    String?  @map("payslip_language")
+
+  // ========== إعدادات سقف الوقت الإضافي ==========
+  enableOvertimeCap        Boolean? @default(false) @map("enable_overtime_cap")
+  maxOvertimeHoursPerMonth Int?     @map("max_overtime_hours_per_month")
+
+  // ========== إعدادات توليد الرواتب التلقائي ==========
+  enableAutoPayrollGeneration Boolean? @default(false) @map("enable_auto_payroll_generation")
+  autoPayrollGenerationDay    Int?     @map("auto_payroll_generation_day")
+
+  // ========== إعدادات التدقيق والتقريب ==========
+  enablePayrollAuditTrail Boolean? @default(false) @map("enable_payroll_audit_trail")
+  enableSalaryRounding    Boolean? @default(false) @map("enable_salary_rounding")
+  salaryRoundingMethod    String?  @map("salary_rounding_method")
+
+  // ========== إعدادات الميزانية ومركز التكلفة ==========
+  enableDepartmentBudget   Boolean? @default(false) @map("enable_department_budget")
+  enableCostCenterTracking Boolean? @default(false) @map("enable_cost_center_tracking")
+
+  // ========== إعدادات التصدير ==========
+  defaultPayrollExportFormat String? @map("default_payroll_export_format")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

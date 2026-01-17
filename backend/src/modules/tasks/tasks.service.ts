@@ -550,7 +550,10 @@ export class TasksService {
             BACKLOG: [],
             TODO: [],
             IN_PROGRESS: [],
+            PENDING_REVIEW: [],
             IN_REVIEW: [],
+            APPROVED: [],
+            REJECTED: [],
             BLOCKED: [],
             COMPLETED: [],
         };
