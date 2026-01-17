@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Delete } from '@nestjs/common';
-import { UpdateRequestStatus, UpdateRequestType } from '@prisma/client';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { DocumentType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
     UpdateProfileDto,
@@ -356,21 +356,65 @@ export class EmployeeProfileService {
     }
 
     /**
-     * جلب الوثائق - placeholder since model not in schema
+     * جلب الوثائق
      */
-    async getDocuments(userId: string, companyId: string) {
-        // EmployeeDocument model is not in schema yet
-        // Return empty placeholder
+    async getDocuments(userId: string, companyId: string, requesterId?: string, type?: DocumentType) {
+        // التحقق من الصلاحيات إذا تم تمرير requesterId
+        if (requesterId) {
+            await this.checkAccess(userId, companyId, requesterId);
+        }
+
+        const whereClause: any = {
+            userId,
+            companyId,
+        };
+
+        if (type) {
+            whereClause.type = type;
+        }
+
+        // جلب جميع المستندات
+        const documents = await this.prisma.employeeDocument.findMany({
+            where: whereClause,
+            orderBy: { createdAt: 'desc' },
+        });
+
+        // تجميع حسب النوع
+        const byType: Record<string, typeof documents> = {};
+        documents.forEach((doc) => {
+            if (!byType[doc.type]) {
+                byType[doc.type] = [];
+            }
+            byType[doc.type].push(doc);
+        });
+
+        // جلب المستندات التي ستنتهي صلاحيتها خلال 30 يوم
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+        const expiringDocuments = documents.filter((doc) => {
+            if (!doc.expiryDate) return false;
+            const expiryDate = new Date(doc.expiryDate);
+            return expiryDate <= thirtyDaysFromNow && expiryDate >= new Date();
+        });
+
+        // جلب المستندات المنتهية الصلاحية
+        const expiredDocuments = documents.filter((doc) => {
+            if (!doc.expiryDate) return false;
+            return new Date(doc.expiryDate) < new Date();
+        });
+
         return {
-            documents: [],
-            byType: {},
-            expiringDocuments: [],
-            totalCount: 0,
+            documents,
+            byType,
+            expiringDocuments,
+            expiredDocuments,
+            totalCount: documents.length,
         };
     }
 
     /**
-     * رفع مستند جديد - placeholder since model not in schema
+     * رفع مستند جديد
      */
     async uploadDocument(
         userId: string,
@@ -392,9 +436,157 @@ export class EmployeeProfileService {
             originalName?: string;
         },
     ) {
-        // EmployeeDocument model is not in schema yet
-        // Return placeholder response
-        throw new BadRequestException('تحميل المستندات غير متاح حالياً');
+        // التحقق من صلاحية رفع المستند
+        await this.checkAccess(userId, companyId, uploadedById, 'EDIT');
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من نوع المستند
+        const validTypes = Object.values(DocumentType);
+        if (!validTypes.includes(data.type as DocumentType)) {
+            throw new BadRequestException('نوع المستند غير صالح');
+        }
+
+        // التحقق من حجم الملف (الحد الأقصى 10 ميجابايت)
+        const maxFileSize = 10 * 1024 * 1024; // 10MB
+        if (data.fileSize > maxFileSize) {
+            throw new BadRequestException('حجم الملف يتجاوز الحد المسموح (10 ميجابايت)');
+        }
+
+        // التحقق من أنواع الملفات المسموحة
+        const allowedFileTypes = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/jpg',
+            'image/webp',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+
+        if (!allowedFileTypes.includes(data.fileType)) {
+            throw new BadRequestException('نوع الملف غير مسموح');
+        }
+
+        // إنشاء المستند
+        const document = await this.prisma.employeeDocument.create({
+            data: {
+                companyId,
+                userId,
+                type: data.type as DocumentType,
+                title: data.title,
+                titleAr: data.titleAr,
+                description: data.description,
+                documentNumber: data.documentNumber,
+                issueDate: data.issueDate ? new Date(data.issueDate) : undefined,
+                expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
+                issuingAuthority: data.issuingAuthority,
+                notes: data.notes,
+                filePath: data.filePath,
+                fileType: data.fileType,
+                fileSize: data.fileSize,
+                originalName: data.originalName,
+                uploadedById,
+            },
+        });
+
+        return document;
+    }
+
+    /**
+     * تحديث مستند
+     */
+    async updateDocument(
+        userId: string,
+        documentId: string,
+        companyId: string,
+        requesterId: string,
+        data: {
+            title?: string;
+            titleAr?: string;
+            description?: string;
+            documentNumber?: string;
+            issueDate?: string;
+            expiryDate?: string;
+            issuingAuthority?: string;
+            notes?: string;
+            isVerified?: boolean;
+        },
+    ) {
+        // التحقق من الصلاحيات
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود المستند
+        const document = await this.prisma.employeeDocument.findFirst({
+            where: { id: documentId, userId, companyId },
+        });
+
+        if (!document) {
+            throw new NotFoundException('المستند غير موجود');
+        }
+
+        // تحضير بيانات التحديث
+        const updateData: any = {};
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.titleAr !== undefined) updateData.titleAr = data.titleAr;
+        if (data.description !== undefined) updateData.description = data.description;
+        if (data.documentNumber !== undefined) updateData.documentNumber = data.documentNumber;
+        if (data.issueDate !== undefined) updateData.issueDate = new Date(data.issueDate);
+        if (data.expiryDate !== undefined) updateData.expiryDate = new Date(data.expiryDate);
+        if (data.issuingAuthority !== undefined) updateData.issuingAuthority = data.issuingAuthority;
+        if (data.notes !== undefined) updateData.notes = data.notes;
+
+        // التحقق من صلاحية التحقق من المستند
+        if (data.isVerified !== undefined) {
+            const requester = await this.prisma.user.findUnique({
+                where: { id: requesterId },
+                select: { role: true, isSuperAdmin: true },
+            });
+
+            if (requester && (requester.role === 'ADMIN' || requester.role === 'HR' || requester.isSuperAdmin)) {
+                updateData.isVerified = data.isVerified;
+                if (data.isVerified) {
+                    updateData.verifiedById = requesterId;
+                    updateData.verifiedAt = new Date();
+                } else {
+                    updateData.verifiedById = null;
+                    updateData.verifiedAt = null;
+                }
+            }
+        }
+
+        // تحديث المستند
+        const updatedDocument = await this.prisma.employeeDocument.update({
+            where: { id: documentId },
+            data: updateData,
+        });
+
+        return updatedDocument;
+    }
+
+    /**
+     * جلب مستند واحد
+     */
+    async getDocumentById(userId: string, documentId: string, companyId: string, requesterId: string) {
+        // التحقق من الصلاحيات
+        await this.checkAccess(userId, companyId, requesterId);
+
+        const document = await this.prisma.employeeDocument.findFirst({
+            where: { id: documentId, userId, companyId },
+        });
+
+        if (!document) {
+            throw new NotFoundException('المستند غير موجود');
+        }
+
+        return document;
     }
 
     /**
@@ -711,8 +903,84 @@ export class EmployeeProfileService {
         });
     }
 
-    async deleteDocument(userId: string, docId: string, companyId: string) {
-        // EmployeeDocument model is not in schema yet
-        throw new BadRequestException('حذف المستندات غير متاح حالياً');
+    /**
+     * حذف مستند
+     */
+    async deleteDocument(userId: string, documentId: string, companyId: string, requesterId: string) {
+        // التحقق من الصلاحيات
+        await this.checkAccess(userId, companyId, requesterId, 'EDIT');
+
+        // التحقق من وجود المستند
+        const document = await this.prisma.employeeDocument.findFirst({
+            where: { id: documentId, userId, companyId },
+        });
+
+        if (!document) {
+            throw new NotFoundException('المستند غير موجود');
+        }
+
+        // حذف المستند
+        await this.prisma.employeeDocument.delete({
+            where: { id: documentId },
+        });
+
+        return { message: 'تم حذف المستند بنجاح' };
+    }
+
+    /**
+     * جلب المستندات المنتهية أو قاربت على الانتهاء لجميع الموظفين (للمدير/HR)
+     */
+    async getExpiringDocumentsForCompany(companyId: string, requesterId: string, daysUntilExpiry: number = 30) {
+        // التحقق من صلاحيات المستخدم
+        const requester = await this.prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { role: true, isSuperAdmin: true, companyId: true },
+        });
+
+        if (!requester || requester.companyId !== companyId) {
+            throw new ForbiddenException('غير مصرح لك');
+        }
+
+        if (!['ADMIN', 'HR', 'MANAGER'].includes(requester.role) && !requester.isSuperAdmin) {
+            throw new ForbiddenException('غير مصرح لك بالوصول لهذه البيانات');
+        }
+
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + daysUntilExpiry);
+
+        const expiringDocuments = await this.prisma.employeeDocument.findMany({
+            where: {
+                companyId,
+                expiryDate: {
+                    lte: expiryDate,
+                },
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        department: {
+                            select: { name: true },
+                        },
+                    },
+                },
+            },
+            orderBy: { expiryDate: 'asc' },
+        });
+
+        // تصنيف المستندات
+        const now = new Date();
+        const expired = expiringDocuments.filter((doc) => new Date(doc.expiryDate!) < now);
+        const expiringSoon = expiringDocuments.filter((doc) => new Date(doc.expiryDate!) >= now);
+
+        return {
+            expired,
+            expiringSoon,
+            totalExpired: expired.length,
+            totalExpiringSoon: expiringSoon.length,
+        };
     }
 }

@@ -1,65 +1,25 @@
 {
   "active": true,
-<<<<<<< HEAD
-<<<<<<< HEAD
-  "spec": "018-qiwa-platform-integration",
+  "spec": "022-",
   "state": "building",
   "subtasks": {
-    "completed": 15,
-    "total": 16,
-=======
-  "spec": "019-implement-company-timezone-loading",
-  "state": "building",
-  "subtasks": {
-    "completed": 5,
-    "total": 6,
->>>>>>> origin/auto-claude/019-implement-company-timezone-loading
-=======
-  "spec": "011-complete-google-play-integrity-api-verification",
-  "state": "building",
-  "subtasks": {
-    "completed": 8,
-    "total": 9,
->>>>>>> origin/auto-claude/011-complete-google-play-integrity-api-verification
+    "completed": 2,
+    "total": 21,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "current": "Integration and End-to-End Testing",
-=======
-    "current": "Testing & Verification",
->>>>>>> origin/auto-claude/019-implement-company-timezone-loading
+    "current": "Backend Core Services",
     "id": null,
-    "total": 1
-=======
-    "current": "Testing and Verification",
-    "id": null,
-    "total": 2
->>>>>>> origin/auto-claude/011-complete-google-play-integrity-api-verification
+    "total": 4
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "number": 17,
-    "started_at": "2026-01-16T02:30:26.397761"
+    "number": 3,
+    "started_at": "2026-01-17T02:04:15.658108"
   },
-  "last_update": "2026-01-16T03:16:04.718223"
-=======
-    "number": 7,
-    "started_at": "2026-01-16T10:22:12.155492"
-  },
-  "last_update": "2026-01-16T10:41:36.469647"
->>>>>>> origin/auto-claude/019-implement-company-timezone-loading
-=======
-    "number": 10,
-    "started_at": "2026-01-15T19:33:29.420415"
-  },
-  "last_update": "2026-01-15T19:56:54.861373"
->>>>>>> origin/auto-claude/011-complete-google-play-integrity-api-verification
+  "last_update": "2026-01-17T02:10:19.994753"
 }
