@@ -19,6 +19,12 @@ import {
     ListItemSecondaryAction,
     Divider,
     Avatar,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
 } from '@mui/material';
 import {
     CheckCircle,
@@ -33,8 +39,10 @@ import {
     Refresh,
     Download,
     TrendingUp,
+    History,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
+import { format } from 'date-fns';
 
 interface ComplianceStatus {
     mudad: {
@@ -69,6 +77,35 @@ interface ActionItem {
     path: string;
 }
 
+interface MudadMetrics {
+    totalSubmissions: number;
+    pendingCount: number;
+    preparedCount: number;
+    submittedCount: number;
+    acceptedCount: number;
+    rejectedCount: number;
+    resubmitRequiredCount: number;
+    totalAmount: number;
+    complianceRate: number;
+    lastSubmissionDate?: string;
+    nextDueDate?: string;
+}
+
+interface MudadSubmission {
+    id: string;
+    month: number;
+    year: number;
+    status: 'PENDING' | 'PREPARED' | 'SUBMITTED' | 'ACCEPTED' | 'REJECTED' | 'RESUBMIT_REQUIRED';
+    createdAt: string;
+    updatedAt: string;
+}
+
+const getMonthName = (month: number) => {
+    const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    return months[month - 1] || '';
+};
+
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'ACCEPTED':
@@ -78,12 +115,14 @@ const getStatusColor = (status: string) => {
         case 'SUBMITTED':
             return 'success';
         case 'PENDING':
+        case 'PREPARED':
             return 'warning';
         case 'NOT_STARTED':
         case 'NOT_READY':
         case 'MISSING':
             return 'error';
         case 'REJECTED':
+        case 'RESUBMIT_REQUIRED':
             return 'error';
         default:
             return 'default';
@@ -99,12 +138,14 @@ const getStatusIcon = (status: string) => {
         case 'SUBMITTED':
             return <CheckCircle color="success" />;
         case 'PENDING':
+        case 'PREPARED':
             return <Schedule color="warning" />;
         case 'NOT_STARTED':
         case 'NOT_READY':
         case 'MISSING':
             return <ErrorIcon color="error" />;
         case 'REJECTED':
+        case 'RESUBMIT_REQUIRED':
             return <ErrorIcon color="error" />;
         default:
             return <Warning color="disabled" />;
@@ -115,9 +156,11 @@ const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
         'NOT_STARTED': 'لم يبدأ',
         'PENDING': 'قيد الانتظار',
+        'PREPARED': 'تم التجهيز',
         'SUBMITTED': 'تم الإرسال',
         'ACCEPTED': 'مقبول',
         'REJECTED': 'مرفوض',
+        'RESUBMIT_REQUIRED': 'يتطلب إعادة إرسال',
         'NOT_READY': 'غير جاهز',
         'READY': 'جاهز',
         'EXPORTED': 'تم التصدير',
@@ -130,6 +173,33 @@ const getStatusLabel = (status: string) => {
 export default function ComplianceOverviewPage() {
     const navigate = useNavigate();
     const [refreshKey, setRefreshKey] = useState(0);
+    const currentYear = new Date().getFullYear();
+
+    // Fetch MUDAD metrics
+    const { data: mudadMetrics } = useQuery<MudadMetrics>({
+        queryKey: ['mudad-metrics', currentYear, refreshKey],
+        queryFn: async () => {
+            const response = await api.get(`/dashboard/mudad-metrics?year=${currentYear}`);
+            return response as MudadMetrics;
+        },
+        refetchInterval: 60000,
+    });
+
+    // Fetch recent MUDAD submissions (last 6 months)
+    const { data: mudadHistory } = useQuery<MudadSubmission[]>({
+        queryKey: ['mudad-history', currentYear, refreshKey],
+        queryFn: async () => {
+            const response = await api.get(`/mudad?year=${currentYear}`);
+            const submissions = (response as any)?.data || response || [];
+            // Sort by date descending and take last 6 months
+            return submissions
+                .sort((a: MudadSubmission, b: MudadSubmission) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                )
+                .slice(0, 6);
+        },
+        refetchInterval: 60000,
+    });
 
     // Fetch compliance status
     const { data: compliance, isLoading } = useQuery<ComplianceStatus>({
@@ -145,11 +215,19 @@ export default function ComplianceOverviewPage() {
             const users = (usersData as any)?.data || [];
             const missingBank = users.filter((u: any) => !u.bankAccounts?.length).length;
 
+            // Determine MUDAD status from metrics
+            let mudadStatus: 'NOT_STARTED' | 'PENDING' | 'SUBMITTED' | 'ACCEPTED' | 'REJECTED' = 'NOT_STARTED';
+            if (mudadMetrics) {
+                if (mudadMetrics.acceptedCount > 0) mudadStatus = 'ACCEPTED';
+                else if (mudadMetrics.submittedCount > 0) mudadStatus = 'SUBMITTED';
+                else if (mudadMetrics.pendingCount > 0 || mudadMetrics.preparedCount > 0) mudadStatus = 'PENDING';
+            }
+
             return {
                 mudad: {
-                    status: 'PENDING',
-                    pendingCount: 0,
-                    lastSubmission: undefined,
+                    status: mudadStatus,
+                    pendingCount: mudadMetrics?.pendingCount || 0,
+                    lastSubmission: mudadMetrics?.lastSubmissionDate,
                 },
                 wps: {
                     status: missingBank > 0 ? 'NOT_READY' : 'READY',
@@ -167,6 +245,7 @@ export default function ComplianceOverviewPage() {
             };
         },
         refetchInterval: 60000,
+        enabled: !!mudadMetrics,
     });
 
     // Generate action items
@@ -184,16 +263,69 @@ export default function ComplianceOverviewPage() {
         });
     }
 
+    // MUDAD-specific action items
+    if (mudadMetrics) {
+        if (mudadMetrics.rejectedCount > 0) {
+            actionItems.push({
+                id: 'mudad-rejected',
+                type: 'MUDAD',
+                priority: 'HIGH',
+                title: 'تقديمات مُدد مرفوضة',
+                description: `${mudadMetrics.rejectedCount} تقديم مرفوض يحتاج مراجعة وإعادة إرسال`,
+                action: 'مراجعة',
+                path: '/mudad',
+            });
+        }
+
+        if (mudadMetrics.resubmitRequiredCount > 0) {
+            actionItems.push({
+                id: 'mudad-resubmit',
+                type: 'MUDAD',
+                priority: 'HIGH',
+                title: 'تقديمات تحتاج إعادة إرسال',
+                description: `${mudadMetrics.resubmitRequiredCount} تقديم تغير ملف WPS الخاص به`,
+                action: 'إعادة إرسال',
+                path: '/mudad',
+            });
+        }
+
+        if (mudadMetrics.pendingCount > 0) {
+            actionItems.push({
+                id: 'mudad-pending',
+                type: 'MUDAD',
+                priority: 'MEDIUM',
+                title: 'تقديمات مُدد معلقة',
+                description: `${mudadMetrics.pendingCount} تقديم في انتظار الإرسال`,
+                action: 'إرسال',
+                path: '/mudad',
+            });
+        }
+
+        if (mudadMetrics.complianceRate < 90 && mudadMetrics.totalSubmissions > 0) {
+            actionItems.push({
+                id: 'mudad-compliance',
+                type: 'MUDAD',
+                priority: 'MEDIUM',
+                title: 'نسبة التزام مُدد منخفضة',
+                description: `نسبة الالتزام ${mudadMetrics.complianceRate.toFixed(0)}% - يُنصح بالوصول لـ 90%`,
+                action: 'تحسين',
+                path: '/mudad',
+            });
+        }
+    }
+
     if (compliance?.mudad.status === 'PENDING' || compliance?.mudad.status === 'NOT_STARTED') {
-        actionItems.push({
-            id: 'mudad-submit',
-            type: 'MUDAD',
-            priority: 'MEDIUM',
-            title: 'إرسال بيانات مدد',
-            description: 'يجب إرسال بيانات الموظفين لمنصة مدد',
-            action: 'إنشاء تقديم',
-            path: '/mudad',
-        });
+        if (!actionItems.find(item => item.id.startsWith('mudad'))) {
+            actionItems.push({
+                id: 'mudad-submit',
+                type: 'MUDAD',
+                priority: 'MEDIUM',
+                title: 'إرسال بيانات مدد',
+                description: 'يجب إرسال بيانات الموظفين لمنصة مدد',
+                action: 'إنشاء تقديم',
+                path: '/mudad',
+            });
+        }
     }
 
     // GOSI action item
@@ -363,9 +495,26 @@ export default function ComplianceOverviewPage() {
                                     size="small"
                                 />
                             </Box>
-                            <Typography variant="body2" color="text.secondary" mb={2}>
-                                منصة الأجور - وزارة الموارد البشرية
-                            </Typography>
+                            {mudadMetrics && (
+                                <Box mb={2}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        نسبة الالتزام: {mudadMetrics.complianceRate.toFixed(0)}%
+                                    </Typography>
+                                    <LinearProgress
+                                        variant="determinate"
+                                        value={mudadMetrics.complianceRate}
+                                        sx={{
+                                            mt: 1,
+                                            height: 6,
+                                            borderRadius: 3,
+                                            bgcolor: 'grey.200',
+                                            '& .MuiLinearProgress-bar': {
+                                                bgcolor: mudadMetrics.complianceRate >= 90 ? 'success.main' : mudadMetrics.complianceRate >= 70 ? 'primary.main' : 'warning.main',
+                                            },
+                                        }}
+                                    />
+                                </Box>
+                            )}
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -443,6 +592,110 @@ export default function ComplianceOverviewPage() {
                     </Card>
                 </Grid>
             </Grid>
+
+            {/* MUDAD Trends Section */}
+            {mudadMetrics && mudadMetrics.totalSubmissions > 0 && (
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', mb: 4 }}>
+                    <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <History color="secondary" />
+                        اتجاهات مُدد - آخر 6 أشهر
+                    </Typography>
+                    <Divider sx={{ my: 2 }} />
+
+                    {/* MUDAD Metrics Summary */}
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={6} sm={3}>
+                            <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 2 }}>
+                                <Typography variant="h5" fontWeight="bold">{mudadMetrics.totalSubmissions}</Typography>
+                                <Typography variant="caption" color="text.secondary">إجمالي التقديمات</Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50', borderRadius: 2 }}>
+                                <Typography variant="h5" fontWeight="bold" color="success.main">{mudadMetrics.acceptedCount}</Typography>
+                                <Typography variant="caption" color="text.secondary">مقبول</Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.50', borderRadius: 2 }}>
+                                <Typography variant="h5" fontWeight="bold" color="warning.main">{mudadMetrics.pendingCount}</Typography>
+                                <Typography variant="caption" color="text.secondary">معلق</Typography>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                            <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.50', borderRadius: 2 }}>
+                                <Typography variant="h5" fontWeight="bold" color="error.main">
+                                    {mudadMetrics.rejectedCount + mudadMetrics.resubmitRequiredCount}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">يحتاج إجراء</Typography>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+
+                    {/* Recent Submissions Table */}
+                    {mudadHistory && mudadHistory.length > 0 && (
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell><strong>الفترة</strong></TableCell>
+                                        <TableCell><strong>الحالة</strong></TableCell>
+                                        <TableCell><strong>تاريخ الإنشاء</strong></TableCell>
+                                        <TableCell><strong>آخر تحديث</strong></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {mudadHistory.map((submission) => (
+                                        <TableRow
+                                            key={submission.id}
+                                            hover
+                                            sx={{
+                                                cursor: 'pointer',
+                                                bgcolor: submission.status === 'RESUBMIT_REQUIRED' ? 'error.50' : undefined
+                                            }}
+                                            onClick={() => navigate('/mudad')}
+                                        >
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">
+                                                    {getMonthName(submission.month)} {submission.year}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={getStatusLabel(submission.status)}
+                                                    color={getStatusColor(submission.status) as any}
+                                                    size="small"
+                                                    icon={getStatusIcon(submission.status)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {format(new Date(submission.createdAt), 'dd/MM/yyyy')}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {format(new Date(submission.updatedAt), 'dd/MM/yyyy HH:mm')}
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+
+                    <Box mt={2} display="flex" justifyContent="center">
+                        <Button
+                            variant="text"
+                            endIcon={<ArrowForward />}
+                            onClick={() => navigate('/mudad')}
+                        >
+                            عرض جميع التقديمات
+                        </Button>
+                    </Box>
+                </Paper>
+            )}
 
             {/* Actions Required */}
             {actionItems.length > 0 && (
