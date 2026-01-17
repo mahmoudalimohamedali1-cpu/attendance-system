@@ -1,113 +1,16 @@
 import { api } from './api.service';
-
-// 📊 Enums
-export enum RiskLevel {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL',
-}
-
-export enum FeatureImpact {
-  HIGH = 'high',
-  MEDIUM = 'medium',
-  LOW = 'low',
-}
-
-// 📊 Interfaces
-export interface FeatureImportance {
-  feature: string;
-  impact: FeatureImpact;
-  description: string;
-  weight: number;
-}
-
-export interface EmployeePrediction {
-  userId: string;
-  employeeName: string;
-  absenceLikelihood: number;
-  riskLevel: RiskLevel;
-  contributingFactors: string[];
-  departmentComparison?: string;
-  predictionDate: Date;
-}
-
-export interface PredictionExplanation {
-  summary: string;
-  riskLevel: RiskLevel;
-  likelihood: number;
-  topFactors: FeatureImportance[];
-  detailedExplanation: string;
-  recommendations: string[];
-}
-
-export interface PatternInsight {
-  patternType: string;
-  description: string;
-  affectedEmployees: string[];
-  confidence: number;
-  detectedAt: Date;
-  insights: string[];
-}
-
-export interface AccuracyMetrics {
-  modelVersion: string;
-  accuracy: number;
-  precision: number;
-  recall: number;
-  f1Score: number;
-  evaluatedAt: Date;
-  predictionCount: number;
-}
-
-export interface EmployeePredictionResponse {
-  success: boolean;
-  count: number;
-  generatedAt: Date;
-  predictions: EmployeePrediction[];
-}
-
-export interface EmployeePredictionWithExplanation {
-  prediction: EmployeePrediction;
-  explanation: PredictionExplanation;
-}
-
-export interface PatternsResponse {
-  success: boolean;
-  count: number;
-  detectedAt: Date;
-  patterns: PatternInsight[];
-}
-
-export interface ModelAccuracyResponse {
-  success: boolean;
-  metrics: AccuracyMetrics | null;
-  message?: string;
-}
-
-export interface TrainModelResponse {
-  success: boolean;
-  message: string;
-  modelVersion: string;
-  accuracy: number;
-  trainedAt: Date;
-}
-
-export interface RecommendationsResponse {
-  success: boolean;
-  overview: {
-    summary: string;
-    riskDistribution: {
-      high: number;
-      medium: number;
-      low: number;
-    };
-    averageLikelihood: number;
-    insights: string[];
-  };
-  recommendations: string[];
-  patterns: PatternInsight[];
-}
+import type {
+  EmployeePrediction,
+  PredictionExplanation,
+  PatternInsight,
+  AccuracyMetrics,
+  EmployeePredictionResponse,
+  EmployeePredictionWithExplanation,
+  PatternsResponse,
+  ModelAccuracyResponse,
+  TrainModelResponse,
+  RecommendationsResponse,
+} from '../types/ai-predictive.types';
 
 // 📡 AI Predictive Service
 export const aiPredictiveService = {
