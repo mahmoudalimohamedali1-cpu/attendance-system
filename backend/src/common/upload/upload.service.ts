@@ -3,6 +3,7 @@ import { Express } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import * as sharp from 'sharp';
 
 export interface UploadedFile {
     originalName: string;
@@ -11,6 +12,8 @@ export interface UploadedFile {
     url: string;
     size: number;
     mimeType: string;
+    thumbnailPath?: string;
+    thumbnailUrl?: string;
 }
 
 @Injectable()
@@ -27,6 +30,14 @@ export class UploadService {
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
 
+    // Configurable file size limits per document type
+    private readonly fileSizeLimits = {
+        profilePhoto: 5 * 1024 * 1024, // 5MB for profile photos
+        idDocument: 10 * 1024 * 1024, // 10MB for ID documents
+        contract: 15 * 1024 * 1024, // 15MB for contracts
+        default: 10 * 1024 * 1024, // 10MB default
+    };
+
     constructor() {
         // إنشاء مجلد الرفع إذا لم يكن موجوداً
         this.ensureUploadDirExists();
@@ -37,8 +48,9 @@ export class UploadService {
         const lettersDir = path.join(this.uploadDir, 'letters');
         const advancesDir = path.join(this.uploadDir, 'advances');
         const raisesDir = path.join(this.uploadDir, 'raises');
+        const employeesDir = path.join(this.uploadDir, 'employees');
 
-        [leavesDir, lettersDir, advancesDir, raisesDir].forEach(dir => {
+        [leavesDir, lettersDir, advancesDir, raisesDir, employeesDir].forEach(dir => {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
@@ -150,6 +162,80 @@ export class UploadService {
                 await this.deleteFile(attachment.url);
             }
         }
+    }
+
+    /**
+     * رفع مستندات الموظفين
+     */
+    async uploadEmployeeDocuments(
+        files: Express.Multer.File[],
+        documentType: 'profilePhoto' | 'idDocument' | 'contract' | 'default' = 'default',
+    ): Promise<UploadedFile[]> {
+        if (!files || files.length === 0) {
+            return [];
+        }
+
+        const uploadedFiles: UploadedFile[] = [];
+        const maxSize = this.fileSizeLimits[documentType];
+
+        for (const file of files) {
+            if (file.size > maxSize) {
+                const maxSizeMB = Math.round(maxSize / (1024 * 1024));
+                throw new BadRequestException(`الملف ${file.originalname} أكبر من الحد المسموح (${maxSizeMB}MB)`);
+            }
+
+            if (!this.allowedMimeTypes.includes(file.mimetype)) {
+                throw new BadRequestException(`نوع الملف ${file.originalname} غير مسموح به`);
+            }
+
+            const ext = path.extname(file.originalname);
+            const filename = `${uuidv4()}${ext}`;
+            const filePath = path.join(this.uploadDir, 'employees', filename);
+
+            fs.writeFileSync(filePath, file.buffer);
+
+            const uploadedFile: UploadedFile = {
+                originalName: file.originalname,
+                filename,
+                path: `/uploads/employees/${filename}`,
+                url: `/uploads/employees/${filename}`,
+                size: file.size,
+                mimeType: file.mimetype,
+            };
+
+            // Generate thumbnail for image files
+            if (file.mimetype.startsWith('image/')) {
+                try {
+                    const thumbnailFilename = await this.generateThumbnail(filePath, filename);
+                    uploadedFile.thumbnailPath = `/uploads/employees/${thumbnailFilename}`;
+                    uploadedFile.thumbnailUrl = `/uploads/employees/${thumbnailFilename}`;
+                } catch (error) {
+                    // If thumbnail generation fails, continue without it
+                }
+            }
+
+            uploadedFiles.push(uploadedFile);
+        }
+
+        return uploadedFiles;
+    }
+
+    /**
+     * إنشاء صورة مصغرة للصور
+     */
+    private async generateThumbnail(filePath: string, originalFilename: string): Promise<string> {
+        const ext = path.extname(originalFilename);
+        const thumbnailFilename = `thumb_${path.basename(originalFilename, ext)}${ext}`;
+        const thumbnailPath = path.join(this.uploadDir, 'employees', thumbnailFilename);
+
+        await sharp(filePath)
+            .resize(200, 200, {
+                fit: 'cover',
+                position: 'center',
+            })
+            .toFile(thumbnailPath);
+
+        return thumbnailFilename;
     }
 
     /**

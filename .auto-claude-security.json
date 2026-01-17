@@ -132,7 +132,6 @@
     "clang",
     "clang++",
     "cmake",
-    "composer",
     "dart",
     "dart2js",
     "dartanalyzer",
@@ -156,7 +155,6 @@
     "npx",
     "objdump",
     "pdb",
-    "php",
     "pip",
     "pip3",
     "pipx",
@@ -179,10 +177,8 @@
     "./deploy-to-vps.sh",
     "./deploy_smart.sh",
     "./find-vps-path.sh",
-    "./fix_nginx.sh",
     "./quick-vps-update.sh",
     "./setup-vps.sh",
-    "./test_task_apis.sh",
     "./update-vps-commands.sh",
     "./upload-custody-fix.sh",
     "./upload-custody-simple.sh",
@@ -196,16 +192,12 @@
       "python",
       "javascript",
       "typescript",
-      "php",
       "kotlin",
       "c",
-      "cpp",
       "swift",
       "dart"
     ],
-    "package_managers": [
-      "npm"
-    ],
+    "package_managers": [],
     "frameworks": [],
     "databases": [],
     "infrastructure": [],
@@ -225,10 +217,8 @@
       "deploy-to-vps.sh",
       "deploy_smart.sh",
       "find-vps-path.sh",
-      "fix_nginx.sh",
       "quick-vps-update.sh",
       "setup-vps.sh",
-      "test_task_apis.sh",
       "update-vps-commands.sh",
       "upload-custody-fix.sh",
       "upload-custody-simple.sh",
@@ -237,7 +227,7 @@
       "verify_smart_policy.sh"
     ]
   },
-  "project_dir": "C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system",
-  "created_at": "2026-01-17T01:43:24.608746",
-  "project_hash": "0126d87d65f31d2c0cc21077e5df73bb"
+  "project_dir": "C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\012-implement-file-upload-service",
+  "created_at": "2026-01-15T21:46:54.410520",
+  "project_hash": "848194bf896a2712a46fde67d4cccd53"
 }

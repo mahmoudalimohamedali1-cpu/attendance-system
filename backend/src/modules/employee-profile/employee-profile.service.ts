@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Delete } from '@nestjs/common';
 import { UpdateRequestStatus, UpdateRequestType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { UploadService } from '../../common/upload/upload.service';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
     UpdateProfileDto,
     RequestOnBehalfDto,
@@ -14,7 +17,10 @@ import {
 
 @Injectable()
 export class EmployeeProfileService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private uploadService: UploadService,
+    ) { }
 
     /**
      * جلب البروفايل الكامل للموظف
@@ -29,13 +35,6 @@ export class EmployeeProfileService {
                 branch: true,
                 department: true,
                 jobTitleRef: true,
-                costCenter: {
-                    select: {
-                        id: true,
-                        nameAr: true,
-                        code: true,
-                    },
-                },
                 manager: {
                     select: {
                         id: true,
@@ -356,26 +355,54 @@ export class EmployeeProfileService {
     }
 
     /**
-     * جلب الوثائق - placeholder since model not in schema
+     * جلب الوثائق
      */
     async getDocuments(userId: string, companyId: string) {
-        // EmployeeDocument model is not in schema yet
-        // Return empty placeholder
+        const documents = await this.prisma.employeeDocument.findMany({
+            where: {
+                userId,
+                companyId,
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+        });
+
+        // تجميع حسب النوع
+        const byType = documents.reduce((acc, doc) => {
+            if (!acc[doc.type]) {
+                acc[doc.type] = [];
+            }
+            acc[doc.type].push(doc);
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        // الوثائق المنتهية أو القريبة من الانتهاء (خلال 30 يوم)
+        const now = new Date();
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+        const expiringDocuments = documents.filter((doc) => {
+            if (!doc.expiryDate) return false;
+            return doc.expiryDate <= thirtyDaysFromNow && doc.expiryDate >= now;
+        });
+
         return {
-            documents: [],
-            byType: {},
-            expiringDocuments: [],
-            totalCount: 0,
+            documents,
+            byType,
+            expiringDocuments,
+            totalCount: documents.length,
         };
     }
 
     /**
-     * رفع مستند جديد - placeholder since model not in schema
+     * رفع مستند جديد
      */
     async uploadDocument(
         userId: string,
         companyId: string,
         uploadedById: string,
+        file: Express.Multer.File,
         data: {
             type: string;
             title: string;
@@ -386,15 +413,61 @@ export class EmployeeProfileService {
             expiryDate?: string;
             issuingAuthority?: string;
             notes?: string;
-            filePath: string;
-            fileType: string;
-            fileSize: number;
-            originalName?: string;
         },
     ) {
-        // EmployeeDocument model is not in schema yet
-        // Return placeholder response
-        throw new BadRequestException('تحميل المستندات غير متاح حالياً');
+        // التحقق من أن المستخدم موجود
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // تحديد نوع المستند للتحقق من حجم الملف
+        let documentType: 'profilePhoto' | 'idDocument' | 'contract' | 'default' = 'default';
+        if (data.type === 'ID_CARD' || data.type === 'IQAMA' || data.type === 'PASSPORT' || data.type === 'DRIVING_LICENSE') {
+            documentType = 'idDocument';
+        } else if (data.type === 'CONTRACT') {
+            documentType = 'contract';
+        }
+
+        // رفع الملف
+        const uploadedFiles = await this.uploadService.uploadEmployeeDocuments(
+            [file],
+            documentType,
+        );
+
+        if (uploadedFiles.length === 0) {
+            throw new BadRequestException('فشل رفع الملف');
+        }
+
+        const uploadedFile = uploadedFiles[0];
+
+        // حفظ بيانات المستند في قاعدة البيانات
+        const document = await this.prisma.employeeDocument.create({
+            data: {
+                userId,
+                companyId,
+                uploadedById,
+                type: data.type as any,
+                title: data.title,
+                titleAr: data.titleAr,
+                description: data.description,
+                filePath: uploadedFile.path,
+                fileType: uploadedFile.mimeType,
+                fileSize: uploadedFile.size,
+                originalName: uploadedFile.originalName,
+                thumbnailPath: uploadedFile.thumbnailPath,
+                documentNumber: data.documentNumber,
+                issueDate: data.issueDate ? new Date(data.issueDate) : null,
+                expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+                issuingAuthority: data.issuingAuthority,
+                notes: data.notes,
+            },
+        });
+
+        return document;
     }
 
     /**
@@ -712,7 +785,87 @@ export class EmployeeProfileService {
     }
 
     async deleteDocument(userId: string, docId: string, companyId: string) {
-        // EmployeeDocument model is not in schema yet
-        throw new BadRequestException('حذف المستندات غير متاح حالياً');
+        // التحقق من وجود المستند
+        const document = await this.prisma.employeeDocument.findFirst({
+            where: {
+                id: docId,
+                userId,
+                companyId,
+            },
+        });
+
+        if (!document) {
+            throw new NotFoundException('المستند غير موجود');
+        }
+
+        // حذف الملف من نظام الملفات
+        try {
+            const fullPath = path.join(process.cwd(), document.filePath);
+            if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+            }
+
+            // حذف الصورة المصغرة إن وجدت
+            if (document.thumbnailPath) {
+                const thumbnailFullPath = path.join(process.cwd(), document.thumbnailPath);
+                if (fs.existsSync(thumbnailFullPath)) {
+                    fs.unlinkSync(thumbnailFullPath);
+                }
+            }
+        } catch (error) {
+            // إذا فشل حذف الملف، نستمر في حذف السجل من قاعدة البيانات
+        }
+
+        // حذف السجل من قاعدة البيانات
+        await this.prisma.employeeDocument.delete({
+            where: { id: docId },
+        });
+
+        return { success: true, message: 'تم حذف المستند بنجاح' };
+    }
+
+    /**
+     * جلب مستند للعرض/التحميل
+     */
+    async getDocument(
+        userId: string,
+        docId: string,
+        companyId: string,
+        requesterId: string,
+        thumbnail = false,
+    ) {
+        // التحقق من وجود المستند
+        const document = await this.prisma.employeeDocument.findFirst({
+            where: {
+                id: docId,
+                userId,
+                companyId,
+            },
+        });
+
+        if (!document) {
+            throw new NotFoundException('المستند غير موجود');
+        }
+
+        // التحقق من الصلاحيات - يجب أن يكون صاحب المستند أو لديه صلاحية الوصول
+        await this.checkAccess(userId, companyId, requesterId, 'VIEW');
+
+        // تحديد المسار - الصورة الأصلية أو المصغرة
+        const filePath = thumbnail && document.thumbnailPath
+            ? document.thumbnailPath
+            : document.filePath;
+
+        const fullPath = path.join(process.cwd(), filePath);
+
+        // التحقق من وجود الملف
+        if (!fs.existsSync(fullPath)) {
+            throw new NotFoundException('الملف غير موجود على الخادم');
+        }
+
+        return {
+            filePath: fullPath,
+            mimeType: document.fileType,
+            originalName: document.originalName,
+        };
     }
 }

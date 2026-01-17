@@ -11,7 +11,9 @@ import {
     UploadedFile,
     ParseUUIDPipe,
     Delete,
+    Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -21,12 +23,17 @@ import {
     RequestOnBehalfDto,
     UploadDocumentDto,
     AttendanceQueryDto,
+    DocumentTypeEnum,
 } from './dto/profile.dto';
+import { UploadService } from '../../common/upload/upload.service';
 
 @Controller('employee-profile')
 @UseGuards(JwtAuthGuard)
 export class EmployeeProfileController {
-    constructor(private readonly profileService: EmployeeProfileService) { }
+    constructor(
+        private readonly profileService: EmployeeProfileService,
+        private readonly uploadService: UploadService,
+    ) { }
 
     /**
      * GET /employee-profile/:id
@@ -157,14 +164,11 @@ export class EmployeeProfileController {
             throw new Error('الملف مطلوب');
         }
 
-        // حفظ الملف في مسار uploads
-        const filePath = `/uploads/documents/${Date.now()}-${file.originalname}`;
-        // TODO: استخدام UploadService لحفظ الملف فعلياً
-
         return this.profileService.uploadDocument(
             userId,
             user.companyId,
             user.id,
+            file,
             {
                 type: dto.type,
                 title: dto.title,
@@ -175,12 +179,36 @@ export class EmployeeProfileController {
                 expiryDate: dto.expiryDate,
                 issuingAuthority: dto.issuingAuthority,
                 notes: dto.notes,
-                filePath,
-                fileType: file.mimetype,
-                fileSize: file.size,
-                originalName: file.originalname,
             },
         );
+    }
+
+    /**
+     * GET /employee-profile/:id/documents/:docId
+     * جلب مستند (عرض أو تحميل)
+     */
+    @Get(':id/documents/:docId')
+    async getDocument(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('docId', ParseUUIDPipe) docId: string,
+        @Query('thumbnail') thumbnail: string,
+        @CurrentUser() user: any,
+        @Res() res: Response,
+    ) {
+        const document = await this.profileService.getDocument(
+            userId,
+            docId,
+            user.companyId,
+            user.id,
+            thumbnail === 'true',
+        );
+
+        res.set({
+            'Content-Type': document.mimeType,
+            'Content-Disposition': `inline; filename="${encodeURIComponent(document.originalName)}"`,
+        });
+
+        res.sendFile(document.filePath);
     }
 
     /**
