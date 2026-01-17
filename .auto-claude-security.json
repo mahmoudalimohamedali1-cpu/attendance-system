@@ -132,6 +132,7 @@
     "clang",
     "clang++",
     "cmake",
+    "composer",
     "dart",
     "dart2js",
     "dartanalyzer",
@@ -155,6 +156,7 @@
     "npx",
     "objdump",
     "pdb",
+    "php",
     "pip",
     "pip3",
     "pipx",
@@ -192,8 +194,10 @@
       "python",
       "javascript",
       "typescript",
+      "php",
       "kotlin",
       "c",
+      "cpp",
       "swift",
       "dart"
     ],
@@ -228,6 +232,6 @@
     ]
   },
   "project_dir": "C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\020-predictive-workforce-planning",
-  "created_at": "2026-01-16T16:19:11.382792",
-  "project_hash": "83a22119375063941d8b2b0e88d9b93b"
+  "created_at": "2026-01-17T01:35:29.293246",
+  "project_hash": "2a71f92c9bc53d52ef01ca442ad9e1c9"
 }

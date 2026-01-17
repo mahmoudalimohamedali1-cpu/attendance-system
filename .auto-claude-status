@@ -1,25 +1,25 @@
 {
   "active": true,
   "spec": "020-predictive-workforce-planning",
-  "state": "planning",
+  "state": "building",
   "subtasks": {
-    "completed": 0,
-    "total": 0,
+    "completed": 15,
+    "total": 16,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Backend - Missing Endpoints & Services",
+    "current": "Integration & Testing",
     "id": null,
-    "total": 6
+    "total": 3
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 2,
-    "started_at": "2026-01-16T16:19:03.832776"
+    "number": 8,
+    "started_at": "2026-01-17T01:35:06.692479"
   },
-  "last_update": "2026-01-16T16:24:59.823209"
+  "last_update": "2026-01-17T01:54:21.494880"
 }
