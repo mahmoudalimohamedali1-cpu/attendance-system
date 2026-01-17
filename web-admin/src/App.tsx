@@ -68,6 +68,7 @@ const ScheduleOptimizer = lazy(() => import('./pages/workforce-planning/Schedule
 const ScenarioModeling = lazy(() => import('./pages/workforce-planning/ScenarioModeling'));
 const CoverageAnalysisPage = lazy(() => import('./pages/workforce-planning/CoverageAnalysisPage'));
 const BusinessMetricsPage = lazy(() => import('./pages/workforce-planning/BusinessMetricsPage'));
+const CostOptimizationPage = lazy(() => import('./pages/workforce-planning/CostOptimizationPage'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -392,6 +393,11 @@ function App() {
             <Route path="business-metrics" element={
               <Suspense fallback={<PageLoader />}>
                 <BusinessMetricsPage />
+              </Suspense>
+            } />
+            <Route path="cost-optimization" element={
+              <Suspense fallback={<PageLoader />}>
+                <CostOptimizationPage />
               </Suspense>
             } />
           </Route>
