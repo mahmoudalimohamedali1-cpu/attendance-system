@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { DocumentType, ProficiencyLevel } from '@prisma/client';
+import { DocumentType, NotificationType, ProficiencyLevel } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
     UpdateProfileDto,
     RequestOnBehalfDto,
@@ -14,7 +15,10 @@ import {
 
 @Injectable()
 export class EmployeeProfileService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private notificationsService: NotificationsService,
+    ) { }
 
     /**
      * جلب البروفايل الكامل للموظف
@@ -664,6 +668,8 @@ export class EmployeeProfileService {
 
     /**
      * تحديث بيانات الموظف
+     * - إذا كان المستخدم ADMIN أو HR، يتم التحديث مباشرة
+     * - إذا كان المستخدم EMPLOYEE، يتم إنشاء طلب تحديث يحتاج موافقة HR
      */
     async updateProfile(
         userId: string,
@@ -679,33 +685,480 @@ export class EmployeeProfileService {
             select: { role: true, isSuperAdmin: true },
         });
 
-        // إذا كان القائم بالطلب Admin أو HR، يتم التحديث فورا
         if (!requester) {
             throw new ForbiddenException('المستخدم غير موجود');
         }
 
-        // Always update directly (PROFILE_UPDATE type and newData field not in schema)
-        return this.prisma.user.update({
+        // إذا كان القائم بالطلب Admin أو HR أو SuperAdmin، يتم التحديث مباشرة
+        if (requester.role === 'ADMIN' || requester.role === 'HR' || requester.isSuperAdmin) {
+            return this.prisma.user.update({
+                where: { id: userId },
+                data: {
+                    ...data,
+                    dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+                    iqamaExpiryDate: data.iqamaExpiryDate
+                        ? new Date(data.iqamaExpiryDate)
+                        : undefined,
+                    passportExpiryDate: data.passportExpiryDate
+                        ? new Date(data.passportExpiryDate)
+                        : undefined,
+                },
+            });
+        }
+
+        // إذا كان المستخدم موظف عادي، يتم إنشاء طلبات تحديث للحقول المتغيرة
+        // جلب البيانات الحالية للمقارنة
+        const currentUser = await this.prisma.user.findUnique({
             where: { id: userId },
+        });
+
+        if (!currentUser) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // الحقول المسموح للموظف بطلب تحديثها
+        const allowedFieldsForEmployee = [
+            'phone', 'alternativePhone', 'emergencyPhone', 'emergencyContactName',
+            'address', 'city', 'region', 'postalCode', 'country',
+            'maritalStatus', 'bloodType',
+        ];
+
+        const updateRequests = [];
+
+        for (const [fieldName, newValue] of Object.entries(data)) {
+            // تخطي الحقول غير المسموح بها
+            if (!allowedFieldsForEmployee.includes(fieldName)) {
+                continue;
+            }
+
+            // تخطي القيم الفارغة أو غير المتغيرة
+            if (newValue === undefined || newValue === null) {
+                continue;
+            }
+
+            const currentValue = (currentUser as any)[fieldName];
+            const newValueStr = String(newValue);
+            const currentValueStr = currentValue ? String(currentValue) : '';
+
+            // إنشاء طلب تحديث فقط إذا كانت القيمة مختلفة
+            if (newValueStr !== currentValueStr) {
+                updateRequests.push({
+                    companyId,
+                    userId,
+                    updateType: 'PERSONAL_INFO',
+                    fieldName,
+                    currentValue: currentValueStr || null,
+                    requestedValue: newValueStr,
+                    status: 'PENDING',
+                });
+            }
+        }
+
+        if (updateRequests.length === 0) {
+            throw new BadRequestException('لا توجد تغييرات لطلب تحديثها');
+        }
+
+        // إنشاء طلبات التحديث
+        await this.prisma.profileUpdateRequest.createMany({
+            data: updateRequests,
+        });
+
+        // إشعار HR بوجود طلبات تحديث جديدة
+        const hrUsers = await this.prisma.user.findMany({
+            where: { companyId, role: { in: ['HR', 'ADMIN'] }, status: 'ACTIVE' },
+            select: { id: true },
+            take: 5,
+        });
+
+        const employee = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { firstName: true, lastName: true },
+        });
+
+        for (const hr of hrUsers) {
+            await this.notificationsService.sendNotification(
+                hr.id,
+                NotificationType.GENERAL,
+                'طلب تحديث بيانات',
+                `${employee?.firstName} ${employee?.lastName} طلب تحديث بيانات البروفايل`,
+                { userId, requestCount: updateRequests.length },
+            );
+        }
+
+        return {
+            message: 'تم إرسال طلب التحديث للمراجعة',
+            requestCount: updateRequests.length,
+            status: 'PENDING',
+        };
+    }
+
+    /**
+     * إنشاء طلب تحديث بيانات البروفايل
+     */
+    async createProfileUpdateRequest(
+        userId: string,
+        companyId: string,
+        requesterId: string,
+        data: {
+            fieldName: string;
+            requestedValue: string;
+            reason?: string;
+            reasonAr?: string;
+            supportingDocuments?: any;
+        },
+    ) {
+        // التحقق من أن الطالب هو نفس الموظف
+        if (userId !== requesterId) {
+            const requester = await this.prisma.user.findUnique({
+                where: { id: requesterId },
+                select: { role: true, isSuperAdmin: true },
+            });
+            if (!requester || (requester.role !== 'ADMIN' && requester.role !== 'HR' && !requester.isSuperAdmin)) {
+                throw new ForbiddenException('لا يمكنك إنشاء طلب تحديث لموظف آخر');
+            }
+        }
+
+        // التحقق من وجود الموظف
+        const user = await this.prisma.user.findFirst({
+            where: { id: userId, companyId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من صحة اسم الحقل
+        const validFields = [
+            'phone', 'alternativePhone', 'emergencyPhone', 'emergencyContactName',
+            'address', 'city', 'region', 'postalCode', 'country',
+            'maritalStatus', 'bloodType', 'nationalId', 'iqamaNumber',
+            'passportNumber', 'passportExpiryDate', 'iqamaExpiryDate',
+        ];
+
+        if (!validFields.includes(data.fieldName)) {
+            throw new BadRequestException(`الحقل ${data.fieldName} غير مسموح بتحديثه`);
+        }
+
+        // التحقق من عدم وجود طلب معلق لنفس الحقل
+        const existingPending = await this.prisma.profileUpdateRequest.findFirst({
+            where: {
+                userId,
+                companyId,
+                fieldName: data.fieldName,
+                status: 'PENDING',
+            },
+        });
+
+        if (existingPending) {
+            throw new BadRequestException('يوجد طلب تحديث معلق لهذا الحقل بالفعل');
+        }
+
+        // جلب القيمة الحالية
+        const currentValue = (user as any)[data.fieldName];
+
+        // إنشاء طلب التحديث
+        const request = await this.prisma.profileUpdateRequest.create({
             data: {
-                ...data,
-                dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-                iqamaExpiryDate: data.iqamaExpiryDate
-                    ? new Date(data.iqamaExpiryDate)
-                    : undefined,
-                passportExpiryDate: data.passportExpiryDate
-                    ? new Date(data.passportExpiryDate)
-                    : undefined,
+                companyId,
+                userId,
+                updateType: 'PERSONAL_INFO',
+                fieldName: data.fieldName,
+                currentValue: currentValue ? String(currentValue) : null,
+                requestedValue: data.requestedValue,
+                reason: data.reason,
+                reasonAr: data.reasonAr,
+                supportingDocuments: data.supportingDocuments,
+                status: 'PENDING',
+            },
+        });
+
+        // إشعار HR
+        const hrUsers = await this.prisma.user.findMany({
+            where: { companyId, role: { in: ['HR', 'ADMIN'] }, status: 'ACTIVE' },
+            select: { id: true },
+            take: 5,
+        });
+
+        for (const hr of hrUsers) {
+            await this.notificationsService.sendNotification(
+                hr.id,
+                NotificationType.GENERAL,
+                'طلب تحديث بيانات جديد',
+                `${user.firstName} ${user.lastName} طلب تحديث ${this.getFieldNameAr(data.fieldName)}`,
+                { profileUpdateRequestId: request.id, userId },
+            );
+        }
+
+        return request;
+    }
+
+    /**
+     * جلب طلبات تحديث البيانات للموظف
+     */
+    async getMyProfileUpdateRequests(userId: string, companyId: string, status?: string) {
+        const where: any = { userId, companyId };
+        if (status) where.status = status;
+
+        const requests = await this.prisma.profileUpdateRequest.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            include: {
+                reviewer: {
+                    select: { firstName: true, lastName: true },
+                },
+            },
+        });
+
+        return {
+            data: requests,
+            totalCount: requests.length,
+        };
+    }
+
+    /**
+     * جلب طلبات تحديث البيانات المعلقة (للـ HR/Admin)
+     */
+    async getPendingProfileUpdateRequests(
+        companyId: string,
+        requesterId: string,
+        page = 1,
+        limit = 20,
+    ) {
+        // التحقق من صلاحيات HR/Admin
+        const requester = await this.prisma.user.findUnique({
+            where: { id: requesterId },
+            select: { role: true, isSuperAdmin: true, companyId: true },
+        });
+
+        if (!requester || requester.companyId !== companyId) {
+            throw new ForbiddenException('غير مصرح لك');
+        }
+
+        if (!['ADMIN', 'HR'].includes(requester.role) && !requester.isSuperAdmin) {
+            throw new ForbiddenException('غير مصرح لك بمراجعة طلبات التحديث');
+        }
+
+        const where = { companyId, status: 'PENDING' };
+
+        const [requests, total] = await Promise.all([
+            this.prisma.profileUpdateRequest.findMany({
+                where,
+                orderBy: { createdAt: 'asc' },
+                skip: (page - 1) * limit,
+                take: limit,
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            employeeCode: true,
+                            avatar: true,
+                            department: { select: { name: true } },
+                        },
+                    },
+                },
+            }),
+            this.prisma.profileUpdateRequest.count({ where }),
+        ]);
+
+        return {
+            data: requests,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * مراجعة طلب تحديث البيانات (موافقة/رفض)
+     */
+    async reviewProfileUpdate(
+        requestId: string,
+        companyId: string,
+        reviewerId: string,
+        decision: 'APPROVED' | 'REJECTED',
+        reviewNote?: string,
+        rejectionReason?: string,
+    ) {
+        // التحقق من صلاحيات HR/Admin
+        const reviewer = await this.prisma.user.findUnique({
+            where: { id: reviewerId },
+            select: { role: true, isSuperAdmin: true, companyId: true, firstName: true, lastName: true },
+        });
+
+        if (!reviewer || reviewer.companyId !== companyId) {
+            throw new ForbiddenException('غير مصرح لك');
+        }
+
+        if (!['ADMIN', 'HR'].includes(reviewer.role) && !reviewer.isSuperAdmin) {
+            throw new ForbiddenException('غير مصرح لك بمراجعة طلبات التحديث');
+        }
+
+        // جلب طلب التحديث
+        const request = await this.prisma.profileUpdateRequest.findFirst({
+            where: { id: requestId, companyId },
+            include: { user: true },
+        });
+
+        if (!request) {
+            throw new NotFoundException('طلب التحديث غير موجود');
+        }
+
+        if (request.status !== 'PENDING') {
+            throw new BadRequestException('هذا الطلب تمت مراجعته مسبقاً');
+        }
+
+        if (decision === 'APPROVED') {
+            // تطبيق التحديث على بيانات الموظف
+            const updateData: any = {};
+
+            // التعامل مع الحقول التي تحتاج تحويل لتاريخ
+            if (['passportExpiryDate', 'iqamaExpiryDate', 'dateOfBirth'].includes(request.fieldName)) {
+                updateData[request.fieldName] = new Date(request.requestedValue);
+            } else {
+                updateData[request.fieldName] = request.requestedValue;
+            }
+
+            await this.prisma.user.update({
+                where: { id: request.userId },
+                data: updateData,
+            });
+
+            // تحديث حالة الطلب
+            await this.prisma.profileUpdateRequest.update({
+                where: { id: requestId },
+                data: {
+                    status: 'APPROVED',
+                    reviewedAt: new Date(),
+                    reviewedBy: reviewerId,
+                    reviewNote,
+                    appliedAt: new Date(),
+                },
+            });
+
+            // إشعار الموظف
+            await this.notificationsService.sendNotification(
+                request.userId,
+                NotificationType.GENERAL,
+                'تمت الموافقة على طلب التحديث',
+                `تمت الموافقة على طلب تحديث ${this.getFieldNameAr(request.fieldName)}${reviewNote ? ': ' + reviewNote : ''}`,
+                { profileUpdateRequestId: requestId },
+            );
+        } else {
+            // رفض الطلب
+            await this.prisma.profileUpdateRequest.update({
+                where: { id: requestId },
+                data: {
+                    status: 'REJECTED',
+                    reviewedAt: new Date(),
+                    reviewedBy: reviewerId,
+                    reviewNote,
+                    rejectionReason,
+                },
+            });
+
+            // إشعار الموظف
+            await this.notificationsService.sendNotification(
+                request.userId,
+                NotificationType.GENERAL,
+                'تم رفض طلب التحديث',
+                `تم رفض طلب تحديث ${this.getFieldNameAr(request.fieldName)}${rejectionReason ? ': ' + rejectionReason : ''}`,
+                { profileUpdateRequestId: requestId },
+            );
+        }
+
+        // تسجيل في سجل الموافقات
+        await this.prisma.approvalLog.create({
+            data: {
+                companyId,
+                requestType: 'PROFILE_UPDATE',
+                requestId,
+                step: 'HR',
+                decision,
+                notes: reviewNote || rejectionReason,
+                byUserId: reviewerId,
+            },
+        });
+
+        return this.prisma.profileUpdateRequest.findUnique({
+            where: { id: requestId },
+            include: {
+                user: { select: { firstName: true, lastName: true, employeeCode: true } },
+                reviewer: { select: { firstName: true, lastName: true } },
             },
         });
     }
 
     /**
-     * الموافقة على طلب تحديث البيانات - placeholder since PROFILE_UPDATE not in schema
+     * الموافقة على طلب تحديث البيانات (اختصار)
      */
-    async approveProfileUpdate(requestId: string, reviewerId: string, companyId: string) {
-        // PROFILE_UPDATE type and newData field not in schema
-        throw new BadRequestException('نظام طلبات تحديث البروفايل غير متاح حالياً');
+    async approveProfileUpdate(requestId: string, reviewerId: string, companyId: string, reviewNote?: string) {
+        return this.reviewProfileUpdate(requestId, companyId, reviewerId, 'APPROVED', reviewNote);
+    }
+
+    /**
+     * رفض طلب تحديث البيانات (اختصار)
+     */
+    async rejectProfileUpdate(requestId: string, reviewerId: string, companyId: string, rejectionReason?: string) {
+        return this.reviewProfileUpdate(requestId, companyId, reviewerId, 'REJECTED', undefined, rejectionReason);
+    }
+
+    /**
+     * إلغاء طلب تحديث من قبل الموظف
+     */
+    async cancelProfileUpdateRequest(requestId: string, userId: string, companyId: string) {
+        const request = await this.prisma.profileUpdateRequest.findFirst({
+            where: { id: requestId, companyId },
+        });
+
+        if (!request) {
+            throw new NotFoundException('طلب التحديث غير موجود');
+        }
+
+        if (request.userId !== userId) {
+            throw new ForbiddenException('لا يمكنك إلغاء طلب شخص آخر');
+        }
+
+        if (request.status !== 'PENDING') {
+            throw new BadRequestException('لا يمكن إلغاء طلب تمت مراجعته');
+        }
+
+        await this.prisma.profileUpdateRequest.update({
+            where: { id: requestId },
+            data: { status: 'CANCELLED' },
+        });
+
+        return { message: 'تم إلغاء طلب التحديث' };
+    }
+
+    /**
+     * جلب ترجمة اسم الحقل بالعربية
+     */
+    private getFieldNameAr(fieldName: string): string {
+        const fieldNames: Record<string, string> = {
+            phone: 'رقم الهاتف',
+            alternativePhone: 'رقم هاتف بديل',
+            emergencyPhone: 'هاتف الطوارئ',
+            emergencyContactName: 'اسم جهة اتصال الطوارئ',
+            address: 'العنوان',
+            city: 'المدينة',
+            region: 'المنطقة',
+            postalCode: 'الرمز البريدي',
+            country: 'البلد',
+            maritalStatus: 'الحالة الاجتماعية',
+            bloodType: 'فصيلة الدم',
+            nationalId: 'رقم الهوية',
+            iqamaNumber: 'رقم الإقامة',
+            passportNumber: 'رقم الجواز',
+            passportExpiryDate: 'تاريخ انتهاء الجواز',
+            iqamaExpiryDate: 'تاريخ انتهاء الإقامة',
+            dateOfBirth: 'تاريخ الميلاد',
+        };
+        return fieldNames[fieldName] || fieldName;
     }
 
     /**
