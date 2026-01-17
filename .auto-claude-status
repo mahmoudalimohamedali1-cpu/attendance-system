@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "012-implement-file-upload-service",
+  "spec": "025-mudad-integration",
   "state": "building",
   "subtasks": {
-    "completed": 5,
-    "total": 6,
+    "completed": 1,
+    "total": 11,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integration Testing",
+    "current": "Enhanced WPS Validation",
     "id": null,
-    "total": 1
+    "total": 3
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 7,
-    "started_at": "2026-01-15T21:46:45.166394"
+    "number": 3,
+    "started_at": "2026-01-17T09:56:53.071569"
   },
-  "last_update": "2026-01-15T22:09:05.937277"
+  "last_update": "2026-01-17T10:05:34.809398"
 }
