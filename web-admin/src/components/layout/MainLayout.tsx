@@ -107,6 +107,7 @@ const allMenuItems: MenuItem[] = [
   // Financial
   { text: 'السلف', icon: <MonetizationOn />, path: '/advances', requiredPermission: ['ADVANCES_VIEW', 'ADVANCES_APPROVE_MANAGER', 'ADVANCES_APPROVE_HR'] },
   { text: 'طلبات التحديث', icon: <SyncIcon />, path: '/data-updates', badge: true, requiredRole: 'ADMIN' },
+  { text: 'طلبات تحديث البيانات', icon: <Person />, path: '/profile-update-requests', badge: true, requiredRole: 'ADMIN' },
 
   // Reports & Audit
   { text: 'التقارير', icon: <Assessment />, path: '/reports' },

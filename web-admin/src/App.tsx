@@ -17,6 +17,7 @@ const RaisesPage = lazy(() => import('@/pages/raises/RaisesPage'));
 const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const DataUpdatesPage = lazy(() => import('@/pages/data-updates/DataUpdatesPage'));
+const ProfileUpdateRequestsPage = lazy(() => import('@/pages/profile-update-requests/ProfileUpdateRequestsPage'));
 const PermissionsPage = lazy(() => import('@/pages/permissions/PermissionsPage'));
 const PermissionAuditPage = lazy(() => import('@/pages/permissions/PermissionAuditPage'));
 const JobTitlesPage = lazy(() => import('@/pages/job-titles/JobTitlesPage'));
@@ -209,6 +210,11 @@ function App() {
           <Route path="data-updates" element={
             <Suspense fallback={<PageLoader />}>
               <DataUpdatesPage />
+            </Suspense>
+          } />
+          <Route path="profile-update-requests" element={
+            <Suspense fallback={<PageLoader />}>
+              <ProfileUpdateRequestsPage />
             </Suspense>
           } />
           <Route path="permissions" element={

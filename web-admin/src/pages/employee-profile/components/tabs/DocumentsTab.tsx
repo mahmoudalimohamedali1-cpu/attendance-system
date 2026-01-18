@@ -1,4 +1,4 @@
-import { Box, Grid, Typography, Chip, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel, IconButton } from '@mui/material';
+import { Box, Grid, Typography, Chip, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel, IconButton, Alert, Snackbar, CircularProgress } from '@mui/material';
 import { Description, CloudUpload, Warning, CheckCircle, Delete, Download, Visibility } from '@mui/icons-material';
 import { useState } from 'react';
 import { api } from '@/services/api.service';
@@ -25,6 +25,8 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadData, setUploadData] = useState({ title: '', type: 'OTHER', expiryDate: '' });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
+    const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
 
     const uploadMutation = useMutation({
         mutationFn: async () => {
@@ -39,23 +41,32 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
             });
         },
         onSuccess: () => {
-            console.log('تم رفع المستند بنجاح');
+            setSnackbar({ open: true, message: 'تم رفع المستند بنجاح', severity: 'success' });
             queryClient.invalidateQueries({ queryKey: ['employee-documents', userId] });
             setUploadOpen(false);
             setUploadData({ title: '', type: 'OTHER', expiryDate: '' });
             setSelectedFile(null);
         },
-        onError: (err: any) => console.error(err?.response?.data?.message || 'فشل رفع المستند'),
+        onError: (err: any) => setSnackbar({ open: true, message: err?.response?.data?.message || 'فشل رفع المستند', severity: 'error' }),
     });
 
     const deleteMutation = useMutation({
         mutationFn: (docId: string) => api.delete(`/employee-profile/${userId}/documents/${docId}`),
         onSuccess: () => {
-            console.log('تم حذف المستند');
+            setSnackbar({ open: true, message: 'تم حذف المستند بنجاح', severity: 'success' });
             queryClient.invalidateQueries({ queryKey: ['employee-documents', userId] });
+            setDeletingDocId(null);
         },
-        onError: (err: any) => console.error(err?.response?.data?.message || 'فشل حذف المستند'),
+        onError: (err: any) => {
+            setSnackbar({ open: true, message: err?.response?.data?.message || 'فشل حذف المستند', severity: 'error' });
+            setDeletingDocId(null);
+        },
     });
+
+    const handleDelete = (docId: string) => {
+        setDeletingDocId(docId);
+        deleteMutation.mutate(docId);
+    };
 
     const getDocTypeLabel = (type: string) => {
         const types: Record<string, string> = {
@@ -63,9 +74,11 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
             PASSPORT: 'جواز السفر',
             IQAMA: 'الإقامة',
             DRIVING_LICENSE: 'رخصة القيادة',
-            DEGREE: 'شهادة علمية',
+            CERTIFICATE: 'شهادة علمية',
+            QUALIFICATION: 'شهادة تأهيل',
             CONTRACT: 'عقد العمل',
             MEDICAL: 'شهادة طبية',
+            BANK_LETTER: 'خطاب البنك',
             OTHER: 'أخرى',
         };
         return types[type] || type;
@@ -152,8 +165,14 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">{getDocTypeLabel(doc.type)}</Typography>
                                 </Box>
-                                <IconButton size="small" color="error" onClick={() => deleteMutation.mutate(doc.id)} sx={{ position: 'absolute', top: 10, left: 10 }}>
-                                    <Delete fontSize="small" />
+                                <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDelete(doc.id)}
+                                    disabled={deletingDocId === doc.id}
+                                    sx={{ position: 'absolute', top: 10, left: 10 }}
+                                >
+                                    {deletingDocId === doc.id ? <CircularProgress size={16} /> : <Delete fontSize="small" />}
                                 </IconButton>
                             </Box>
 
@@ -178,7 +197,7 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
                                     variant="outlined"
                                     startIcon={<Visibility />}
                                     sx={{ flex: 1, borderColor: theme.teal, color: theme.teal }}
-                                    onClick={() => window.open(doc.fileUrl, '_blank')}
+                                    onClick={() => window.open(doc.filePath, '_blank')}
                                 >
                                     عرض
                                 </Button>
@@ -187,7 +206,7 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
                                     variant="outlined"
                                     startIcon={<Download />}
                                     sx={{ flex: 1, borderColor: theme.navy, color: theme.navy }}
-                                    href={doc.fileUrl}
+                                    href={doc.filePath}
                                     download
                                 >
                                     تحميل
@@ -237,8 +256,11 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
                                 <MenuItem value="PASSPORT">جواز السفر</MenuItem>
                                 <MenuItem value="IQAMA">الإقامة</MenuItem>
                                 <MenuItem value="DRIVING_LICENSE">رخصة القيادة</MenuItem>
-                                <MenuItem value="DEGREE">شهادة علمية</MenuItem>
+                                <MenuItem value="CERTIFICATE">شهادة علمية</MenuItem>
+                                <MenuItem value="QUALIFICATION">شهادة تأهيل</MenuItem>
                                 <MenuItem value="CONTRACT">عقد العمل</MenuItem>
+                                <MenuItem value="MEDICAL">شهادة طبية</MenuItem>
+                                <MenuItem value="BANK_LETTER">خطاب البنك</MenuItem>
                                 <MenuItem value="OTHER">أخرى</MenuItem>
                             </Select>
                         </FormControl>
@@ -273,6 +295,23 @@ export const DocumentsTab = ({ userId, documentsData }: DocumentsTabProps) => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };
