@@ -11,7 +11,7 @@ export class FaceRecognitionService {
   constructor(
     private prisma: PrismaService,
     private faceComparison: FaceComparisonService,
-  ) {}
+  ) { }
 
   /**
    * تسجيل وجه مستخدم جديد
@@ -28,7 +28,7 @@ export class FaceRecognitionService {
 
     // التحقق من صحة Face Embedding
     const embedding = this.parseEmbedding(data.faceEmbedding);
-    
+
     // التحقق من جودة الصورة
     const qualityCheck = this.faceComparison.validateEmbeddingQuality(embedding);
     if (!qualityCheck.isValid) {
@@ -93,10 +93,22 @@ export class FaceRecognitionService {
     }
 
     if (!user.faceRegistered || !user.faceData) {
+      // ✅ إصلاح تلقائي: إذا كان face_registered = true لكن لا توجد بيانات وجه
+      if (user.faceRegistered && !user.faceData) {
+        this.logger.warn(
+          `Inconsistent face data for user ${userId}: faceRegistered=true but no faceData. Auto-fixing...`,
+        );
+        // إعادة تعيين العلم لـ false
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { faceRegistered: false },
+        });
+      }
+
       return {
         success: false,
         verified: false,
-        message: 'لم يتم تسجيل وجه لهذا المستخدم بعد',
+        message: 'يرجى إعادة تسجيل الوجه - بيانات الوجه غير موجودة',
         requiresRegistration: true,
       };
     }
@@ -166,8 +178,8 @@ export class FaceRecognitionService {
       verified: comparison.isMatch,
       confidence: comparison.confidence,
       threshold: comparison.threshold,
-      message: comparison.isMatch 
-        ? 'تم التحقق من الوجه بنجاح' 
+      message: comparison.isMatch
+        ? 'تم التحقق من الوجه بنجاح'
         : 'فشل التحقق من الوجه - الوجه غير مطابق',
       quality: qualityCheck.quality,
     };
