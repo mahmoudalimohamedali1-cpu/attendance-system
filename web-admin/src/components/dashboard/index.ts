@@ -6,3 +6,4 @@ export { TeamAvailability } from './TeamAvailability';
 export { UpcomingEvents } from './UpcomingEvents';
 export { QuickInsights } from './QuickInsights';
 export { KPICard } from './KPICard';
+export { MudadComplianceCard } from './MudadComplianceCard';

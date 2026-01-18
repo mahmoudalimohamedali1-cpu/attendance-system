@@ -3,6 +3,8 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { MudadStatus, SubmissionEntityType } from '@prisma/client';
 import { StatusLogService } from '../../common/services/status-log.service';
 import { StateMachineService } from '../../common/services/state-machine.service';
+import { MudadValidatorService } from '../wps-export/validators/mudad-validator.service';
+import * as ExcelJS from 'exceljs';
 
 interface CreateMudadSubmissionDto {
     payrollRunId: string;
@@ -24,6 +26,7 @@ export class MudadService {
         private prisma: PrismaService,
         private statusLogService: StatusLogService,
         private stateMachineService: StateMachineService,
+        private mudadValidator: MudadValidatorService,
     ) { }
 
     /**
@@ -45,6 +48,20 @@ export class MudadService {
         if (!run) throw new NotFoundException('مسيرة الرواتب غير موجودة');
         if (run.status !== 'LOCKED' && run.status !== 'PAID') {
             throw new BadRequestException('يجب إقفال مسيرة الرواتب قبل التقديم لمُدد');
+        }
+
+        // التحقق من صحة البيانات قبل التقديم لمُدد
+        const validation = await this.mudadValidator.validateForMudad(dto.payrollRunId, companyId);
+
+        if (!validation.readyForSubmission) {
+            const errorMessages = validation.issues
+                .filter(issue => issue.severity === 'ERROR')
+                .map(issue => issue.messageAr || issue.message)
+                .join(', ');
+
+            throw new BadRequestException(
+                `لا يمكن التقديم لمُدد. يوجد ${validation.summary.errors} أخطاء في البيانات: ${errorMessages}`
+            );
         }
 
         // حساب المبلغ الإجمالي وعدد الموظفين
@@ -351,5 +368,122 @@ export class MudadService {
             rejected: submissions.filter(s => s.status === 'REJECTED').length,
             totalAmount: submissions.reduce((sum, s) => sum + Number(s.totalAmount), 0),
         };
+    }
+
+    /**
+     * تصدير سجل تقديمات مُدد إلى Excel
+     */
+    async exportSubmissionHistory(companyId: string, year?: number, format: string = 'excel'): Promise<Buffer> {
+        if (format !== 'excel') {
+            throw new BadRequestException('فقط تنسيق Excel مدعوم حاليًا');
+        }
+
+        // جلب التقديمات مع التفاصيل
+        const where: any = { companyId };
+        if (year) {
+            where.period = { startsWith: String(year) };
+        }
+
+        const submissions = await this.prisma.mudadSubmission.findMany({
+            where,
+            include: {
+                payrollRun: {
+                    include: {
+                        period: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('سجل تقديمات مُدد');
+
+        // Set RTL
+        worksheet.views = [{ rightToLeft: true }];
+
+        // Headers
+        worksheet.columns = [
+            { header: 'الفترة', key: 'period', width: 15 },
+            { header: 'نوع التقديم', key: 'submissionType', width: 15 },
+            { header: 'الحالة', key: 'status', width: 15 },
+            { header: 'عدد الموظفين', key: 'employeeCount', width: 15 },
+            { header: 'المبلغ الإجمالي', key: 'totalAmount', width: 18 },
+            { header: 'تاريخ التجهيز', key: 'preparedAt', width: 18 },
+            { header: 'تاريخ الإرسال', key: 'submittedAt', width: 18 },
+            { header: 'تاريخ القبول', key: 'acceptedAt', width: 18 },
+            { header: 'رقم مُدد', key: 'mudadRef', width: 20 },
+            { header: 'ملاحظات', key: 'notes', width: 30 },
+            { header: 'سبب الرفض', key: 'rejectionNote', width: 30 },
+        ];
+
+        // Style header row
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: '4472C4' },
+        };
+        headerRow.font = { color: { argb: 'FFFFFF' }, bold: true };
+
+        // Add data
+        for (const submission of submissions) {
+            worksheet.addRow({
+                period: submission.period,
+                submissionType: this.getSubmissionTypeArabic(submission.submissionType),
+                status: this.getStatusArabic(submission.status),
+                employeeCount: submission.employeeCount,
+                totalAmount: Number(submission.totalAmount).toFixed(2),
+                preparedAt: submission.preparedAt
+                    ? new Date(submission.preparedAt).toLocaleString('ar-SA')
+                    : '-',
+                submittedAt: submission.submittedAt
+                    ? new Date(submission.submittedAt).toLocaleString('ar-SA')
+                    : '-',
+                acceptedAt: submission.acceptedAt
+                    ? new Date(submission.acceptedAt).toLocaleString('ar-SA')
+                    : '-',
+                mudadRef: submission.mudadRef || '-',
+                notes: submission.notes || '-',
+                rejectionNote: submission.rejectionNote || '-',
+            });
+        }
+
+        // Auto-fit columns
+        worksheet.columns.forEach((column) => {
+            if (column.width) {
+                column.width = Math.max(column.width, 12);
+            }
+        });
+
+        return Buffer.from(await workbook.xlsx.writeBuffer());
+    }
+
+    /**
+     * ترجمة حالة التقديم إلى العربية
+     */
+    private getStatusArabic(status: string): string {
+        const statuses: Record<string, string> = {
+            PENDING: 'قيد الانتظار',
+            PREPARED: 'جاهز',
+            SUBMITTED: 'مُرسل',
+            ACCEPTED: 'مقبول',
+            REJECTED: 'مرفوض',
+            RESUBMIT_REQUIRED: 'يتطلب إعادة تقديم',
+        };
+        return statuses[status] || status;
+    }
+
+    /**
+     * ترجمة نوع التقديم إلى العربية
+     */
+    private getSubmissionTypeArabic(type: string): string {
+        const types: Record<string, string> = {
+            SALARY: 'رواتب',
+            BONUS: 'مكافآت',
+            END_OF_SERVICE: 'نهاية الخدمة',
+        };
+        return types[type] || type;
     }
 }

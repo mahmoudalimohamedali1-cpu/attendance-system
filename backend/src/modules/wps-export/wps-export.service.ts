@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { MudadValidatorService, MudadValidationResult } from './validators/mudad-validator.service';
 
 interface WpsRecord {
     // Employee Identification
@@ -38,7 +39,10 @@ interface WpsExportResult {
 
 @Injectable()
 export class WpsExportService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private mudadValidator: MudadValidatorService,
+    ) { }
 
     /**
      * تصدير ملف WPS متوافق مع نظام مدد
@@ -512,6 +516,34 @@ export class WpsExportService {
             isReady: issues.length === 0,
             issues,
         };
+    }
+
+    /**
+     * التحقق من صحة ملف WPS للتقديم إلى نظام مُدد
+     * MUDAD Validation - comprehensive validation for wage protection system
+     */
+    async validateForMudad(
+        payrollRunId: string,
+        companyId: string,
+        options?: {
+            strictMode?: boolean;
+            skipCompanyValidation?: boolean;
+        }
+    ): Promise<MudadValidationResult> {
+        return this.mudadValidator.validateForMudad(payrollRunId, companyId, options);
+    }
+
+    /**
+     * التحقق السريع من صحة البيانات للتقديم إلى نظام مُدد
+     * Quick validation check
+     */
+    async quickValidateMudad(payrollRunId: string, companyId: string): Promise<{
+        hasData: boolean;
+        isValid: boolean;
+        errorCount: number;
+        warningCount: number;
+    }> {
+        return this.mudadValidator.quickValidate(payrollRunId, companyId);
     }
 
     // === Helper Methods ===

@@ -77,6 +77,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { api } from '@/services/api.service';
 import { useAuthStore } from '@/store/auth.store';
+import { MudadComplianceCard } from '@/components/dashboard/MudadComplianceCard';
 
 interface DashboardStats {
   employees: { total: number; active: number };
@@ -756,25 +757,7 @@ export const DashboardPage = () => {
               </Card>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  cursor: 'pointer',
-                  border: '2px solid',
-                  borderColor: 'primary.light',
-                  '&:hover': { boxShadow: 4 }
-                }}
-                onClick={() => navigate('/mudad')}
-              >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                  <History sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">مُدد</Typography>
-                  <Chip label="منصة الأجور" color="primary" size="small" sx={{ mt: 1 }} />
-                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                    انقر لإدارة التقديمات
-                  </Typography>
-                </CardContent>
-              </Card>
+              <MudadComplianceCard />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <Card
