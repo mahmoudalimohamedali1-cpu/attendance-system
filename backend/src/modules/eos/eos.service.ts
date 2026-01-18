@@ -70,20 +70,59 @@ export class EosService {
                 ? Number(employee.salaryAssignments[0].baseSalary)
                 : (employee.salary ? Number(employee.salary) : 0));
 
+        // ✅ جلب إعدادات الرواتب لتحديد طريقة حساب نهاية الخدمة
+        const payrollSettings = await (this.prisma as any).payrollSettings.findUnique({
+            where: { companyId: employee.companyId },
+        });
+
+        const eosCalculationMethod = payrollSettings?.eosCalculationMethod || 'SAUDI_LABOR_LAW';
+
         // ========================================
-        // حساب مكافأة نهاية الخدمة (طريقة نظام العمل السعودي)
+        // حساب مكافأة نهاية الخدمة (بناءً على طريقة الحساب)
         // ========================================
         let eosForFirst5Years = 0;
         let eosForRemaining = 0;
 
-        if (totalYears <= 5) {
-            // أول 5 سنوات: نصف شهر عن كل سنة
-            eosForFirst5Years = totalYears * (baseSalary * 0.5);
-        } else {
-            // أول 5 سنوات كاملة
-            eosForFirst5Years = 5 * (baseSalary * 0.5);
-            // ما بعد 5 سنوات: شهر كامل عن كل سنة
-            eosForRemaining = (totalYears - 5) * baseSalary;
+        switch (eosCalculationMethod) {
+            case 'SAUDI_LABOR_LAW':
+                // نظام العمل السعودي: نصف شهر لأول 5 سنوات، شهر كامل بعدها
+                if (totalYears <= 5) {
+                    eosForFirst5Years = totalYears * (baseSalary * 0.5);
+                } else {
+                    eosForFirst5Years = 5 * (baseSalary * 0.5);
+                    eosForRemaining = (totalYears - 5) * baseSalary;
+                }
+                break;
+
+            case 'CUSTOM':
+                // طريقة مخصصة: يمكن تحديد نسب مختلفة من الإعدادات
+                const customFirstYearsRate = payrollSettings?.eosFirstYearsRate || 0.5; // نصف شهر
+                const customLaterYearsRate = payrollSettings?.eosLaterYearsRate || 1.0; // شهر كامل
+                const customThresholdYears = payrollSettings?.eosThresholdYears || 5;
+
+                if (totalYears <= customThresholdYears) {
+                    eosForFirst5Years = totalYears * (baseSalary * customFirstYearsRate);
+                } else {
+                    eosForFirst5Years = customThresholdYears * (baseSalary * customFirstYearsRate);
+                    eosForRemaining = (totalYears - customThresholdYears) * (baseSalary * customLaterYearsRate);
+                }
+                break;
+
+            case 'CONTRACTUAL':
+                // حسب العقد: مبلغ ثابت أو نسبة من الراتب لكل سنة
+                const contractualRate = payrollSettings?.eosContractualRate || 1.0; // شهر كامل لكل سنة
+                eosForFirst5Years = totalYears * (baseSalary * contractualRate);
+                eosForRemaining = 0; // لا يوجد تفرقة في الطريقة التعاقدية
+                break;
+
+            default:
+                // الافتراضي: نظام العمل السعودي
+                if (totalYears <= 5) {
+                    eosForFirst5Years = totalYears * (baseSalary * 0.5);
+                } else {
+                    eosForFirst5Years = 5 * (baseSalary * 0.5);
+                    eosForRemaining = (totalYears - 5) * baseSalary;
+                }
         }
 
         const totalEos = eosForFirst5Years + eosForRemaining;
@@ -136,12 +175,7 @@ export class EosService {
             remainingLeaveDays = Math.max(0, Math.floor(earnedLeaveDays - usedLeaveDays));
         }
 
-        // ✅ جلب إعدادات الرواتب للشركة
-        const payrollSettings = await (this.prisma as any).payrollSettings.findUnique({
-            where: { companyId: employee.companyId },
-        });
-
-        // ✅ تحديد قاعدة حساب بدل الإجازة (leaveAllowanceMethod)
+        // ✅ استخدام payrollSettings المُعلن مسبقاً لتحديد قاعدة حساب بدل الإجازة
         const leaveAllowanceMethod = payrollSettings?.leaveAllowanceMethod || 'BASIC_PLUS_HOUSING';
         const leaveDailyRateDivisor = payrollSettings?.leaveDailyRateDivisor || 30;
 
