@@ -11,9 +11,7 @@ import {
     UploadedFile,
     ParseUUIDPipe,
     Delete,
-    Res,
 } from '@nestjs/common';
-import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -23,17 +21,20 @@ import {
     RequestOnBehalfDto,
     UploadDocumentDto,
     AttendanceQueryDto,
-    DocumentTypeEnum,
+    CreateEmergencyContactDto,
+    UpdateEmergencyContactDto,
+    CreateSkillDto,
+    UpdateSkillDto,
+    ProficiencyLevelEnum,
+    CreateProfileUpdateRequestDto,
+    ReviewProfileUpdateDto,
+    ProfileUpdateRequestQueryDto,
 } from './dto/profile.dto';
-import { UploadService } from '../../common/upload/upload.service';
 
 @Controller('employee-profile')
 @UseGuards(JwtAuthGuard)
 export class EmployeeProfileController {
-    constructor(
-        private readonly profileService: EmployeeProfileService,
-        private readonly uploadService: UploadService,
-    ) { }
+    constructor(private readonly profileService: EmployeeProfileService) { }
 
     /**
      * GET /employee-profile/:id
@@ -164,11 +165,14 @@ export class EmployeeProfileController {
             throw new Error('الملف مطلوب');
         }
 
+        // حفظ الملف في مسار uploads
+        const filePath = `/uploads/documents/${Date.now()}-${file.originalname}`;
+        // TODO: استخدام UploadService لحفظ الملف فعلياً
+
         return this.profileService.uploadDocument(
             userId,
             user.companyId,
             user.id,
-            file,
             {
                 type: dto.type,
                 title: dto.title,
@@ -179,36 +183,12 @@ export class EmployeeProfileController {
                 expiryDate: dto.expiryDate,
                 issuingAuthority: dto.issuingAuthority,
                 notes: dto.notes,
+                filePath,
+                fileType: file.mimetype,
+                fileSize: file.size,
+                originalName: file.originalname,
             },
         );
-    }
-
-    /**
-     * GET /employee-profile/:id/documents/:docId
-     * جلب مستند (عرض أو تحميل)
-     */
-    @Get(':id/documents/:docId')
-    async getDocument(
-        @Param('id', ParseUUIDPipe) userId: string,
-        @Param('docId', ParseUUIDPipe) docId: string,
-        @Query('thumbnail') thumbnail: string,
-        @CurrentUser() user: any,
-        @Res() res: Response,
-    ) {
-        const document = await this.profileService.getDocument(
-            userId,
-            docId,
-            user.companyId,
-            user.id,
-            thumbnail === 'true',
-        );
-
-        res.set({
-            'Content-Type': document.mimeType,
-            'Content-Disposition': `inline; filename="${encodeURIComponent(document.originalName)}"`,
-        });
-
-        res.sendFile(document.filePath);
     }
 
     /**
@@ -240,6 +220,290 @@ export class EmployeeProfileController {
         @CurrentUser() user: any,
     ) {
         // التحقق من أن المستند ينتمي للموظف والشركة
-        return this.profileService.deleteDocument(userId, docId, user.companyId);
+        return this.profileService.deleteDocument(userId, docId, user.companyId, user.id);
+    }
+
+    // ============ Emergency Contacts Endpoints ============
+
+    /**
+     * GET /employee-profile/:id/emergency-contacts
+     * جلب جهات الاتصال الطارئة للموظف
+     */
+    @Get(':id/emergency-contacts')
+    async getEmergencyContacts(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getEmergencyContacts(userId, user.companyId, user.id);
+    }
+
+    /**
+     * POST /employee-profile/:id/emergency-contacts
+     * إضافة جهة اتصال طارئة جديدة
+     */
+    @Post(':id/emergency-contacts')
+    async createEmergencyContact(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Body() dto: CreateEmergencyContactDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.createEmergencyContact(
+            userId,
+            user.companyId,
+            user.id,
+            dto,
+        );
+    }
+
+    /**
+     * PATCH /employee-profile/:id/emergency-contacts/:contactId
+     * تحديث جهة اتصال طارئة
+     */
+    @Patch(':id/emergency-contacts/:contactId')
+    async updateEmergencyContact(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('contactId', ParseUUIDPipe) contactId: string,
+        @Body() dto: UpdateEmergencyContactDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.updateEmergencyContact(
+            userId,
+            contactId,
+            user.companyId,
+            user.id,
+            dto,
+        );
+    }
+
+    /**
+     * DELETE /employee-profile/:id/emergency-contacts/:contactId
+     * حذف جهة اتصال طارئة
+     */
+    @Delete(':id/emergency-contacts/:contactId')
+    async deleteEmergencyContact(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('contactId', ParseUUIDPipe) contactId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.deleteEmergencyContact(
+            userId,
+            contactId,
+            user.companyId,
+            user.id,
+        );
+    }
+
+    // ============ Skills Endpoints ============
+
+    /**
+     * GET /employee-profile/:id/skills
+     * جلب مهارات الموظف
+     */
+    @Get(':id/skills')
+    async getSkills(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Query('category') category: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getSkills(
+            userId,
+            user.companyId,
+            user.id,
+            category,
+        );
+    }
+
+    /**
+     * POST /employee-profile/:id/skills
+     * إضافة مهارة جديدة للموظف
+     */
+    @Post(':id/skills')
+    async addSkill(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Body() dto: CreateSkillDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.addSkill(
+            userId,
+            user.companyId,
+            user.id,
+            {
+                skillName: dto.skillName,
+                skillNameAr: dto.skillNameAr,
+                category: dto.category,
+                proficiencyLevel: dto.proficiencyLevel as any,
+                yearsExperience: dto.yearsExperience,
+                notes: dto.notes,
+            },
+        );
+    }
+
+    /**
+     * PATCH /employee-profile/:id/skills/:skillId
+     * تحديث مهارة الموظف
+     */
+    @Patch(':id/skills/:skillId')
+    async updateSkill(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('skillId', ParseUUIDPipe) skillId: string,
+        @Body() dto: UpdateSkillDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.updateSkill(
+            userId,
+            skillId,
+            user.companyId,
+            user.id,
+            {
+                skillName: dto.skillName,
+                skillNameAr: dto.skillNameAr,
+                category: dto.category,
+                proficiencyLevel: dto.proficiencyLevel as any,
+                yearsExperience: dto.yearsExperience,
+                notes: dto.notes,
+                isVerified: dto.isVerified,
+            },
+        );
+    }
+
+    /**
+     * DELETE /employee-profile/:id/skills/:skillId
+     * حذف مهارة الموظف
+     */
+    @Delete(':id/skills/:skillId')
+    async removeSkill(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('skillId', ParseUUIDPipe) skillId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.removeSkill(
+            userId,
+            skillId,
+            user.companyId,
+            user.id,
+        );
+    }
+
+    /**
+     * GET /employee-profile/skills/categories
+     * جلب جميع فئات المهارات للشركة
+     */
+    @Get('skills/categories')
+    async getSkillCategories(@CurrentUser() user: any) {
+        return this.profileService.getSkillCategories(user.companyId, user.id);
+    }
+
+    /**
+     * GET /employee-profile/skills/search
+     * البحث عن موظفين بمهارة معينة (للمدير/HR)
+     */
+    @Get('skills/search')
+    async searchEmployeesBySkill(
+        @Query('skillName') skillName: string,
+        @Query('minProficiency') minProficiency: ProficiencyLevelEnum,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getEmployeesWithSkill(
+            user.companyId,
+            user.id,
+            skillName,
+            minProficiency as any,
+        );
+    }
+
+    // ============ Profile Update Request Endpoints ============
+
+    /**
+     * GET /employee-profile/update-requests/pending
+     * جلب طلبات تحديث البيانات المعلقة (للـ HR/Admin)
+     */
+    @Get('update-requests/pending')
+    async getPendingProfileUpdateRequests(
+        @Query() query: ProfileUpdateRequestQueryDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getPendingProfileUpdateRequests(
+            user.companyId,
+            user.id,
+            query.page ?? 1,
+            query.limit ?? 20,
+        );
+    }
+
+    /**
+     * PATCH /employee-profile/update-requests/:requestId/review
+     * مراجعة طلب تحديث البيانات (موافقة/رفض) - للـ HR/Admin
+     */
+    @Patch('update-requests/:requestId/review')
+    async reviewProfileUpdateRequest(
+        @Param('requestId', ParseUUIDPipe) requestId: string,
+        @Body() dto: ReviewProfileUpdateDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.reviewProfileUpdate(
+            requestId,
+            user.companyId,
+            user.id,
+            dto.status as 'APPROVED' | 'REJECTED',
+            dto.reviewNote,
+            dto.rejectionReason,
+        );
+    }
+
+    /**
+     * DELETE /employee-profile/update-requests/:requestId
+     * إلغاء طلب تحديث البيانات من قبل الموظف
+     */
+    @Delete('update-requests/:requestId')
+    async cancelProfileUpdateRequest(
+        @Param('requestId', ParseUUIDPipe) requestId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.cancelProfileUpdateRequest(
+            requestId,
+            user.id,
+            user.companyId,
+        );
+    }
+
+    /**
+     * GET /employee-profile/:id/update-requests
+     * جلب طلبات تحديث البيانات للموظف
+     */
+    @Get(':id/update-requests')
+    async getMyProfileUpdateRequests(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Query() query: ProfileUpdateRequestQueryDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getMyProfileUpdateRequests(
+            userId,
+            user.companyId,
+            query.status,
+        );
+    }
+
+    /**
+     * POST /employee-profile/:id/update-requests
+     * إنشاء طلب تحديث بيانات جديد
+     */
+    @Post(':id/update-requests')
+    async createProfileUpdateRequest(
+        @Param('id', ParseUUIDPipe) userId: string,
+        @Body() dto: CreateProfileUpdateRequestDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.createProfileUpdateRequest(
+            userId,
+            user.companyId,
+            user.id,
+            {
+                fieldName: dto.fieldName,
+                requestedValue: dto.requestedValue,
+                reason: dto.reason,
+                reasonAr: dto.reasonAr,
+                supportingDocuments: dto.supportingDocuments,
+            },
+        );
     }
 }

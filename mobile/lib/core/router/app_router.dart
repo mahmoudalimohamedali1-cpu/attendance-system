@@ -24,7 +24,9 @@ import '../../features/advances/presentation/pages/advances_page.dart';
 import '../../features/advances/presentation/pages/create_advance_request_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/profile/presentation/pages/profile_edit_page.dart';
 import '../../features/profile/presentation/pages/change_password_page.dart';
+import '../../features/profile/presentation/pages/update_data_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/disciplinary/presentation/pages/disciplinary_list_page.dart';
 import '../../features/disciplinary/presentation/pages/disciplinary_detail_page.dart';
@@ -255,6 +257,18 @@ class AppRouter {
             name: 'profile',
             builder: (context, state) => const ProfilePage(),
             routes: [
+              GoRoute(
+                path: 'edit',
+                name: 'profile-edit',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const ProfileEditPage(),
+              ),
+              GoRoute(
+                path: 'update-data',
+                name: 'update-data',
+                parentNavigatorKey: _rootNavigatorKey,
+                builder: (context, state) => const UpdateDataPage(),
+              ),
               GoRoute(
                 path: 'change-password',
                 name: 'change-password',
