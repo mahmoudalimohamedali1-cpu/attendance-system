@@ -113,7 +113,7 @@ export class EosService {
         const adjustedEos = totalEos * eosAdjustmentFactor;
 
         // ========================================
-        // تعويض الإجازات المتبقية
+        // تعويض الإجازات المتبقية (باستخدام leaveAllowanceMethod)
         // ========================================
         let remainingLeaveDays: number;
         let remainingLeaveDaysOverridden = false;
@@ -136,7 +136,68 @@ export class EosService {
             remainingLeaveDays = Math.max(0, Math.floor(earnedLeaveDays - usedLeaveDays));
         }
 
-        const dailySalary = baseSalary / 30;
+        // ✅ جلب إعدادات الرواتب للشركة
+        const payrollSettings = await (this.prisma as any).payrollSettings.findUnique({
+            where: { companyId: employee.companyId },
+        });
+
+        // ✅ تحديد قاعدة حساب بدل الإجازة (leaveAllowanceMethod)
+        const leaveAllowanceMethod = payrollSettings?.leaveAllowanceMethod || 'BASIC_PLUS_HOUSING';
+        const leaveDailyRateDivisor = payrollSettings?.leaveDailyRateDivisor || 30;
+
+        // حساب بدل السكن (إن وجد) من هيكل الراتب
+        let housingAllowance = 0;
+        let totalSalary = baseSalary;
+
+        if (employee.salaryAssignments[0]) {
+            const assignment = await (this.prisma as any).salaryAssignment.findUnique({
+                where: { id: employee.salaryAssignments[0].id },
+                include: {
+                    structure: {
+                        include: {
+                            lines: {
+                                include: { component: true }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (assignment?.structure?.lines) {
+                for (const line of assignment.structure.lines) {
+                    const code = line.component?.code?.toUpperCase();
+                    const lineAmount = Number(line.amount) || (Number(line.percentage) / 100 * Number(assignment.baseSalary || 0));
+
+                    // بدل السكن
+                    if (code === 'HOUSING' || code === 'HOUSING_ALLOWANCE' || code === 'HRA') {
+                        housingAllowance = lineAmount;
+                    }
+                    // إجمالي الراتب
+                    totalSalary += lineAmount;
+                }
+            }
+        }
+
+        // ✅ حساب أساس بدل الإجازة بناءً على الطريقة المختارة
+        let leaveAllowanceBase = baseSalary;
+        switch (leaveAllowanceMethod) {
+            case 'BASIC_SALARY':
+                // بدل الإجازة على الراتب الأساسي فقط
+                leaveAllowanceBase = baseSalary;
+                break;
+            case 'BASIC_PLUS_HOUSING':
+                // بدل الإجازة على الراتب الأساسي + بدل السكن (نظام العمل السعودي)
+                leaveAllowanceBase = baseSalary + housingAllowance;
+                break;
+            case 'TOTAL_SALARY':
+                // بدل الإجازة على إجمالي الراتب
+                leaveAllowanceBase = totalSalary;
+                break;
+            default:
+                leaveAllowanceBase = baseSalary + housingAllowance;
+        }
+
+        const dailySalary = leaveAllowanceBase / leaveDailyRateDivisor;
         const leavePayout = remainingLeaveDays * dailySalary;
 
         // ========================================
