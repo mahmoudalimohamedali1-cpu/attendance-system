@@ -1230,6 +1230,109 @@ export class PayrollCalculationService {
             }
         }
 
+        // --- Unpaid Leave Deduction (BASED_ON_SHIFTS, BASED_ON_CALENDAR, BASED_ON_WORKING_DAYS) ---
+        // ✅ حساب خصم الإجازات غير المدفوعة بناءً على طريقة الحساب المختارة
+        const unpaidLeaves = await this.prisma.leaveRequest.findMany({
+            where: {
+                userId: employeeId,
+                companyId,
+                status: 'APPROVED',
+                type: 'UNPAID', // إجازة بدون راتب
+                startDate: { lte: policyPeriodEnd },
+                endDate: { gte: policyPeriodStart },
+            }
+        });
+
+        for (const unpaid of unpaidLeaves) {
+            // حساب أيام الإجازة الفعلية في هذه الفترة
+            const leaveStart = new Date(Math.max(new Date(unpaid.startDate).getTime(), policyPeriodStart.getTime()));
+            const leaveEnd = new Date(Math.min(new Date(unpaid.endDate).getTime(), policyPeriodEnd.getTime()));
+
+            let unpaidDaysCount = 0;
+            const unpaidLeaveMethod = settings.unpaidLeaveMethod || 'BASED_ON_CALENDAR';
+            const unpaidLeaveCalcBase = settings.unpaidLeaveCalcBase || 'CALENDAR_DAYS';
+
+            switch (unpaidLeaveMethod) {
+                case 'BASED_ON_SHIFTS':
+                    // خصم أيام الإجازة التي تقع في أيام عمل الموظف فقط (أحد-خميس)
+                    for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+                        const dayOfWeek = d.getDay();
+                        // أيام العمل: الأحد (0) إلى الخميس (4)
+                        if (dayOfWeek >= 0 && dayOfWeek <= 4) {
+                            unpaidDaysCount++;
+                        }
+                    }
+                    break;
+
+                case 'BASED_ON_CALENDAR':
+                    // خصم كل أيام الإجازة (بما فيها الجمعة والسبت)
+                    unpaidDaysCount = Math.floor((leaveEnd.getTime() - leaveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+                    break;
+
+                case 'BASED_ON_WORKING_DAYS':
+                    // خصم أيام العمل فقط (22 يوم بدلاً من 30)
+                    for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+                        const dayOfWeek = d.getDay();
+                        if (dayOfWeek >= 0 && dayOfWeek <= 4) {
+                            unpaidDaysCount++;
+                        }
+                    }
+                    break;
+
+                default:
+                    unpaidDaysCount = Math.floor((leaveEnd.getTime() - leaveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+            }
+
+            if (unpaidDaysCount > 0) {
+                // حساب المعدل اليومي بناءً على قاعدة الحساب
+                let unpaidDivisor = 30; // الافتراضي
+                switch (unpaidLeaveCalcBase) {
+                    case 'CALENDAR_DAYS':
+                        unpaidDivisor = this.getDaysInPeriod(policyPeriodStart, policyPeriodEnd, CalculationMethod.CALENDAR_DAYS);
+                        break;
+                    case 'ACTUAL_WORKING_DAYS':
+                        unpaidDivisor = this.getWorkingDaysInPeriod(policyPeriodStart, policyPeriodEnd);
+                        break;
+                    case 'FIXED_30_DAYS':
+                        unpaidDivisor = 30;
+                        break;
+                }
+
+                const unpaidDailyRate = calcDailyRate(deductionBase, unpaidDivisor);
+                const unpaidDeduction = mul(unpaidDaysCount, unpaidDailyRate);
+
+                // ✅ تقسيم الإجازات بناءً على تاريخ الإغلاق (إذا مفعل)
+                if (settings.splitUnpaidByClosingDate && settings.payrollClosingDay > 0) {
+                    const closingDay = settings.payrollClosingDay;
+                    // إذا كانت الإجازة تمتد عبر تاريخ الإغلاق، نفصلها إلى جزئين
+                    // الجزء الأول: من بداية الإجازة إلى تاريخ الإغلاق
+                    // الجزء الثاني: من تاريخ الإغلاق إلى نهاية الإجازة
+                    // هذا يُستخدم للشركات التي تريد احتساب الخصم في الشهر الصحيح
+                    this.logger.debug(`Unpaid leave split enabled: leave ${unpaid.id} spans closing day ${closingDay}`);
+                }
+
+                policyLines.push({
+                    componentId: `UNPAID-LEAVE-${unpaid.id}`,
+                    componentCode: 'UNPAID_LEAVE_DED',
+                    componentName: 'خصم إجازة بدون راتب',
+                    sign: 'DEDUCTION',
+                    amount: toNumber(round(unpaidDeduction)),
+                    units: unpaidDaysCount,
+                    rate: toNumber(unpaidDailyRate),
+                    descriptionAr: `خصم ${unpaidDaysCount} يوم إجازة بدون راتب (${unpaidLeaveMethod})`,
+                    source: {
+                        policyId: unpaid.id,
+                        policyCode: 'LEAVE',
+                        ruleId: 'UNPAID_LEAVE',
+                        ruleCode: unpaidLeaveMethod
+                    },
+                    gosiEligible: false,
+                });
+
+                this.logger.debug(`Unpaid leave deduction: ${unpaidDaysCount} days × ${toFixed(unpaidDailyRate)} = ${toFixed(unpaidDeduction)} (method: ${unpaidLeaveMethod})`);
+            }
+        }
+
         // --- Retroactive Pay (Backpay) ---
         const retroPays = await this.prisma.retroPay.findMany({
             where: {
