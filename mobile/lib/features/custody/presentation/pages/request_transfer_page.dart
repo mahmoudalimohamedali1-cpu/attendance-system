@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../../data/datasources/custody_remote_datasource.dart';
 import 'my_custody_page.dart';
 
@@ -27,8 +28,21 @@ class _RequestTransferPageState extends ConsumerState<RequestTransferPage> {
   }
 
   Future<void> _loadEmployees() async {
-    // TODO: Load employees from API
-    // For now, this should be connected to the actual employees API
+    try {
+      final dio = Dio(BaseOptions(
+        baseUrl: 'https://72.61.239.170/api/v1',
+        connectTimeout: const Duration(seconds: 30),
+      ));
+      final response = await dio.get('/users', queryParameters: {'status': 'ACTIVE'});
+      setState(() {
+        _employees = (response.data as List).map((e) => {
+          'id': e['id'],
+          'name': '${e['firstName'] ?? ''} ${e['lastName'] ?? ''}'.trim(),
+        }).toList();
+      });
+    } catch (e) {
+      debugPrint('Error loading employees: $e');
+    }
   }
 
   Future<void> _submit() async {
@@ -101,19 +115,22 @@ class _RequestTransferPageState extends ConsumerState<RequestTransferPage> {
             ),
             const SizedBox(height: 24),
 
-            // Employee Selection
+            // Employee Selection Dropdown
             const Text('الموظف المستلم *', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            TextFormField(
+            DropdownButtonFormField<String>(
+              value: _selectedEmployeeId,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                hintText: 'ابحث عن الموظف...',
-                prefixIcon: Icon(Icons.search),
+                hintText: 'اختر الموظف...',
+                prefixIcon: Icon(Icons.person),
               ),
-              // TODO: Connect to employee search/autocomplete
-              onChanged: (v) {
-                // Search logic
-              },
+              items: _employees.map((emp) => DropdownMenuItem(
+                value: emp['id'] as String,
+                child: Text(emp['name'] as String),
+              )).toList(),
+              onChanged: (v) => setState(() => _selectedEmployeeId = v),
+              validator: (v) => v == null ? 'يرجى اختيار الموظف' : null,
             ),
             const SizedBox(height: 16),
 

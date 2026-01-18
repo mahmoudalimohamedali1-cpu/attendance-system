@@ -32,6 +32,11 @@ import '../../features/disciplinary/presentation/pages/disciplinary_list_page.da
 import '../../features/disciplinary/presentation/pages/disciplinary_detail_page.dart';
 import '../../features/tasks/presentation/pages/my_tasks_page.dart';
 import '../../features/tasks/presentation/pages/task_details_page.dart';
+import '../../features/custody/presentation/pages/my_custody_page.dart';
+import '../../features/custody/presentation/pages/request_return_page.dart';
+import '../../features/custody/presentation/pages/request_transfer_page.dart';
+import '../../features/custody/presentation/pages/sign_custody_page.dart';
+import '../../features/custody/data/datasources/custody_remote_datasource.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -283,7 +288,38 @@ class AppRouter {
               ),
             ],
           ),
+          // Custody routes
+          GoRoute(
+            path: '/my-custody',
+            name: 'my-custody',
+            builder: (context, state) => const MyCustodyPage(),
+          ),
         ],
+      ),
+      // Custody sub-routes (outside shell for full screen)
+      GoRoute(
+        path: '/custody/return',
+        name: 'custody-return',
+        builder: (context, state) {
+          final assignment = state.extra as CustodyAssignmentModel;
+          return RequestReturnPage(assignment: assignment);
+        },
+      ),
+      GoRoute(
+        path: '/custody/transfer',
+        name: 'custody-transfer',
+        builder: (context, state) {
+          final assignment = state.extra as CustodyAssignmentModel;
+          return RequestTransferPage(assignment: assignment);
+        },
+      ),
+      GoRoute(
+        path: '/custody/sign',
+        name: 'custody-sign',
+        builder: (context, state) {
+          final assignment = state.extra as CustodyAssignmentModel;
+          return SignCustodyPage(assignment: assignment);
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

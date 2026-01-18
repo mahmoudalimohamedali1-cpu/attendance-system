@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/datasources/custody_remote_datasource.dart';
 
 class MyCustodyPage extends ConsumerStatefulWidget {
@@ -222,7 +224,7 @@ class _MyCustodyPageState extends ConsumerState<MyCustodyPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        Navigator.pushNamed(context, '/custody/return', arguments: assignment);
+                        context.push('/custody/return', extra: assignment);
                       },
                       icon: const Icon(Icons.assignment_return),
                       label: const Text('طلب إرجاع'),
@@ -234,7 +236,7 @@ class _MyCustodyPageState extends ConsumerState<MyCustodyPage> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        Navigator.pushNamed(context, '/custody/transfer', arguments: assignment);
+                        context.push('/custody/transfer', extra: assignment);
                       },
                       icon: const Icon(Icons.compare_arrows),
                       label: const Text('طلب تحويل'),
@@ -248,7 +250,7 @@ class _MyCustodyPageState extends ConsumerState<MyCustodyPage> {
                 ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
-                    Navigator.pushNamed(context, '/custody/sign', arguments: assignment);
+                    context.push('/custody/sign', extra: assignment);
                   },
                   icon: const Icon(Icons.draw),
                   label: const Text('توقيع الاستلام'),
@@ -287,7 +289,14 @@ class _MyCustodyPageState extends ConsumerState<MyCustodyPage> {
   }
 }
 
-// Provider for the data source - should be properly set up with Riverpod
+// Provider for the data source
 final custodyDataSourceProvider = Provider<CustodyRemoteDataSource>((ref) {
-  throw UnimplementedError('Must be overridden in the main app');
+  // Get dio instance from the existing dioProvider
+  // For now, create a basic Dio instance with the base URL
+  final dio = Dio(BaseOptions(
+    baseUrl: 'https://72.61.239.170/api/v1',
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+  ));
+  return CustodyRemoteDataSource(dio);
 });
