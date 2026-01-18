@@ -1,6 +1,6 @@
 import { IsOptional, IsEnum, IsString, IsDateString, IsUUID, IsInt, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { TaskPriority, TaskStatus } from '@prisma/client';
+import { TaskPriority, TaskStatus } from '../../../shared/enums';
 import { Transform } from 'class-transformer';
 
 export class TaskQueryDto {

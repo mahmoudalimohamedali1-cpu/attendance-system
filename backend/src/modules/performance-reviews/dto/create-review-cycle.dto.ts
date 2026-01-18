@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsDateString, IsBoolean, IsInt, Min, Max } from 'class-validator';
-import { PerformanceReviewCycleType } from '@prisma/client';
+import { PerformanceReviewCycleType } from '../../../shared/enums';
 
 export class CreateReviewCycleDto {
     @IsString()

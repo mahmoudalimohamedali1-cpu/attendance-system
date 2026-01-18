@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum, IsInt, Min, Max, IsString } from 'class-validator';
-import { PerformanceReviewStatus } from '@prisma/client';
+import { PerformanceReviewStatus } from '../../../shared/enums';
 
 export class UpdateReviewDto {
     @IsOptional()

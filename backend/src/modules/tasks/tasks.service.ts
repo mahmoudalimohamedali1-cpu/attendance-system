@@ -25,7 +25,8 @@ import {
     CreateTimeLogDto,
     ReorderTaskDto,
 } from './dto/task-actions.dto';
-import { TaskStatus, NotificationType, Prisma } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
+import { TaskStatus } from '../../shared/enums';
 
 // Type for Task with all relations included
 type TaskWithRelations = Prisma.TaskGetPayload<{
