@@ -158,4 +158,35 @@ class DisciplinaryCubit extends Cubit<DisciplinaryState> {
       emit(DisciplinaryError('فشل تحميل الموظفين: ${e.toString()}'));
     }
   }
+
+  /// جلب جميع القضايا
+  Future<void> loadAllCases() async {
+    emit(DisciplinaryLoading());
+    try {
+      final response = await _dataSource.getAllCases();
+      final cases = (response as List)
+          .map((json) => DisciplinaryCase.fromJson(json))
+          .toList();
+      emit(DisciplinaryCasesLoaded(cases));
+    } catch (e) {
+      emit(DisciplinaryError('فشل في تحميل القضايا: ${e.toString()}'));
+    }
+  }
+
+  /// جدولة جلسة استماع
+  Future<void> scheduleHearing(String caseId, DateTime date, String location, {String? notes}) async {
+    emit(DisciplinaryLoading());
+    try {
+      final data = {
+        'scheduledDate': date.toIso8601String(),
+        'location': location,
+        if (notes != null) 'notes': notes,
+      };
+      await _dataSource.scheduleHearing(caseId, data);
+      emit(DisciplinaryActionSuccess('تم جدولة جلسة الاستماع'));
+      await loadCaseDetails(caseId);
+    } catch (e) {
+      emit(DisciplinaryError('فشل في جدولة الجلسة: ${e.toString()}'));
+    }
+  }
 }

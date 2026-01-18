@@ -11,6 +11,7 @@
       "Edit(./**)",
       "Glob(./**)",
       "Grep(./**)",
+<<<<<<< Updated upstream
       "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\031-ai-predictive-absence-analytics/**)",
       "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\031-ai-predictive-absence-analytics/**)",
       "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\worktrees\\tasks\\031-ai-predictive-absence-analytics/**)",
@@ -29,6 +30,16 @@
       "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
       "Glob(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
       "Grep(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.worktrees/**)",
+=======
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Glob(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Grep(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system/**)",
+      "Read(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\specs\\042-/**)",
+      "Write(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\specs\\042-/**)",
+      "Edit(C:\\Users\\Administrator\\Downloads\\attendance system\\attendance-system\\.auto-claude\\specs\\042-/**)",
+>>>>>>> Stashed changes
       "Bash(*)",
       "WebFetch(*)",
       "WebSearch(*)",

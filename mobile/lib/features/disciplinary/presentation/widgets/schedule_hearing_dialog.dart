@@ -87,8 +87,8 @@ class _ScheduleHearingDialogState extends State<ScheduleHearingDialog> {
             );
             widget.cubit.scheduleHearing(
               widget.caseId,
-              scheduledAt: scheduledAt,
-              location: _locationController.text,
+              scheduledAt,
+              _locationController.text,
             );
             Navigator.pop(context);
           },

@@ -79,12 +79,13 @@ class _IssueDecisionDialogState extends State<IssueDecisionDialog> {
         ),
         ElevatedButton(
           onPressed: () {
-            widget.cubit.issueDecision(
-              widget.caseId,
-              decisionType: _decisionType,
-              notes: _notesController.text,
-              penaltyAmount: double.tryParse(_amountController.text),
-            );
+            final data = {
+              'decisionType': _decisionType,
+              'notes': _notesController.text,
+              if (_amountController.text.isNotEmpty) 
+                'penaltyAmount': double.tryParse(_amountController.text),
+            };
+            widget.cubit.issueDecision(widget.caseId, data);
             Navigator.pop(context);
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),

@@ -212,7 +212,6 @@ class _CreateCaseViewState extends State<_CreateCaseView> {
                   controller: _witnessesController,
                   maxLines: 2,
                   decoration: _inputDecoration('أسماء الشهود أو الأطراف الأخرى (اختياري)'),
-                  ),
                 ),
 
                 const SizedBox(height: 24),

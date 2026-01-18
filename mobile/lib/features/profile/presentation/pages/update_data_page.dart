@@ -1,8 +1,12 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../../core/services/device_service.dart';
+import '../../../../core/config/app_config.dart';
 
 /// صفحة تحديث بيانات الحضور (الوجه والجهاز)
 class UpdateDataPage extends StatefulWidget {
@@ -15,6 +19,7 @@ class UpdateDataPage extends StatefulWidget {
 class _UpdateDataPageState extends State<UpdateDataPage> {
   final DeviceService _deviceService = DeviceService();
   final TextEditingController _reasonController = TextEditingController();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   
   UpdateType _selectedType = UpdateType.both;
   DeviceInfo? _deviceInfo;
@@ -425,36 +430,88 @@ class _UpdateDataPageState extends State<UpdateDataPage> {
     setState(() => _isLoading = true);
     
     try {
-      // TODO: Call API to submit request
-      final requestData = {
+      // Convert face image to base64 if captured
+      String? faceImageBase64;
+      if (_capturedFaceImage != null) {
+        final File imageFile = File(_capturedFaceImage!);
+        if (await imageFile.exists()) {
+          final bytes = await imageFile.readAsBytes();
+          faceImageBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        }
+      }
+      
+      // Build request data
+      final requestData = <String, dynamic>{
         'requestType': _getApiRequestType(_selectedType),
-        'reason': _reasonController.text,
-        
-        // Face data
-        if (_faceEmbedding != null) 'newFaceEmbedding': _faceEmbedding,
-        if (_capturedFaceImage != null) 'newFaceImage': _capturedFaceImage, // Should be base64
-        if (_faceQuality != null) 'faceImageQuality': _faceQuality,
-        
-        // Device data
-        if (_deviceInfo != null) ...{
-          'newDeviceId': _deviceInfo!.deviceId,
-          'newDeviceFingerprint': _deviceInfo!.fingerprint,
-          'newDeviceName': _deviceInfo!.deviceName,
-          'newDeviceModel': _deviceInfo!.deviceModel,
-          'newDeviceBrand': _deviceInfo!.deviceBrand,
-          'newDevicePlatform': _deviceInfo!.platform,
-          'newDeviceOsVersion': _deviceInfo!.osVersion,
-          'newDeviceAppVersion': _deviceInfo!.appVersion,
-        },
+        'reason': _reasonController.text.isNotEmpty ? _reasonController.text : null,
       };
       
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
-      
-      if (mounted) {
-        _showSuccess('تم إرسال طلب التحديث بنجاح');
-        Navigator.pop(context, true);
+      // Add face data if applicable
+      if (_selectedType == UpdateType.faceOnly || _selectedType == UpdateType.both) {
+        if (_faceEmbedding != null) {
+          requestData['newFaceEmbedding'] = _faceEmbedding;
+        }
+        if (faceImageBase64 != null) {
+          requestData['newFaceImage'] = faceImageBase64;
+        }
+        if (_faceQuality != null) {
+          requestData['faceImageQuality'] = _faceQuality;
+        }
       }
+      
+      // Add device data if applicable
+      if (_selectedType != UpdateType.faceOnly && _deviceInfo != null) {
+        requestData['newDeviceId'] = _deviceInfo!.deviceId;
+        requestData['newDeviceFingerprint'] = _deviceInfo!.fingerprint;
+        requestData['newDeviceName'] = _deviceInfo!.deviceName;
+        requestData['newDeviceModel'] = _deviceInfo!.deviceModel;
+        requestData['newDeviceBrand'] = _deviceInfo!.deviceBrand;
+        requestData['newDevicePlatform'] = _deviceInfo!.platform;
+        requestData['newDeviceOsVersion'] = _deviceInfo!.osVersion;
+        requestData['newDeviceAppVersion'] = _deviceInfo!.appVersion;
+      }
+      
+      // Create Dio instance with base URL
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ));
+      
+      // Add auth token from secure storage
+      final token = await _secureStorage.read(key: 'access_token');
+      if (token != null && token.isNotEmpty) {
+        dio.options.headers['Authorization'] = 'Bearer $token';
+      }
+      
+      // Send the request
+      final response = await dio.post('/data-update/request', data: requestData);
+      
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        if (mounted) {
+          _showSuccess('تم إرسال طلب التحديث بنجاح! سيتم مراجعته من قبل المسؤول.');
+          Navigator.pop(context, true);
+        }
+      } else {
+        throw Exception('فشل في إرسال الطلب');
+      }
+    } on DioException catch (e) {
+      String errorMessage = 'فشل في إرسال الطلب';
+      if (e.response?.data != null && e.response?.data['message'] != null) {
+        errorMessage = e.response?.data['message'];
+      } else if (e.type == DioExceptionType.connectionTimeout) {
+        errorMessage = 'انتهت مهلة الاتصال. تحقق من اتصالك بالإنترنت';
+      } else if (e.type == DioExceptionType.receiveTimeout) {
+        errorMessage = 'انتهت مهلة استلام البيانات';
+      } else if (e.response?.statusCode == 400) {
+        errorMessage = e.response?.data['message'] ?? 'يوجد طلب معلق سابقاً';
+      } else if (e.response?.statusCode == 401) {
+        errorMessage = 'يرجى إعادة تسجيل الدخول';
+      }
+      _showError(errorMessage);
     } catch (e) {
       _showError('فشل في إرسال الطلب: $e');
     } finally {

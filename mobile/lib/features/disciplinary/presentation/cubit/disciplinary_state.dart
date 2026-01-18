@@ -1,4 +1,4 @@
-import '../data/models/disciplinary_case_model.dart';
+import '../../data/models/disciplinary_case_model.dart';
 
 abstract class DisciplinaryState {}
 

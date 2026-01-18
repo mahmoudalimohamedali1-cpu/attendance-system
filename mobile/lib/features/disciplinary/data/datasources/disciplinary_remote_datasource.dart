@@ -44,6 +44,9 @@ abstract class DisciplinaryRemoteDataSource {
 
   /// جلب قائمة المستخدمين لاختيار المتهم
   Future<dynamic> getUsers();
+  
+  /// جلب جميع القضايا
+  Future<dynamic> getAllCases();
 }
 
 class DisciplinaryRemoteDataSourceImpl implements DisciplinaryRemoteDataSource {
@@ -144,6 +147,12 @@ class DisciplinaryRemoteDataSourceImpl implements DisciplinaryRemoteDataSource {
   @override
   Future getUsers() async {
     final response = await _apiClient.getUsers();
+    return response.data;
+  }
+
+  @override
+  Future getAllCases() async {
+    final response = await _apiClient.getDisciplinaryCases('all');
     return response.data;
   }
 }
