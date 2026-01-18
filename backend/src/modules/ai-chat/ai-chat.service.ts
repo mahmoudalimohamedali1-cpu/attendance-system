@@ -1453,7 +1453,7 @@ export class AiChatService {
             this.prisma.leaveRequest.count({
                 where: { userId: emp.id, status: 'APPROVED', createdAt: { gte: thirtyDaysAgo } },
             }),
-            this.prisma.task.count({
+            this.prisma.tasks.count({
                 where: { assigneeId: emp.id, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
             }),
         ]);
@@ -1543,7 +1543,7 @@ export class AiChatService {
         }
 
         // 5. عبء العمل
-        const activeTasks = await this.prisma.task.count({
+        const activeTasks = await this.prisma.tasks.count({
             where: { assigneeId: emp.id, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
         });
         if (activeTasks > 10) {

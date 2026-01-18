@@ -1589,7 +1589,7 @@ export class AiAgentToolsService {
             return { success: false, message: `❌ لم يتم العثور على موظف باسم "${assigneeName}"` };
         }
 
-        const task = await this.prisma.task.create({
+        const task = await this.prisma.tasks.create({
             data: {
                 title,
                 assignee: { connect: { id: assignee.id } },
@@ -1671,7 +1671,7 @@ export class AiAgentToolsService {
                 count = await this.prisma.user.count({ where: { companyId: context.companyId } });
                 break;
             case 'tasks':
-                count = await this.prisma.task.count({ where: { companyId: context.companyId } });
+                count = await this.prisma.tasks.count({ where: { companyId: context.companyId } });
                 break;
             case 'leaves':
                 count = await this.prisma.leaveRequest.count({ where: { companyId: context.companyId } });
@@ -2399,7 +2399,7 @@ export class ${this.capitalize(moduleName)}Module {}
 
     private async workloadAnalysis(params: any, context: any): Promise<ToolResult> {
         try {
-            const tasks = await this.prisma.task.findMany({
+            const tasks = await this.prisma.tasks.findMany({
                 where: { companyId: context.companyId },
                 include: { assignee: { select: { firstName: true, lastName: true } } },
             });
@@ -2504,7 +2504,7 @@ export class ${this.capitalize(moduleName)}Module {}
             const { title, date } = params;
 
             // Create task as reminder
-            await this.prisma.task.create({
+            await this.prisma.tasks.create({
                 data: {
                     title: `📌 تذكير: ${title}`,
                     description: `تذكير مجدول ليوم ${date}`,
@@ -2551,7 +2551,7 @@ export class ${this.capitalize(moduleName)}Module {}
                 },
             });
 
-            const pendingTasks = await this.prisma.task.count({
+            const pendingTasks = await this.prisma.tasks.count({
                 where: {
                     companyId: context.companyId,
                     status: 'TODO',
@@ -2611,7 +2611,7 @@ export class ${this.capitalize(moduleName)}Module {}
             const users = await this.prisma.user.count();
             const attendance = await this.prisma.attendance.count();
             const leaves = await this.prisma.leaveRequest.count();
-            const tasks = await this.prisma.task.count();
+            const tasks = await this.prisma.tasks.count();
             const notifications = await this.prisma.notification.count();
 
             return {
@@ -2685,7 +2685,7 @@ export class ${this.capitalize(moduleName)}Module {}
             const pendingLeaves = await this.prisma.leaveRequest.count({
                 where: { status: 'PENDING', companyId: context.companyId },
             });
-            const pendingTasks = await this.prisma.task.count({
+            const pendingTasks = await this.prisma.tasks.count({
                 where: { status: 'TODO', companyId: context.companyId },
             });
 
@@ -2746,7 +2746,7 @@ export class ${this.capitalize(moduleName)}Module {}
                 this.prisma.user.count({ where: { companyId: context.companyId } }),
                 this.prisma.attendance.count({ where: { createdAt: { gte: today } } }),
                 this.prisma.leaveRequest.count({ where: { status: 'PENDING', companyId: context.companyId } }),
-                this.prisma.task.count({ where: { status: 'TODO', companyId: context.companyId } }),
+                this.prisma.tasks.count({ where: { status: 'TODO', companyId: context.companyId } }),
             ]);
 
             return {
@@ -2768,7 +2768,7 @@ export class ${this.capitalize(moduleName)}Module {}
             let count = 0;
 
             if (type === 'tasks') {
-                const pendingTasks = await this.prisma.task.findMany({
+                const pendingTasks = await this.prisma.tasks.findMany({
                     where: { status: 'TODO', companyId: context.companyId },
                     include: { assignee: true },
                     take: 10,
@@ -3582,7 +3582,7 @@ ${shiftList}`,
                     assigneeName = `${emp.firstName} ${emp.lastName}`;
                 }
             }
-            const task = await this.prisma.task.create({
+            const task = await this.prisma.tasks.create({
                 data: {
                     title,
                     description: '',

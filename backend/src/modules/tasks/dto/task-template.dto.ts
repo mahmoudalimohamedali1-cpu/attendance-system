@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsArray, IsInt, IsEnum, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TaskPriority } from '../../../shared/enums';
+import { TaskPriority } from '@prisma/client';
 
 export class CreateTaskTemplateDto {
     @ApiProperty({ description: 'اسم القالب بالعربية', example: 'قالب مهام التوظيف' })

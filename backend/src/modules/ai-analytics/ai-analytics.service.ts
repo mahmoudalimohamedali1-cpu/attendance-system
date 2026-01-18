@@ -51,7 +51,7 @@ export class AiAnalyticsService {
             this.prisma.leaveRequest.findMany({
                 where: { userId, createdAt: { gte: thirtyDaysAgo } },
             }),
-            this.prisma.task.findMany({
+            this.prisma.tasks.findMany({
                 where: { assigneeId: userId, updatedAt: { gte: thirtyDaysAgo } },
             }),
         ]);
