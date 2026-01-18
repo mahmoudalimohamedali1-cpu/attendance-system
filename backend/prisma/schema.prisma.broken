@@ -3620,3 +3620,21 @@ model AbsencePattern {
   @@index([patternType])
   @@map("absence_patterns")
 }
+
+
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+  BLOCKED
+  REVIEW
+}

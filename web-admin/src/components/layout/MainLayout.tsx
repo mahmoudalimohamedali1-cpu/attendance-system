@@ -98,6 +98,7 @@ const allMenuItems: MenuItem[] = [
   { text: '👥 تعاون الفريق', icon: <People />, path: '/team-collaboration', requiredRole: 'ADMIN' },
   { text: '📊 إدارة المشاريع', icon: <AccountTree />, path: '/projects', requiredRole: 'ADMIN' },
   { text: '🧠 المساعد الذكي', icon: <AutoAwesome />, path: '/genius-ai' },
+  { text: '📊 التحليلات التنبؤية', icon: <InsightsIcon />, path: '/ai-predictive' },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },
   { text: 'العطلات الرسمية', icon: <EventNote />, path: '/holidays', requiredRole: 'ADMIN', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE_HR'] },
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },

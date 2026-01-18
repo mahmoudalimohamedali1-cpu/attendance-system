@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "022-",
+  "spec": "031-ai-predictive-absence-analytics",
   "state": "building",
   "subtasks": {
-    "completed": 19,
-    "total": 21,
+    "completed": 24,
+    "total": 25,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integration & Verification",
+    "current": "Integration and End-to-End Testing",
     "id": null,
-    "total": 3
+    "total": 4
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 20,
-    "started_at": "2026-01-17T02:04:15.658108"
+    "number": 819,
+    "started_at": "2026-01-17T17:29:47.834645"
   },
-  "last_update": "2026-01-17T03:12:19.464382"
+  "last_update": "2026-01-17T20:35:20.628331"
 }
