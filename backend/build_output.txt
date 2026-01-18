@@ -2,5 +2,5 @@
 > attendance-system-backend@1.0.0 build
 > nest build
 
-Found 352 error(s).
+Found 1637 error(s).
 
