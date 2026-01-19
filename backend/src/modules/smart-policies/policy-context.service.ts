@@ -670,11 +670,12 @@ export class PolicyContextService {
             const records = await this.prisma.attendance.findMany({
                 where: {
                     userId: employeeId,
-                    checkIn: {
+                    // 🔧 FIX: Use 'date' field instead of 'checkIn' - checkIn is named 'checkInTime' in schema
+                    date: {
                         gte: startDate,
                         lte: endDate,
                     },
-                } as any,
+                },
             });
 
             let presentDays = 0;
