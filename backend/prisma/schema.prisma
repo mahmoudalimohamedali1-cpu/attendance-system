@@ -131,6 +131,9 @@ model Company {
   // Social Feed (المنشورات والتواصل الاجتماعي)
   posts Post[]
 
+  // Calendar Events (أحداث التقويم)
+  events Event[]
+
   @@map("companies")
 }
 
@@ -585,6 +588,10 @@ model User {
   postViews        PostView[]        @relation("PostViews")
   postImpressions  PostImpression[]  @relation("PostImpressions")
   postAcknowledges PostAcknowledge[] @relation("PostAcknowledges")
+
+  // Calendar Events (أحداث التقويم)
+  eventsCreated    Event[]           @relation("EventCreator")
+  eventAttendances EventAttendee[]   @relation("EventAttendee")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -6855,4 +6862,134 @@ model PostAttachment {
   @@index([postId])
   @@index([fileType])
   @@map("post_attachments")
+}
+
+// ==================== أحداث التقويم (Calendar Events) ====================
+
+// نوع الحدث
+enum EventType {
+  MEETING // اجتماع
+  INTERVIEW // مقابلة
+  PAYROLL // رواتب
+  HOLIDAY // عطلة
+  DEADLINE // موعد نهائي
+  ANNOUNCEMENT // إعلان
+  OTHER // أخرى
+}
+
+// حالة الحدث
+enum EventStatus {
+  SCHEDULED // مجدول
+  CANCELLED // ملغي
+  DONE // تم
+}
+
+// حالة RSVP للحضور
+enum RSVPStatus {
+  INVITED // مدعو
+  GOING // سيحضر
+  MAYBE // ربما
+  DECLINED // رفض
+}
+
+// نموذج الحدث (Calendar Event)
+model Event {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creatorId String  @map("creator_id")
+  creator   User    @relation("EventCreator", fields: [creatorId], references: [id])
+
+  // معلومات الحدث (ثنائي اللغة)
+  title         String
+  titleEn       String?  @map("title_en")
+  description   String?  @db.Text
+  descriptionEn String?  @map("description_en") @db.Text
+
+  // التوقيت
+  startAt  DateTime @map("start_at")
+  endAt    DateTime @map("end_at")
+  isAllDay Boolean  @default(false) @map("is_all_day")
+  timezone String   @default("Asia/Riyadh")
+
+  // الموقع والرابط
+  location    String?
+  meetingLink String? @map("meeting_link")
+
+  // النوع والظهور
+  eventType      EventType      @default(MEETING) @map("event_type")
+  visibilityType VisibilityType @default(PUBLIC) @map("visibility_type")
+
+  // الحالة
+  status EventStatus @default(SCHEDULED)
+
+  // إعدادات التكرار (اختياري)
+  isRecurring    Boolean @default(false) @map("is_recurring")
+  recurrenceRule String? @map("recurrence_rule") // قاعدة التكرار (RRULE format)
+
+  // معلومات إضافية
+  color String? // لون الحدث في التقويم
+  icon  String? // أيقونة الحدث
+
+  // العلاقات
+  attendees EventAttendee[]
+  targets   EventTarget[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, startAt])
+  @@index([companyId, status])
+  @@index([creatorId])
+  @@map("events")
+}
+
+// نموذج حضور الحدث (Event Attendees with RSVP)
+model EventAttendee {
+  id      String @id @default(uuid())
+  eventId String @map("event_id")
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId  String @map("user_id")
+  user    User   @relation("EventAttendee", fields: [userId], references: [id])
+
+  // حالة RSVP
+  rsvpStatus  RSVPStatus @default(INVITED) @map("rsvp_status")
+  respondedAt DateTime?  @map("responded_at") // تاريخ الرد
+
+  // ملاحظات الحضور
+  note String? @db.Text
+
+  // إشعار التذكير
+  reminderSent   Boolean   @default(false) @map("reminder_sent")
+  reminderSentAt DateTime? @map("reminder_sent_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // كل مستخدم يُدعى مرة واحدة فقط لكل حدث
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([rsvpStatus])
+  @@map("event_attendees")
+}
+
+// نموذج استهداف الحدث (Event Targeting - similar to PostTarget)
+model EventTarget {
+  id      String @id @default(uuid())
+  eventId String @map("event_id")
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // نوع وقيمة الاستهداف
+  targetType  TargetType @map("target_type")
+  targetValue String     @map("target_value") // قيمة الاستهداف (معرف الفرع، القسم، المستخدم، إلخ)
+
+  // قواعد الشمول/الاستثناء
+  isExclusion Boolean @default(false) @map("is_exclusion") // استثناء بدلاً من شمول
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([eventId])
+  @@index([targetType, targetValue])
+  @@map("event_targets")
 }
