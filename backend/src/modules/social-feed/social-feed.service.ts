@@ -1360,4 +1360,481 @@ export class SocialFeedService {
 
     return updatedPost as PostWithRelations;
   }
+
+  // ==================== التفاعلات (Reactions) ====================
+
+  /**
+   * إضافة تفاعل على منشور
+   */
+  async addReaction(
+    postId: string,
+    userId: string,
+    companyId: string,
+    emoji: string,
+  ): Promise<{ success: boolean; reaction: { id: string; emoji: string } }> {
+    // التحقق من وجود المنشور وصلاحية المشاهدة
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PUBLISHED,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // التحقق من صلاحية المشاهدة
+    const canView = await this.canUserViewPost(userId, companyId, post);
+    if (!canView) {
+      throw new ForbiddenException('ليس لديك صلاحية للتفاعل مع هذا المنشور');
+    }
+
+    // التحقق من صحة الإيموجي
+    const validEmojis = ['like', 'love', 'celebrate', 'support', 'insightful', 'funny'];
+    if (!validEmojis.includes(emoji)) {
+      throw new BadRequestException('نوع التفاعل غير صالح');
+    }
+
+    // إضافة أو تحديث التفاعل (upsert)
+    const reaction = await this.prisma.postReaction.upsert({
+      where: {
+        postId_userId_emoji: {
+          postId,
+          userId,
+          emoji,
+        },
+      },
+      update: {}, // لا تغيير إذا موجود
+      create: {
+        postId,
+        userId,
+        emoji,
+      },
+    });
+
+    this.logger.log(`تم إضافة تفاعل ${emoji} على المنشور: ${postId} بواسطة ${userId}`);
+
+    return {
+      success: true,
+      reaction: {
+        id: reaction.id,
+        emoji: reaction.emoji,
+      },
+    };
+  }
+
+  /**
+   * إزالة تفاعل من منشور
+   */
+  async removeReaction(
+    postId: string,
+    userId: string,
+    companyId: string,
+    emoji: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // حذف التفاعل
+    const result = await this.prisma.postReaction.deleteMany({
+      where: {
+        postId,
+        userId,
+        emoji,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new NotFoundException('التفاعل غير موجود');
+    }
+
+    this.logger.log(`تم إزالة تفاعل ${emoji} من المنشور: ${postId} بواسطة ${userId}`);
+
+    return {
+      success: true,
+      message: 'تم إزالة التفاعل بنجاح',
+    };
+  }
+
+  /**
+   * جلب التفاعلات على منشور مع التجميع
+   */
+  async getReactions(
+    postId: string,
+    companyId: string,
+  ): Promise<{
+    reactions: Array<{ emoji: string; count: number; users: Array<{ id: string; firstName: string; lastName: string; avatar: string | null }> }>;
+    total: number;
+  }> {
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // جلب جميع التفاعلات مع بيانات المستخدمين
+    const reactions = await this.prisma.postReaction.findMany({
+      where: { postId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // تجميع التفاعلات حسب النوع
+    const groupedReactions = new Map<string, { emoji: string; count: number; users: Array<{ id: string; firstName: string; lastName: string; avatar: string | null }> }>();
+
+    for (const reaction of reactions) {
+      const existing = groupedReactions.get(reaction.emoji);
+      if (existing) {
+        existing.count++;
+        existing.users.push(reaction.user);
+      } else {
+        groupedReactions.set(reaction.emoji, {
+          emoji: reaction.emoji,
+          count: 1,
+          users: [reaction.user],
+        });
+      }
+    }
+
+    return {
+      reactions: Array.from(groupedReactions.values()),
+      total: reactions.length,
+    };
+  }
+
+  // ==================== التعليقات (Comments) ====================
+
+  /**
+   * إضافة تعليق على منشور
+   */
+  async addComment(
+    postId: string,
+    authorId: string,
+    companyId: string,
+    content: string,
+    parentId?: string,
+    mentions?: string[],
+  ): Promise<{
+    id: string;
+    content: string;
+    mentions: string[];
+    parentId: string | null;
+    createdAt: Date;
+    author: { id: string; firstName: string; lastName: string; avatar: string | null };
+  }> {
+    // التحقق من وجود المنشور وصلاحية التعليق
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PUBLISHED,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // التحقق من أن التعليقات مسموحة
+    if (!post.allowComments) {
+      throw new ForbiddenException('التعليقات غير مسموحة على هذا المنشور');
+    }
+
+    // التحقق من صلاحية المشاهدة
+    const canView = await this.canUserViewPost(authorId, companyId, post);
+    if (!canView) {
+      throw new ForbiddenException('ليس لديك صلاحية للتعليق على هذا المنشور');
+    }
+
+    // التحقق من صحة المحتوى
+    if (!content || content.trim().length === 0) {
+      throw new BadRequestException('محتوى التعليق مطلوب');
+    }
+
+    // التحقق من وجود التعليق الأب إذا تم تحديده
+    if (parentId) {
+      const parentComment = await this.prisma.postComment.findFirst({
+        where: {
+          id: parentId,
+          postId,
+        },
+      });
+
+      if (!parentComment) {
+        throw new NotFoundException('التعليق الأب غير موجود');
+      }
+    }
+
+    // إنشاء التعليق
+    const comment = await this.prisma.postComment.create({
+      data: {
+        postId,
+        authorId,
+        content: content.trim(),
+        mentions: mentions || [],
+        parentId: parentId || null,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(`تم إضافة تعليق على المنشور: ${postId} بواسطة ${authorId}`);
+
+    return {
+      id: comment.id,
+      content: comment.content,
+      mentions: comment.mentions,
+      parentId: comment.parentId,
+      createdAt: comment.createdAt,
+      author: comment.author,
+    };
+  }
+
+  /**
+   * جلب تعليقات منشور
+   */
+  async getComments(
+    postId: string,
+    userId: string,
+    companyId: string,
+    options: { page?: number; limit?: number; parentId?: string | null } = {},
+  ): Promise<FeedResult<{
+    id: string;
+    content: string;
+    mentions: string[];
+    isEdited: boolean;
+    parentId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    author: { id: string; firstName: string; lastName: string; avatar: string | null };
+    _count: { replies: number };
+  }>> {
+    const { page = 1, limit = 20, parentId = null } = options;
+
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // التحقق من صلاحية المشاهدة
+    const canView = await this.canUserViewPost(userId, companyId, post);
+    if (!canView) {
+      throw new ForbiddenException('ليس لديك صلاحية لمشاهدة التعليقات');
+    }
+
+    // بناء شرط الاستعلام
+    const where: Prisma.PostCommentWhereInput = {
+      postId,
+      parentId: parentId === null ? null : parentId,
+    };
+
+    // جلب التعليقات مع العدد
+    const [comments, total] = await Promise.all([
+      this.prisma.postComment.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+            },
+          },
+          _count: {
+            select: {
+              replies: true,
+            },
+          },
+        },
+      }),
+      this.prisma.postComment.count({ where }),
+    ]);
+
+    return {
+      items: comments.map((comment) => ({
+        id: comment.id,
+        content: comment.content,
+        mentions: comment.mentions,
+        isEdited: comment.isEdited,
+        parentId: comment.parentId,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
+        author: comment.author,
+        _count: comment._count,
+      })),
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
+    };
+  }
+
+  /**
+   * تعديل تعليق
+   */
+  async updateComment(
+    commentId: string,
+    authorId: string,
+    companyId: string,
+    content: string,
+    mentions?: string[],
+  ): Promise<{
+    id: string;
+    content: string;
+    mentions: string[];
+    isEdited: boolean;
+    editedAt: Date | null;
+    author: { id: string; firstName: string; lastName: string; avatar: string | null };
+  }> {
+    // جلب التعليق للتحقق من الصلاحية
+    const comment = await this.prisma.postComment.findFirst({
+      where: { id: commentId },
+      include: {
+        post: {
+          select: { companyId: true },
+        },
+      },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('التعليق غير موجود');
+    }
+
+    // التحقق من الشركة
+    if (comment.post.companyId !== companyId) {
+      throw new ForbiddenException('ليس لديك صلاحية لتعديل هذا التعليق');
+    }
+
+    // التحقق من الكاتب
+    if (comment.authorId !== authorId) {
+      throw new ForbiddenException('يمكنك تعديل تعليقاتك فقط');
+    }
+
+    // التحقق من صحة المحتوى
+    if (!content || content.trim().length === 0) {
+      throw new BadRequestException('محتوى التعليق مطلوب');
+    }
+
+    // تحديث التعليق
+    const updatedComment = await this.prisma.postComment.update({
+      where: { id: commentId },
+      data: {
+        content: content.trim(),
+        mentions: mentions || comment.mentions,
+        isEdited: true,
+        editedAt: new Date(),
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(`تم تعديل التعليق: ${commentId} بواسطة ${authorId}`);
+
+    return {
+      id: updatedComment.id,
+      content: updatedComment.content,
+      mentions: updatedComment.mentions,
+      isEdited: updatedComment.isEdited,
+      editedAt: updatedComment.editedAt,
+      author: updatedComment.author,
+    };
+  }
+
+  /**
+   * حذف تعليق
+   */
+  async deleteComment(
+    commentId: string,
+    userId: string,
+    companyId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    // جلب التعليق للتحقق من الصلاحية
+    const comment = await this.prisma.postComment.findFirst({
+      where: { id: commentId },
+      include: {
+        post: {
+          select: { companyId: true, authorId: true },
+        },
+      },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('التعليق غير موجود');
+    }
+
+    // التحقق من الشركة
+    if (comment.post.companyId !== companyId) {
+      throw new ForbiddenException('ليس لديك صلاحية لحذف هذا التعليق');
+    }
+
+    // التحقق من الصلاحية (الكاتب أو صاحب المنشور)
+    if (comment.authorId !== userId && comment.post.authorId !== userId) {
+      throw new ForbiddenException('ليس لديك صلاحية لحذف هذا التعليق');
+    }
+
+    // حذف التعليق (سيحذف الردود تلقائياً بسبب Cascade)
+    await this.prisma.postComment.delete({
+      where: { id: commentId },
+    });
+
+    this.logger.log(`تم حذف التعليق: ${commentId} بواسطة ${userId}`);
+
+    return {
+      success: true,
+      message: 'تم حذف التعليق بنجاح',
+    };
+  }
 }
