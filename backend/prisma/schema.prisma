@@ -128,6 +128,9 @@ model Company {
   recognitions    Recognition[]
   successionPlans SuccessionPlan[]
 
+  // Social Feed (المنشورات والتواصل الاجتماعي)
+  posts Post[]
+
   @@map("companies")
 }
 
@@ -574,6 +577,9 @@ model User {
   recognitionsReceived Recognition[]         @relation("RecognitionReceiver")
   recognitionReactions RecognitionReaction[]
   successionCandidates SuccessionCandidate[]
+
+  // Social Feed (المنشورات والتواصل الاجتماعي)
+  postsAuthored Post[] @relation("PostAuthor")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -6544,4 +6550,96 @@ model SuccessionCandidate {
 
   @@unique([planId, employeeId])
   @@map("succession_candidates")
+}
+
+// ==================== Social Feed (المنشورات والتواصل الاجتماعي) ====================
+
+// نوع المنشور
+enum PostType {
+  POST // منشور عادي
+  ANNOUNCEMENT // إعلان رسمي
+  PROMOTED // منشور مروج
+}
+
+// حالة المنشور
+enum PostStatus {
+  DRAFT // مسودة
+  PENDING_APPROVAL // في انتظار الموافقة
+  PUBLISHED // منشور
+  ARCHIVED // مؤرشف
+  REJECTED // مرفوض
+}
+
+// نوع الظهور/الرؤية
+enum VisibilityType {
+  PUBLIC // عام - للجميع في الشركة
+  DEPARTMENT // للقسم فقط
+  TEAM // للفريق فقط
+  TARGETED // مستهدف بقواعد محددة
+  MANAGERS_ONLY // للمدراء فقط
+  HR_ONLY // للموارد البشرية فقط
+  PRIVATE // خاص
+}
+
+model Post {
+  id        String  @id @default(uuid())
+  companyId String  @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  authorId  String  @map("author_id")
+  author    User    @relation("PostAuthor", fields: [authorId], references: [id])
+
+  // نوع المنشور
+  type PostType @default(POST)
+
+  // المحتوى (ثنائي اللغة)
+  title     String? // عنوان المنشور (اختياري)
+  titleEn   String? @map("title_en")
+  content   String  @db.Text // محتوى المنشور
+  contentEn String? @map("content_en") @db.Text
+
+  // إعدادات الظهور
+  visibilityType VisibilityType @default(PUBLIC) @map("visibility_type")
+  isPinned       Boolean        @default(false) @map("is_pinned")
+  pinnedUntil    DateTime?      @map("pinned_until")
+
+  // التوقيت
+  publishedAt DateTime? @map("published_at") // تاريخ النشر الفعلي
+  scheduledAt DateTime? @map("scheduled_at") // تاريخ النشر المجدول
+  expiresAt   DateTime? @map("expires_at") // تاريخ انتهاء الصلاحية
+
+  // إعدادات التفاعل
+  requireAcknowledge   Boolean @default(false) @map("require_acknowledge") // يتطلب تأكيد القراءة
+  hideAfterAcknowledge Boolean @default(false) @map("hide_after_acknowledge") // إخفاء بعد التأكيد
+  allowComments        Boolean @default(true) @map("allow_comments") // السماح بالتعليقات
+
+  // حالة المنشور
+  status PostStatus @default(DRAFT)
+
+  // إحصائيات الوصول
+  reachCount      Int @default(0) @map("reach_count") // عدد المستخدمين الذين شاهدوا
+  impressionCount Int @default(0) @map("impression_count") // عدد مرات الظهور
+  clickCount      Int @default(0) @map("click_count") // عدد النقرات
+
+  // إعدادات الترويج
+  priority       Int       @default(0) // أولوية الظهور (أعلى = أهم)
+  maxImpressions Int?      @map("max_impressions") // الحد الأقصى للظهور
+  promotedUntil  DateTime? @map("promoted_until") // تاريخ انتهاء الترويج
+
+  // العلاقات (ستضاف في المهام اللاحقة)
+  // targets       PostTarget[]
+  // reactions     PostReaction[]
+  // comments      PostComment[]
+  // views         PostView[]
+  // impressions   PostImpression[]
+  // acknowledges  PostAcknowledge[]
+  // attachments   PostAttachment[]
+  // mentions      PostMention[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, status, publishedAt])
+  @@index([authorId])
+  @@index([companyId, isPinned])
+  @@map("posts")
 }
