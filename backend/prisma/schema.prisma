@@ -88,9 +88,29 @@ model Company {
   absencePredictions   AbsencePrediction[]
   predictionAccuracies PredictionAccuracy[]
   absencePatterns      AbsencePattern[]
+  saudizationConfig    SaudizationConfig?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  // Tasks & Sprints
+  tasks          Task[]
+  taskCategories TaskCategory[]
+  taskTemplates  TaskTemplate[]
+  sprints        Sprint[]
+
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  shiftTemplates        ShiftTemplate[]
+  shiftSchedules        ShiftSchedule[]
+  shifts                Shift[]
+  shiftRules            ShiftRule[]
+  shiftOptimizationRuns ShiftOptimizationRun[]
+  employeeSurveys       EmployeeSurvey[]
+  knowledgeBaseArticles KnowledgeBaseArticle[]
+  teamCalendarEvents    TeamCalendarEvent[]
+  programs              Program[]
+  projects              Project[]
+  projectTemplates      ProjectTemplate[]
+  taskAutomations       TaskAutomation[]
+  employeeDebtLedgers   EmployeeDebtLedger[]
 
   @@map("companies")
 }
@@ -373,6 +393,57 @@ model User {
   // التحليلات التنبؤية (AI Predictive Analytics)
   absencePredictions AbsencePrediction[]
 
+  // Tasks & Sprints relations
+  tasksCreated           Task[]            @relation("tasks_created_by_idTousers")
+  tasksAssigned          Task[]            @relation("tasks_assignee_idTousers")
+  tasksApproved          Task[]            @relation("tasks_approver_idTousers")
+  tasksReviewed          Task[]            @relation("tasks_reviewer_idTousers")
+  taskAssignments        TaskAssignment[]
+  taskWatchers           TaskWatcher[]
+  taskComments           TaskComment[]
+  taskTimeLogs           TaskTimeLog[]
+  taskActivityLogs       TaskActivityLog[]
+  taskApprovals          TaskApproval[]
+  taskEvidencesSubmitted TaskEvidence[]    @relation("task_evidences_submitted_by_idTousers")
+  taskEvidencesVerified  TaskEvidence[]    @relation("task_evidences_verified_by_idTousers")
+  sprintsCreated         Sprint[]          @relation("SprintCreator")
+
+  // Planning & Projects relations
+  programsCreated        Program[]          @relation("ProgramCreator")
+  programsManaged        Program[]          @relation("ProgramManager")
+  programsOwned          Program[]          @relation("ProgramOwner")
+  projectsCreated        Project[]          @relation("ProjectCreator")
+  projectsManaged        Project[]          @relation("ProjectManager")
+  projectsOwned          Project[]          @relation("ProjectOwner")
+  projectsSponsored      Project[]          @relation("ProjectSponsor")
+  projectMembers         ProjectMember[]    @relation("ProjectMembers")
+  projectMilestonesOwned ProjectMilestone[] @relation("MilestoneOwner")
+  projectRisksCreated    ProjectRisk[]      @relation("RiskCreator")
+  projectRisksOwned      ProjectRisk[]      @relation("RiskOwner")
+  projectBudgetsApproved ProjectBudget[]    @relation("BudgetApprover")
+  projectBudgetsCreated  ProjectBudget[]    @relation("BudgetCreator")
+  projectActivities      ProjectActivity[]  @relation("ProjectActivityUser")
+
+  // Other relations
+  shifts                      Shift[]
+  shiftSwapManaged            ShiftSwapRequest[]           @relation("ShiftSwapManager")
+  shiftSwapRequested          ShiftSwapRequest[]           @relation("ShiftSwapRequester")
+  shiftSwapTargeted           ShiftSwapRequest[]           @relation("ShiftSwapTarget")
+  shiftBids                   ShiftBid[]
+  policyViolationPredictions  PolicyViolationPrediction[]
+  profileUpdateRequests       ProfileUpdateRequest[]
+  emergencyContacts           EmergencyContact[]
+  trainingRequests            TrainingRequest[]
+  surveyResponses             SurveyResponse[]
+  articleFeedbacks            ArticleFeedback[]
+  offlineSyncQueues           OfflineSyncQueue[]
+  userNotificationPreferences UserNotificationPreferences?
+  locationProofs              LocationProof[]
+  teamCalendarEvents          TeamCalendarEvent[]
+  taskAutomations             TaskAutomation[]
+  taskAttachments             TaskAttachment[]
+  employeeDebtLedgers         EmployeeDebtLedger[]
+
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
   @@map("users")
@@ -654,8 +725,9 @@ model Branch {
   policies     Policy[] // سياسات على مستوى الفرع
   custodyItems CustodyItem[] // العهد في هذا الفرع
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  shiftSchedules ShiftSchedule[]
 
   @@unique([companyId, name])
   @@map("branches")
@@ -677,8 +749,10 @@ model Department {
   users    User[]
   policies Policy[] // سياسات على مستوى القسم
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  departmentSaudizations DepartmentSaudization[]
+  shiftSchedules         ShiftSchedule[]
 
   @@unique([companyId, name])
   @@map("departments")
@@ -1971,8 +2045,9 @@ model PayrollPeriod {
   disciplinaryCases  DisciplinaryCase[]
   payrollAdjustments PayrollAdjustment[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  employeeDebtLedgers EmployeeDebtLedger[]
 
   @@unique([companyId, month, year])
   @@index([companyId, status])
@@ -3425,11 +3500,16 @@ enum TaskPriority {
 
 // حالة المهمة العامة
 enum TaskStatus {
+  BACKLOG
   TODO
   IN_PROGRESS
   IN_REVIEW
-  DONE
+  BLOCKED
+  COMPLETED
   CANCELLED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
 }
 
 // حالة المهمة
@@ -3638,9 +3718,27 @@ model AbsencePattern {
   @@map("absence_patterns")
 }
 
-saudizationTargets      SaudizationTarget[]
+// ==================== إعدادات التوطين (Saudization Config) ====================
 
-@@map("saudization_configs")
+model SaudizationConfig {
+  id        String  @id @default(uuid())
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // إعدادات نطاقات
+  activityType String? @map("activity_type") // نوع النشاط التجاري لتحديد نسب التوطين
+  nitaqatSize  String? @map("nitaqat_size") // حجم المنشأة في نظام نطاقات
+
+  // العلاقات
+  saudizationRecords     SaudizationRecord[]
+  saudizationTargets     SaudizationTarget[]
+  departmentSaudizations DepartmentSaudization[]
+  nitaqatAlerts          NitaqatAlert[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("saudization_configs")
 }
 
 model SaudizationRecord {
@@ -4688,654 +4786,358 @@ model ProjectActivity {
   @@map("project_activities")
 }
 
-enum WorkDayCalculationBase {
-  CALENDAR_DAYS
-  ACTUAL_WORKING_DAYS
-  FIXED_30_DAYS
-}
-
-enum HireTerminationMethod {
-  EXCLUDE_WEEKENDS
-  INCLUDE_ALL_DAYS
-  PRORATE_BY_CALENDAR
-}
-
-enum UnpaidLeaveMethod {
-  BASED_ON_SHIFTS
-  BASED_ON_CALENDAR
-  BASED_ON_WORKING_DAYS
-}
-
-enum OvertimeCalculationMethod {
-  BASED_ON_SHIFTS
-  BASED_ON_BASIC_ONLY
-  BASED_ON_TOTAL
-  BASED_ON_ELIGIBLE_COMPONENTS
-}
-
-enum LeaveAllowanceMethod {
-  BASIC_SALARY
-  BASIC_PLUS_HOUSING
-  TOTAL_SALARY
-}
-
-enum Role {
-  ADMIN
-  MANAGER
-  EMPLOYEE
-  HR
-}
-
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-}
-
-enum ContractType {
-  PERMANENT
-  FIXED_TERM
-  PART_TIME
-  SEASONAL
-  PROBATION
-}
-
-enum ContractStatus {
-  ACTIVE
-  EXPIRED
-  TERMINATED
-  RENEWED
-  SUSPENDED
-  DRAFT
-  PENDING_EMPLOYEE
-  PENDING_EMPLOYER
-  PENDING_QIWA
-  REJECTED
-}
-
-enum QiwaAuthStatus {
-  NOT_SUBMITTED
-  PENDING
-  AUTHENTICATED
-  REJECTED
-  EXPIRED
-}
-
-enum DeviceStatus {
-  ACTIVE
-  PENDING
-  BLOCKED
-  INACTIVE
-}
-
-enum DevicePlatform {
-  ANDROID
-  IOS
-  WEB
-  UNKNOWN
-}
-
-enum UpdateRequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
-}
-
-enum UpdateRequestType {
-  FACE_UPDATE
-  DEVICE_UPDATE
-  BOTH
-  DEVICE_CHANGE
-  PROFILE_UPDATE
-}
-
-enum AttendanceStatus {
-  PRESENT
-  LATE
-  EARLY_LEAVE
-  ABSENT
-  ON_LEAVE
-  WORK_FROM_HOME
-  LATE_AND_EARLY
-  HOLIDAY
-}
-
-enum CheckType {
-  CHECK_IN
-  CHECK_OUT
-}
-
-enum LeaveCategory {
-  BALANCED
-  CASUAL
-  SICK
-  UNPAID
-}
-
-enum LeaveType {
-  ANNUAL
-  SICK
-  PERSONAL
-  EMERGENCY
-  NEW_BABY
-  MARRIAGE
-  BEREAVEMENT
-  HAJJ
-  EXAM
-  WORK_MISSION
-  UNPAID
-  EARLY_LEAVE
-  OTHER
-}
-
-enum LeaveStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
-  MODIFIED
-  MGR_APPROVED
-  MGR_REJECTED
-  DELAYED
-}
-
-enum ApprovalStep {
-  MANAGER
-  HR
-  COMPLETED
-  FINANCE
-  CEO
-}
-
-enum ApprovalDecision {
-  PENDING
-  APPROVED
-  REJECTED
-  DELAYED
-}
-
-enum LetterType {
-  SALARY_DEFINITION
-  SERVICE_CONFIRMATION
-  SALARY_ADJUSTMENT
-  PROMOTION
-  TRANSFER_ASSIGNMENT
-  RESIGNATION
-  TERMINATION
-  CLEARANCE
-  EXPERIENCE
-  SALARY_DEFINITION_DIRECTED
-  NOC
-  DELEGATION
-}
-
-enum LetterStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
-  MGR_APPROVED
-  MGR_REJECTED
-  DELAYED
-}
-
-enum NotificationType {
-  LATE_CHECK_IN
-  EARLY_CHECK_OUT
-  EARLY_CHECK_IN
-  LEAVE_APPROVED
-  LEAVE_REJECTED
-  SUSPICIOUS_ACTIVITY
-  GENERAL
-  LETTER_APPROVED
-  LETTER_REJECTED
-  DISC_CASE_SUBMITTED
-  DISC_HR_REJECTED
-  DISC_INFORMAL_SENT
-  DISC_EMP_REJECTED_INFORMAL
-  DISC_HEARING_SCHEDULED
-  DISC_DECISION_ISSUED
-  DISC_EMP_OBJECTED
-  DISC_FINALIZED
-  EMP_EXIT_GEOFENCE
-  EMP_RETURN_GEOFENCE
-}
-
-enum AuditAction {
-  CREATE
-  UPDATE
-  DELETE
-  LOGIN
-  LOGOUT
-  SETTINGS_CHANGE
-  EXPORT
-  IMPORT
-}
-
-enum HolidayApplicationType {
-  ALL
-  BRANCH
-  DEPARTMENT
-  SPECIFIC_EMPLOYEES
-  EXCLUDE_EMPLOYEES
-}
-
-enum PermissionScope {
-  SELF
-  TEAM
-  BRANCH
-  DEPARTMENT
-  ALL
-  CUSTOM
-}
-
-enum PermissionAuditAction {
-  ADDED
-  REMOVED
-  MODIFIED
-}
-
-enum RaiseType {
-  SALARY_INCREASE
-  ANNUAL_LEAVE_BONUS
-  BUSINESS_TRIP
-  BONUS
-  ALLOWANCE
-  OTHER
-}
-
-enum RaiseStatus {
-  PENDING
-  MGR_APPROVED
-  MGR_REJECTED
-  APPROVED
-  REJECTED
-  DELAYED
-  CANCELLED
-}
-
-enum AdvanceType {
-  BANK_TRANSFER
-  CASH
-}
-
-enum SalaryComponentType {
-  EARNING
-  DEDUCTION
-}
-
-enum SalaryComponentNature {
-  FIXED
-  VARIABLE
-  FORMULA
-}
-
-enum PayrollFrequency {
-  WEEKLY
-  BI_WEEKLY
-  MONTHLY
-  OTHER
-}
-
-enum PayrollStatus {
-  DRAFT
-  INPUTS_COLLECTED
-  CALCULATED
-  HR_REVIEWED
-  FINANCE_APPROVED
-  LOCKED
-  PAID
-  CANCELLED
-  ARCHIVED
-}
-
-enum PayslipLineSource {
-  STRUCTURE
-  POLICY
-  MANUAL
-  ADJUSTMENT
-  STATUTORY
-  SMART
-  SYSTEM
-}
-
-enum RetroPayStatus {
-  PENDING
-  APPROVED
-  PAID
-  CANCELLED
-}
-
-enum PolicyType {
-  OVERTIME
-  LEAVE
-  DEDUCTION
-  ALLOWANCE
-  ATTENDANCE
-  GENERAL
-}
-
-enum PolicyScope {
-  COMPANY
-  BRANCH
-  DEPARTMENT
-  JOB_TITLE
-  EMPLOYEE
-}
-
-enum OutputSign {
-  EARNING
-  DEDUCTION
-}
-
-enum SmartPolicyTrigger {
-  ATTENDANCE
-  LEAVE
-  CUSTODY
-  PAYROLL
-  ANNIVERSARY
-  CONTRACT
-  DISCIPLINARY
-  PERFORMANCE
-  CUSTOM
-}
-
-enum SmartPolicyStatus {
-  DRAFT
-  PENDING
-  ACTIVE
-  PAUSED
-  ARCHIVED
-}
-
-enum SmartPolicyActionType {
-  ADD_TO_PAYROLL
-  DEDUCT_FROM_PAYROLL
-  SEND_NOTIFICATION
-  ALERT_HR
-  CREATE_RECORD
-}
-
-enum PolicyApprovalAction {
-  SUBMITTED
-  APPROVED
-  REJECTED
-  CHANGES_REQUESTED
-}
-
-enum OccurrenceResetPeriod {
-  MONTHLY
-  QUARTERLY
-  YEARLY
-  NEVER
-}
-
-enum RetroApplicationStatus {
-  PENDING
-  CALCULATING
-  REVIEWED
-  APPROVED
-  APPLIED
-  CANCELLED
-}
-
-enum MudadStatus {
-  PENDING
-  PREPARED
-  SUBMITTED
-  ACCEPTED
-  REJECTED
-  RESUBMITTED
-  RESUBMIT_REQUIRED
-}
-
-enum WpsStatus {
-  GENERATED
-  DOWNLOADED
-  SUBMITTED
-  PROCESSING
-  PROCESSED
-  FAILED
-}
-
-enum AuditModule {
-  AUTH
-  USER
-  PAYROLL
-  PAYSLIP
-  BANK_ACCOUNT
-  SALARY
-  LEAVE
-  ATTENDANCE
-  ADVANCE
-  GOSI
-  EOS
-  PERMISSION
-  POLICY
-  RETRO_PAY
-  LETTER
-  SETTINGS
-  MUDAD
-  WPS
-  CONTRACT
-  DISCIPLINARY
-}
-
-enum DisciplinaryStage {
-  MANAGER_REQUEST
-  HR_INITIAL_REVIEW
-  EMPLOYEE_INFORMAL_RESPONSE
-  OFFICIAL_INVESTIGATION
-  DECISION
-  OBJECTION
-  FINAL
-}
-
-enum DisciplinaryStatus {
-  SUBMITTED_TO_HR
-  HR_REJECTED
-  HR_INFORMAL_SENT
-  AWAITING_EMPLOYEE_INFORMAL
-  EMPLOYEE_REJECTED_INFORMAL
-  OFFICIAL_INVESTIGATION_OPENED
-  HEARING_SCHEDULED
-  INVESTIGATION_IN_PROGRESS
-  AWAITING_HR_DECISION
-  DECISION_ISSUED
-  AWAITING_EMPLOYEE_ACK
-  EMPLOYEE_OBJECTED
-  HR_REVIEWING_OBJECTION
-  FINALIZED_APPROVED
-  FINALIZED_CANCELLED
-  FINALIZED_CONTINUE_INVESTIGATION
-}
-
-enum DecisionType {
-  NO_VIOLATION
-  NOTICE
-  WARNING
-  FIRST_WARNING
-  SECOND_WARNING
-  FINAL_WARNING_TERMINATION
-  FINAL_TERMINATION_ART80
-  PROMOTION_DELAY
-  SALARY_DEDUCTION
-  SUSPENSION_WITH_PAY
-  SUSPENSION_WITHOUT_PAY
-}
-
-enum PayrollAdjustmentStatus {
-  PENDING
-  POSTED
-  REVERSED
-  CANCELLED
-}
-
-enum AdjustmentUnit {
-  DAYS
-  HOURS
-  AMOUNT
-}
-
-enum CaseEventType {
-  CASE_CREATED
-  HR_INITIAL_REVIEW
-  INFORMAL_ACTION_SENT
-  EMPLOYEE_INFORMAL_RESPONSE
-  OFFICIAL_INVESTIGATION_OPENED
-  HEARING_SCHEDULED
-  MINUTES_UPLOADED
-  DECISION_ISSUED
-  EMPLOYEE_ACKNOWLEDGED
-  EMPLOYEE_OBJECTED
-  OBJECTION_REVIEWED
-  FINALIZED
-  CANCELLED
-}
-
-enum DeductionBasePolicy {
-  BASIC_ONLY
-  BASIC_FIXED
-  GROSS
-}
-
-enum SubmissionEntityType {
-  MUDAD
-  WPS
-  QIWA
-}
-
-enum ApprovalRequestType {
-  LEAVE
-  ADVANCE
-  RAISE
-  PAYROLL
-  WPS
-}
-
-enum CustodyItemStatus {
-  AVAILABLE
-  ASSIGNED
-  IN_MAINTENANCE
-  LOST
-  DAMAGED
-  DISPOSED
-  RESERVED
-}
-
-enum CustodyCondition {
-  NEW
-  EXCELLENT
-  GOOD
-  FAIR
-  POOR
-}
-
-enum CustodyAssignmentStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  DELIVERED
-  RETURNED
-  TRANSFERRED
-}
-
-enum CustodyReturnStatus {
-  PENDING
-  INSPECTING
-  APPROVED
-  REJECTED
-  COMPLETED
-}
-
-enum CustodyTransferStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  COMPLETED
-}
-
-enum CustodyMaintenanceStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  CANNOT_REPAIR
-}
-
-enum MaintenanceType {
-  PREVENTIVE
-  CORRECTIVE
-  EMERGENCY
-}
-
-enum DocumentType {
-  ID_CARD
-  IQAMA
-  PASSPORT
-  CONTRACT
-  CERTIFICATE
-  MEDICAL
-  BANK_LETTER
-  DRIVING_LICENSE
-  QUALIFICATION
-  OTHER
-}
-
-enum ProficiencyLevel {
-  BEGINNER
-  INTERMEDIATE
-  ADVANCED
-  EXPERT
-}
-
-enum OnboardingType {
-  JOINING
-  OFFBOARDING
-  RETURN
-}
-
-enum AssigneeType {
-  HR
-  IT
-  MANAGER
-  FINANCE
-  EMPLOYEE
-}
-
-enum OnboardingProcessStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum OnboardingTaskStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  SKIPPED
-}
-
-enum TaskStatus {
-  BACKLOG
-  TODO
-  IN_PROGRESS
-  IN_REVIEW
-  BLOCKED
-  COMPLETED
-  CANCELLED
-  PENDING_REVIEW
-  APPROVED
-  REJECTED
-}
-
-enum TaskPriority {
-  URGENT
-  HIGH
-  MEDIUM
-  LOW
-}
+// ==================== مهام ومشاريع (Tasks & Projects) ====================
+
+model Task {
+  id                String              @id @default(uuid())
+  companyId         String              @map("company_id")
+  company           Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?             @db.Text
+  status            TaskStatus          @default(TODO)
+  priority          TaskPriority        @default(MEDIUM)
+  categoryId        String?             @map("category_id")
+  category          TaskCategory?       @relation(fields: [categoryId], references: [id])
+  templateId        String?             @map("template_id")
+  template          TaskTemplate?       @relation(fields: [templateId], references: [id])
+  dueDate           DateTime?           @map("due_date")
+  startDate         DateTime?           @map("start_date")
+  completedAt       DateTime?           @map("completed_at")
+  createdById       String              @map("created_by_id")
+  createdBy         User                @relation("tasks_created_by_idTousers", fields: [createdById], references: [id])
+  assigneeId        String?             @map("assignee_id")
+  assignee          User?               @relation("tasks_assignee_idTousers", fields: [assigneeId], references: [id])
+  recurrenceType    TaskRecurrenceType? @map("recurrence_type")
+  recurrenceEnd     DateTime?           @map("recurrence_end")
+  parentTaskId      String?             @map("parent_task_id")
+  parentTask        Task?               @relation("TaskToTask", fields: [parentTaskId], references: [id])
+  subTasks          Task[]              @relation("TaskToTask")
+  progress          Int                 @default(0)
+  tags              String[]            @default([])
+  customFields      Json?               @map("custom_fields")
+  order             Int                 @default(0)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  approvedAt        DateTime?           @map("approved_at")
+  approverId        String?             @map("approver_id")
+  approver          User?               @relation("tasks_approver_idTousers", fields: [approverId], references: [id])
+  reviewerId        String?             @map("reviewer_id")
+  reviewer          User?               @relation("tasks_reviewer_idTousers", fields: [reviewerId], references: [id])
+  reviewedAt        DateTime?           @map("reviewed_at")
+  reviewRequestedAt DateTime?           @map("review_requested_at")
+  isEscalated       Boolean             @default(false) @map("is_escalated")
+  escalatedAt       DateTime?           @map("escalated_at")
+  rejectedAt        DateTime?           @map("rejected_at")
+  rejectionReason   String?             @map("rejection_reason")
+  slaHours          Int?                @map("sla_hours")
+
+  // Relations
+  activityLogs TaskActivityLog[]
+  approvals    TaskApproval[]
+  assignments  TaskAssignment[]
+  attachments  TaskAttachment[]
+  checklists   TaskChecklist[]
+  comments     TaskComment[]
+  evidences    TaskEvidence[]
+  timeLogs     TaskTimeLog[]
+  watchers     TaskWatcher[]
+  sprintId     String?           @map("sprint_id")
+  sprint       Sprint?           @relation(fields: [sprintId], references: [id])
+  projectId    String?           @map("project_id")
+  project      Project?          @relation("ProjectTasks", fields: [projectId], references: [id])
+
+  // Dependencies
+  blockedTasks  TaskDependency[] @relation("BlockedTask")
+  blockingTasks TaskDependency[] @relation("BlockingTask")
+
+  @@index([companyId, assigneeId])
+  @@index([companyId, categoryId])
+  @@index([companyId, createdById])
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+  @@map("tasks")
+}
+
+model TaskCategory {
+  id          String           @id @default(uuid())
+  companyId   String           @map("company_id")
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  nameEn      String?          @map("name_en")
+  color       String           @default("#3B82F6")
+  icon        String?
+  order       Int              @default(0)
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  tasks       Task[]
+  automations TaskAutomation[]
+  templates   TaskTemplate[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("task_categories")
+}
+
+model TaskTemplate {
+  id                String        @id @default(uuid())
+  companyId         String        @map("company_id")
+  company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name              String
+  nameEn            String?       @map("name_en")
+  description       String?       @db.Text
+  categoryId        String?       @map("category_id")
+  category          TaskCategory? @relation(fields: [categoryId], references: [id])
+  defaultPriority   TaskPriority  @default(MEDIUM) @map("default_priority")
+  defaultDueDays    Int?          @map("default_due_days")
+  checklistTemplate Json?         @map("checklist_template")
+  workflowType      String?       @map("workflow_type")
+  isActive          Boolean       @default(true) @map("is_active")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  tasks             Task[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("task_templates")
+}
+
+model Sprint {
+  id              String       @id @default(uuid())
+  companyId       String       @map("company_id")
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  goal            String?      @db.Text
+  description     String?      @db.Text
+  status          SprintStatus @default(PLANNING)
+  startDate       DateTime?    @map("start_date")
+  endDate         DateTime?    @map("end_date")
+  startedAt       DateTime?    @map("started_at")
+  completedAt     DateTime?    @map("completed_at")
+  plannedPoints   Int          @default(0) @map("planned_points")
+  completedPoints Int          @default(0) @map("completed_points")
+  velocity        Float?
+  createdById     String       @map("created_by_id")
+  createdBy       User         @relation("SprintCreator", fields: [createdById], references: [id])
+  tasks           Task[]
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  @@index([companyId, startDate])
+  @@index([companyId, status])
+  @@map("sprints")
+}
+
+model TaskAssignment {
+  id           String   @id @default(uuid())
+  taskId       String   @map("task_id")
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime @default(now()) @map("assigned_at")
+  assignedById String?  @map("assigned_by_id")
+
+  @@unique([taskId, userId])
+  @@map("task_assignments")
+}
+
+model TaskWatcher {
+  id            String   @id @default(uuid())
+  taskId        String   @map("task_id")
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchingSince DateTime @default(now()) @map("watching_since")
+
+  @@unique([taskId, userId])
+  @@map("task_watchers")
+}
+
+model TaskComment {
+  id        String        @id @default(uuid())
+  taskId    String        @map("task_id")
+  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  String        @map("author_id")
+  author    User          @relation(fields: [authorId], references: [id])
+  content   String        @db.Text
+  mentions  String[]      @default([])
+  isEdited  Boolean       @default(false) @map("is_edited")
+  editedAt  DateTime?     @map("edited_at")
+  parentId  String?       @map("parent_id")
+  parent    TaskComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   TaskComment[] @relation("CommentReplies")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@index([authorId])
+  @@index([parentId])
+  @@index([taskId])
+  @@map("task_comments")
+}
+
+model TaskActivityLog {
+  id          String   @id @default(uuid())
+  taskId      String   @map("task_id")
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  action      String // STATUS_CHANGE, ASSIGNEE_CHANGE, etc.
+  oldValue    String?  @map("old_value")
+  newValue    String?  @map("new_value")
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_activity_logs")
+}
+
+model TaskEvidence {
+  id                  String             @id @default(uuid())
+  taskId              String             @map("task_id")
+  task                Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  submittedById       String             @map("submitted_by_id")
+  submittedBy         User               @relation("task_evidences_submitted_by_idTousers", fields: [submittedById], references: [id])
+  description         String?            @db.Text
+  fileUrl             String?            @map("file_url")
+  fileName            String?            @map("file_name")
+  fileType            String?            @map("file_type")
+  fileSize            Int?               @map("file_size")
+  latitude            Float?
+  longitude           Float?
+  locationName        String?            @map("location_name")
+  status              TaskEvidenceStatus @default(PENDING)
+  verifiedById        String?            @map("verified_by_id")
+  verifiedBy          User?              @relation("task_evidences_verified_by_idTousers", fields: [verifiedById], references: [id])
+  verifiedAt          DateTime?          @map("verified_at")
+  verificationComment String?            @map("verification_comment") @db.Text
+  createdAt           DateTime           @default(now()) @map("created_at")
+
+  @@index([submittedById])
+  @@index([taskId])
+  @@map("task_evidences")
+}
+
+model TaskTimeLog {
+  id          String    @id @default(uuid())
+  taskId      String    @map("task_id")
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  startTime   DateTime  @map("start_time")
+  endTime     DateTime? @map("end_time")
+  duration    Int? // in seconds
+  description String?   @db.Text
+  isBillable  Boolean   @default(false) @map("is_billable")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_time_logs")
+}
+
+model TaskDependency {
+  id             String         @id @default(uuid())
+  blockedTaskId  String         @map("blocked_task_id")
+  blockedTask    Task           @relation("BlockedTask", fields: [blockedTaskId], references: [id], onDelete: Cascade)
+  blockingTaskId String         @map("blocking_task_id")
+  blockingTask   Task           @relation("BlockingTask", fields: [blockingTaskId], references: [id], onDelete: Cascade)
+  type           DependencyType @default(BLOCKS)
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@unique([blockedTaskId, blockingTaskId])
+  @@map("task_dependencies")
+}
+
+model TaskChecklist {
+  id        String              @id @default(uuid())
+  taskId    String              @map("task_id")
+  task      Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title     String
+  order     Int                 @default(0)
+  items     TaskChecklistItem[]
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  @@index([taskId])
+  @@map("task_checklists")
+}
+
+model TaskChecklistItem {
+  id            String        @id @default(uuid())
+  checklistId   String        @map("checklist_id")
+  checklist     TaskChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  content       String        @db.Text
+  isCompleted   Boolean       @default(false) @map("is_completed")
+  order         Int           @default(0)
+  completedAt   DateTime?     @map("completed_at")
+  completedById String?       @map("completed_by_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@index([checklistId])
+  @@map("task_checklist_items")
+}
+
+model TaskAutomation {
+  id            String            @id @default(uuid())
+  companyId     String            @map("company_id")
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdById   String            @map("created_by_id")
+  createdBy     User              @relation(fields: [createdById], references: [id])
+  name          String
+  description   String?           @db.Text
+  isActive      Boolean           @default(true) @map("is_active")
+  trigger       AutomationTrigger
+  triggerConfig Json?             @map("trigger_config")
+  action        AutomationAction
+  actionConfig  Json?             @map("action_config")
+  categoryId    String?           @map("category_id")
+  category      TaskCategory?     @relation(fields: [categoryId], references: [id])
+  priority      TaskPriority?
+  lastRunAt     DateTime?         @map("last_run_at")
+  run_count     Int               @default(0) @map("run_count")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@index([isActive])
+  @@map("task_automations")
+}
+
+model TaskAttachment {
+  id           String   @id @default(uuid())
+  taskId       String   @map("task_id")
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedById String   @map("uploaded_by_id")
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  fileName     String   @map("file_name")
+  fileSize     Int      @map("file_size")
+  mimeType     String   @map("mime_type")
+  storagePath  String   @map("storage_path")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([taskId])
+  @@map("task_attachments")
+}
+
+model TaskApproval {
+  id        String             @id @default(uuid())
+  taskId    String             @map("task_id")
+  task      Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String             @map("user_id")
+  user      User               @relation(fields: [userId], references: [id])
+  action    TaskApprovalAction
+  comment   String?            @db.Text
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_approvals")
+}
+
+// ==================== Enums (Restored) ====================
 
 enum TaskRecurrenceType {
   DAILY
@@ -5940,4 +5742,48 @@ enum DebtTransactionType {
   ADJUSTMENT // تعديل
   WRITE_OFF // شطب
   REVERSAL // عكس عملية سابقة
+}
+
+// ==================== نظام اكتشاف إيقاف التطبيق/الهاتف ====================
+
+enum OfflineEventType {
+  PHONE_OFF // الهاتف مغلق
+  APP_CLOSED // التطبيق مغلق
+  NO_SIGNAL // فقدان الإشارة
+  APP_UNINSTALLED // التطبيق محذوف (مفترض بعد timeout طويل)
+}
+
+model EmployeeOfflineEvent {
+  id        String @id @default(uuid())
+  userId    String @map("user_id")
+  companyId String @map("company_id")
+
+  // نوع الحدث
+  eventType OfflineEventType @map("event_type")
+
+  // وقت البداية والنهاية
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  // مدة الانقطاع (بالدقائق)
+  durationMinutes Int? @map("duration_minutes")
+
+  // آخر موقع معروف قبل الانقطاع
+  lastLatitude  Decimal? @map("last_latitude") @db.Decimal(10, 8)
+  lastLongitude Decimal? @map("last_longitude") @db.Decimal(11, 8)
+
+  // هل تم الإشعار؟
+  notified   Boolean   @default(false)
+  notifiedAt DateTime? @map("notified_at")
+
+  // هل الموظف عاد للاتصال؟
+  isResolved Boolean @default(false) @map("is_resolved")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId, startedAt])
+  @@index([userId, isResolved])
+  @@index([companyId, isResolved, notified])
+  @@map("employee_offline_events")
 }
