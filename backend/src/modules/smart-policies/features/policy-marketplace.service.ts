@@ -628,9 +628,15 @@ export class PolicyMarketplaceService {
 
     // ============== Initialization ==============
 
+
     private initializeMarketplace(): void {
         // إضافة سياسات نموذجية
         this.addSamplePolicies();
+
+        // تحميل السياسات من قاعدة البيانات (غير متزامن)
+        this.loadDatabaseTemplates().catch(err => {
+            this.logger.warn(`Failed to load database templates: ${err.message}`);
+        });
 
         // إضافة المجموعات المميزة
         this.featuredCollections = [
@@ -652,6 +658,69 @@ export class PolicyMarketplaceService {
             },
         ];
     }
+
+    /**
+     * تحميل السياسات من قاعدة البيانات
+     */
+    private async loadDatabaseTemplates(): Promise<void> {
+        try {
+            const templates = await this.prisma.smartPolicyTemplate.findMany({
+                where: { isSystemTemplate: true },
+            });
+
+            this.logger.log(`Loading ${templates.length} templates from database...`);
+
+            for (const template of templates) {
+                const marketplacePolicy: MarketplacePolicy = {
+                    id: template.id,
+                    name: template.name || 'سياسة بدون اسم',
+                    nameEn: template.nameEn || template.name || 'Unnamed Policy',
+                    description: template.description || '',
+                    category: ((template.category as string) || 'OTHER') as PolicyCategory,
+                    tags: (template.legalCompliance as any)?.tags || [],
+                    industry: [(template.legalCompliance as any)?.industry || 'ALL'],
+                    companySize: ['SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE'] as CompanySize[],
+                    country: ['SA', 'AE', 'EG'],
+                    template: template.parsedRule as unknown as PolicyTemplate,
+                    variables: [],
+                    stats: {
+                        downloads: template.usageCount || 0,
+                        installs: 0,
+                        activeUsage: 0,
+                        views: 0,
+                        favorites: 0,
+                        shares: 0,
+                        forks: 0,
+                    },
+                    reviews: [],
+                    avgRating: template.rating ? Number(template.rating) : 4.5,
+                    author: {
+                        id: 'official',
+                        name: 'فريق السياسات الذكية',
+                        type: 'OFFICIAL',
+                        policiesCount: templates.length,
+                        totalDownloads: 10000,
+                        avgRating: 4.7,
+                        isVerified: true,
+                    },
+                    isOfficial: true,
+                    isVerified: true,
+                    pricing: { type: 'FREE' },
+                    createdAt: template.createdAt || new Date(),
+                    updatedAt: template.updatedAt || new Date(),
+                    publishedAt: template.createdAt || new Date(),
+                    version: '1.0.0',
+                };
+
+                this.policiesCache.set(template.id, marketplacePolicy);
+            }
+
+            this.logger.log(`✅ Loaded ${templates.length} database templates into marketplace cache`);
+        } catch (error: any) {
+            this.logger.error(`Failed to load database templates: ${error.message}`);
+        }
+    }
+
 
     private addSamplePolicies(): void {
         const samplePolicies: MarketplacePolicy[] = [
