@@ -269,6 +269,15 @@ export const FIELD_SHORTCUTS: Record<string, string> = {
     'isHoliday': 'attendance.isHoliday',
     'absenceType': 'attendance.lastAbsenceType',
     'dailyHours': 'attendance.currentPeriod.dailyHours',
+    // 🔧 FIX: Full path aliases for policy compatibility (attendance.* → attendance.currentPeriod.*)
+    'attendance.lateDays': 'attendance.currentPeriod.lateDays',
+    'attendance.absentDays': 'attendance.currentPeriod.absentDays',
+    'attendance.presentDays': 'attendance.currentPeriod.presentDays',
+    'attendance.lateMinutes': 'attendance.currentPeriod.lateMinutes',
+    'attendance.overtimeHours': 'attendance.currentPeriod.overtimeHours',
+    'attendance.attendancePercentage': 'attendance.currentPeriod.attendancePercentage',
+    'attendance.workingDays': 'attendance.currentPeriod.workingDays',
+    'attendance.lateCount': 'attendance.currentPeriod.lateDays',
 
     // ==========================================
     // Tenure shortcuts (مدة الخدمة)
