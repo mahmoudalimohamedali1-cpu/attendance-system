@@ -7,3 +7,4 @@ export { UpcomingEvents } from './UpcomingEvents';
 export { QuickInsights } from './QuickInsights';
 export { KPICard } from './KPICard';
 export { MudadComplianceCard } from './MudadComplianceCard';
+export { CalendarWidget } from './CalendarWidget';
