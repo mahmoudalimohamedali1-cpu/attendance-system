@@ -2646,7 +2646,7 @@ model SmartPolicyAnalytics {
 model SmartPolicyApproval {
   id             String                @id @default(uuid())
   policyId       String                @map("policy_id")
-  requestedBy    String                @map("requested_by")
+  requestedBy    String?               @map("requested_by")
   requestedAt    DateTime              @default(now()) @map("requested_at")
   status         SmartPolicyStatus     @default(PENDING)
   approvedBy     String?               @map("approved_by")
@@ -2716,20 +2716,20 @@ model SmartPolicyRetroApplication {
 }
 
 model SmartPolicyTemplate {
-  id             String             @id @default(uuid())
-  nameAr         String             @map("name_ar")
-  nameEn         String?            @map("name_en")
-  descriptionAr  String?            @map("description_ar")
-  descriptionEn  String?            @map("description_en")
-  triggerEvent   SmartPolicyTrigger @map("trigger_event")
+  id             String              @id @default(uuid())
+  nameAr         String?             @map("name_ar")
+  nameEn         String?             @map("name_en")
+  descriptionAr  String?             @map("description_ar")
+  descriptionEn  String?             @map("description_en")
+  triggerEvent   SmartPolicyTrigger? @map("trigger_event")
   category       String
-  baseRule       Json               @map("base_rule")
-  recommendedFor String?            @map("recommended_for")
-  usageCount     Int                @default(0) @map("usage_count")
-  isActive       Boolean            @default(true) @map("is_active")
-  companyId      String?            @map("company_id")
-  company        Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt      DateTime           @default(now()) @map("created_at")
+  baseRule       Json?               @map("base_rule")
+  recommendedFor String?             @map("recommended_for")
+  usageCount     Int                 @default(0) @map("usage_count")
+  isActive       Boolean             @default(true) @map("is_active")
+  companyId      String?             @map("company_id")
+  company        Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now()) @map("created_at")
 
   @@map("smart_policy_templates")
 }
@@ -2764,9 +2764,9 @@ model PolicySimulationRun {
   createdAt              DateTime    @default(now()) @map("created_at")
   startDate              DateTime?   @default(now()) @map("start_date") @db.Timestamp(6)
   endDate                DateTime?   @default(now()) @map("end_date") @db.Timestamp(6)
-  companyId              String      @map("company_id")
+  companyId              String?     @map("company_id")
   smartPolicy            SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  company                Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company                Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([policyId, createdAt])
   @@map("policy_simulation_runs")
