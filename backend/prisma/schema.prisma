@@ -124,6 +124,10 @@ model Company {
   taskAutomations       TaskAutomation[]
   employeeDebtLedgers   EmployeeDebtLedger[]
 
+  // Recognition & Succession Planning
+  recognitions    Recognition[]
+  successionPlans SuccessionPlan[]
+
   @@map("companies")
 }
 
@@ -565,6 +569,12 @@ model User {
   smartPolicyOccurrenceTrackers SmartPolicyOccurrenceTracker[]
   smartPolicyRetroApplications  SmartPolicyRetroApplication[]
 
+  // Recognition & Succession Planning
+  recognitionsSent     Recognition[]         @relation("RecognitionSender")
+  recognitionsReceived Recognition[]         @relation("RecognitionReceiver")
+  recognitionReactions RecognitionReaction[]
+  successionCandidates SuccessionCandidate[]
+
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
   @@map("users")
@@ -874,6 +884,7 @@ model Department {
   updatedAt              DateTime                @updatedAt @map("updated_at")
   departmentSaudizations DepartmentSaudization[]
   shiftSchedules         ShiftSchedule[]
+  costCenters            CostCenter[]
 
   @@unique([companyId, name])
   @@map("departments")
@@ -914,6 +925,7 @@ enum AttendanceStatus {
   EXCUSED // غياب بعذر
   WFM // عمل من المنزل (Advanced)
   MOCKED // موقع وهمي
+  LATE_AND_EARLY
 }
 
 enum CheckType {
@@ -1998,163 +2010,6 @@ model Contract {
   @@map("contracts")
 }
 
-model CostCenter {
-  id          String   @id @default(uuid())
-  companyId   String?  @map("company_id")
-  company     Company? @relation(fields: [companyId], references: [id])
-  code        String   @unique
-  name        String
-  description String?
-
-  // production fields
-  effective_from          DateTime? @default(now()) @db.Timestamp(6)
-  is_allow_overbudget     Boolean?  @default(false)
-  budget_alert_threshold  Float?    @default(90)
-  is_mandatory_in_payroll Boolean?  @default(false)
-
-  users User[]
-
-  // relations to production models
-  allocations        CostCenterAllocation[] @relation("cost_center_allocations_cost_center_idTocost_centers")
-  primaryAllocations CostCenterAllocation[] @relation("cost_center_allocations_primary_cost_center_idTocost_centers")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@unique([companyId, code])
-  @@map("cost_centers")
-}
-
-// ==================== موديولات الرواتب: المكونات والهياكل ====================
-
-enum SalaryComponentType {
-  EARNING // استحقاق (بدلات، راتب أساسي)
-  DEDUCTION // استقطاع (تأمينات، غرامات)
-}
-
-enum SalaryComponentNature {
-  FIXED // مبلغ ثابت
-  VARIABLE // مبلغ متغير (يدخل يدوياً كل شهر)
-  FORMULA // محسوب بناءً على معادلة
-}
-
-model SalaryComponent {
-  id        String                @id @default(uuid())
-  companyId String?               @map("company_id")
-  company   Company?              @relation(fields: [companyId], references: [id])
-  code      String // مثال: BASIC, HRA, TRANSPORT
-  nameAr    String                @map("name_ar")
-  nameEn    String?               @map("name_en")
-  type      SalaryComponentType
-  nature    SalaryComponentNature @default(FIXED)
-
-  description  String?
-  gosiEligible Boolean @default(false) @map("gosi_eligible")
-  otEligible   Boolean @default(false) @map("ot_eligible")
-  eosEligible  Boolean @default(false) @map("eos_eligible") // يدخل في حساب مستحقات نهاية الخدمة
-  isProrated   Boolean @default(true) @map("is_prorated") // هل يتأثر بالغياب والتعيين المتأخر (Pro-rated)
-  taxable      Boolean @default(false) // خاضع للضريبة
-
-  // لربط المكون باللي يعتمد عليه (مثلاً السكن 25% من الأساسي)
-  formula String? // المعادلة (سيتم استخدامها لاحقاً في Rules Engine)
-
-  // Enterprise: Versioning & Effective Dating
-  version       Int       @default(1)
-  effectiveDate DateTime  @default(now()) @map("effective_date")
-  endDate       DateTime? @map("end_date")
-  isActive      Boolean   @default(true) @map("is_active")
-
-  // Enterprise: Rounding & Display
-  roundingMode String @default("ROUND") @map("rounding_mode") // ROUND, FLOOR, CEIL
-  decimals     Int    @default(2)
-  priority     Int    @default(100) // ترتيب الظهور في الـ Payslip
-
-  structureLines SalaryStructureLine[]
-  PayslipLine    PayslipLine[]
-  policyRules    PolicyRule[]          @relation("PolicyOutputComponent")
-  createdAt      DateTime              @default(now()) @map("created_at")
-  updatedAt      DateTime              @updatedAt @map("updated_at")
-
-  @@unique([companyId, type, code, version])
-  @@index([companyId, isActive])
-  @@index([effectiveDate, endDate])
-  @@map("salary_components")
-}
-
-enum PayrollStatus {
-  DRAFT
-  INPUTS_COLLECTED
-  CALCULATED
-  HR_REVIEWED
-  FINANCE_APPROVED
-  LOCKED
-  PAID
-  CANCELLED
-  ARCHIVED
-}
-
-model SalaryStructure {
-  id          String   @id @default(uuid())
-  companyId   String?  @map("company_id")
-  company     Company? @relation(fields: [companyId], references: [id])
-  name        String
-  description String?
-  isActive    Boolean  @default(true) @map("is_active")
-
-  // Enterprise: Versioning
-  version       Int       @default(1)
-  effectiveDate DateTime  @default(now()) @map("effective_date")
-  endDate       DateTime? @map("end_date")
-
-  // المكونات التابعة لهذا الهيكل
-  lines       SalaryStructureLine[]
-  assignments EmployeeSalaryAssignment[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@unique([companyId, name, version])
-  @@index([companyId, isActive])
-  @@index([effectiveDate, endDate])
-  @@map("salary_structures")
-}
-
-model SalaryStructureLine {
-  id          String          @id @default(uuid())
-  structureId String          @map("structure_id")
-  structure   SalaryStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
-
-  componentId String          @map("component_id")
-  component   SalaryComponent @relation(fields: [componentId], references: [id])
-
-  amount     Decimal  @default(0) @db.Decimal(10, 2)
-  percentage Decimal? @db.Decimal(5, 2) // إذا كان مبلغ البدلة نسبة من الأساسي
-
-  priority Int @default(0) // ترتيب الحساب
-
-  @@map("salary_structure_lines")
-}
-
-model EmployeeSalaryAssignment {
-  id         String @id @default(uuid())
-  employeeId String @map("employee_id")
-  employee   User   @relation("EmployeeSalaryAssignments", fields: [employeeId], references: [id])
-
-  structureId String          @map("structure_id")
-  structure   SalaryStructure @relation(fields: [structureId], references: [id])
-
-  baseSalary    Decimal   @map("base_salary") @db.Decimal(10, 2)
-  effectiveDate DateTime  @map("effective_date") @db.Date
-  endDate       DateTime? @map("end_date") @db.Date
-
-  isActive Boolean @default(true) @map("is_active")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("employee_salary_assignments")
-}
-
 // قشرة قسيمة الراتب (سيتم إضافتها بالكامل في Step 2 لكن نحتاج الموديلات للعلاقات)
 
 // 🔥 مصدر سطر قسيمة الراتب
@@ -2168,26 +2023,150 @@ enum PayslipLineSource {
 }
 
 model PayslipLine {
-  id          String          @id @default(uuid())
-  payslipId   String          @map("payslip_id")
-  payslip     Payslip         @relation(fields: [payslipId], references: [id], onDelete: Cascade)
-  componentId String          @map("component_id")
-  component   SalaryComponent @relation(fields: [componentId], references: [id])
-
-  // 🔥 Extended fields for Policy Engine integration
-  sign          String            @default("EARNING") // EARNING | DEDUCTION
-  amount        Decimal           @db.Decimal(10, 2)
-  sourceType    PayslipLineSource @default(STRUCTURE) @map("source_type")
-  sourceRef     String?           @map("source_ref") // policyId:ruleId or "MERGED"
-  descriptionAr String?           @map("description_ar") // وصف السطر
-  units         Decimal?          @db.Decimal(10, 2) // ساعات OT، دقائق تأخير
-  rate          Decimal?          @db.Decimal(10, 4) // معدل الحساب
-
-  createdAt DateTime @default(now()) @map("created_at")
+  id             String            @id @default(uuid())
+  payslipId      String            @map("payslip_id")
+  componentId    String            @map("component_id")
+  amount         Decimal           @db.Decimal(10, 2)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  descriptionAr  String?           @map("description_ar")
+  rate           Decimal?          @db.Decimal(10, 4)
+  sign           String            @default("EARNING")
+  sourceRef      String?           @map("source_ref")
+  sourceType     PayslipLineSource @default(STRUCTURE) @map("source_type")
+  units          Decimal?          @db.Decimal(10, 2)
+  cost_center_id String?
+  component      SalaryComponent   @relation(fields: [componentId], references: [id])
+  cost_centers   CostCenter?       @relation(fields: [cost_center_id], references: [id])
+  payslip        Payslip           @relation(fields: [payslipId], references: [id], onDelete: Cascade)
 
   @@index([payslipId, sourceType])
   @@index([payslipId, componentId])
+  @@index([cost_center_id])
   @@map("payslip_lines")
+}
+
+model CostCenter {
+  id                                                                                   String                 @id @default(uuid())
+  code                                                                                 String
+  description                                                                          String?
+  createdAt                                                                            DateTime               @default(now()) @map("created_at")
+  updatedAt                                                                            DateTime               @updatedAt @map("updated_at")
+  companyId                                                                            String?                @map("company_id")
+  effective_from                                                                       DateTime               @default(now())
+  effective_to                                                                         DateTime?
+  is_allow_overbudget                                                                  Boolean                @default(false)
+  level                                                                                Int                    @default(1)
+  manager_id                                                                           String?
+  name_ar                                                                              String
+  name_en                                                                              String?
+  parent_id                                                                            String?
+  path                                                                                 String?
+  status                                                                               String                 @default("ACTIVE")
+  type                                                                                 String                 @default("OPERATING")
+  version                                                                              Int                    @default(1)
+  department_id                                                                        String?
+  max_headcount                                                                        Int?
+  budget_alert_threshold                                                               Decimal?               @default(80) @db.Decimal(5, 2)
+  name                                                                                 String?                @db.VarChar(255)
+  cost_center_allocations_cost_center_allocations_cost_center_idTocost_centers         CostCenterAllocation[] @relation("cost_center_allocations_cost_center_idTocost_centers")
+  cost_center_allocations_cost_center_allocations_primary_cost_center_idTocost_centers CostCenterAllocation[] @relation("cost_center_allocations_primary_cost_center_idTocost_centers")
+  company                                                                              Company?               @relation(fields: [companyId], references: [id])
+  departments                                                                          Department?            @relation(fields: [department_id], references: [id])
+  cost_centers                                                                         CostCenter?            @relation("cost_centersTocost_centers", fields: [parent_id], references: [id])
+  other_cost_centers                                                                   CostCenter[]           @relation("cost_centersTocost_centers")
+  payslip_lines                                                                        PayslipLine[]
+  users                                                                                User[]
+
+  @@unique([companyId, code, version])
+  @@index([companyId, status])
+  @@index([effective_from, effective_to])
+  @@index([parent_id])
+  @@map("cost_centers")
+}
+
+model SalaryComponent {
+  id             String                @id @default(uuid())
+  code           String
+  nameAr         String                @map("name_ar")
+  nameEn         String?               @map("name_en")
+  type           SalaryComponentType
+  nature         SalaryComponentNature @default(FIXED)
+  description    String?
+  gosiEligible   Boolean               @default(false) @map("gosi_eligible")
+  otEligible     Boolean               @default(false) @map("ot_eligible")
+  formula        String?
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  companyId      String?               @map("company_id")
+  decimals       Int                   @default(2)
+  effectiveDate  DateTime              @default(now()) @map("effective_date")
+  endDate        DateTime?             @map("end_date")
+  isActive       Boolean               @default(true) @map("is_active")
+  priority       Int                   @default(100)
+  roundingMode   String                @default("ROUND") @map("rounding_mode")
+  taxable        Boolean               @default(false)
+  version        Int                   @default(1)
+  eosEligible    Boolean               @default(false) @map("eos_eligible")
+  isProrated     Boolean               @default(true) @map("is_prorated")
+  PayslipLine    PayslipLine[]
+  policyRules    PolicyRule[]          @relation("PolicyOutputComponent")
+  company        Company?              @relation(fields: [companyId], references: [id])
+  structureLines SalaryStructureLine[]
+
+  @@unique([companyId, type, code, version])
+  @@index([companyId, isActive])
+  @@index([effectiveDate, endDate])
+  @@map("salary_components")
+}
+
+model SalaryStructure {
+  id            String                     @id @default(uuid())
+  name          String
+  description   String?
+  isActive      Boolean                    @default(true) @map("is_active")
+  createdAt     DateTime                   @default(now()) @map("created_at")
+  updatedAt     DateTime                   @updatedAt @map("updated_at")
+  companyId     String?                    @map("company_id")
+  effectiveDate DateTime                   @default(now()) @map("effective_date")
+  endDate       DateTime?                  @map("end_date")
+  version       Int                        @default(1)
+  assignments   EmployeeSalaryAssignment[]
+  lines         SalaryStructureLine[]
+  company       Company?                   @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name, version])
+  @@index([companyId, isActive])
+  @@index([effectiveDate, endDate])
+  @@map("salary_structures")
+}
+
+model SalaryStructureLine {
+  id          String          @id @default(uuid())
+  structureId String          @map("structure_id")
+  componentId String          @map("component_id")
+  amount      Decimal         @default(0) @db.Decimal(10, 2)
+  percentage  Decimal?        @db.Decimal(5, 2)
+  priority    Int             @default(0)
+  component   SalaryComponent @relation(fields: [componentId], references: [id])
+  structure   SalaryStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@map("salary_structure_lines")
+}
+
+model EmployeeSalaryAssignment {
+  id            String          @id @default(uuid())
+  employeeId    String          @map("employee_id")
+  structureId   String          @map("structure_id")
+  baseSalary    Decimal         @map("base_salary") @db.Decimal(10, 2)
+  effectiveDate DateTime        @map("effective_date") @db.Date
+  endDate       DateTime?       @map("end_date") @db.Date
+  isActive      Boolean         @default(true) @map("is_active")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  employee      User            @relation("EmployeeSalaryAssignments", fields: [employeeId], references: [id])
+  structure     SalaryStructure @relation(fields: [structureId], references: [id])
+
+  @@map("employee_salary_assignments")
 }
 
 model PayrollPeriod {
@@ -5609,6 +5588,12 @@ enum RecognitionType {
   AWARD
   ACHIEVEMENT
   SPOT_BONUS
+  PEER_TO_PEER
+  MANAGER_TO_EMPLOYEE
+  ANNIVERSARY
+  BIRTHDAY
+  PROJECT_COMPLETION
+  TOP_PERFORMER
 }
 
 enum DevelopmentGoalStatus {
@@ -6050,6 +6035,9 @@ enum DebtStatus {
   SETTLED // تم تسويته بالكامل
   WRITTEN_OFF // تم شطبه
   SUSPENDED // معلق مؤقتاً
+  PENDING
+  PAID
+  CANCELLED
 }
 
 enum DebtSourceType {
@@ -6059,6 +6047,9 @@ enum DebtSourceType {
   PENALTY // غرامة
   OVERPAYMENT_CORRECTION // تصحيح دفع زائد
   OTHER // أخرى
+  ADVANCE
+  CUSTODY
+  PAYROLL_OVERPAYMENT
 }
 
 enum DebtTransactionType {
@@ -6068,6 +6059,9 @@ enum DebtTransactionType {
   ADJUSTMENT // تعديل
   WRITE_OFF // شطب
   REVERSAL // عكس عملية سابقة
+  CREATION
+  PAYMENT
+  CANCELLATION
 }
 
 // ==================== نظام اكتشاف إيقاف التطبيق/الهاتف ====================
@@ -6121,6 +6115,10 @@ enum HolidayApplicationType {
   SPECIFIC_BRANCH
   SPECIFIC_DEPT
   SPECIFIC_JOB_TITLE
+  BRANCH
+  DEPARTMENT
+  SPECIFIC_EMPLOYEES
+  EXCLUDE_EMPLOYEES
 }
 
 enum OccurrenceResetPeriod {
@@ -6129,6 +6127,9 @@ enum OccurrenceResetPeriod {
   SEMI_ANNUAL
   ANNUAL
   NEVER
+  YEARLY
+  DAILY
+  WEEKLY
 }
 
 enum RetroApplicationStatus {
@@ -6137,12 +6138,48 @@ enum RetroApplicationStatus {
   REJECTED
   APPLIED
   CANCELLED
+  CALCULATING
+  REVIEWED
 }
 
 enum PolicyApprovalAction {
   APPROVE
   REJECT
   REQUEST_CHANGES
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum SalaryComponentType {
+  EARNING
+  DEDUCTION
+}
+
+enum SalaryComponentNature {
+  FIXED
+  VARIABLE
+  FORMULA
+}
+
+enum PayrollFrequency {
+  MONTHLY
+  WEEKLY
+  BIWEEKLY
+  DAILY
+}
+
+enum PayrollStatus {
+  DRAFT
+  INPUTS_COLLECTED
+  CALCULATED
+  HR_REVIEWED
+  FINANCE_APPROVED
+  LOCKED
+  PAID
+  CANCELLED
+  ARCHIVED
 }
 
 // ==================== Missing Production Models ====================
@@ -6440,4 +6477,70 @@ model PerformanceReview {
   @@index([employeeId])
   @@index([managerId])
   @@map("performance_reviews")
+}
+
+// ==================== Missing Production Models (Batch 2) ====================
+
+model Recognition {
+  id         String                @id @default(uuid())
+  companyId  String                @map("company_id")
+  senderId   String                @map("sender_id")
+  receiverId String                @map("receiver_id")
+  type       RecognitionType       @default(PEER_TO_PEER)
+  message    String
+  points     Int                   @default(0)
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+  company    Company               @relation(fields: [companyId], references: [id])
+  sender     User                  @relation("RecognitionSender", fields: [senderId], references: [id])
+  receiver   User                  @relation("RecognitionReceiver", fields: [receiverId], references: [id])
+  reactions  RecognitionReaction[]
+
+  @@index([companyId, createdAt])
+  @@index([receiverId])
+  @@map("recognitions")
+}
+
+model RecognitionReaction {
+  id            String      @id @default(uuid())
+  recognitionId String      @map("recognition_id")
+  userId        String      @map("user_id")
+  emoji         String
+  createdAt     DateTime    @default(now()) @map("created_at")
+  recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@unique([recognitionId, userId, emoji])
+  @@map("recognition_reactions")
+}
+
+model SuccessionPlan {
+  id         String                @id @default(uuid())
+  companyId  String                @map("company_id")
+  positionId String                @map("position_id")
+  targetYear Int                   @map("target_year")
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+  company    Company               @relation(fields: [companyId], references: [id])
+  candidates SuccessionCandidate[]
+
+  @@unique([positionId, targetYear])
+  @@map("succession_plans")
+}
+
+model SuccessionCandidate {
+  id                 String         @id @default(uuid())
+  planId             String         @map("plan_id")
+  employeeId         String         @map("employee_id")
+  readinessLevel     String         @map("readiness_level")
+  riskOfLeaving      String?        @map("risk_of_leaving")
+  developmentActions Json?          @map("development_actions")
+  notes              String?
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+  plan               SuccessionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  employee           User           @relation(fields: [employeeId], references: [id])
+
+  @@unique([planId, employeeId])
+  @@map("succession_candidates")
 }

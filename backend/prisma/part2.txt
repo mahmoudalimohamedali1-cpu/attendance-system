@@ -1,0 +1,291 @@
+model AdvanceRequest {
+  id                String       @id @default(uuid())
+  userId            String       @map("user_id")
+  type              AdvanceType
+  amount            Decimal      @db.Decimal(10, 2)
+  reason            String
+  installments      Int          @default(1)
+  status            RaiseStatus  @default(PENDING)
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+  managerApproverId String?      @map("manager_approver_id")
+  managerApprovedAt DateTime?    @map("manager_approved_at")
+  managerNotes      String?      @map("manager_notes")
+  hrApproverId      String?      @map("hr_approver_id")
+  hrApprovedAt      DateTime?    @map("hr_approved_at")
+  hrNotes           String?      @map("hr_notes")
+  financeApproverId String?      @map("finance_approver_id")
+  financeApprovedAt DateTime?    @map("finance_approved_at")
+  financeNotes      String?      @map("finance_notes")
+  ceoApproverId     String?      @map("ceo_approver_id")
+  ceoApprovedAt     DateTime?    @map("ceo_approved_at")
+  ceoNotes          String?      @map("ceo_notes")
+  currentStep       ApprovalStep @default(MANAGER) @map("current_step")
+  companyId         String?      @map("company_id")
+  ceoApprover       User?        @relation("CEOApproverAdvanceRequests", fields: [ceoApproverId], references: [id])
+  company           Company?     @relation(fields: [companyId], references: [id])
+  employee          User         @relation("EmployeeAdvanceRequests", fields: [userId], references: [id], onDelete: Cascade)
+  financeApprover   User?        @relation("FinanceApproverAdvanceRequests", fields: [financeApproverId], references: [id])
+  hrApprover        User?        @relation("HRApproverAdvanceRequests", fields: [hrApproverId], references: [id])
+  managerApprover   User?        @relation("ManagerApproverAdvanceRequests", fields: [managerApproverId], references: [id])
+  repaymentLogs     LoanPayment[]
+
+  @@index([userId, status])
+  @@map("advance_requests")
+}
+
+model LoanPayment {
+  id               String         @id @default(uuid())
+  advanceRequestId String         @map("advance_request_id")
+  amount           Decimal        @db.Decimal(10, 2)
+  paymentDate      DateTime       @map("payment_date")
+  paymentMethod    String         @default("SALARY_DEDUCTION") @map("payment_method")
+  notes            String?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  advanceRequest   AdvanceRequest @relation(fields: [advanceRequestId], references: [id], onDelete: Cascade)
+
+  @@index([advanceRequestId])
+  @@map("loan_payments")
+}
+
+model EmployeeBankAccount {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  bankName      String   @map("bank_name")
+  accountNumber String   @map("account_number")
+  iban          String   @unique
+  isDefault     Boolean  @default(true) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("employee_bank_accounts")
+}
+
+model CompanyBankAccount {
+  id            String   @id @default(uuid())
+  companyId     String   @map("company_id")
+  bankName      String   @map("bank_name")
+  accountNumber String   @map("account_number")
+  iban          String   @unique
+  swiftCode     String?  @map("swift_code")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_bank_accounts")
+}
+
+model Contract {
+  id             String         @id @default(uuid())
+  userId         String         @map("user_id")
+  type           ContractType   @default(FIXED_TERM)
+  status         ContractStatus @default(ACTIVE)
+  startDate      DateTime       @map("start_date") @db.Date
+  endDate        DateTime?      @map("end_date") @db.Date
+  probationDays  Int            @default(90) @map("probation_days")
+  basicSalary    Decimal        @map("basic_salary") @db.Decimal(10, 2)
+  housingType    String         @default("COMPANY_PROVIDED") @map("housing_type")
+  housingAmount  Decimal        @default(0) @map("housing_amount") @db.Decimal(10, 2)
+  transportation Decimal        @default(0) @db.Decimal(10, 2)
+  otherAllowances Decimal       @default(0) @map("other_allowances") @db.Decimal(10, 2)
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("contracts")
+}
+
+model CostCenter {
+  id                      String                    @id @default(uuid())
+  code                    String                    @unique
+  nameAr                  String                    @map("name_ar")
+  nameEn                  String?                   @map("name_en")
+  companyId               String                    @map("company_id")
+  departmentId            String?                   @map("department_id")
+  parentId                String?                   @map("parent_id")
+  managerId               String?                   @map("manager_id")
+  isActive                Boolean                   @default(true) @map("is_active")
+  createdAt               DateTime                  @default(now()) @map("created_at")
+  updatedAt               DateTime                  @updatedAt @map("updated_at")
+  company                 Company                   @relation(fields: [companyId], references: [id])
+  department              Department?               @relation(fields: [departmentId], references: [id])
+  parent                  CostCenter?               @relation("CostCenterHierarchy", fields: [parentId], references: [id])
+  children                CostCenter[]              @relation("CostCenterHierarchy")
+  cost_center_allocations cost_center_allocations[]
+  cost_center_budgets     cost_center_budgets[]
+  payslip_lines           PayslipLine[]
+  users                   User[]
+
+  @@index([companyId])
+  @@index([departmentId])
+  @@map("cost_centers")
+}
+
+model SalaryComponent {
+  id              String               @id @default(uuid())
+  companyId       String               @map("company_id")
+  nameAr          String               @map("name_ar")
+  nameEn          String?              @map("name_en")
+  code            String
+  type            SalaryComponentType
+  nature          SalaryComponentNature @default(FIXED)
+  isTaxable       Boolean              @default(false) @map("is_taxable")
+  isGosiApplicable Boolean             @default(false) @map("is_gosi_applicable")
+  isDefault       Boolean              @default(false) @map("is_default")
+  formula         String?
+  isStatic        Boolean              @default(false) @map("is_static")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  payslipLines    PayslipLine[]
+  company         Company              @relation(fields: [companyId], references: [id])
+  structureLines  SalaryStructureLine[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("salary_components")
+}
+
+model SalaryStructure {
+  id                String                     @id @default(uuid())
+  companyId         String                     @map("company_id")
+  name              String
+  description       String?
+  isActive          Boolean                    @default(true) @map("is_active")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+  salaryAssignments EmployeeSalaryAssignment[]
+  company           Company                    @relation(fields: [companyId], references: [id])
+  lines             SalaryStructureLine[]
+
+  @@index([companyId])
+  @@map("salary_structures")
+}
+
+model SalaryStructureLine {
+  id              String          @id @default(uuid())
+  structureId     String          @map("structure_id")
+  componentId     String          @map("component_id")
+  amount          Decimal?        @db.Decimal(10, 2)
+  percentage      Decimal?        @db.Decimal(5, 2)
+  calculationBase String?         @map("calculation_base")
+  formula         String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  component       SalaryComponent @relation(fields: [componentId], references: [id])
+  structure       SalaryStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@index([structureId])
+  @@index([componentId])
+  @@map("salary_structure_lines")
+}
+
+model EmployeeSalaryAssignment {
+  id               String          @id @default(uuid())
+  userId           String          @map("user_id")
+  structureId      String          @map("structure_id")
+  baseSalary       Decimal         @map("base_salary") @db.Decimal(10, 2)
+  effectiveDate    DateTime        @map("effective_date") @db.Date
+  endDate          DateTime?       @map("end_date") @db.Date
+  isActive         Boolean         @default(true) @map("is_active")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  structure        SalaryStructure @relation(fields: [structureId], references: [id])
+  user             User            @relation("EmployeeSalaryAssignments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@map("employee_salary_assignments")
+}
+
+model Payslip {
+  id               String       @id @default(uuid())
+  companyId        String       @map("company_id")
+  userId           String       @map("user_id")
+  periodId         String       @map("period_id")
+  runId            String       @map("run_id")
+  basicSalary      Decimal      @map("basic_salary") @db.Decimal(10, 2)
+  totalEarnings    Decimal      @map("total_earnings") @db.Decimal(10, 2)
+  totalDeductions  Decimal      @map("total_deductions") @db.Decimal(10, 2)
+  netSalary        Decimal      @map("net_salary") @db.Decimal(10, 2)
+  status           PayrollStatus @default(DRAFT)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  retro_pay_id     String?      @db.VarChar(255)
+  company          Company      @relation(fields: [companyId], references: [id])
+  payrollPeriod    PayrollPeriod @relation(fields: [periodId], references: [id])
+  payrollRun       PayrollRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lines            PayslipLine[]
+
+  @@unique([userId, periodId])
+  @@index([companyId, periodId])
+  @@index([runId])
+  @@map("payslips")
+}
+
+model PayslipLine {
+  id             String            @id @default(uuid())
+  payslipId      String            @map("payslip_id")
+  componentId    String            @map("component_id")
+  amount         Decimal           @db.Decimal(10, 2)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  descriptionAr  String?           @map("description_ar")
+  rate           Decimal?          @db.Decimal(10, 4)
+  sign           String            @default("EARNING")
+  sourceRef      String?           @map("source_ref")
+  sourceType     PayslipLineSource @default(STRUCTURE) @map("source_type")
+  units          Decimal?          @db.Decimal(10, 2)
+  cost_center_id String?
+  component      SalaryComponent   @relation(fields: [componentId], references: [id])
+  cost_centers   CostCenter?       @relation(fields: [cost_center_id], references: [id])
+  payslip        Payslip           @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@index([payslipId, sourceType])
+  @@index([payslipId, componentId])
+  @@index([cost_center_id])
+  @@map("payslip_lines")
+}
+
+model PayrollPeriod {
+  id           String        @id @default(uuid())
+  companyId    String        @map("company_id")
+  name         String
+  startDate    DateTime      @map("start_date") @db.Date
+  endDate      DateTime      @map("end_date") @db.Date
+  isClosed     Boolean       @default(false) @map("is_closed")
+  closedAt     DateTime?     @map("closed_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  company      Company       @relation(fields: [companyId], references: [id])
+  payrollRuns  PayrollRun[]
+  payslips     Payslip[]
+  retroPays    RetroPay[]
+
+  @@unique([companyId, startDate])
+  @@index([companyId, isClosed])
+  @@map("payroll_periods")
+}
+
+model PayrollRun {
+  id           String        @id @default(uuid())
+  companyId    String        @map("company_id")
+  periodId     String        @map("period_id")
+  status       PayrollStatus @default(DRAFT)
+  processedAt  DateTime?     @map("processed_at")
+  processedBy  String?       @map("processed_by")
+  totalNet     Decimal       @default(0) @map("total_net") @db.Decimal(12, 2)
+  employeeCount Int          @default(0) @map("employee_count")
+  notes        String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  company      Company       @relation(fields: [companyId], references: [id])
+  payrollPeriod PayrollPeriod @relation(fields: [periodId], references: [id])
+  payslips     Payslip[]
+
+  @@index([companyId, periodId])
+  @@map("payroll_runs")
+}

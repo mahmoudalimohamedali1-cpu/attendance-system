@@ -1,0 +1,351 @@
+model GosiConfig {
+  id                    String   @id @default(uuid())
+  companyId             String   @unique @map("company_id")
+  employeeSaudiPercent  Decimal  @default(9.75) @map("employee_saudi_percent") @db.Decimal(5, 2)
+  employerSaudiPercent  Decimal  @default(11.75) @map("employer_saudi_percent") @db.Decimal(5, 2)
+  employeeNonSaudiPercent Decimal @default(0) @map("employee_non_saudi_percent") @db.Decimal(5, 2)
+  employerNonSaudiPercent Decimal @default(2.0) @map("employer_non_saudi_percent") @db.Decimal(5, 2)
+  maxSalaryLimit        Decimal  @default(45000) @map("max_salary_limit") @db.Decimal(10, 2)
+  minSalaryLimit        Decimal  @default(1500) @map("min_salary_limit") @db.Decimal(10, 2)
+  enableSaned           Boolean  @default(true) @map("enable_saned")
+  sanedPercent          Decimal  @default(1.5) @map("saned_percent") @db.Decimal(5, 2)
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  company               Company  @relation(fields: [companyId], references: [id])
+
+  @@map("gosi_configs")
+}
+
+model RetroPay {
+  id              String           @id @default(uuid())
+  companyId       String           @map("company_id")
+  userId          String           @map("user_id")
+  periodId        String           @map("period_id")
+  amount          Decimal          @db.Decimal(10, 2)
+  reason          String
+  status          RetroPayStatus   @default(PENDING)
+  processedAt     DateTime?        @map("processed_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  payroll_period  PayrollPeriod    @relation(fields: [periodId], references: [id])
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("retro_pays")
+}
+
+model Policy {
+  id                   String                 @id @default(uuid())
+  companyId            String                 @map("company_id")
+  nameAr               String                 @map("name_ar")
+  nameEn               String?                @map("name_en")
+  type                 PolicyType
+  scope                PolicyScope            @default(COMPANY)
+  description          String?
+  rules                Json
+  isActive             Boolean                @default(true) @map("is_active")
+  priority             Int                    @default(0)
+  effectiveDate        DateTime               @map("effective_date") @db.Date
+  expiryDate           DateTime?              @map("expiry_date") @db.Date
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+  branchId             String?                @map("branch_id")
+  departmentId         String?                @map("department_id")
+  employeeId           String?                @map("employee_id")
+  jobTitleId           String?                @map("job_title_id")
+  branch               Branch?                @relation(fields: [branchId], references: [id])
+  company              Company                @relation(fields: [companyId], references: [id])
+  department           Department?            @relation(fields: [departmentId], references: [id])
+  targetEmployee       User?                  @relation("PolicyTargetEmployee", fields: [employeeId], references: [id])
+  jobTitle             JobTitle?              @relation(fields: [jobTitleId], references: [id])
+  policy_benchmarks    policy_benchmarks[]
+  policy_suggestions   policy_suggestions[]
+  smartPolicyExecution SmartPolicyExecution[]
+
+  @@index([companyId, type])
+  @@map("policies")
+}
+
+model PolicyRule {
+  id             String      @id @default(uuid())
+  policyId       String      @map("policy_id")
+  ruleName       String      @map("rule_name")
+  condition      Json
+  action         Json
+  description    String?
+  executionOrder Int         @default(0) @map("execution_order")
+  isActive       Boolean     @default(true) @map("is_active")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@index([policyId, executionOrder])
+  @@map("policy_rules")
+}
+
+model SmartPolicy {
+  id                   String                 @id @default(uuid())
+  companyId            String                 @map("company_id")
+  name                 String
+  description          String?
+  triggerType          SmartPolicyTrigger     @map("trigger_type")
+  triggerConfig        Json?                  @map("trigger_config")
+  actionType           SmartPolicyActionType  @map("action_type")
+  actionConfig         Json                   @map("action_config")
+  status               SmartPolicyStatus      @default(DRAFT)
+  lastExecutedAt       DateTime?              @map("last_executed_at")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+  company              Company                @relation(fields: [companyId], references: [id])
+  smartPolicyExecution SmartPolicyExecution[]
+
+  @@index([companyId, status])
+  @@map("smart_policies")
+}
+
+model SmartPolicyExecution {
+  id             String            @id @default(uuid())
+  smartPolicyId  String            @map("smart_policy_id")
+  policyId       String?           @map("policy_id")
+  triggeredBy    String            @map("triggered_by")
+  status         RetroPayStatus    @default(PENDING)
+  executionLog   Json?             @map("execution_log")
+  resultData     Json?             @map("result_data")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  policy         Policy?           @relation(fields: [policyId], references: [id])
+  smartPolicy    SmartPolicy       @relation(fields: [smartPolicyId], references: [id])
+
+  @@index([smartPolicyId])
+  @@map("smart_policy_executions")
+}
+
+model MudadSubmission {
+  id             String          @id @default(uuid())
+  companyId      String          @map("company_id")
+  period         String
+  submissionType String          @map("submission_type")
+  status         MudadStatus     @default(PENDING)
+  fileUrl        String?         @map("file_url")
+  responseLog    Json?           @map("response_log")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  company        Company         @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, period])
+  @@map("mudad_submissions")
+}
+
+model WpsSubmission {
+  id             String          @id @default(uuid())
+  companyId      String          @map("company_id")
+  payrollMonth   Int             @map("payroll_month")
+  payrollYear    Int             @map("payroll_year")
+  status         WpsStatus       @default(PENDING)
+  totalAmount    Decimal         @map("total_amount") @db.Decimal(12, 2)
+  employeeCount  Int             @map("employee_count")
+  sifFileUrl     String?         @map("sif_file_url")
+  bankReference  String?         @map("bank_reference")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  company        Company         @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, payrollYear, payrollMonth])
+  @@map("wps_submissions")
+}
+
+model CompanyDisciplinaryPolicy {
+  id             String               @id @default(uuid())
+  companyId      String               @unique @map("company_id")
+  policyConfig   Json                 @map("policy_config")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  company        Company              @relation(fields: [companyId], references: [id])
+  rules          DisciplinaryPolicyRule[]
+
+  @@map("company_disciplinary_policies")
+}
+
+model DisciplinaryPolicyRule {
+  id                String                    @id @default(uuid())
+  policyId          String                    @map("policy_id")
+  offenseCategory   String                    @map("offense_category")
+  offenseName       String                    @map("offense_name")
+  firstOccurrence   DecisionType              @map("first_occurrence")
+  secondOccurrence  DecisionType              @map("second_occurrence")
+  thirdOccurrence   DecisionType              @map("third_occurrence")
+  fourthOccurrence  DecisionType              @map("fourth_occurrence")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  policy            CompanyDisciplinaryPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@map("disciplinary_policy_rules")
+}
+
+model DisciplinaryCase {
+  id              String             @id @default(uuid())
+  companyId       String             @map("company_id")
+  employeeId      String             @map("employee_id")
+  managerId       String             @map("manager_id")
+  offenseDate     DateTime           @map("offense_date")
+  offenseType     String             @map("offense_type")
+  description     String
+  status          DisciplinaryStatus @default(OPEN)
+  severity        String?            @default("LOW")
+  currentStage    DisciplinaryStage  @default(INVESTIGATION) @map("current_stage")
+  attachments     CaseAttachment[]
+  events          CaseEvent[]
+  minutes         CaseMinute[]
+  company         Company            @relation(fields: [companyId], references: [id])
+  employee        User               @relation("EmployeeDisciplinaryCases", fields: [employeeId], references: [id])
+  manager         User               @relation("ManagerCreatedCases", fields: [managerId], references: [id])
+  employeeRecords EmployeeDisciplinaryRecord[]
+
+  @@index([employeeId, status])
+  @@map("disciplinary_cases")
+}
+
+model CaseEvent {
+  id             String           @id @default(uuid())
+  caseId         String           @map("case_id")
+  eventType      CaseEventType    @map("event_type")
+  description    String
+  actorId        String           @map("actor_id")
+  eventData      Json?            @map("event_data")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  disciplinaryCase DisciplinaryCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("case_events")
+}
+
+model CaseAttachment {
+  id             String           @id @default(uuid())
+  caseId         String           @map("case_id")
+  fileName       String           @map("file_name")
+  fileUrl        String           @map("file_url")
+  fileType       String           @map("file_type")
+  uploadedBy     String           @map("uploaded_by")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  disciplinaryCase DisciplinaryCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("case_attachments")
+}
+
+model CaseMinute {
+  id             String           @id @default(uuid())
+  caseId         String           @map("case_id")
+  content        String
+  recordedBy     String           @map("recorded_by")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  disciplinaryCase DisciplinaryCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("case_minutes")
+}
+
+model EmployeeDisciplinaryRecord {
+  id              String           @id @default(uuid())
+  employeeId      String           @map("employee_id")
+  caseId          String           @map("case_id")
+  decisionType    DecisionType     @map("decision_type")
+  decisionDetails Json?            @map("decision_details")
+  effectiveDate   DateTime         @map("effective_date")
+  expiryDate      DateTime?        @map("expiry_date")
+  isApplied       Boolean          @default(false) @map("is_applied")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  disciplinaryCase DisciplinaryCase @relation(fields: [caseId], references: [id])
+  employee        User             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, effectiveDate])
+  @@map("employee_disciplinary_records")
+}
+
+model PayrollAdjustment {
+  id             String                  @id @default(uuid())
+  companyId      String                  @map("company_id")
+  employeeId     String                  @map("employee_id")
+  type           SalaryComponentType
+  amount         Decimal                 @db.Decimal(10, 2)
+  reason         String
+  effectiveDate  DateTime                @map("effective_date")
+  status         PayrollAdjustmentStatus @default(PENDING)
+  approvedBy     String?                 @map("approved_by")
+  approvedAt     DateTime?               @map("approved_at")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  company        Company                 @relation(fields: [companyId], references: [id])
+  employee       User                    @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, status])
+  @@map("payroll_adjustments")
+}
+
+model SubmissionStatusLog {
+  id             String               @id @default(uuid())
+  companyId      String               @map("company_id")
+  entityId       String               @map("entity_id")
+  entityType     SubmissionEntityType @map("entity_type")
+  oldStatus      String?              @map("old_status")
+  newStatus      String               @map("new_status")
+  changedBy      String               @map("changed_by")
+  note           String?
+  createdAt      DateTime             @default(now()) @map("created_at")
+  company        Company              @relation(fields: [companyId], references: [id])
+
+  @@index([entityId, entityType])
+  @@map("submission_status_logs")
+}
+
+model ApprovalChainConfig {
+  id             String              @id @default(uuid())
+  companyId      String              @map("company_id")
+  requestType    ApprovalRequestType @map("request_type")
+  chainSteps     Json                @map("chain_steps")
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  company        Company             @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, requestType])
+  @@map("approval_chain_configs")
+}
+
+model CustodyCategory {
+  id             String        @id @default(uuid())
+  companyId      String        @map("company_id")
+  nameAr         String        @map("name_ar")
+  nameEn         String?       @map("name_en")
+  description    String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  company        Company       @relation(fields: [companyId], references: [id])
+  items          CustodyItem[]
+
+  @@unique([companyId, nameAr])
+  @@map("custody_categories")
+}
+
+model CustodyItem {
+  id             String              @id @default(uuid())
+  companyId      String              @map("company_id")
+  categoryId     String              @map("category_id")
+  branchId       String?             @map("branch_id")
+  nameAr         String              @map("name_ar")
+  nameEn         String?             @map("name_en")
+  serialNumber   String?             @map("serial_number")
+  specs          Json?
+  status         CustodyItemStatus   @default(AVAILABLE)
+  condition      CustodyCondition    @default(NEW)
+  purchaseDate   DateTime?           @map("purchase_date")
+  purchaseValue  Decimal?            @map("purchase_value") @db.Decimal(10, 2)
+  notes          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  assignments    CustodyAssignment[]
+  branch         Branch?             @relation(fields: [branchId], references: [id])
+  category       CustodyCategory     @relation(fields: [categoryId], references: [id])
+  company        Company             @relation(fields: [companyId], references: [id])
+  maintenances   CustodyMaintenance[]
+  returns        CustodyReturn[]
+  transfers      CustodyTransfer[]
+
+  @@unique([companyId, serialNumber])
+  @@index([categoryId])
+  @@map("custody_items")
+}

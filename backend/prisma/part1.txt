@@ -1,0 +1,514 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id                              String                            @id @default(uuid())
+  name                            String                            @unique
+  nameEn                          String?                           @map("name_en")
+  crNumber                        String?                           @unique @map("cr_number")
+  taxId                           String?                           @unique @map("tax_id")
+  logo                            String?
+  address                         String?
+  phone                           String?
+  email                           String?
+  website                         String?
+  createdAt                       DateTime                          @default(now()) @map("created_at")
+  updatedAt                       DateTime                          @updatedAt @map("updated_at")
+  advanceRequests                 AdvanceRequest[]
+  ai_conversations                ai_conversations[]
+  approvalChainConfigs            ApprovalChainConfig[]
+  approvalLogs                    ApprovalLog[]
+  attendances                     Attendance[]
+  auditLogs                       AuditLog[]
+  branches                        Branch[]
+  career_paths                    career_paths[]
+  companyBankAccounts             CompanyBankAccount[]
+  company_configs                 company_configs?
+  disciplinaryPolicy              CompanyDisciplinaryPolicy?
+  competency_frameworks           competency_frameworks[]
+  core_values                     core_values[]
+  cost_center_allocations         cost_center_allocations[]
+  cost_center_budgets             cost_center_budgets[]
+  costCenters                     CostCenter[]
+  custodyAssignments              CustodyAssignment[]
+  custodyCategories               CustodyCategory[]
+  custodyItems                    CustodyItem[]
+  custodyMaintenances             CustodyMaintenance[]
+  custodyReturns                  CustodyReturn[]
+  custodyTransfers                CustodyTransfer[]
+  departments                     Department[]
+  development_plans               development_plans[]
+  disciplinaryCases               DisciplinaryCase[]
+  employeeLocationLogs            EmployeeLocationLog[]
+  employee_surveys                employee_surveys[]
+  feedback_question_sets          feedback_question_sets[]
+  geofenceExitEvents              GeofenceExitEvent[]
+  goals                           goals[]
+  gosiConfigs                     GosiConfig[]
+  holidays                        Holiday[]
+  job_families                    job_families[]
+  jobTitles                       JobTitle[]
+  knowledge_base_articles         knowledge_base_articles[]
+  kpi_definitions                 kpi_definitions[]
+  leaveBalances                   LeaveBalance[]
+  leaveRequests                   LeaveRequest[]
+  leaveTypeConfigs                LeaveTypeConfig[]
+  letterRequests                  LetterRequest[]
+  mudadSubmissions                MudadSubmission[]
+  notifications                   Notification[]
+  onboardingProcesses             OnboardingProcess[]
+  onboardingTemplates             OnboardingTemplate[]
+  payrollAdjustments              PayrollAdjustment[]
+  payrollPeriods                  PayrollPeriod[]
+  payrollRuns                     PayrollRun[]
+  payrollSettings                 PayrollSettings?
+  payslips                        Payslip[]
+  performance_competency_models   performance_competency_models[]
+  performance_review_cycles       performance_review_cycles[]
+  permissionAuditLogs             PermissionAuditLog[]
+  policies                        Policy[]
+  predictionAccuracies            PredictionAccuracy[]
+  programs                        programs[]
+  project_templates               project_templates[]
+  projects                        projects[]
+  raiseRequests                   RaiseRequest[]
+  recognitions                    recognitions[]
+  retroPays                       RetroPay[]
+  salaryComponents                SalaryComponent[]
+  salaryStructures                SalaryStructure[]
+  saudization_configs             saudization_configs?
+  shift_optimization_runs         shift_optimization_runs[]
+  shift_rules                     shift_rules[]
+  shift_schedules                 shift_schedules[]
+  shift_templates                 shift_templates[]
+  shifts                          shifts[]
+  smartPolicies                   SmartPolicy[]
+  smart_policy_analytics          smart_policy_analytics[]
+  smart_policy_exceptions         smart_policy_exceptions[]
+  smart_policy_retro_applications smart_policy_retro_applications[]
+  sprints                         sprints[]
+  submissionStatusLogs            SubmissionStatusLog[]
+  succession_plans                succession_plans[]
+  suspiciousAttempts              SuspiciousAttempt[]
+  systemSettings                  SystemSetting[]
+  task_automations                task_automations[]
+  task_categories                 task_categories[]
+  task_templates                  task_templates[]
+  tasks                           tasks[]
+  team_calendar_events            team_calendar_events[]
+  userPermissions                 UserPermission[]
+  users                           User[]
+  workFromHomes                   WorkFromHome[]
+  workSchedules                   WorkSchedule[]
+  wpsSubmissions                  WpsSubmission[]
+
+  @@map("companies")
+}
+
+model PayrollSettings {
+  id                                String                    @id @default(uuid())
+  companyId                         String                    @unique @map("company_id")
+  payrollClosingDay                 Int                       @default(25) @map("payroll_closing_day")
+  hireTerminationCalcBase           WorkDayCalculationBase    @default(CALENDAR_DAYS) @map("hire_termination_calc_base")
+  hireTerminationMethod             HireTerminationMethod     @default(EXCLUDE_WEEKENDS) @map("hire_termination_method")
+  unpaidLeaveCalcBase               WorkDayCalculationBase    @default(ACTUAL_WORKING_DAYS) @map("unpaid_leave_calc_base")
+  unpaidLeaveMethod                 UnpaidLeaveMethod         @default(BASED_ON_SHIFTS) @map("unpaid_leave_method")
+  splitUnpaidByClosingDate          Boolean                   @default(false) @map("split_unpaid_by_closing_date")
+  overtimeCalcBase                  WorkDayCalculationBase    @default(ACTUAL_WORKING_DAYS) @map("overtime_calc_base")
+  overtimeMethod                    OvertimeCalculationMethod @default(BASED_ON_SHIFTS) @map("overtime_method")
+  leaveAllowanceCalcBase            WorkDayCalculationBase    @default(CALENDAR_DAYS) @map("leave_allowance_calc_base")
+  leaveAllowanceMethod              LeaveAllowanceMethod      @default(BASIC_PLUS_HOUSING) @map("leave_allowance_method")
+  showCompanyContributions          Boolean                   @default(true) @map("show_company_contributions")
+  showClosingDateOnPayslip          Boolean                   @default(true) @map("show_closing_date_on_payslip")
+  deductAbsenceFromBasic            Boolean                   @default(true) @map("deduct_absence_from_basic")
+  showActualAbsenceDays             Boolean                   @default(false) @map("show_actual_absence_days")
+  enableNegativeBalanceCarryover    Boolean                   @default(false) @map("enable_negative_balance_carryover")
+  settleNegativeAsTransaction       Boolean                   @default(false) @map("settle_negative_as_transaction")
+  roundSalaryToNearest              Int                       @default(0) @map("round_salary_to_nearest")
+  defaultWorkingDaysPerMonth        Int                       @default(30) @map("default_working_days_per_month")
+  createdAt                         DateTime                  @default(now()) @map("created_at")
+  updatedAt                         DateTime                  @updatedAt @map("updated_at")
+  leaveDailyRateDivisor             Int                       @default(30) @map("leave_daily_rate_divisor")
+  overtime_multiplier               Float                     @default(1.5)
+  grace_period_minutes              Int                       @default(15)
+  weekend_overtime_multiplier       Float                     @default(2.0)
+  holiday_overtime_multiplier       Float                     @default(2.0)
+  night_shift_allowance_percent     Float                     @default(0)
+  max_deduction_percent             Float                     @default(50)
+  min_net_salary                    Float                     @default(0)
+  auto_lock_day                     Int                       @default(0)
+  default_currency                  String                    @default("SAR")
+  enable_multi_currency             Boolean                   @default(false)
+  enable_bonus_tracking             Boolean                   @default(true)
+  bonus_calculation_method          String                    @default("FIXED")
+  enable_commission                 Boolean                   @default(false)
+  commission_calculation_base       String                    @default("SALES")
+  enable_allowance_categories       Boolean                   @default(true)
+  max_allowance_percent             Float                     @default(100)
+  enable_tax_calculation            Boolean                   @default(false)
+  tax_calculation_method            String                    @default("EXEMPT")
+  enable_salary_advance             Boolean                   @default(true)
+  max_advance_percent               Float                     @default(50)
+  enable_loan_deduction             Boolean                   @default(true)
+  max_loan_deduction_percent        Float                     @default(30)
+  enable_approval_workflow          Boolean                   @default(false)
+  approval_levels                   Int                       @default(1)
+  enable_bank_transfer              Boolean                   @default(true)
+  default_bank_code                 String                    @default("")
+  enable_retroactive_pay            Boolean                   @default(true)
+  retroactive_months_limit          Int                       @default(3)
+  enable_eos_calculation            Boolean                   @default(true)
+  eos_calculation_method            String                    @default("SAUDI_LABOR_LAW")
+  enable_gosi_calculation           Boolean                   @default(true)
+  gosi_employee_percent             Float                     @default(9.75)
+  gosi_employer_percent             Float                     @default(11.75)
+  enable_vacation_encashment        Boolean                   @default(true)
+  vacation_encashment_method        String                    @default("ON_TERMINATION")
+  enable_attendance_penalty         Boolean                   @default(true)
+  late_deduction_method             String                    @default("PER_MINUTE")
+  late_threshold_minutes            Int                       @default(120)
+  absence_deduction_method          String                    @default("DAILY_RATE")
+  absence_progressive_rate          Float                     @default(1.0)
+  enable_early_departure_penalty    Boolean                   @default(false)
+  early_departure_deduction_method  String                    @default("PER_MINUTE")
+  early_departure_threshold_minutes Int                       @default(120)
+  enable_cumulative_late_deduction  Boolean                   @default(false)
+  late_count_for_day_deduction      Int                       @default(3)
+  gosi_max_salary                   Float                     @default(45000)
+  enable_saned_calculation          Boolean                   @default(true)
+  saned_employee_percent            Float                     @default(0.75)
+  saned_employer_percent            Float                     @default(0.75)
+  hazard_rate_percent               Float                     @default(2.0)
+  enable_payslip_email              Boolean                   @default(true)
+  payslip_language                  String                    @default("AR")
+  enable_overtime_cap               Boolean                   @default(false)
+  max_overtime_hours_per_month      Int                       @default(50)
+  enable_auto_payroll_generation    Boolean                   @default(false)
+  auto_payroll_generation_day       Int                       @default(25)
+  enable_payroll_audit_trail        Boolean                   @default(true)
+  enable_salary_rounding            Boolean                   @default(false)
+  salary_rounding_method            String                    @default("NEAREST")
+  enable_department_budget          Boolean                   @default(false)
+  enable_cost_center_tracking       Boolean                   @default(false)
+  default_payroll_export_format     String                    @default("EXCEL")
+  enable_sick_leave_deduction       Boolean?                  @default(true)
+  sick_leave_partial_pay_percent    Float?                    @default(75)
+  sick_leave_full_pay_days          Int?                      @default(30)
+  sick_leave_partial_pay_days       Int?                      @default(60)
+  sick_leave_unpaid_days            Int?                      @default(30)
+  calculation_method                String?                   @default("STANDARD") @db.VarChar
+  payslip_template                  String?                   @default("DEFAULT") @db.VarChar
+  show_salary_breakdown             Boolean?                  @default(true)
+  show_ytd_totals                   Boolean?                  @default(true)
+  auto_calculate_eos                Boolean?                  @default(true)
+  eos_first_years_rate              Float?                    @default(0.5)
+  eos_later_years_rate              Float?                    @default(1.0)
+  eos_threshold_years               Int?                      @default(5)
+  eos_contractual_rate              Float?                    @default(1.0)
+  daily_working_hours               Float?                    @default(8)
+  weekly_working_days               Int?                      @default(5)
+  overtime_rate                     Float?                    @default(1.5)
+  weekend_overtime_rate             Float?                    @default(2.0)
+  holiday_overtime_rate             Float?                    @default(2.0)
+  late_deduction_rate               Float?                    @default(1.0)
+  absence_deduction_rate            Float?                    @default(1.0)
+  include_housing_in_gosi           Boolean?                  @default(true)
+  include_transport_in_gosi         Boolean?                  @default(false)
+  default_leave_days                Int?                      @default(21)
+  leave_carry_over_days             Int?                      @default(5)
+  probation_leave_enabled           Boolean?                  @default(false)
+  auto_approve_leave                Boolean?                  @default(false)
+  enable_overtime_approval          Boolean?                  @default(true)
+  working_days_per_week             Int?                      @default(5)
+  company                           Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_settings")
+}
+
+model User {
+  id                                                                 String                         @id @default(uuid())
+  email                                                              String                         @unique
+  phone                                                              String?                        @unique
+  password                                                           String
+  firstName                                                          String                         @map("first_name")
+  lastName                                                           String                         @map("last_name")
+  avatar                                                             String?
+  employeeCode                                                       String?                        @map("employee_code")
+  jobTitle                                                           String?                        @map("job_title")
+  role                                                               Role                           @default(EMPLOYEE)
+  status                                                             UserStatus                     @default(ACTIVE)
+  salary                                                             Decimal?                       @db.Decimal(10, 2)
+  hireDate                                                           DateTime?                      @map("hire_date")
+  fcmToken                                                           String?                        @map("fcm_token")
+  branchId                                                           String?                        @map("branch_id")
+  departmentId                                                       String?                        @map("department_id")
+  managerId                                                          String?                        @map("manager_id")
+  createdAt                                                          DateTime                       @default(now()) @map("created_at")
+  updatedAt                                                          DateTime                       @updatedAt @map("updated_at")
+  faceRegistered                                                     Boolean                        @default(false) @map("face_registered")
+  annualLeaveDays                                                    Int                            @default(21) @map("annual_leave_days")
+  usedLeaveDays                                                      Int                            @default(0) @map("used_leave_days")
+  remainingLeaveDays                                                 Int                            @default(21) @map("remaining_leave_days")
+  isSuperAdmin                                                       Boolean                        @default(false) @map("is_super_admin")
+  jobTitleId                                                         String?                        @map("job_title_id")
+  costCenterId                                                       String?                        @map("cost_center_id")
+  isSaudi                                                            Boolean                        @default(true) @map("is_saudi")
+  nationality                                                        String?                        @map("nationality")
+  nationalId                                                         String?                        @unique @map("national_id")
+  companyId                                                          String?                        @map("company_id")
+  borderNumber                                                       String?                        @map("border_number")
+  iqamaExpiryDate                                                    DateTime?                      @map("iqama_expiry_date") @db.Date
+  iqamaNumber                                                        String?                        @map("iqama_number")
+  passportExpiryDate                                                 DateTime?                      @map("passport_expiry_date") @db.Date
+  passportNumber                                                     String?                        @map("passport_number")
+  profession                                                         String?                        @map("profession")
+  professionCode                                                     String?                        @map("profession_code")
+  dateOfBirth                                                        DateTime?                      @map("date_of_birth") @db.Date
+  gender                                                             String?
+  gosiNumber                                                         String?                        @unique @map("gosi_number")
+  maritalStatus                                                      String?                        @map("marital_status")
+  jobFamilyId                                                        String?
+  roleLevelId                                                        String?
+  job_family_id                                                      String?                        @db.VarChar(255)
+  role_level_id                                                      String?                        @db.VarChar(255)
+  ceoApprovedAdvances                                                AdvanceRequest[]               @relation("CEOApproverAdvanceRequests")
+  financeApprovedAdvances                                            AdvanceRequest[]               @relation("FinanceApproverAdvanceRequests")
+  hrApprovedAdvances                                                 AdvanceRequest[]               @relation("HRApproverAdvanceRequests")
+  managerApprovedAdvances                                            AdvanceRequest[]               @relation("ManagerApproverAdvanceRequests")
+  advanceRequests                                                    AdvanceRequest[]               @relation("EmployeeAdvanceRequests")
+  ai_conversations                                                   ai_conversations[]
+  approvalLogs                                                       ApprovalLog[]
+  article_feedback                                                   article_feedback[]
+  attendances                                                        Attendance[]
+  auditLogs                                                          AuditLog[]
+  comment_reactions                                                  comment_reactions[]
+  contracts                                                          Contract[]
+  cost_center_audit_logs                                             cost_center_audit_logs[]
+  custodyApproved                                                    CustodyAssignment[]            @relation("CustodyApprover")
+  custodyAssignedBy                                                  CustodyAssignment[]            @relation("CustodyAssigner")
+  custodyAssignments                                                 CustodyAssignment[]            @relation("EmployeeCustody")
+  custodyMaintenanceReports                                          CustodyMaintenance[]           @relation("MaintenanceReporter")
+  custodyReturns                                                     CustodyReturn[]                @relation("CustodyReturner")
+  custodyReturnReviews                                               CustodyReturn[]                @relation("CustodyReturnReviewer")
+  custodyTransferApproved                                            CustodyTransfer[]              @relation("CustodyTransferApprover")
+  custodyTransfersFrom                                               CustodyTransfer[]              @relation("CustodyTransferFrom")
+  custodyTransferInitiated                                           CustodyTransfer[]              @relation("CustodyTransferInitiator")
+  custodyTransfersTo                                                 CustodyTransfer[]              @relation("CustodyTransferTo")
+  disciplinaryCases                                                  DisciplinaryCase[]             @relation("EmployeeDisciplinaryCases")
+  createdDisciplinaryCases                                           DisciplinaryCase[]             @relation("ManagerCreatedCases")
+  emergency_contacts                                                 emergency_contacts[]
+  bankAccounts                                                       EmployeeBankAccount[]
+  disciplinaryRecords                                                EmployeeDisciplinaryRecord[]
+  employeeDocuments                                                  EmployeeDocument[]
+  locationLogs                                                       EmployeeLocationLog[]
+  salaryAssignments                                                  EmployeeSalaryAssignment[]     @relation("EmployeeSalaryAssignments")
+  faceData                                                           FaceData?
+  geofenceExitEvents                                                 GeofenceExitEvent[]
+  kpi_assignments                                                    kpi_assignments[]
+  leaveBalances                                                      LeaveBalance[]
+  approvedLeaves                                                     LeaveRequest[]                 @relation("ApproverLeaveRequests")
+  hrApprovedLeaves                                                   LeaveRequest[]                 @relation("HRApproverLeaveRequests")
+  managerApprovedLeaves                                              LeaveRequest[]                 @relation("ManagerApproverLeaveRequests")
+  leaveRequests                                                      LeaveRequest[]                 @relation("EmployeeLeaveRequests")
+  approvedLetters                                                    LetterRequest[]                @relation("ApproverLetterRequests")
+  hrApprovedLetters                                                  LetterRequest[]                @relation("HRApproverLetterRequests")
+  managerApprovedLetters                                             LetterRequest[]                @relation("ManagerApproverLetterRequests")
+  letterRequests                                                     LetterRequest[]                @relation("EmployeeLetterRequests")
+  location_proofs                                                    location_proofs[]
+  notifications                                                      Notification[]
+  offline_sync_queue                                                 offline_sync_queue[]
+  onboardingProcesses                                                OnboardingProcess[]
+  payrollAdjustments                                                 PayrollAdjustment[]
+  payslips                                                           Payslip[]
+  policyTargets                                                      Policy[]                       @relation("PolicyTargetEmployee")
+  policy_violation_predictions                                       policy_violation_predictions[]
+  profile_update_requests_profile_update_requests_reviewed_byTousers profile_update_requests[]      @relation("profile_update_requests_reviewed_byTousers")
+  profile_update_requests_profile_update_requests_user_idTousers     profile_update_requests[]      @relation("profile_update_requests_user_idTousers")
+  programs_programs_created_by_idTousers                             programs[]                     @relation("programs_created_by_idTousers")
+  programs_programs_manager_idTousers                                programs[]                     @relation("programs_manager_idTousers")
+  programs_programs_owner_idTousers                                  programs[]                     @relation("programs_owner_idTousers")
+  project_activities                                                 project_activities[]
+  project_budgets_project_budgets_approved_by_idTousers              project_budgets[]              @relation("project_budgets_approved_by_idTousers")
+  project_budgets_project_budgets_created_by_idTousers               project_budgets[]              @relation("project_budgets_created_by_idTousers")
+  project_members                                                    project_members[]
+  project_milestones                                                 project_milestones[]
+  project_risks_project_risks_created_by_idTousers                   project_risks[]                @relation("project_risks_created_by_idTousers")
+  project_risks_project_risks_owner_idTousers                        project_risks[]                @relation("project_risks_owner_idTousers")
+  projects_projects_created_by_idTousers                             projects[]                     @relation("projects_created_by_idTousers")
+  projects_projects_manager_idTousers                                projects[]                     @relation("projects_manager_idTousers")
+  projects_projects_owner_idTousers                                  projects[]                     @relation("projects_owner_idTousers")
+  projects_projects_sponsor_idTousers                                projects[]                     @relation("projects_sponsor_idTousers")
+  ceoApprovedRaises                                                  RaiseRequest[]                 @relation("CEOApproverRaiseRequests")
+  financeApprovedRaises                                              RaiseRequest[]                 @relation("FinanceApproverRaiseRequests")
+  hrApprovedRaises                                                   RaiseRequest[]                 @relation("HRApproverRaiseRequests")
+  managerApprovedRaises                                              RaiseRequest[]                 @relation("ManagerApproverRaiseRequests")
+  raiseRequests                                                      RaiseRequest[]                 @relation("EmployeeRaiseRequests")
+  refreshTokens                                                      RefreshToken[]
+  registeredDevices                                                  RegisteredDevice[]
+  retroPays                                                          RetroPay[]
+  shift_bids                                                         shift_bids[]
+  shift_swap_requests_shift_swap_requests_manager_idTousers          shift_swap_requests[]          @relation("shift_swap_requests_manager_idTousers")
+  shift_swap_requests_shift_swap_requests_requester_idTousers        shift_swap_requests[]          @relation("shift_swap_requests_requester_idTousers")
+  shift_swap_requests_shift_swap_requests_target_user_idTousers      shift_swap_requests[]          @relation("shift_swap_requests_target_user_idTousers")
+  shifts                                                             shifts[]
+  sprints                                                            sprints[]
+  survey_responses                                                   survey_responses[]
+  suspiciousAttempts                                                 SuspiciousAttempt[]
+  task_activity_logs                                                 task_activity_logs[]
+  task_approvals                                                     task_approvals[]
+  task_assignments                                                   task_assignments[]
+  task_attachments                                                   task_attachments[]
+  task_automations                                                   task_automations[]
+  task_comments                                                      task_comments[]
+  task_evidences_task_evidences_submitted_by_idTousers               task_evidences[]               @relation("task_evidences_submitted_by_idTousers")
+  task_evidences_task_evidences_verified_by_idTousers                task_evidences[]               @relation("task_evidences_verified_by_idTousers")
+  task_time_logs                                                     task_time_logs[]
+  task_watchers                                                      task_watchers[]
+  tasks_tasks_approver_idTousers                                     tasks[]                        @relation("tasks_approver_idTousers")
+  tasks_tasks_assignee_idTousers                                     tasks[]                        @relation("tasks_assignee_idTousers")
+  tasks_tasks_created_by_idTousers                                   tasks[]                        @relation("tasks_created_by_idTousers")
+  tasks_tasks_reviewer_idTousers                                     tasks[]                        @relation("tasks_reviewer_idTousers")
+  team_calendar_events                                               team_calendar_events[]
+  training_requests                                                  training_requests[]
+  customFields                                                       UserCustomField[]
+  user_notification_preferences                                      user_notification_preferences?
+  userPermissions                                                    UserPermission[]
+  branch                                                             Branch?                        @relation(fields: [branchId], references: [id])
+  company                                                            Company?                       @relation(fields: [companyId], references: [id])
+  costCenter                                                         CostCenter?                    @relation(fields: [costCenterId], references: [id])
+  department                                                         Department?                    @relation(fields: [departmentId], references: [id])
+  job_families                                                       job_families?                  @relation(fields: [jobFamilyId], references: [id])
+  jobTitleRef                                                        JobTitle?                      @relation(fields: [jobTitleId], references: [id])
+  manager                                                            User?                          @relation("ManagerEmployees", fields: [managerId], references: [id])
+  employees                                                          User[]                         @relation("ManagerEmployees")
+  role_levels                                                        role_levels?                   @relation(fields: [roleLevelId], references: [id])
+  workFromHome                                                       WorkFromHome[]
+
+  @@unique([companyId, employeeCode])
+  @@index([companyId, status])
+  @@map("users")
+}
+
+model UserCustomField {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  fieldName    String   @map("field_name")
+  fieldValue   String   @map("field_value")
+  fieldType    String   @default("text") @map("field_type")
+  sourceHeader String?  @map("source_header")
+  importedAt   DateTime @default(now()) @map("imported_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fieldName])
+  @@index([userId])
+  @@index([fieldName])
+  @@map("user_custom_fields")
+}
+
+model JobTitle {
+  id                 String               @id @default(uuid())
+  name               String
+  nameEn             String?              @map("name_en")
+  isDirectManager    Boolean              @default(false) @map("is_direct_manager")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  level              Role                 @default(EMPLOYEE)
+  companyId          String?              @map("company_id")
+  isActive           Boolean              @default(true) @map("is_active")
+  defaultPermissions JobTitlePermission[]
+  company            Company?             @relation(fields: [companyId], references: [id])
+  policies           Policy[]
+  users              User[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("job_titles")
+}
+
+model RegisteredDevice {
+  id                String            @id @default(uuid())
+  userId            String            @map("user_id")
+  deviceId          String            @map("device_id")
+  deviceFingerprint String?           @map("device_fingerprint")
+  deviceName        String?           @map("device_name")
+  deviceModel       String?           @map("device_model")
+  deviceBrand       String?           @map("device_brand")
+  platform          DevicePlatform    @default(UNKNOWN)
+  osVersion         String?           @map("os_version")
+  appVersion        String?           @map("app_version")
+  status            DeviceStatus      @default(PENDING)
+  isMainDevice      Boolean           @default(false) @map("is_main_device")
+  approvedBy        String?           @map("approved_by")
+  approvedAt        DateTime?         @map("approved_at")
+  blockedReason     String?           @map("blocked_reason")
+  lastUsedAt        DateTime?         @map("last_used_at")
+  usageCount        Int               @default(0) @map("usage_count")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  deviceLogs        DeviceAccessLog[]
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([deviceId])
+  @@index([userId, status])
+  @@map("registered_devices")
+}
+
+model DeviceAccessLog {
+  id                String            @id @default(uuid())
+  deviceId          String?           @map("device_id")
+  userId            String            @map("user_id")
+  attemptedDeviceId String            @map("attempted_device_id")
+  actionType        String            @map("action_type")
+  isSuccess         Boolean           @map("is_success")
+  isKnownDevice     Boolean           @map("is_known_device")
+  deviceInfo        String?           @map("device_info")
+  ipAddress         String?           @map("ip_address")
+  location          String?
+  failureReason     String?           @map("failure_reason")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  device            RegisteredDevice? @relation(fields: [deviceId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([attemptedDeviceId])
+  @@map("device_access_logs")
+}
+
+model DataUpdateRequest {
+  id                   String              @id @default(uuid())
+  userId               String              @map("user_id")
+  requestType          UpdateRequestType   @map("request_type")
+  status               UpdateRequestStatus @default(PENDING)
+  reason               String?
+  newFaceEmbedding     String?             @map("new_face_embedding")
+  newFaceImage         String?             @map("new_face_image")
+  faceImageQuality     Float?              @map("face_image_quality")
+  newDeviceId          String?             @map("new_device_id")
+  newDeviceFingerprint String?             @map("new_device_fingerprint")
+  newDeviceName        String?             @map("new_device_name")
+  newDeviceModel       String?             @map("new_device_model")
+  newDeviceBrand       String?             @map("new_device_brand")
+  newDevicePlatform    DevicePlatform?     @map("new_device_platform")
+  newDeviceOsVersion   String?             @map("new_device_os_version")
+  newDeviceAppVersion  String?             @map("new_device_app_version")
+  reviewedBy           String?             @map("reviewed_by")
+  reviewedAt           DateTime?           @map("reviewed_at")
+  reviewNote           String?             @map("review_note")
+  rejectionReason      String?             @map("rejection_reason")
+  oldDeviceId          String?             @map("old_device_id")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  newData              Json?               @map("new_data")
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("data_update_requests")
+}
