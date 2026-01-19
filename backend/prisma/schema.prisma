@@ -579,9 +579,12 @@ model User {
   successionCandidates SuccessionCandidate[]
 
   // Social Feed (المنشورات والتواصل الاجتماعي)
-  postsAuthored Post[]          @relation("PostAuthor")
-  postReactions PostReaction[]  @relation("PostReactions")
-  postComments  PostComment[]   @relation("PostComments")
+  postsAuthored    Post[]            @relation("PostAuthor")
+  postReactions    PostReaction[]    @relation("PostReactions")
+  postComments     PostComment[]     @relation("PostComments")
+  postViews        PostView[]        @relation("PostViews")
+  postImpressions  PostImpression[]  @relation("PostImpressions")
+  postAcknowledges PostAcknowledge[] @relation("PostAcknowledges")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -6655,11 +6658,11 @@ model Post {
   comments  PostComment[]
   mentions  PostMention[]
 
-  // العلاقات (ستضاف في المهام اللاحقة)
-  // views         PostView[]
-  // impressions   PostImpression[]
-  // acknowledges  PostAcknowledge[]
-  // attachments   PostAttachment[]
+  // العلاقات - التتبع والتحليلات
+  views        PostView[]
+  impressions  PostImpression[]
+  acknowledges PostAcknowledge[]
+  attachments  PostAttachment[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6754,4 +6757,102 @@ model PostMention {
   @@index([postId])
   @@index([mentionType, mentionId])
   @@map("post_mentions")
+}
+
+// نموذج مشاهدات المنشور (Unique Views Tracking)
+model PostView {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  user   User   @relation("PostViews", fields: [userId], references: [id])
+
+  // معلومات المشاهدة
+  viewedAt   DateTime @default(now()) @map("viewed_at") // وقت المشاهدة
+  duration   Int?     // مدة المشاهدة بالثواني (اختياري)
+  deviceType String?  @map("device_type") // WEB, MOBILE, TABLET
+  ipAddress  String?  @map("ip_address") // عنوان IP للتحليلات
+
+  // unique constraint - كل مستخدم يُحسب مرة واحدة فقط
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@index([viewedAt])
+  @@map("post_views")
+}
+
+// نموذج ظهورات المنشور (Impressions Tracking - للإحصائيات)
+model PostImpression {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String? @map("user_id") // قد يكون null للمستخدمين غير المسجلين
+  user   User?   @relation("PostImpressions", fields: [userId], references: [id])
+
+  // معلومات الظهور
+  impressedAt DateTime @default(now()) @map("impressed_at") // وقت الظهور
+  source      String?  // مصدر الظهور: FEED, SEARCH, NOTIFICATION, DIRECT_LINK
+  position    Int?     // موقع المنشور في الـ Feed عند الظهور
+  deviceType  String?  @map("device_type") // WEB, MOBILE, TABLET
+  sessionId   String?  @map("session_id") // معرف الجلسة للتتبع
+
+  @@index([postId])
+  @@index([userId])
+  @@index([impressedAt])
+  @@index([source])
+  @@map("post_impressions")
+}
+
+// نموذج تأكيد قراءة المنشور الرسمي (Acknowledgement Tracking)
+model PostAcknowledge {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  user   User   @relation("PostAcknowledges", fields: [userId], references: [id])
+
+  // معلومات التأكيد
+  acknowledgedAt DateTime @default(now()) @map("acknowledged_at") // وقت التأكيد
+  deviceType     String?  @map("device_type") // WEB, MOBILE, TABLET
+  ipAddress      String?  @map("ip_address") // عنوان IP للتوثيق
+
+  // ملاحظة اختيارية (في حال طلب تعليق من المستخدم)
+  note String? @db.Text
+
+  // unique constraint - كل مستخدم يؤكد مرة واحدة فقط
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@index([acknowledgedAt])
+  @@map("post_acknowledges")
+}
+
+// نموذج مرفقات المنشور (File Attachments)
+model PostAttachment {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // معلومات الملف
+  fileName     String  @map("file_name") // اسم الملف الأصلي
+  fileUrl      String  @map("file_url") // رابط الملف المخزن
+  fileType     String  @map("file_type") // نوع الملف: IMAGE, VIDEO, DOCUMENT, AUDIO, OTHER
+  mimeType     String  @map("mime_type") // نوع MIME للملف
+  fileSize     Int     @map("file_size") // حجم الملف بالبايت
+  thumbnailUrl String? @map("thumbnail_url") // رابط الصورة المصغرة (للصور والفيديو)
+
+  // بيانات إضافية
+  altText     String? @map("alt_text") // نص بديل للصورة (accessibility)
+  description String? // وصف المرفق
+  sortOrder   Int     @default(0) @map("sort_order") // ترتيب العرض
+
+  // إحصائيات
+  downloadCount Int @default(0) @map("download_count") // عدد مرات التحميل
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([postId])
+  @@index([fileType])
+  @@map("post_attachments")
 }
