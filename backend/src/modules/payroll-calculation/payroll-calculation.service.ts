@@ -396,13 +396,35 @@ export class PayrollCalculationService {
 
         if (!employee) throw new NotFoundException('الموظف غير موجود');
 
-        // ✅ التحقق من تاريخ التعيين المستقبلي
+        // جلب الإعدادات أولاً لتحديد كيفية التعامل مع الموظفين الجدد
+        const settings = await this.getCalculationSettings(employeeId, companyId);
+
+        // ✅ التحقق من تاريخ التعيين - بناءً على إعدادات الشركة
         if (employee.hireDate && new Date(employee.hireDate) > startDate) {
-            throw new BadRequestException(
-                `لا يمكن حساب راتب الموظف ${employee.firstName} ${employee.lastName} - ` +
-                `تاريخ التعيين (${new Date(employee.hireDate).toLocaleDateString('ar-SA')}) ` +
-                `بعد بداية فترة الراتب (${startDate.toLocaleDateString('ar-SA')})`
-            );
+            // إذا كان تاريخ التعيين بعد نهاية الفترة بالكامل - لا يمكن الحساب
+            if (new Date(employee.hireDate) > endDate) {
+                throw new BadRequestException(
+                    `لا يمكن حساب راتب الموظف ${employee.firstName} ${employee.lastName} - ` +
+                    `تاريخ التعيين (${new Date(employee.hireDate).toLocaleDateString('ar-SA')}) ` +
+                    `بعد نهاية فترة الراتب (${endDate.toLocaleDateString('ar-SA')})`
+                );
+            }
+
+            // التعامل حسب الإعداد المختار
+            const hireMethod = settings.hireTerminationMethod || 'INCLUDE_ALL_DAYS';
+
+            // إذا كان الإعداد هو استثناء الموظفين الجدد من الدورة
+            if (hireMethod === 'EXCLUDE_FROM_PERIOD') {
+                this.logger.log(`⏭️ Skipping employee ${employee.firstName} ${employee.lastName} - hired after period start (setting: EXCLUDE_FROM_PERIOD)`);
+                throw new BadRequestException(
+                    `الموظف ${employee.firstName} ${employee.lastName} مستثنى من هذه الدورة ` +
+                    `(تاريخ التعيين: ${new Date(employee.hireDate).toLocaleDateString('ar-SA')}) - ` +
+                    `يمكن تغيير هذا السلوك من إعدادات الرواتب`
+                );
+            }
+
+            // خلاف ذلك، سيتم حساب الراتب بالتناسب (Pro-rata) تلقائياً في الكود أدناه
+            this.logger.log(`📊 Employee ${employee.firstName} ${employee.lastName} hired mid-period - will calculate pro-rata`);
         }
 
         const assignment = employee.salaryAssignments[0];
@@ -420,7 +442,7 @@ export class PayrollCalculationService {
             result: toNumber(totalSalary),
         });
 
-        const settings = await this.getCalculationSettings(employeeId, companyId);
+        // settings تم جلبها مسبقاً قبل التحقق من تاريخ التعيين
 
         const activeContract = employee.contracts?.[0];
         const terminationDate = activeContract?.terminatedAt || null;
