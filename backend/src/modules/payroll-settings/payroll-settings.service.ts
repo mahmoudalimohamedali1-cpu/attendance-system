@@ -4,9 +4,9 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 export class UpdatePayrollSettingsDto {
     payrollClosingDay?: number;
 
-    // Hire/Termination
+    // Hire/Termination - طريقة حساب راتب الموظف الجديد/المنتهي خدماته
     hireTerminationCalcBase?: 'CALENDAR_DAYS' | 'ACTUAL_WORKING_DAYS' | 'FIXED_30_DAYS';
-    hireTerminationMethod?: 'EXCLUDE_WEEKENDS' | 'INCLUDE_ALL_DAYS' | 'PRORATE_BY_CALENDAR';
+    hireTerminationMethod?: 'EXCLUDE_WEEKENDS' | 'INCLUDE_ALL_DAYS' | 'PRORATE_BY_CALENDAR' | 'EXCLUDE_FROM_PERIOD';
 
     // Unpaid Leave
     unpaidLeaveCalcBase?: 'CALENDAR_DAYS' | 'ACTUAL_WORKING_DAYS' | 'FIXED_30_DAYS';

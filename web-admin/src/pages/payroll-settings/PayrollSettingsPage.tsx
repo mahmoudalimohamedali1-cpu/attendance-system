@@ -69,8 +69,9 @@ const CALC_BASE_OPTIONS = [
 
 const HIRE_TERMINATION_METHODS = [
     { value: 'EXCLUDE_WEEKENDS', label: 'استثناء العطل', desc: 'لا يُحسب الراتب لأيام الجمعة والسبت' },
-    { value: 'INCLUDE_ALL_DAYS', label: 'شمول جميع الأيام', desc: 'يُحسب الراتب لكل الأيام بما فيها العطل' },
+    { value: 'INCLUDE_ALL_DAYS', label: 'شمول جميع الأيام', desc: 'يُحسب الراتب لكل الأيام بما فيها العطل (Pro-rata)' },
     { value: 'PRORATE_BY_CALENDAR', label: 'التناسب التقويمي', desc: 'الراتب × (أيام العمل ÷ أيام الشهر)' },
+    { value: 'EXCLUDE_FROM_PERIOD', label: 'استثناء من الدورة الحالية', desc: 'الموظفين الجدد خلال الفترة لا يُحسب راتبهم هذا الشهر' },
 ];
 
 const UNPAID_LEAVE_METHODS = [
