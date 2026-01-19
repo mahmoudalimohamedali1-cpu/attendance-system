@@ -98,6 +98,7 @@ const PayrollSimulationPage = lazy(() => import('./pages/enterprise-payroll/Payr
 const EmployeeDebtPage = lazy(() => import('./pages/employee-debt/EmployeeDebtPage'));
 const CustodyAuditPage = lazy(() => import('./pages/custody-audit/CustodyAuditPage'));
 const AiPredictivePage = lazy(() => import('./pages/ai-predictive/AiPredictivePage'));
+const SocialFeedPage = lazy(() => import('./pages/social-feed/SocialFeedPage'));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -536,6 +537,17 @@ function App() {
           <Route path="team-collaboration" element={
             <Suspense fallback={<PageLoader />}>
               <TeamCollaborationPage />
+            </Suspense>
+          } />
+          {/* Social Feed Routes */}
+          <Route path="social-feed" element={
+            <Suspense fallback={<PageLoader />}>
+              <SocialFeedPage />
+            </Suspense>
+          } />
+          <Route path="social-feed/post/:id" element={
+            <Suspense fallback={<PageLoader />}>
+              <SocialFeedPage />
             </Suspense>
           } />
           <Route path="integrations" element={
