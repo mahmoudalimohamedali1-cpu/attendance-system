@@ -12,6 +12,55 @@ import { PostStatus, PostType, VisibilityType, Prisma, MentionType, Notification
 import { CreatePostDto, PostTargetDto, PostAttachmentDto, PostMentionDto } from './dto';
 import { UpdatePostDto } from './dto';
 
+// ==================== Content Sanitization Configuration ====================
+
+/**
+ * Allowed HTML tags for rich content (used in sanitization)
+ */
+const ALLOWED_TAGS = [
+  'p', 'br', 'b', 'i', 'u', 'strong', 'em', 's', 'strike',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'ul', 'ol', 'li',
+  'blockquote', 'pre', 'code',
+  'a', 'span', 'div',
+  'table', 'thead', 'tbody', 'tr', 'th', 'td',
+];
+
+/**
+ * Allowed HTML attributes (tag-specific)
+ */
+const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
+  a: ['href', 'title', 'target', 'rel'],
+  span: ['class', 'style'],
+  div: ['class', 'style'],
+  td: ['colspan', 'rowspan'],
+  th: ['colspan', 'rowspan'],
+};
+
+/**
+ * Dangerous patterns that indicate XSS attempts
+ */
+const XSS_PATTERNS: RegExp[] = [
+  // JavaScript URLs
+  /javascript\s*:/gi,
+  /vbscript\s*:/gi,
+  /data\s*:/gi,
+  // Event handlers
+  /on\w+\s*=/gi,
+  // Expression/eval
+  /expression\s*\(/gi,
+  /eval\s*\(/gi,
+  // Script tags (even if not in allowed list, extra safety)
+  /<\s*script/gi,
+  /<\s*\/\s*script/gi,
+  // Style with expression
+  /style\s*=\s*["'][^"']*expression/gi,
+  // Import statements
+  /@import/gi,
+  // Binding expressions
+  /\{\{.*\}\}/gi,
+];
+
 // ==================== الواجهات (Interfaces) ====================
 
 /**
@@ -116,6 +165,300 @@ export class SocialFeedService {
     private targetingService: TargetingService,
     private notificationsService: NotificationsService,
   ) {}
+
+  // ==================== Content Sanitization (XSS Prevention) ====================
+
+  /**
+   * تنظيف المحتوى من XSS - DOMPurify-like sanitization for server-side
+   * Sanitizes HTML content to prevent XSS attacks
+   * @param content - The content to sanitize
+   * @param options - Sanitization options
+   * @returns Sanitized content safe for storage and display
+   */
+  private sanitizeContent(
+    content: string | null | undefined,
+    options: {
+      allowHtml?: boolean;
+      maxLength?: number;
+    } = {},
+  ): string | null {
+    if (content === null || content === undefined) {
+      return null;
+    }
+
+    const { allowHtml = true, maxLength = 50000 } = options;
+
+    let sanitized = content;
+
+    // 1. Remove null bytes and control characters
+    sanitized = sanitized.replace(/\x00/g, '');
+    sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    // 2. Remove zero-width characters that can be used for obfuscation
+    sanitized = sanitized.replace(/[\u200B-\u200D\uFEFF\u2060\u180E]/g, '');
+
+    // 3. Remove dangerous XSS patterns
+    for (const pattern of XSS_PATTERNS) {
+      sanitized = sanitized.replace(pattern, '');
+    }
+
+    // 4. Handle HTML content
+    if (!allowHtml) {
+      // Strip all HTML tags if not allowed
+      sanitized = this.stripHtmlTags(sanitized);
+    } else {
+      // Sanitize HTML - remove dangerous tags and attributes
+      sanitized = this.sanitizeHtml(sanitized);
+    }
+
+    // 5. Normalize multiple spaces and newlines
+    sanitized = sanitized.replace(/\n{3,}/g, '\n\n');
+    sanitized = sanitized.replace(/[ \t]{2,}/g, ' ');
+
+    // 6. Truncate if too long
+    if (sanitized.length > maxLength) {
+      sanitized = sanitized.substring(0, maxLength);
+    }
+
+    return sanitized.trim();
+  }
+
+  /**
+   * تجريد جميع وسوم HTML من النص
+   * Strip all HTML tags from text
+   */
+  private stripHtmlTags(html: string): string {
+    return html
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/');
+  }
+
+  /**
+   * تنظيف HTML مع السماح بالوسوم الآمنة
+   * Sanitize HTML while allowing safe tags
+   */
+  private sanitizeHtml(html: string): string {
+    let sanitized = html;
+
+    // Remove dangerous tags completely (script, style, iframe, object, embed, etc.)
+    const dangerousTags = [
+      'script', 'style', 'iframe', 'frame', 'frameset', 'object',
+      'embed', 'applet', 'form', 'input', 'button', 'select',
+      'textarea', 'meta', 'link', 'base', 'svg', 'math',
+    ];
+
+    for (const tag of dangerousTags) {
+      // Remove opening and closing tags with content
+      const tagRegex = new RegExp(`<${tag}[^>]*>[\\s\\S]*?<\\/${tag}>`, 'gi');
+      sanitized = sanitized.replace(tagRegex, '');
+      // Remove self-closing tags
+      const selfClosingRegex = new RegExp(`<${tag}[^>]*\\/?>`, 'gi');
+      sanitized = sanitized.replace(selfClosingRegex, '');
+    }
+
+    // Remove dangerous attributes from all tags
+    // Event handlers (onclick, onerror, onload, etc.)
+    sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+    sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+
+    // Remove javascript:, vbscript:, data: from href and src
+    sanitized = sanitized.replace(
+      /(\s+(?:href|src|action|formaction|xlink:href)\s*=\s*["']?)\s*(?:javascript|vbscript|data)\s*:[^"'\s>]*/gi,
+      '$1#blocked'
+    );
+
+    // Remove style attributes containing dangerous content
+    sanitized = sanitized.replace(
+      /style\s*=\s*["'][^"']*(?:expression|url\s*\(|@import)[^"']*["']/gi,
+      ''
+    );
+
+    // Remove tags that are not in the allowed list
+    sanitized = this.filterAllowedTags(sanitized);
+
+    return sanitized;
+  }
+
+  /**
+   * تصفية الوسوم المسموح بها فقط
+   * Filter to keep only allowed HTML tags
+   */
+  private filterAllowedTags(html: string): string {
+    // Build regex pattern for tags
+    const tagPattern = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+
+    return html.replace(tagPattern, (match, tagName) => {
+      const tag = tagName.toLowerCase();
+
+      // Check if tag is allowed
+      if (!ALLOWED_TAGS.includes(tag)) {
+        return ''; // Remove disallowed tags
+      }
+
+      // For allowed tags, filter attributes
+      if (match.startsWith('</')) {
+        return `</${tag}>`; // Closing tag, no attributes
+      }
+
+      // Extract and filter attributes for opening tags
+      const allowedAttrs = ALLOWED_ATTRIBUTES[tag] || [];
+      const attrPattern = /\s+([a-z][a-z0-9-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*))/gi;
+      const safeAttributes: string[] = [];
+
+      let attrMatch;
+      while ((attrMatch = attrPattern.exec(match)) !== null) {
+        const attrName = attrMatch[1].toLowerCase();
+        const attrValue = attrMatch[2] || attrMatch[3] || attrMatch[4] || '';
+
+        // Check if attribute is allowed for this tag
+        if (allowedAttrs.includes(attrName)) {
+          // Additional validation for href
+          if (attrName === 'href') {
+            const safeHref = this.sanitizeUrl(attrValue);
+            if (safeHref) {
+              safeAttributes.push(`${attrName}="${this.escapeHtmlAttribute(safeHref)}"`);
+            }
+          } else if (attrName === 'style') {
+            const safeStyle = this.sanitizeStyle(attrValue);
+            if (safeStyle) {
+              safeAttributes.push(`${attrName}="${this.escapeHtmlAttribute(safeStyle)}"`);
+            }
+          } else {
+            safeAttributes.push(`${attrName}="${this.escapeHtmlAttribute(attrValue)}"`);
+          }
+        }
+      }
+
+      // Check for self-closing tag
+      const isSelfClosing = match.endsWith('/>') || ['br', 'hr', 'img'].includes(tag);
+
+      if (safeAttributes.length > 0) {
+        return `<${tag} ${safeAttributes.join(' ')}${isSelfClosing ? ' /' : ''}>`;
+      }
+
+      return `<${tag}${isSelfClosing ? ' /' : ''}>`;
+    });
+  }
+
+  /**
+   * تنظيف عنوان URL
+   * Sanitize URL to prevent XSS via javascript: or data: URLs
+   */
+  private sanitizeUrl(url: string): string | null {
+    const trimmed = url.trim().toLowerCase();
+
+    // Block dangerous protocols
+    if (
+      trimmed.startsWith('javascript:') ||
+      trimmed.startsWith('vbscript:') ||
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('file:')
+    ) {
+      return null;
+    }
+
+    // Allow relative URLs, http, https, mailto, tel
+    if (
+      trimmed.startsWith('/') ||
+      trimmed.startsWith('#') ||
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('mailto:') ||
+      trimmed.startsWith('tel:')
+    ) {
+      return url.trim();
+    }
+
+    // If no protocol, treat as relative URL
+    if (!trimmed.includes(':')) {
+      return url.trim();
+    }
+
+    return null;
+  }
+
+  /**
+   * تنظيف CSS inline styles
+   * Sanitize CSS inline styles
+   */
+  private sanitizeStyle(style: string): string | null {
+    // Remove dangerous CSS
+    const dangerous = [
+      'expression', 'url(', '@import', 'javascript:',
+      'vbscript:', 'behavior:', '-moz-binding',
+    ];
+
+    const lowerStyle = style.toLowerCase();
+    for (const d of dangerous) {
+      if (lowerStyle.includes(d)) {
+        return null;
+      }
+    }
+
+    // Only allow safe CSS properties
+    const allowedProperties = [
+      'color', 'background-color', 'font-size', 'font-weight', 'font-style',
+      'text-align', 'text-decoration', 'margin', 'padding', 'border',
+      'width', 'height', 'display', 'list-style',
+    ];
+
+    const properties = style.split(';').filter(p => p.trim());
+    const safeProperties: string[] = [];
+
+    for (const prop of properties) {
+      const [name] = prop.split(':').map(s => s.trim().toLowerCase());
+      if (allowedProperties.some(allowed => name.startsWith(allowed))) {
+        safeProperties.push(prop.trim());
+      }
+    }
+
+    return safeProperties.length > 0 ? safeProperties.join('; ') : null;
+  }
+
+  /**
+   * تهريب حروف HTML الخاصة في قيم الخصائص
+   * Escape HTML special characters in attribute values
+   */
+  private escapeHtmlAttribute(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#x27;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
+   * تنظيف محتوى التعليق (بدون HTML)
+   * Sanitize comment content (no HTML allowed)
+   */
+  private sanitizeCommentContent(content: string): string {
+    const sanitized = this.sanitizeContent(content, {
+      allowHtml: false,
+      maxLength: 5000,
+    });
+    return sanitized || '';
+  }
+
+  /**
+   * تنظيف عنوان المنشور
+   * Sanitize post title (no HTML, shorter length)
+   */
+  private sanitizeTitle(title: string | null | undefined): string | null {
+    if (!title) return null;
+    const sanitized = this.sanitizeContent(title, {
+      allowHtml: false,
+      maxLength: 500,
+    });
+    return sanitized;
+  }
 
   // ==================== جلب الفيد ====================
 
@@ -465,6 +808,14 @@ export class SocialFeedService {
     companyId: string,
     dto: CreatePostDto,
   ): Promise<PostWithRelations> {
+    // تنظيف المحتوى من XSS قبل الحفظ
+    const sanitizedTitle = this.sanitizeTitle(dto.title);
+    const sanitizedTitleEn = this.sanitizeTitle(dto.titleEn);
+    const sanitizedContent = this.sanitizeContent(dto.content, { allowHtml: true });
+    const sanitizedContentEn = this.sanitizeContent(dto.contentEn, { allowHtml: true });
+
+    this.logger.debug(`Content sanitized for new post by ${authorId}`);
+
     // تحديد حالة المنشور
     let status = PostStatus.DRAFT;
     let publishedAt: Date | null = null;
@@ -490,10 +841,10 @@ export class SocialFeedService {
         companyId,
         authorId,
         type: dto.type || PostType.POST,
-        title: dto.title,
-        titleEn: dto.titleEn,
-        content: dto.content,
-        contentEn: dto.contentEn,
+        title: sanitizedTitle,
+        titleEn: sanitizedTitleEn,
+        content: sanitizedContent || '',
+        contentEn: sanitizedContentEn,
         visibilityType: dto.visibilityType || VisibilityType.PUBLIC,
         isPinned: dto.isPinned || false,
         pinnedUntil: dto.pinnedUntil ? new Date(dto.pinnedUntil) : null,
@@ -832,11 +1183,13 @@ export class SocialFeedService {
     // تحضير بيانات التحديث
     const updateData: Prisma.PostUpdateInput = {};
 
-    // تحديث الحقول النصية
-    if (dto.title !== undefined) updateData.title = dto.title;
-    if (dto.titleEn !== undefined) updateData.titleEn = dto.titleEn;
-    if (dto.content !== undefined) updateData.content = dto.content;
-    if (dto.contentEn !== undefined) updateData.contentEn = dto.contentEn;
+    // تحديث الحقول النصية مع تنظيف المحتوى من XSS
+    if (dto.title !== undefined) updateData.title = this.sanitizeTitle(dto.title);
+    if (dto.titleEn !== undefined) updateData.titleEn = this.sanitizeTitle(dto.titleEn);
+    if (dto.content !== undefined) updateData.content = this.sanitizeContent(dto.content, { allowHtml: true }) || '';
+    if (dto.contentEn !== undefined) updateData.contentEn = this.sanitizeContent(dto.contentEn, { allowHtml: true });
+
+    this.logger.debug(`Content sanitized for post update: ${postId}`);
     if (dto.visibilityType !== undefined) updateData.visibilityType = dto.visibilityType;
     if (dto.isPinned !== undefined) updateData.isPinned = dto.isPinned;
     if (dto.pinnedUntil !== undefined) {
@@ -2105,6 +2458,14 @@ export class SocialFeedService {
       throw new BadRequestException('محتوى التعليق مطلوب');
     }
 
+    // تنظيف محتوى التعليق من XSS
+    const sanitizedContent = this.sanitizeCommentContent(content);
+    if (!sanitizedContent || sanitizedContent.trim().length === 0) {
+      throw new BadRequestException('محتوى التعليق غير صالح');
+    }
+
+    this.logger.debug(`Comment content sanitized for post: ${postId}`);
+
     // التحقق من وجود التعليق الأب إذا تم تحديده
     if (parentId) {
       const parentComment = await this.prisma.postComment.findFirst({
@@ -2124,7 +2485,7 @@ export class SocialFeedService {
       data: {
         postId,
         authorId,
-        content: content.trim(),
+        content: sanitizedContent,
         mentions: mentions || [],
         parentId: parentId || null,
       },
@@ -2369,11 +2730,19 @@ export class SocialFeedService {
       throw new BadRequestException('محتوى التعليق مطلوب');
     }
 
+    // تنظيف محتوى التعليق من XSS
+    const sanitizedContent = this.sanitizeCommentContent(content);
+    if (!sanitizedContent || sanitizedContent.trim().length === 0) {
+      throw new BadRequestException('محتوى التعليق غير صالح');
+    }
+
+    this.logger.debug(`Comment content sanitized for update: ${commentId}`);
+
     // تحديث التعليق
     const updatedComment = await this.prisma.postComment.update({
       where: { id: commentId },
       data: {
-        content: content.trim(),
+        content: sanitizedContent,
         mentions: mentions || comment.mentions,
         isEdited: true,
         editedAt: new Date(),
