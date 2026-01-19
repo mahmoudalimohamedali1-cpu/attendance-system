@@ -2524,7 +2524,8 @@ model SmartPolicy {
   isActive Boolean           @default(false) @map("is_active")
 
   // الأولوية (الأعلى تُنفذ أولاً)
-  priority Int @default(0)
+  priority       Int @default(0)
+  executionOrder Int @default(0) @map("execution_order")
 
   // تاريخ الصلاحية
   effectiveFrom DateTime? @map("effective_from")
