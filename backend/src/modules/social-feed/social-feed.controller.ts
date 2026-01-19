@@ -26,7 +26,8 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { CreateCommentDto, UpdateCommentDto } from './dto/create-comment.dto';
 import { PostReactionDto } from './dto/post-reaction.dto';
-import { PostType } from '@prisma/client';
+import { AudiencePreviewDto } from './dto/audience-preview.dto';
+import { PostType, TargetType } from '@prisma/client';
 
 @ApiTags('social-feed')
 @ApiBearerAuth()
@@ -117,6 +118,108 @@ export class SocialFeedController {
     @Body() dto: CreatePostDto,
   ) {
     return this.socialFeedService.createPost(userId, companyId, dto);
+  }
+
+  @Post('audience-preview')
+  @ApiOperation({ summary: 'معاينة الجمهور المستهدف قبل النشر' })
+  @ApiResponse({
+    status: 200,
+    description: 'معلومات الجمهور المستهدف',
+    schema: {
+      type: 'object',
+      properties: {
+        totalCount: { type: 'number', description: 'إجمالي عدد المستخدمين المستهدفين' },
+        users: {
+          type: 'array',
+          description: 'عينة من المستخدمين المستهدفين',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              firstName: { type: 'string' },
+              lastName: { type: 'string' },
+              email: { type: 'string' },
+              avatar: { type: 'string', nullable: true },
+              department: {
+                type: 'object',
+                nullable: true,
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                },
+              },
+              branch: {
+                type: 'object',
+                nullable: true,
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        breakdown: {
+          type: 'object',
+          description: 'توزيع الجمهور',
+          properties: {
+            byDepartment: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  count: { type: 'number' },
+                },
+              },
+            },
+            byBranch: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                  count: { type: 'number' },
+                },
+              },
+            },
+            byRole: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  role: { type: 'string' },
+                  count: { type: 'number' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'بيانات غير صالحة' })
+  async previewAudience(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() dto: AudiencePreviewDto,
+  ) {
+    // تحويل قواعد الاستهداف إلى الصيغة المطلوبة
+    const targets = (dto.targets || []).map((target) => ({
+      targetType: target.targetType as TargetType,
+      targetValue: target.targetValue,
+      isExclusion: target.isExclusion || false,
+    }));
+
+    return this.socialFeedService.previewAudience(
+      userId,
+      companyId,
+      dto.visibilityType,
+      targets,
+      dto.limit || 10,
+    );
   }
 
   @Get(':id')
@@ -514,4 +617,5 @@ export class SocialFeedController {
   ) {
     return this.socialFeedService.hardDeletePost(postId, companyId);
   }
+
 }
