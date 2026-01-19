@@ -1164,6 +1164,349 @@ export class SocialFeedService {
     return updatedPost as PostWithRelations;
   }
 
+  /**
+   * الموافقة على منشور معلق
+   */
+  async approvePost(
+    postId: string,
+    approverId: string,
+    companyId: string,
+  ): Promise<PostWithRelations> {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PENDING_APPROVAL,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود أو ليس في انتظار الموافقة');
+    }
+
+    const updatedPost = await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        status: PostStatus.PUBLISHED,
+        publishedAt: new Date(),
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            department: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+        targets: {
+          select: {
+            id: true,
+            targetType: true,
+            targetValue: true,
+            isExclusion: true,
+          },
+        },
+        reactions: {
+          select: {
+            id: true,
+            userId: true,
+            emoji: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            fileType: true,
+            mimeType: true,
+            fileSize: true,
+            thumbnailUrl: true,
+          },
+        },
+        mentions: {
+          select: {
+            id: true,
+            mentionType: true,
+            mentionId: true,
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            reactions: true,
+            acknowledges: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(`تم الموافقة على المنشور: ${postId} بواسطة ${approverId}`);
+
+    return updatedPost as PostWithRelations;
+  }
+
+  /**
+   * رفض منشور معلق
+   */
+  async rejectPost(
+    postId: string,
+    rejecterId: string,
+    companyId: string,
+    reason?: string,
+  ): Promise<PostWithRelations> {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PENDING_APPROVAL,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود أو ليس في انتظار الموافقة');
+    }
+
+    const updatedPost = await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        status: PostStatus.REJECTED,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            department: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+        targets: {
+          select: {
+            id: true,
+            targetType: true,
+            targetValue: true,
+            isExclusion: true,
+          },
+        },
+        reactions: {
+          select: {
+            id: true,
+            userId: true,
+            emoji: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            fileType: true,
+            mimeType: true,
+            fileSize: true,
+            thumbnailUrl: true,
+          },
+        },
+        mentions: {
+          select: {
+            id: true,
+            mentionType: true,
+            mentionId: true,
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            reactions: true,
+            acknowledges: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(
+      `تم رفض المنشور: ${postId} بواسطة ${rejecterId}${reason ? ` - السبب: ${reason}` : ''}`,
+    );
+
+    return updatedPost as PostWithRelations;
+  }
+
+  /**
+   * تثبيت منشور
+   */
+  async pinPost(
+    postId: string,
+    companyId: string,
+    pinnedUntil?: Date,
+  ): Promise<PostWithRelations> {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    const updatedPost = await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        isPinned: true,
+        pinnedUntil: pinnedUntil || null,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            department: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+        targets: {
+          select: {
+            id: true,
+            targetType: true,
+            targetValue: true,
+            isExclusion: true,
+          },
+        },
+        reactions: {
+          select: {
+            id: true,
+            userId: true,
+            emoji: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            fileType: true,
+            mimeType: true,
+            fileSize: true,
+            thumbnailUrl: true,
+          },
+        },
+        mentions: {
+          select: {
+            id: true,
+            mentionType: true,
+            mentionId: true,
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            reactions: true,
+            acknowledges: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(`تم تثبيت المنشور: ${postId}`);
+
+    return updatedPost as PostWithRelations;
+  }
+
+  /**
+   * إلغاء تثبيت منشور
+   */
+  async unpinPost(
+    postId: string,
+    companyId: string,
+  ): Promise<PostWithRelations> {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    const updatedPost = await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        isPinned: false,
+        pinnedUntil: null,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatar: true,
+            department: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+        targets: {
+          select: {
+            id: true,
+            targetType: true,
+            targetValue: true,
+            isExclusion: true,
+          },
+        },
+        reactions: {
+          select: {
+            id: true,
+            userId: true,
+            emoji: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            fileType: true,
+            mimeType: true,
+            fileSize: true,
+            thumbnailUrl: true,
+          },
+        },
+        mentions: {
+          select: {
+            id: true,
+            mentionType: true,
+            mentionId: true,
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            reactions: true,
+            acknowledges: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(`تم إلغاء تثبيت المنشور: ${postId}`);
+
+    return updatedPost as PostWithRelations;
+  }
+
   // ==================== معاينة الجمهور ====================
 
   /**

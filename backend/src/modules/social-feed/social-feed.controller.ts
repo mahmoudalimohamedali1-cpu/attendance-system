@@ -456,6 +456,51 @@ export class SocialFeedController {
     return this.socialFeedService.togglePinPost(postId, companyId, pinnedUntil);
   }
 
+  @Delete(':id/pin')
+  @Roles('ADMIN', 'HR')
+  @ApiOperation({ summary: 'إلغاء تثبيت منشور' })
+  @ApiResponse({ status: 200, description: 'تم إلغاء تثبيت المنشور' })
+  @ApiResponse({ status: 404, description: 'المنشور غير موجود' })
+  @ApiResponse({ status: 403, description: 'ليس لديك صلاحية' })
+  @ApiParam({ name: 'id', description: 'معرف المنشور' })
+  async unpinPost(
+    @Param('id') postId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.socialFeedService.unpinPost(postId, companyId);
+  }
+
+  @Post(':id/approve')
+  @Roles('ADMIN', 'HR')
+  @ApiOperation({ summary: 'الموافقة على منشور معلق' })
+  @ApiResponse({ status: 200, description: 'تم الموافقة على المنشور' })
+  @ApiResponse({ status: 404, description: 'المنشور غير موجود أو ليس في انتظار الموافقة' })
+  @ApiResponse({ status: 403, description: 'ليس لديك صلاحية' })
+  @ApiParam({ name: 'id', description: 'معرف المنشور' })
+  async approvePost(
+    @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.socialFeedService.approvePost(postId, userId, companyId);
+  }
+
+  @Post(':id/reject')
+  @Roles('ADMIN', 'HR')
+  @ApiOperation({ summary: 'رفض منشور معلق' })
+  @ApiResponse({ status: 200, description: 'تم رفض المنشور' })
+  @ApiResponse({ status: 404, description: 'المنشور غير موجود أو ليس في انتظار الموافقة' })
+  @ApiResponse({ status: 403, description: 'ليس لديك صلاحية' })
+  @ApiParam({ name: 'id', description: 'معرف المنشور' })
+  async rejectPost(
+    @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() body?: { reason?: string },
+  ) {
+    return this.socialFeedService.rejectPost(postId, userId, companyId, body?.reason);
+  }
+
   @Delete(':id/hard')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'حذف منشور نهائياً' })
