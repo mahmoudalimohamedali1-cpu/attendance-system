@@ -1837,4 +1837,496 @@ export class SocialFeedService {
       message: 'تم حذف التعليق بنجاح',
     };
   }
+
+  // ==================== تأكيد القراءة (Acknowledgements) ====================
+
+  /**
+   * تأكيد قراءة منشور رسمي
+   */
+  async acknowledgePost(
+    postId: string,
+    userId: string,
+    companyId: string,
+    options?: {
+      note?: string;
+      deviceType?: string;
+      ipAddress?: string;
+    },
+  ): Promise<{
+    success: boolean;
+    acknowledge: {
+      id: string;
+      acknowledgedAt: Date;
+      note: string | null;
+    };
+  }> {
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PUBLISHED,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // التحقق من أن المنشور يتطلب تأكيد
+    if (!post.requireAcknowledge) {
+      throw new BadRequestException('هذا المنشور لا يتطلب تأكيد قراءة');
+    }
+
+    // التحقق من صلاحية المشاهدة
+    const canView = await this.canUserViewPost(userId, companyId, post);
+    if (!canView) {
+      throw new ForbiddenException('ليس لديك صلاحية لتأكيد قراءة هذا المنشور');
+    }
+
+    // التحقق من عدم وجود تأكيد سابق
+    const existingAcknowledge = await this.prisma.postAcknowledge.findUnique({
+      where: {
+        postId_userId: {
+          postId,
+          userId,
+        },
+      },
+    });
+
+    if (existingAcknowledge) {
+      throw new BadRequestException('تم تأكيد قراءة هذا المنشور مسبقاً');
+    }
+
+    // إنشاء تأكيد القراءة
+    const acknowledge = await this.prisma.postAcknowledge.create({
+      data: {
+        postId,
+        userId,
+        note: options?.note,
+        deviceType: options?.deviceType,
+        ipAddress: options?.ipAddress,
+      },
+    });
+
+    this.logger.log(`تم تأكيد قراءة المنشور: ${postId} بواسطة ${userId}`);
+
+    return {
+      success: true,
+      acknowledge: {
+        id: acknowledge.id,
+        acknowledgedAt: acknowledge.acknowledgedAt,
+        note: acknowledge.note,
+      },
+    };
+  }
+
+  /**
+   * جلب تأكيدات القراءة لمنشور معين
+   */
+  async getAcknowledgements(
+    postId: string,
+    companyId: string,
+    options?: {
+      page?: number;
+      limit?: number;
+    },
+  ): Promise<FeedResult<{
+    id: string;
+    acknowledgedAt: Date;
+    note: string | null;
+    deviceType: string | null;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      avatar: string | null;
+      department?: { id: string; name: string } | null;
+    };
+  }>> {
+    const { page = 1, limit = 20 } = options || {};
+
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // جلب تأكيدات القراءة مع بيانات المستخدمين
+    const [acknowledges, total] = await Promise.all([
+      this.prisma.postAcknowledge.findMany({
+        where: { postId },
+        orderBy: { acknowledgedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatar: true,
+              department: {
+                select: { id: true, name: true },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.postAcknowledge.count({ where: { postId } }),
+    ]);
+
+    return {
+      items: acknowledges.map((ack) => ({
+        id: ack.id,
+        acknowledgedAt: ack.acknowledgedAt,
+        note: ack.note,
+        deviceType: ack.deviceType,
+        user: ack.user,
+      })),
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
+    };
+  }
+
+  /**
+   * التحقق من حالة تأكيد القراءة للمستخدم
+   */
+  async hasUserAcknowledged(
+    postId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const acknowledge = await this.prisma.postAcknowledge.findUnique({
+      where: {
+        postId_userId: {
+          postId,
+          userId,
+        },
+      },
+    });
+
+    return !!acknowledge;
+  }
+
+  // ==================== التحليلات والتتبع (Analytics & Tracking) ====================
+
+  /**
+   * تسجيل مشاهدة منشور (View)
+   * يُسجل مرة واحدة فقط لكل مستخدم
+   */
+  async trackView(
+    postId: string,
+    userId: string,
+    companyId: string,
+    options?: {
+      duration?: number;
+      deviceType?: string;
+      ipAddress?: string;
+    },
+  ): Promise<{
+    success: boolean;
+    isNewView: boolean;
+    viewId?: string;
+  }> {
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PUBLISHED,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // التحقق من صلاحية المشاهدة
+    const canView = await this.canUserViewPost(userId, companyId, post);
+    if (!canView) {
+      throw new ForbiddenException('ليس لديك صلاحية لمشاهدة هذا المنشور');
+    }
+
+    // محاولة إنشاء سجل مشاهدة جديد أو تحديث الموجود
+    try {
+      const view = await this.prisma.postView.upsert({
+        where: {
+          postId_userId: {
+            postId,
+            userId,
+          },
+        },
+        update: {
+          // تحديث مدة المشاهدة إذا تم تقديمها
+          duration: options?.duration,
+        },
+        create: {
+          postId,
+          userId,
+          duration: options?.duration,
+          deviceType: options?.deviceType,
+          ipAddress: options?.ipAddress,
+        },
+      });
+
+      // التحقق من أن هذه مشاهدة جديدة (تم إنشاؤها الآن)
+      const isNewView = view.viewedAt.getTime() >= Date.now() - 1000;
+
+      // تحديث عداد الوصول إذا كانت مشاهدة جديدة
+      if (isNewView) {
+        await this.prisma.post.update({
+          where: { id: postId },
+          data: {
+            reachCount: { increment: 1 },
+          },
+        });
+      }
+
+      return {
+        success: true,
+        isNewView,
+        viewId: view.id,
+      };
+    } catch (error) {
+      // في حالة التكرار (race condition)، المشاهدة موجودة مسبقاً
+      return {
+        success: true,
+        isNewView: false,
+      };
+    }
+  }
+
+  /**
+   * تسجيل ظهور منشور في الفيد (Impression)
+   * يمكن تسجيل عدة ظهورات لنفس المستخدم
+   */
+  async trackImpression(
+    postId: string,
+    userId: string | null,
+    companyId: string,
+    options?: {
+      source?: string;
+      position?: number;
+      deviceType?: string;
+      sessionId?: string;
+    },
+  ): Promise<{
+    success: boolean;
+    impressionId: string;
+  }> {
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PUBLISHED,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // إنشاء سجل الظهور
+    const impression = await this.prisma.postImpression.create({
+      data: {
+        postId,
+        userId,
+        source: options?.source || 'FEED',
+        position: options?.position,
+        deviceType: options?.deviceType,
+        sessionId: options?.sessionId,
+      },
+    });
+
+    // تحديث عداد الظهورات
+    await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        impressionCount: { increment: 1 },
+      },
+    });
+
+    return {
+      success: true,
+      impressionId: impression.id,
+    };
+  }
+
+  /**
+   * تسجيل نقرة على منشور (Click)
+   */
+  async trackClick(
+    postId: string,
+    companyId: string,
+  ): Promise<{
+    success: boolean;
+    clickCount: number;
+  }> {
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+        status: PostStatus.PUBLISHED,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // تحديث عداد النقرات
+    const updatedPost = await this.prisma.post.update({
+      where: { id: postId },
+      data: {
+        clickCount: { increment: 1 },
+      },
+      select: {
+        clickCount: true,
+      },
+    });
+
+    return {
+      success: true,
+      clickCount: updatedPost.clickCount,
+    };
+  }
+
+  /**
+   * جلب إحصائيات منشور
+   */
+  async getPostAnalytics(
+    postId: string,
+    companyId: string,
+  ): Promise<{
+    reachCount: number;
+    impressionCount: number;
+    clickCount: number;
+    reactionsCount: number;
+    commentsCount: number;
+    acknowledgementsCount: number;
+    acknowledgementsRequired: boolean;
+    uniqueViewers: number;
+    reactionsByType: Array<{ emoji: string; count: number }>;
+  }> {
+    // التحقق من وجود المنشور
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: postId,
+        companyId,
+      },
+      include: {
+        _count: {
+          select: {
+            reactions: true,
+            comments: true,
+            acknowledges: true,
+            views: true,
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('المنشور غير موجود');
+    }
+
+    // جلب التفاعلات مجمعة حسب النوع
+    const reactionsByType = await this.prisma.postReaction.groupBy({
+      by: ['emoji'],
+      where: { postId },
+      _count: {
+        emoji: true,
+      },
+    });
+
+    return {
+      reachCount: post.reachCount,
+      impressionCount: post.impressionCount,
+      clickCount: post.clickCount,
+      reactionsCount: post._count.reactions,
+      commentsCount: post._count.comments,
+      acknowledgementsCount: post._count.acknowledges,
+      acknowledgementsRequired: post.requireAcknowledge,
+      uniqueViewers: post._count.views,
+      reactionsByType: reactionsByType.map((r) => ({
+        emoji: r.emoji,
+        count: r._count.emoji,
+      })),
+    };
+  }
+
+  /**
+   * تسجيل ظهورات متعددة (Batch Impressions)
+   * للاستخدام عند تحميل الفيد
+   */
+  async trackBatchImpressions(
+    postIds: string[],
+    userId: string | null,
+    companyId: string,
+    options?: {
+      source?: string;
+      deviceType?: string;
+      sessionId?: string;
+    },
+  ): Promise<{
+    success: boolean;
+    count: number;
+  }> {
+    if (postIds.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // التحقق من وجود المنشورات
+    const posts = await this.prisma.post.findMany({
+      where: {
+        id: { in: postIds },
+        companyId,
+        status: PostStatus.PUBLISHED,
+      },
+      select: { id: true },
+    });
+
+    const validPostIds = posts.map((p) => p.id);
+
+    if (validPostIds.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    // إنشاء سجلات الظهور
+    const impressionsData = validPostIds.map((postId, index) => ({
+      postId,
+      userId,
+      source: options?.source || 'FEED',
+      position: index,
+      deviceType: options?.deviceType,
+      sessionId: options?.sessionId,
+    }));
+
+    await this.prisma.postImpression.createMany({
+      data: impressionsData,
+    });
+
+    // تحديث عدادات الظهورات
+    await this.prisma.post.updateMany({
+      where: { id: { in: validPostIds } },
+      data: {
+        impressionCount: { increment: 1 },
+      },
+    });
+
+    return {
+      success: true,
+      count: validPostIds.length,
+    };
+  }
 }
