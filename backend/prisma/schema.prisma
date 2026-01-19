@@ -2699,25 +2699,26 @@ model SmartPolicyRetroApplication {
 }
 
 model SmartPolicyTemplate {
-  id               String   @id @default(uuid())
-  name             String?  @map("name")
-  nameEn           String?  @map("name_en")
+  id               String              @id
+  name             String?             @map("name")
+  nameEn           String?             @map("name_en")
+  triggerEvent     SmartPolicyTrigger? @map("trigger_event")
   category         String
-  description      String?  @map("description") @db.Text
-  originalText     String?  @map("original_text") @db.Text
-  parsedRule       Json?    @map("parsed_rule")
-  recommendedFor   String?  @map("recommended_for")
-  legalCompliance  Json?    @map("legal_compliance")
-  laborLawArticles Json?    @map("labor_law_articles")
-  isPublic         Boolean  @default(true) @map("is_public")
-  rating           Decimal? @default(0) @db.Decimal(3, 1)
-  ratingCount      Int      @default(0) @map("rating_count")
-  usageCount       Int      @default(0) @map("usage_count")
-  isActive         Boolean  @default(true) @map("is_active")
-  isSystemTemplate Boolean  @default(false) @map("is_system_template")
-  companyId        String?  @map("company_id")
-  company          Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt        DateTime @default(now()) @map("created_at")
+  description      String?             @map("description") @db.Text
+  originalText     String?             @map("original_text") @db.Text
+  parsedRule       Json?               @map("parsed_rule")
+  recommendedFor   String?             @map("recommended_for")
+  legalCompliance  Json?               @map("legal_compliance")
+  laborLawArticles Json?               @map("labor_law_articles")
+  isPublic         Boolean             @default(true) @map("is_public")
+  rating           Decimal?            @default(0) @db.Decimal(3, 1)
+  ratingCount      Int                 @default(0) @map("rating_count")
+  usageCount       Int                 @default(0) @map("usage_count")
+  isActive         Boolean             @default(true) @map("is_active")
+  isSystemTemplate Boolean             @default(false) @map("is_system_template")
+  companyId        String?             @map("company_id")
+  company          Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt        DateTime            @default(now()) @map("created_at")
 
   @@map("smart_policy_templates")
 }

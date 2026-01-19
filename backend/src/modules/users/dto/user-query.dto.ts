@@ -32,12 +32,12 @@ export class UserQueryDto {
 
   @ApiProperty({ description: 'معرف الفرع', required: false })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   branchId?: string;
 
   @ApiProperty({ description: 'معرف القسم', required: false })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   departmentId?: string;
 
   @ApiProperty({ description: 'رقم الصفحة', default: 1 })
