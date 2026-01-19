@@ -132,7 +132,7 @@ export class SettingsService {
     return this.prisma.holiday.findMany({
       where,
       include: {
-        assignments: true,
+        holidayAssignments: true,
       },
       orderBy: { date: 'asc' },
     });

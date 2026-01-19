@@ -161,7 +161,7 @@ export class UsersService {
           faceData: { select: { faceImage: true, registeredAt: true } },
           nationality: true,
           isSaudi: true,
-          costCenter: { select: { id: true, nameAr: true, code: true } },
+          costCenter: { select: { id: true, name_ar: true, code: true } },
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
