@@ -53,7 +53,7 @@ export class AiManagerService {
                     date: { gte: thirtyDaysAgo },
                 },
             }),
-            this.prisma.task.findMany({
+            this.prisma.tasks.findMany({
                 where: {
                     assignee: { companyId },
                     updatedAt: { gte: thirtyDaysAgo },
@@ -222,7 +222,7 @@ export class AiManagerService {
             }
 
             // 2. عدد المهام الكبير
-            const activeTasks = await this.prisma.task.count({
+            const activeTasks = await this.prisma.tasks.count({
                 where: {
                     assigneeId: emp.id,
                     status: { notIn: ['COMPLETED', 'CANCELLED'] },

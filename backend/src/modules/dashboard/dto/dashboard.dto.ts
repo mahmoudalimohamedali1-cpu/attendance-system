@@ -47,6 +47,20 @@ export class DashboardTrendsDto {
     @ApiProperty() otHours: number[];
 }
 
+export class DashboardMudadMetricsDto {
+    @ApiProperty() totalSubmissions: number;
+    @ApiProperty() pendingCount: number;
+    @ApiProperty() preparedCount: number;
+    @ApiProperty() submittedCount: number;
+    @ApiProperty() acceptedCount: number;
+    @ApiProperty() rejectedCount: number;
+    @ApiProperty() resubmitRequiredCount: number;
+    @ApiProperty() totalAmount: number;
+    @ApiProperty() complianceRate: number; // percentage of accepted/total
+    @ApiProperty({ required: false }) lastSubmissionDate?: Date;
+    @ApiProperty({ required: false }) nextDueDate?: Date;
+}
+
 // Role-based Dashboard Response
 export class RoleBasedDashboardDto {
     @ApiProperty() role: string;

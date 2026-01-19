@@ -522,10 +522,10 @@ ${events.join('\n')}`;
                 return '📋 **المهام:** غير مفعلة';
             }
             const [totalTasks, pendingTasks, completedTasks, overdueTasks] = await Promise.all([
-                this.prisma.task.count({ where: { companyId } }),
-                this.prisma.task.count({ where: { companyId, status: 'TODO' } }),
-                this.prisma.task.count({ where: { companyId, status: 'COMPLETED' } }),
-                this.prisma.task.count({
+                this.prisma.tasks.count({ where: { companyId } }),
+                this.prisma.tasks.count({ where: { companyId, status: 'TODO' } }),
+                this.prisma.tasks.count({ where: { companyId, status: 'COMPLETED' } }),
+                this.prisma.tasks.count({
                     where: {
                         companyId,
                         status: { notIn: ['COMPLETED', 'CANCELLED'] },

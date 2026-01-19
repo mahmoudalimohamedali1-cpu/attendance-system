@@ -10,6 +10,7 @@ import {
     DashboardHealthDto,
     DashboardExceptionsDto,
     DashboardTrendsDto,
+    DashboardMudadMetricsDto,
     RoleBasedDashboardDto,
     ROLE_VISIBILITY,
     filterByRole
@@ -139,5 +140,16 @@ export class DashboardController {
         @CurrentUser('companyId') companyId: string,
     ): Promise<{ totalActive: number; newThisMonth: number; onLeaveToday: number; pendingApprovals: number }> {
         return this.service.getUsersQuickStats(companyId);
+    }
+
+    @Get('mudad-metrics')
+    @Roles('ADMIN', 'HR', 'FINANCE')
+    @ApiOperation({ summary: 'MUDAD Compliance Metrics' })
+    @ApiQuery({ name: 'year', type: Number, required: false, example: 2025 })
+    async getMudadMetrics(
+        @CurrentUser('companyId') companyId: string,
+        @Query('year') year?: string,
+    ): Promise<DashboardMudadMetricsDto> {
+        return this.service.getMudadMetrics(companyId, year ? parseInt(year) : undefined);
     }
 }

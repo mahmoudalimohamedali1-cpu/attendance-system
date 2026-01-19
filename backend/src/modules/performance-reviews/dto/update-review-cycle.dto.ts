@@ -1,6 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { IsOptional, IsEnum } from 'class-validator';
-import { PerformanceReviewCycleStatus } from '@prisma/client';
+import { PerformanceReviewCycleStatus } from '../../../shared/enums';
 import { CreateReviewCycleDto } from './create-review-cycle.dto';
 
 export class UpdateReviewCycleDto extends PartialType(CreateReviewCycleDto) {

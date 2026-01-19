@@ -1,0 +1,4350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model advance_requests {
+  id                                                String           @id
+  user_id                                           String
+  type                                              AdvanceType
+  amount                                            Decimal          @db.Decimal(10, 2)
+  start_date                                        DateTime         @db.Date
+  end_date                                          DateTime         @db.Date
+  period_months                                     Int
+  monthly_deduction                                 Decimal          @db.Decimal(10, 2)
+  notes                                             String?          @db.VarChar(500)
+  attachments                                       Json?
+  status                                            String           @default("PENDING")
+  current_step                                      ApprovalStep     @default(MANAGER)
+  manager_approver_id                               String?
+  manager_decision                                  ApprovalDecision @default(PENDING)
+  manager_decision_at                               DateTime?
+  manager_notes                                     String?          @db.VarChar(500)
+  hr_approver_id                                    String?
+  hr_decision                                       ApprovalDecision @default(PENDING)
+  hr_decision_at                                    DateTime?
+  hr_decision_notes                                 String?          @db.VarChar(500)
+  approved_amount                                   Decimal?         @db.Decimal(10, 2)
+  approved_monthly_deduction                        Decimal?         @db.Decimal(10, 2)
+  created_at                                        DateTime         @default(now())
+  updated_at                                        DateTime
+  company_id                                        String?
+  approval_chain                                    Json?
+  ceo_approver_id                                   String?
+  ceo_decision                                      ApprovalDecision @default(PENDING)
+  ceo_decision_at                                   DateTime?
+  ceo_decision_notes                                String?          @db.VarChar(500)
+  finance_approver_id                               String?
+  finance_decision                                  ApprovalDecision @default(PENDING)
+  finance_decision_at                               DateTime?
+  finance_decision_notes                            String?          @db.VarChar(500)
+  users_advance_requests_ceo_approver_idTousers     users?           @relation("advance_requests_ceo_approver_idTousers", fields: [ceo_approver_id], references: [id])
+  companies                                         companies?       @relation(fields: [company_id], references: [id])
+  users_advance_requests_finance_approver_idTousers users?           @relation("advance_requests_finance_approver_idTousers", fields: [finance_approver_id], references: [id])
+  users_advance_requests_hr_approver_idTousers      users?           @relation("advance_requests_hr_approver_idTousers", fields: [hr_approver_id], references: [id])
+  users_advance_requests_manager_approver_idTousers users?           @relation("advance_requests_manager_approver_idTousers", fields: [manager_approver_id], references: [id])
+  users_advance_requests_user_idTousers             users            @relation("advance_requests_user_idTousers", fields: [user_id], references: [id])
+  loan_payments                                     loan_payments[]
+
+  @@index([status, created_at])
+  @@index([user_id, status])
+}
+
+model approval_chain_configs {
+  id           String              @id
+  company_id   String
+  request_type ApprovalRequestType
+  min_amount   Decimal?            @db.Decimal(12, 2)
+  max_amount   Decimal?            @db.Decimal(12, 2)
+  min_days     Int?
+  max_days     Int?
+  chain        Json
+  name         String              @db.VarChar(100)
+  description  String?             @db.VarChar(500)
+  priority     Int                 @default(0)
+  is_active    Boolean             @default(true)
+  created_at   DateTime            @default(now())
+  updated_at   DateTime
+  companies    companies           @relation(fields: [company_id], references: [id])
+
+  @@index([company_id, request_type, is_active])
+}
+
+model approval_logs {
+  id           String     @id
+  request_type String
+  request_id   String
+  step         String
+  decision     String
+  notes        String?    @db.VarChar(500)
+  by_user_id   String
+  created_at   DateTime   @default(now())
+  company_id   String?
+  users        users      @relation(fields: [by_user_id], references: [id])
+  companies    companies? @relation(fields: [company_id], references: [id])
+
+  @@index([by_user_id])
+  @@index([request_type, request_id])
+}
+
+model attendances {
+  id                        String                 @id
+  user_id                   String
+  branch_id                 String
+  date                      DateTime               @db.Date
+  check_in_time             DateTime?
+  check_out_time            DateTime?
+  check_in_latitude         Decimal?               @db.Decimal(10, 8)
+  check_in_longitude        Decimal?               @db.Decimal(11, 8)
+  check_in_distance         Int?
+  check_out_latitude        Decimal?               @db.Decimal(10, 8)
+  check_out_longitude       Decimal?               @db.Decimal(11, 8)
+  check_out_distance        Int?
+  status                    AttendanceStatus       @default(ABSENT)
+  late_minutes              Int                    @default(0)
+  early_leave_minutes       Int                    @default(0)
+  working_minutes           Int                    @default(0)
+  overtime_minutes          Int                    @default(0)
+  notes                     String?
+  is_work_from_home         Boolean                @default(false)
+  is_mock_location          Boolean                @default(false)
+  device_info               String?
+  created_at                DateTime               @default(now())
+  updated_at                DateTime
+  check_in_face_confidence  Float?
+  check_in_face_verified    Boolean                @default(false)
+  check_out_face_confidence Float?
+  check_out_face_verified   Boolean                @default(false)
+  company_id                String?
+  branches                  branches               @relation(fields: [branch_id], references: [id])
+  companies                 companies?             @relation(fields: [company_id], references: [id])
+  users                     users                  @relation(fields: [user_id], references: [id])
+  geofence_exit_events      geofence_exit_events[]
+
+  @@unique([user_id, date])
+  @@index([branch_id, date])
+  @@index([company_id, date])
+  @@index([user_id, date])
+}
+
+model audit_logs {
+  id          String      @id
+  user_id     String?
+  action      AuditAction
+  entity      String
+  entity_id   String?
+  old_value   Json?
+  new_value   Json?
+  description String?
+  ip_address  String?
+  user_agent  String?
+  created_at  DateTime    @default(now())
+  company_id  String?
+  companies   companies?  @relation(fields: [company_id], references: [id])
+  users       users?      @relation(fields: [user_id], references: [id])
+
+  @@index([company_id, created_at])
+  @@index([created_at])
+  @@index([entity, entity_id])
+  @@index([user_id])
+}
+
+model automation_logs {
+  id               String           @id
+  automation_id    String
+  task_id          String
+  trigger          String
+  action           String
+  success          Boolean          @default(true)
+  error            String?
+  executed_at      DateTime         @default(now())
+  task_automations task_automations @relation(fields: [automation_id], references: [id], onDelete: Cascade)
+
+  @@index([automation_id])
+  @@index([task_id])
+}
+
+model branches {
+  id                     String           @id
+  name                   String
+  name_en                String?
+  address                String?
+  latitude               Decimal          @db.Decimal(10, 8)
+  longitude              Decimal          @db.Decimal(11, 8)
+  geofence_radius        Int              @default(100)
+  timezone               String           @default("Asia/Riyadh")
+  is_active              Boolean          @default(true)
+  work_start_time        String           @default("09:00")
+  work_end_time          String           @default("17:00")
+  late_grace_period      Int              @default(10)
+  early_check_in_period  Int              @default(15)
+  early_check_out_period Int              @default(0)
+  working_days           String           @default("1,2,3,4,5")
+  created_at             DateTime         @default(now())
+  updated_at             DateTime
+  company_id             String?
+  attendances            attendances[]
+  companies              companies?       @relation(fields: [company_id], references: [id])
+  custody_items          custody_items[]
+  departments            departments[]
+  policies               policies[]
+  users                  users[]
+  work_schedules         work_schedules[]
+
+  @@unique([company_id, name])
+}
+
+model calibration_adjustments {
+  id                   String               @id
+  session_id           String
+  result_id            String
+  old_score            Decimal              @db.Decimal(5, 2)
+  new_score            Decimal              @db.Decimal(5, 2)
+  old_band             RatingBand
+  new_band             RatingBand
+  reason               String
+  adjusted_by          String
+  adjusted_at          DateTime             @default(now())
+  final_results        final_results        @relation(fields: [result_id], references: [id])
+  calibration_sessions calibration_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+}
+
+model calibration_sessions {
+  id                        String                    @id
+  cycle_id                  String
+  name                      String
+  status                    CalibrationStatus         @default(DRAFT)
+  scheduled_at              DateTime?
+  completed_at              DateTime?
+  created_at                DateTime                  @default(now())
+  updated_at                DateTime
+  calibration_adjustments   calibration_adjustments[]
+  performance_review_cycles performance_review_cycles @relation(fields: [cycle_id], references: [id])
+
+  @@index([cycle_id])
+}
+
+model career_path_levels {
+  id                    String       @id
+  path_id               String
+  level                 Int
+  title                 String
+  title_en              String?
+  min_experience_years  Int?
+  required_skills       Json?
+  required_competencies Json?
+  salary_range_min      Decimal?     @db.Decimal(10, 2)
+  salary_range_max      Decimal?     @db.Decimal(10, 2)
+  created_at            DateTime     @default(now())
+  updated_at            DateTime
+  career_paths          career_paths @relation(fields: [path_id], references: [id], onDelete: Cascade)
+
+  @@unique([path_id, level])
+}
+
+model career_paths {
+  id                 String               @id
+  company_id         String
+  name               String
+  name_en            String?
+  description        String?
+  is_active          Boolean              @default(true)
+  created_at         DateTime             @default(now())
+  updated_at         DateTime
+  career_path_levels career_path_levels[]
+  companies          companies            @relation(fields: [company_id], references: [id])
+
+  @@index([company_id])
+}
+
+model case_attachments {
+  id                 String             @id
+  case_id            String
+  uploader_user_id   String
+  file_url           String
+  file_name          String
+  file_type          String
+  created_at         DateTime           @default(now())
+  disciplinary_cases disciplinary_cases @relation(fields: [case_id], references: [id])
+}
+
+model case_events {
+  id                 String             @id
+  case_id            String
+  actor_user_id      String?
+  event_type         CaseEventType
+  message            String?
+  metadata           Json?
+  created_at         DateTime           @default(now())
+  disciplinary_cases disciplinary_cases @relation(fields: [case_id], references: [id])
+
+  @@index([case_id, created_at])
+}
+
+model case_minutes {
+  id                 String             @id
+  case_id            String
+  session_no         Int
+  minutes_text       String?
+  minutes_file_url   String?
+  created_by_hr_id   String
+  created_at         DateTime           @default(now())
+  disciplinary_cases disciplinary_cases @relation(fields: [case_id], references: [id])
+}
+
+model comment_reactions {
+  id            String        @id
+  comment_id    String
+  user_id       String
+  emoji         String
+  created_at    DateTime      @default(now())
+  task_comments task_comments @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  users         users         @relation(fields: [user_id], references: [id])
+
+  @@unique([comment_id, user_id, emoji])
+  @@index([comment_id])
+}
+
+model companies {
+  id                              String                            @id
+  name                            String                            @unique
+  name_en                         String?
+  cr_number                       String?                           @unique
+  tax_id                          String?                           @unique
+  logo                            String?
+  address                         String?
+  phone                           String?
+  email                           String?
+  website                         String?
+  created_at                      DateTime                          @default(now())
+  updated_at                      DateTime
+  advance_requests                advance_requests[]
+  approval_chain_configs          approval_chain_configs[]
+  approval_logs                   approval_logs[]
+  attendances                     attendances[]
+  audit_logs                      audit_logs[]
+  branches                        branches[]
+  career_paths                    career_paths[]
+  company_bank_accounts           company_bank_accounts[]
+  company_configs                 company_configs?
+  company_disciplinary_policies   company_disciplinary_policies?
+  competency_frameworks           competency_frameworks[]
+  core_values                     core_values[]
+  cost_center_allocations         cost_center_allocations[]
+  cost_center_budgets             cost_center_budgets[]
+  cost_centers                    cost_centers[]
+  custody_assignments             custody_assignments[]
+  custody_categories              custody_categories[]
+  custody_items                   custody_items[]
+  custody_maintenances            custody_maintenances[]
+  custody_returns                 custody_returns[]
+  custody_transfers               custody_transfers[]
+  departments                     departments[]
+  development_plans               development_plans[]
+  disciplinary_cases              disciplinary_cases[]
+  employee_location_logs          employee_location_logs[]
+  feedback_question_sets          feedback_question_sets[]
+  geofence_exit_events            geofence_exit_events[]
+  goals                           goals[]
+  gosi_configs                    gosi_configs[]
+  holidays                        holidays[]
+  job_families                    job_families[]
+  job_titles                      job_titles[]
+  kpi_definitions                 kpi_definitions[]
+  leave_balances                  leave_balances[]
+  leave_requests                  leave_requests[]
+  leave_type_configs              leave_type_configs[]
+  letter_requests                 letter_requests[]
+  mudad_submissions               mudad_submissions[]
+  notifications                   notifications[]
+  onboarding_processes            onboarding_processes[]
+  onboarding_templates            onboarding_templates[]
+  payroll_adjustments             payroll_adjustments[]
+  payroll_periods                 payroll_periods[]
+  payroll_runs                    payroll_runs[]
+  payroll_settings                payroll_settings?
+  payslips                        payslips[]
+  performance_competency_models   performance_competency_models[]
+  performance_review_cycles       performance_review_cycles[]
+  permission_audit_logs           permission_audit_logs[]
+  policies                        policies[]
+  raise_requests                  raise_requests[]
+  recognitions                    recognitions[]
+  retro_pays                      retro_pays[]
+  salary_components               salary_components[]
+  salary_structures               salary_structures[]
+  smart_policies                  smart_policies[]
+  smart_policy_analytics          smart_policy_analytics[]
+  smart_policy_exceptions         smart_policy_exceptions[]
+  smart_policy_retro_applications smart_policy_retro_applications[]
+  submission_status_logs          submission_status_logs[]
+  succession_plans                succession_plans[]
+  suspicious_attempts             suspicious_attempts[]
+  system_settings                 system_settings[]
+  task_automations                task_automations[]
+  task_categories                 task_categories[]
+  task_templates                  task_templates[]
+  tasks                           tasks[]
+  user_permissions                user_permissions[]
+  users                           users[]
+  work_from_home                  work_from_home[]
+  work_schedules                  work_schedules[]
+  wps_submissions                 wps_submissions[]
+}
+
+model company_bank_accounts {
+  id              String    @id
+  company_id      String
+  bank_name       String
+  bank_code       String
+  iban            String
+  account_name    String
+  swift_code      String?
+  is_primary      Boolean   @default(false)
+  is_active       Boolean   @default(true)
+  mol_id          String?
+  wps_participant String?
+  account_type    String    @default("CURRENT")
+  currency        String    @default("SAR")
+  notes           String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime
+  companies       companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@unique([company_id, iban])
+  @@index([company_id, is_active])
+  @@index([company_id, is_primary])
+}
+
+model company_configs {
+  id              String         @id
+  company_id      String         @unique
+  company_type    CompanyType    @default(HYBRID)
+  philosophy      EvalPhilosophy @default(BALANCED)
+  enabled_modules Json           @default("{}")
+  default_weights Json           @default("{}")
+  policies        Json           @default("{}")
+  ui_config       Json           @default("{}")
+  created_at      DateTime       @default(now())
+  updated_at      DateTime
+  companies       companies      @relation(fields: [company_id], references: [id])
+}
+
+model company_disciplinary_policies {
+  id                                String              @id
+  company_id                        String              @unique
+  incident_max_age_days             Int                 @default(30)
+  decision_deadline_days            Int                 @default(30)
+  objection_window_days             Int                 @default(15)
+  allow_retrospective_incidents     Boolean             @default(false)
+  auto_apply_to_open_payroll_period Boolean             @default(true)
+  deduction_base_policy             DeductionBasePolicy @default(BASIC_FIXED)
+  created_at                        DateTime            @default(now())
+  updated_at                        DateTime
+  companies                         companies           @relation(fields: [company_id], references: [id])
+}
+
+model competencies {
+  id                    String                @id
+  framework_id          String
+  name                  String
+  name_en               String?
+  description           String?
+  category              CompetencyCategory    @default(CORE)
+  level_1_desc          String?
+  level_2_desc          String?
+  level_3_desc          String?
+  level_4_desc          String?
+  level_5_desc          String?
+  behavior_examples     Json?
+  is_active             Boolean               @default(true)
+  sort_order            Int                   @default(0)
+  created_at            DateTime              @default(now())
+  updated_at            DateTime
+  competency_frameworks competency_frameworks @relation(fields: [framework_id], references: [id], onDelete: Cascade)
+  competency_ratings    competency_ratings[]
+
+  @@index([framework_id, category])
+}
+
+model competency_frameworks {
+  id           String         @id
+  company_id   String
+  name         String
+  name_en      String?
+  description  String?
+  is_active    Boolean        @default(true)
+  created_at   DateTime       @default(now())
+  updated_at   DateTime
+  competencies competencies[]
+  companies    companies      @relation(fields: [company_id], references: [id])
+
+  @@index([company_id])
+}
+
+model competency_ratings {
+  id                  String              @id
+  review_id           String
+  competency_id       String
+  self_rating         Int?
+  self_comments       String?
+  self_evidence       Json?
+  manager_rating      Int?
+  manager_comments    String?
+  final_rating        Int?
+  created_at          DateTime            @default(now())
+  updated_at          DateTime
+  competencies        competencies        @relation(fields: [competency_id], references: [id])
+  performance_reviews performance_reviews @relation(fields: [review_id], references: [id], onDelete: Cascade)
+
+  @@unique([review_id, competency_id])
+}
+
+model conduct_flags {
+  id                        String                    @id
+  cycle_id                  String
+  employee_id               String
+  type                      String
+  severity                  ConductSeverity
+  notes                     String?
+  created_by                String
+  created_at                DateTime                  @default(now())
+  performance_review_cycles performance_review_cycles @relation(fields: [cycle_id], references: [id])
+
+  @@index([cycle_id, employee_id])
+}
+
+model contracts {
+  id                     String         @id
+  user_id                String
+  start_date             DateTime       @db.Date
+  end_date               DateTime?      @db.Date
+  salary_cycle           String         @default("MONTHLY")
+  created_at             DateTime       @default(now())
+  updated_at             DateTime
+  contract_number        String?        @unique
+  document_url           String?
+  previous_contract_id   String?
+  probation_end_date     DateTime?      @db.Date
+  renewal_count          Int            @default(0)
+  terminated_at          DateTime?
+  terminated_by          String?
+  termination_reason     String?
+  type                   ContractType   @default(PERMANENT)
+  status                 ContractStatus @default(DRAFT)
+  additional_terms       String?
+  annual_leave_days      Int            @default(21)
+  basic_salary           Decimal?       @db.Decimal(10, 2)
+  contract_job_title     String?
+  employee_signature     Boolean        @default(false)
+  employee_signed_at     DateTime?
+  employer_signature     Boolean        @default(false)
+  employer_signed_at     DateTime?
+  housing_allowance      Decimal?       @db.Decimal(10, 2)
+  notes                  String?
+  notice_period_days     Int            @default(30)
+  other_allowances       Decimal?       @db.Decimal(10, 2)
+  qiwa_auth_date         DateTime?
+  qiwa_contract_id       String?        @unique
+  qiwa_last_sync         DateTime?
+  qiwa_reject_reason     String?
+  qiwa_status            QiwaAuthStatus @default(NOT_SUBMITTED)
+  signed_by_user_id      String?
+  total_salary           Decimal?       @db.Decimal(10, 2)
+  transport_allowance    Decimal?       @db.Decimal(10, 2)
+  work_location          String?
+  working_hours_per_week Int            @default(48)
+  users                  users          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([end_date])
+  @@index([qiwa_status])
+  @@index([user_id, status])
+}
+
+model core_values {
+  id          String    @id
+  company_id  String
+  name        String
+  name_en     String?
+  description String?
+  icon        String?
+  color       String?
+  is_active   Boolean   @default(true)
+  sort_order  Int       @default(0)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime
+  companies   companies @relation(fields: [company_id], references: [id])
+
+  @@index([company_id])
+}
+
+model cost_center_allocations {
+  id                                                                        String        @id
+  company_id                                                                String?
+  user_id                                                                   String
+  cost_center_id                                                            String
+  primary_cost_center_id                                                    String?
+  percentage                                                                Decimal       @db.Decimal(5, 2)
+  effective_from                                                            DateTime      @default(now())
+  effective_to                                                              DateTime?
+  allocation_type                                                           String        @default("POSITION")
+  reason                                                                    String?
+  is_active                                                                 Boolean       @default(true)
+  created_at                                                                DateTime      @default(now())
+  updated_at                                                                DateTime
+  companies                                                                 companies?    @relation(fields: [company_id], references: [id])
+  cost_centers_cost_center_allocations_cost_center_idTocost_centers         cost_centers  @relation("cost_center_allocations_cost_center_idTocost_centers", fields: [cost_center_id], references: [id])
+  cost_centers_cost_center_allocations_primary_cost_center_idTocost_centers cost_centers? @relation("cost_center_allocations_primary_cost_center_idTocost_centers", fields: [primary_cost_center_id], references: [id])
+
+  @@unique([user_id, cost_center_id, effective_from])
+  @@index([cost_center_id])
+  @@index([effective_from, effective_to])
+  @@index([user_id, is_active])
+}
+
+model cost_center_budgets {
+  id             String       @id
+  company_id     String?
+  cost_center_id String
+  year           Int
+  month          Int?
+  quarter        Int?
+  budget_amount  Decimal      @db.Decimal(12, 2)
+  actual_amount  Decimal      @default(0) @db.Decimal(12, 2)
+  variance       Decimal      @default(0) @db.Decimal(12, 2)
+  notes          String?
+  is_locked      Boolean      @default(false)
+  locked_at      DateTime?
+  locked_by      String?
+  created_at     DateTime     @default(now())
+  updated_at     DateTime
+  companies      companies?   @relation(fields: [company_id], references: [id])
+  cost_centers   cost_centers @relation(fields: [cost_center_id], references: [id])
+
+  @@unique([cost_center_id, year, month])
+  @@index([cost_center_id, year])
+}
+
+model cost_centers {
+  id                                                                                   String                    @id
+  code                                                                                 String
+  description                                                                          String?
+  created_at                                                                           DateTime                  @default(now())
+  updated_at                                                                           DateTime
+  company_id                                                                           String?
+  effective_from                                                                       DateTime                  @default(now())
+  effective_to                                                                         DateTime?
+  is_allow_overbudget                                                                  Boolean                   @default(false)
+  level                                                                                Int                       @default(1)
+  manager_id                                                                           String?
+  name_ar                                                                              String
+  name_en                                                                              String?
+  parent_id                                                                            String?
+  path                                                                                 String?
+  status                                                                               String                    @default("ACTIVE")
+  type                                                                                 String                    @default("OPERATING")
+  version                                                                              Int                       @default(1)
+  cost_center_allocations_cost_center_allocations_cost_center_idTocost_centers         cost_center_allocations[] @relation("cost_center_allocations_cost_center_idTocost_centers")
+  cost_center_allocations_cost_center_allocations_primary_cost_center_idTocost_centers cost_center_allocations[] @relation("cost_center_allocations_primary_cost_center_idTocost_centers")
+  cost_center_budgets                                                                  cost_center_budgets[]
+  companies                                                                            companies?                @relation(fields: [company_id], references: [id])
+  cost_centers                                                                         cost_centers?             @relation("cost_centersTocost_centers", fields: [parent_id], references: [id])
+  other_cost_centers                                                                   cost_centers[]            @relation("cost_centersTocost_centers")
+  payslip_lines                                                                        payslip_lines[]
+  users                                                                                users[]
+
+  @@unique([company_id, code, version])
+  @@index([company_id, status])
+  @@index([effective_from, effective_to])
+  @@index([parent_id])
+}
+
+model custody_assignments {
+  id                                              String                  @id
+  company_id                                      String
+  custody_item_id                                 String
+  employee_id                                     String
+  assigned_at                                     DateTime                @default(now())
+  expected_return                                 DateTime?
+  actual_return                                   DateTime?
+  status                                          CustodyAssignmentStatus @default(PENDING)
+  condition_on_assign                             CustodyCondition?
+  condition_on_return                             CustodyCondition?
+  assigned_by_id                                  String
+  approved_by_id                                  String?
+  approved_at                                     DateTime?
+  notes                                           String?
+  employee_signature                              String?
+  signature_date                                  DateTime?
+  attachments                                     Json?                   @default("[]")
+  approval_chain                                  Json?
+  created_at                                      DateTime                @default(now())
+  updated_at                                      DateTime
+  users_custody_assignments_approved_by_idTousers users?                  @relation("custody_assignments_approved_by_idTousers", fields: [approved_by_id], references: [id])
+  users_custody_assignments_assigned_by_idTousers users                   @relation("custody_assignments_assigned_by_idTousers", fields: [assigned_by_id], references: [id])
+  companies                                       companies               @relation(fields: [company_id], references: [id])
+  custody_items                                   custody_items           @relation(fields: [custody_item_id], references: [id])
+  users_custody_assignments_employee_idTousers    users                   @relation("custody_assignments_employee_idTousers", fields: [employee_id], references: [id])
+  custody_returns                                 custody_returns[]
+
+  @@index([company_id, status])
+  @@index([custody_item_id])
+  @@index([employee_id])
+}
+
+model custody_categories {
+  id                     String          @id
+  company_id             String
+  name                   String
+  name_en                String?
+  description            String?
+  icon                   String?
+  requires_approval      Boolean         @default(true)
+  requires_serial_number Boolean         @default(true)
+  depreciation_years     Int?
+  is_active              Boolean         @default(true)
+  created_at             DateTime        @default(now())
+  updated_at             DateTime
+  companies              companies       @relation(fields: [company_id], references: [id])
+  custody_items          custody_items[]
+
+  @@unique([company_id, name])
+}
+
+model custody_items {
+  id                   String                 @id
+  company_id           String
+  category_id          String
+  code                 String
+  name                 String
+  name_en              String?
+  description          String?
+  serial_number        String?
+  model                String?
+  brand                String?
+  barcode              String?
+  qr_code              String?
+  purchase_date        DateTime?
+  purchase_price       Decimal?               @db.Decimal(12, 2)
+  warranty_expiry      DateTime?
+  vendor               String?
+  invoice_number       String?
+  status               CustodyItemStatus      @default(AVAILABLE)
+  condition            CustodyCondition       @default(NEW)
+  current_location     String?
+  notes                String?
+  image_url            String?
+  attachments          Json?                  @default("[]")
+  branch_id            String?
+  current_assignee_id  String?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime
+  custody_assignments  custody_assignments[]
+  branches             branches?              @relation(fields: [branch_id], references: [id])
+  custody_categories   custody_categories     @relation(fields: [category_id], references: [id])
+  companies            companies              @relation(fields: [company_id], references: [id])
+  custody_maintenances custody_maintenances[]
+  custody_returns      custody_returns[]
+  custody_transfers    custody_transfers[]
+
+  @@unique([company_id, code])
+  @@index([category_id])
+  @@index([company_id, status])
+  @@index([current_assignee_id])
+}
+
+model custody_maintenances {
+  id              String                   @id
+  company_id      String
+  custody_item_id String
+  type            MaintenanceType
+  description     String
+  reported_at     DateTime                 @default(now())
+  reported_by_id  String
+  started_at      DateTime?
+  completed_at    DateTime?
+  status          CustodyMaintenanceStatus @default(PENDING)
+  estimated_cost  Decimal?                 @db.Decimal(12, 2)
+  actual_cost     Decimal?                 @db.Decimal(12, 2)
+  vendor          String?
+  vendor_contact  String?
+  vendor_email    String?
+  invoice_number  String?
+  result          String?
+  condition_after CustodyCondition?
+  attachments     Json?                    @default("[]")
+  created_at      DateTime                 @default(now())
+  updated_at      DateTime
+  companies       companies                @relation(fields: [company_id], references: [id])
+  custody_items   custody_items            @relation(fields: [custody_item_id], references: [id])
+  users           users                    @relation(fields: [reported_by_id], references: [id])
+
+  @@index([company_id, status])
+}
+
+model custody_returns {
+  id                                          String              @id
+  company_id                                  String
+  custody_item_id                             String
+  assignment_id                               String
+  returned_by_id                              String
+  return_date                                 DateTime            @default(now())
+  return_reason                               String?
+  condition_on_return                         CustodyCondition
+  status                                      CustodyReturnStatus @default(PENDING)
+  reviewed_by_id                              String?
+  reviewed_at                                 DateTime?
+  review_notes                                String?
+  damage_description                          String?
+  estimated_cost                              Decimal?            @db.Decimal(12, 2)
+  charge_employee                             Boolean             @default(false)
+  charged_to_payroll                          Boolean             @default(false)
+  payroll_deduction_id                        String?
+  attachments                                 Json?               @default("[]")
+  created_at                                  DateTime            @default(now())
+  updated_at                                  DateTime
+  custody_assignments                         custody_assignments @relation(fields: [assignment_id], references: [id])
+  companies                                   companies           @relation(fields: [company_id], references: [id])
+  custody_items                               custody_items       @relation(fields: [custody_item_id], references: [id])
+  users_custody_returns_returned_by_idTousers users               @relation("custody_returns_returned_by_idTousers", fields: [returned_by_id], references: [id])
+  users_custody_returns_reviewed_by_idTousers users?              @relation("custody_returns_reviewed_by_idTousers", fields: [reviewed_by_id], references: [id])
+
+  @@index([company_id, status])
+}
+
+model custody_transfers {
+  id                                              String                @id
+  company_id                                      String
+  custody_item_id                                 String
+  from_employee_id                                String
+  to_employee_id                                  String
+  transfer_date                                   DateTime              @default(now())
+  reason                                          String?
+  status                                          CustodyTransferStatus @default(PENDING)
+  initiated_by_id                                 String
+  approved_by_id                                  String?
+  approved_at                                     DateTime?
+  from_signature                                  String?
+  to_signature                                    String?
+  notes                                           String?
+  attachments                                     Json?                 @default("[]")
+  created_at                                      DateTime              @default(now())
+  updated_at                                      DateTime
+  users_custody_transfers_approved_by_idTousers   users?                @relation("custody_transfers_approved_by_idTousers", fields: [approved_by_id], references: [id])
+  companies                                       companies             @relation(fields: [company_id], references: [id])
+  custody_items                                   custody_items         @relation(fields: [custody_item_id], references: [id])
+  users_custody_transfers_from_employee_idTousers users                 @relation("custody_transfers_from_employee_idTousers", fields: [from_employee_id], references: [id])
+  users_custody_transfers_initiated_by_idTousers  users                 @relation("custody_transfers_initiated_by_idTousers", fields: [initiated_by_id], references: [id])
+  users_custody_transfers_to_employee_idTousers   users                 @relation("custody_transfers_to_employee_idTousers", fields: [to_employee_id], references: [id])
+
+  @@index([company_id, status])
+}
+
+model data_update_requests {
+  id                     String              @id
+  user_id                String
+  request_type           UpdateRequestType
+  status                 UpdateRequestStatus @default(PENDING)
+  reason                 String?
+  new_face_embedding     String?
+  new_face_image         String?
+  face_image_quality     Float?
+  new_device_id          String?
+  new_device_fingerprint String?
+  new_device_name        String?
+  new_device_model       String?
+  new_device_brand       String?
+  new_device_platform    DevicePlatform?
+  new_device_os_version  String?
+  new_device_app_version String?
+  reviewed_by            String?
+  reviewed_at            DateTime?
+  review_note            String?
+  rejection_reason       String?
+  old_device_id          String?
+  created_at             DateTime            @default(now())
+  updated_at             DateTime
+  new_data               Json?
+
+  @@index([status, created_at])
+  @@index([user_id, status])
+}
+
+model departments {
+  id              String     @id
+  name            String
+  name_en         String?
+  branch_id       String
+  work_start_time String?
+  work_end_time   String?
+  created_at      DateTime   @default(now())
+  updated_at      DateTime
+  company_id      String?
+  branches        branches   @relation(fields: [branch_id], references: [id])
+  companies       companies? @relation(fields: [company_id], references: [id])
+  policies        policies[]
+  users           users[]
+
+  @@unique([company_id, name])
+}
+
+model development_goals {
+  id                String                @id
+  plan_id           String
+  category          String
+  description       String
+  target_date       DateTime?             @db.Date
+  status            DevelopmentGoalStatus @default(NOT_STARTED)
+  actions           Json?
+  progress          Int                   @default(0)
+  completed_at      DateTime?
+  notes             String?
+  created_at        DateTime              @default(now())
+  updated_at        DateTime
+  development_plans development_plans     @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+
+  @@index([plan_id])
+}
+
+model development_plans {
+  id                   String               @id
+  company_id           String
+  employee_id          String
+  review_id            String?              @unique
+  year                 Int
+  ai_strengths_summary String?
+  ai_gap_analysis      String?
+  ai_recommendations   Json?
+  created_at           DateTime             @default(now())
+  updated_at           DateTime
+  development_goals    development_goals[]
+  companies            companies            @relation(fields: [company_id], references: [id])
+  performance_reviews  performance_reviews? @relation(fields: [review_id], references: [id])
+
+  @@unique([employee_id, year])
+  @@index([company_id, employee_id])
+}
+
+model device_access_logs {
+  id                  String              @id
+  device_id           String?
+  user_id             String
+  attempted_device_id String
+  action_type         String
+  is_success          Boolean
+  is_known_device     Boolean
+  device_info         String?
+  ip_address          String?
+  location            String?
+  failure_reason      String?
+  created_at          DateTime            @default(now())
+  registered_devices  registered_devices? @relation(fields: [device_id], references: [id])
+
+  @@index([attempted_device_id])
+  @@index([user_id, created_at])
+}
+
+model disciplinary_cases {
+  id                                          String                          @id
+  company_id                                  String
+  case_code                                   String
+  employee_id                                 String
+  manager_id                                  String
+  title                                       String
+  incident_date                               DateTime
+  incident_location                           String
+  involved_parties                            Json?
+  description                                 String
+  status                                      DisciplinaryStatus              @default(SUBMITTED_TO_HR)
+  stage                                       DisciplinaryStage               @default(MANAGER_REQUEST)
+  incident_max_age_days_snapshot              Int
+  decision_deadline_days_snapshot             Int
+  objection_window_days_snapshot              Int
+  allow_retrospective_snapshot                Boolean
+  deduction_base_policy_snapshot              DeductionBasePolicy
+  is_retrospective                            Boolean                         @default(false)
+  retrospective_reason                        String?
+  hr_initial_action                           String?
+  hr_initial_reason                           String?
+  official_investigation_opened_at            DateTime?
+  hearing_datetime                            DateTime?
+  hearing_location                            String?
+  decision_type                               DecisionType?
+  decision_reason                             String?
+  decision_created_at                         DateTime?
+  penalty_unit                                AdjustmentUnit?
+  penalty_value                               Decimal?                        @db.Decimal(10, 2)
+  penalty_effective_date                      DateTime?                       @db.Date
+  payroll_period_id                           String?
+  employee_ack_status                         String?
+  employee_ack_at                             DateTime?
+  objection_text                              String?
+  objection_submitted_at                      DateTime?
+  hr_after_objection_action                   String?
+  hr_after_objection_reason                   String?
+  finalized_at                                DateTime?
+  legal_hold                                  Boolean                         @default(false)
+  created_at                                  DateTime                        @default(now())
+  updated_at                                  DateTime
+  violation_type                              String?
+  case_attachments                            case_attachments[]
+  case_events                                 case_events[]
+  case_minutes                                case_minutes[]
+  companies                                   companies                       @relation(fields: [company_id], references: [id])
+  users_disciplinary_cases_employee_idTousers users                           @relation("disciplinary_cases_employee_idTousers", fields: [employee_id], references: [id])
+  users_disciplinary_cases_manager_idTousers  users                           @relation("disciplinary_cases_manager_idTousers", fields: [manager_id], references: [id])
+  payroll_periods                             payroll_periods?                @relation(fields: [payroll_period_id], references: [id])
+  employee_disciplinary_records               employee_disciplinary_records[]
+  payroll_adjustments                         payroll_adjustments[]
+
+  @@unique([company_id, case_code])
+  @@index([company_id, employee_id])
+  @@index([company_id, status])
+  @@index([employee_id])
+}
+
+model employee_bank_accounts {
+  id                  String    @id
+  user_id             String
+  iban                String
+  bank_name           String
+  bank_code           String?
+  is_primary          Boolean   @default(false)
+  verified_at         DateTime?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime
+  account_holder_name String?
+  is_verified         Boolean   @default(false)
+  swift_code          String?
+  verified_by         String?
+  users               users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, iban])
+  @@index([user_id, is_primary])
+}
+
+model employee_disciplinary_records {
+  id                 String             @id
+  employee_id        String
+  case_id            String
+  decision_type      DecisionType
+  reason             String?
+  effective_date     DateTime
+  penalty_metadata   Json?
+  created_at         DateTime           @default(now())
+  disciplinary_cases disciplinary_cases @relation(fields: [case_id], references: [id])
+  users              users              @relation(fields: [employee_id], references: [id])
+}
+
+model employee_documents {
+  id                String       @id
+  company_id        String
+  user_id           String
+  type              DocumentType
+  title             String
+  title_ar          String?
+  description       String?
+  file_path         String
+  file_type         String
+  file_size         Int
+  original_name     String?
+  document_number   String?
+  issue_date        DateTime?    @db.Date
+  expiry_date       DateTime?    @db.Date
+  issuing_authority String?
+  is_verified       Boolean      @default(false)
+  verified_by_id    String?
+  verified_at       DateTime?
+  uploaded_by_id    String
+  notes             String?
+  created_at        DateTime     @default(now())
+  updated_at        DateTime
+  users             users        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id, type])
+  @@index([expiry_date])
+  @@index([user_id])
+}
+
+model employee_location_logs {
+  id                   String     @id
+  company_id           String?
+  user_id              String
+  latitude             Decimal    @db.Decimal(10, 8)
+  longitude            Decimal    @db.Decimal(11, 8)
+  accuracy             Float?
+  is_inside_geofence   Boolean    @default(true)
+  distance_from_branch Int?
+  battery_level        Float?
+  device_info          String?
+  created_at           DateTime   @default(now())
+  companies            companies? @relation(fields: [company_id], references: [id])
+  users                users      @relation(fields: [user_id], references: [id])
+
+  @@index([company_id, created_at])
+  @@index([user_id, created_at])
+  @@index([user_id, is_inside_geofence])
+}
+
+model employee_salary_assignments {
+  id                String            @id
+  employee_id       String
+  structure_id      String
+  base_salary       Decimal           @db.Decimal(10, 2)
+  effective_date    DateTime          @db.Date
+  end_date          DateTime?         @db.Date
+  is_active         Boolean           @default(true)
+  created_at        DateTime          @default(now())
+  updated_at        DateTime
+  users             users             @relation(fields: [employee_id], references: [id])
+  salary_structures salary_structures @relation(fields: [structure_id], references: [id])
+}
+
+model evaluation_templates {
+  id           String      @id
+  company_id   String?
+  code         String      @unique
+  company_type CompanyType
+  name         String
+  name_ar      String?
+  version      Int         @default(1)
+  modules      Json
+  weights      Json
+  policies     Json
+  ui_config    Json
+  is_active    Boolean     @default(true)
+  is_default   Boolean     @default(false)
+  created_at   DateTime    @default(now())
+  updated_at   DateTime
+}
+
+model face_data {
+  id                 String    @id
+  user_id            String    @unique
+  face_embedding     String
+  face_image         String?
+  registered_at      DateTime  @default(now())
+  last_verified_at   DateTime?
+  verification_count Int       @default(0)
+  image_quality      Float?
+  confidence         Float?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime
+  users              users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model face_verification_logs {
+  id                String   @id
+  user_id           String
+  verification_type String
+  is_success        Boolean
+  confidence        Float?
+  threshold         Float?
+  device_info       String?
+  ip_address        String?
+  attempt_image     String?
+  error_message     String?
+  created_at        DateTime @default(now())
+
+  @@index([user_id, created_at])
+}
+
+model feedback_question_sets {
+  id                 String               @id
+  company_id         String
+  name               String
+  name_ar            String?
+  version            Int                  @default(1)
+  is_active          Boolean              @default(true)
+  created_at         DateTime             @default(now())
+  updated_at         DateTime
+  companies          companies            @relation(fields: [company_id], references: [id])
+  feedback_questions feedback_questions[]
+
+  @@index([company_id])
+}
+
+model feedback_questions {
+  id                     String                  @id
+  set_id                 String
+  text                   String
+  text_ar                String?
+  type                   FeedbackQuestionType
+  required               Boolean                 @default(true)
+  order                  Int                     @default(0)
+  feedback_question_sets feedback_question_sets  @relation(fields: [set_id], references: [id], onDelete: Cascade)
+  upee_feedback_answers  upee_feedback_answers[]
+
+  @@index([set_id])
+}
+
+model feedback_requests {
+  id                  String                @id
+  review_id           String
+  requestor_id        String
+  provider_id         String
+  relationship_type   String
+  status              FeedbackRequestStatus @default(PENDING)
+  is_anonymous        Boolean               @default(true)
+  due_date            DateTime?
+  submitted_at        DateTime?
+  created_at          DateTime              @default(now())
+  updated_at          DateTime
+  performance_reviews performance_reviews   @relation(fields: [review_id], references: [id], onDelete: Cascade)
+  feedback_responses  feedback_responses[]
+
+  @@index([provider_id, status])
+  @@index([review_id])
+}
+
+model feedback_responses {
+  id                String            @id
+  request_id        String
+  question_id       String?
+  question_text     String
+  rating            Int?
+  comment           String?
+  sentiment_score   Decimal?          @db.Decimal(3, 2)
+  themes            Json?
+  created_at        DateTime          @default(now())
+  feedback_requests feedback_requests @relation(fields: [request_id], references: [id], onDelete: Cascade)
+
+  @@index([request_id])
+}
+
+model final_results {
+  id                        String                    @id
+  cycle_id                  String
+  employee_id               String
+  final_score               Decimal                   @db.Decimal(5, 2)
+  rating_band               RatingBand
+  status                    ResultStatus              @default(DRAFT)
+  blueprint_snapshot        Json
+  created_at                DateTime                  @default(now())
+  updated_at                DateTime
+  calibration_adjustments   calibration_adjustments[]
+  performance_review_cycles performance_review_cycles @relation(fields: [cycle_id], references: [id])
+
+  @@unique([cycle_id, employee_id])
+}
+
+model geofence_exit_events {
+  id                   String      @id
+  company_id           String?
+  user_id              String
+  attendance_id        String
+  exit_latitude        Decimal     @db.Decimal(10, 8)
+  exit_longitude       Decimal     @db.Decimal(11, 8)
+  distance_from_branch Int
+  exit_time            DateTime
+  return_time          DateTime?
+  return_latitude      Decimal?    @db.Decimal(10, 8)
+  return_longitude     Decimal?    @db.Decimal(11, 8)
+  duration_minutes     Int?
+  notification_sent    Boolean     @default(false)
+  created_at           DateTime    @default(now())
+  updated_at           DateTime
+  attendances          attendances @relation(fields: [attendance_id], references: [id])
+  companies            companies?  @relation(fields: [company_id], references: [id])
+  users                users       @relation(fields: [user_id], references: [id])
+
+  @@index([attendance_id])
+  @@index([company_id, exit_time])
+  @@index([user_id, exit_time])
+}
+
+model goal_check_ins {
+  id             String   @id
+  goal_id        String
+  user_id        String
+  previous_value Decimal  @db.Decimal(10, 2)
+  new_value      Decimal  @db.Decimal(10, 2)
+  status_update  String?
+  blockers       String?
+  next_steps     String?
+  confidence     Int?
+  created_at     DateTime @default(now())
+  goals          goals    @relation(fields: [goal_id], references: [id], onDelete: Cascade)
+
+  @@index([goal_id])
+}
+
+model goal_ratings {
+  id                  String              @id
+  review_id           String
+  goal_id             String
+  self_rating         Decimal?            @db.Decimal(3, 2)
+  self_comments       String?
+  manager_rating      Decimal?            @db.Decimal(3, 2)
+  manager_comments    String?
+  final_rating        Decimal?            @db.Decimal(3, 2)
+  weight              Int                 @default(100)
+  created_at          DateTime            @default(now())
+  updated_at          DateTime
+  goals               goals               @relation(fields: [goal_id], references: [id])
+  performance_reviews performance_reviews @relation(fields: [review_id], references: [id], onDelete: Cascade)
+
+  @@unique([review_id, goal_id])
+}
+
+model goals {
+  id                      String           @id
+  company_id              String
+  owner_id                String
+  manager_id              String?
+  type                    GoalType         @default(INDIVIDUAL)
+  status                  GoalStatus       @default(DRAFT)
+  title                   String
+  title_en                String?
+  description             String?
+  start_date              DateTime?        @db.Date
+  due_date                DateTime?        @db.Date
+  completed_at            DateTime?
+  target_value            Decimal?         @db.Decimal(10, 2)
+  current_value           Decimal?         @db.Decimal(10, 2)
+  unit                    String?
+  progress                Int              @default(0)
+  weight                  Int              @default(100)
+  category                String?
+  is_stretch              Boolean          @default(false)
+  parent_goal_id          String?
+  aligned_company_goal_id String?
+  approved_by             String?
+  approved_at             DateTime?
+  rejection_reason        String?
+  ai_generated            Boolean          @default(false)
+  ai_prompt               String?
+  created_at              DateTime         @default(now())
+  updated_at              DateTime
+  auto_calculated         Boolean          @default(false)
+  data_source             GoalDataSource?
+  data_source_config      Json?
+  last_sync_at            DateTime?
+  goal_check_ins          goal_check_ins[]
+  goal_ratings            goal_ratings[]
+  companies               companies        @relation(fields: [company_id], references: [id])
+  goals                   goals?           @relation("goalsTogoals", fields: [parent_goal_id], references: [id])
+  other_goals             goals[]          @relation("goalsTogoals")
+  key_results             key_results[]
+
+  @@index([company_id, owner_id])
+  @@index([company_id, status])
+  @@index([data_source])
+  @@index([type])
+}
+
+model gosi_configs {
+  id                 String     @id
+  employee_rate      Decimal    @db.Decimal(5, 2)
+  employer_rate      Decimal    @db.Decimal(5, 2)
+  saned_rate         Decimal    @db.Decimal(5, 2)
+  hazard_rate        Decimal    @db.Decimal(5, 2)
+  max_cap_amount     Decimal    @default(45000) @db.Decimal(10, 2)
+  is_saudi_only      Boolean    @default(true)
+  is_active          Boolean    @default(true)
+  created_at         DateTime   @default(now())
+  updated_at         DateTime
+  company_id         String?
+  effective_date     DateTime   @default(now()) @db.Date
+  end_date           DateTime?  @db.Date
+  include_allowances Boolean    @default(false)
+  min_base_salary    Decimal    @default(0) @db.Decimal(10, 2)
+  notes              String?
+  version            Int        @default(1)
+  companies          companies? @relation(fields: [company_id], references: [id])
+
+  @@unique([company_id, version])
+  @@index([company_id, is_active])
+  @@index([effective_date, end_date])
+}
+
+model holidays {
+  id           String     @id
+  name         String
+  name_en      String?
+  date         DateTime   @db.Date
+  is_recurring Boolean    @default(false)
+  created_at   DateTime   @default(now())
+  updated_at   DateTime
+  company_id   String?
+  companies    companies? @relation(fields: [company_id], references: [id])
+}
+
+model idp_plans {
+  id             String    @id
+  cycle_id       String
+  employee_id    String
+  strengths      Json
+  improvements   Json
+  goals_90_days  Json
+  learning_tasks Json
+  mentor_id      String?
+  status         IDPStatus @default(ACTIVE)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+
+  @@unique([cycle_id, employee_id])
+}
+
+model job_families {
+  id                  String            @id
+  company_id          String
+  code                String
+  name                String
+  name_ar             String?
+  module_overrides    Json?
+  evidence_types      Json?
+  competency_model_id String?
+  created_at          DateTime          @default(now())
+  updated_at          DateTime
+  companies           companies         @relation(fields: [company_id], references: [id])
+  kpi_definitions     kpi_definitions[]
+  role_levels         role_levels[]
+  users               users[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model job_title_permissions {
+  id            String          @id
+  job_title_id  String
+  permission_id String
+  created_at    DateTime        @default(now())
+  scope         PermissionScope @default(TEAM)
+  job_titles    job_titles      @relation(fields: [job_title_id], references: [id], onDelete: Cascade)
+  permissions   permissions     @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
+  @@unique([job_title_id, permission_id])
+  @@index([job_title_id])
+  @@index([permission_id])
+}
+
+model job_titles {
+  id                    String                  @id
+  name                  String
+  name_en               String?
+  is_direct_manager     Boolean                 @default(false)
+  created_at            DateTime                @default(now())
+  updated_at            DateTime
+  level                 Role                    @default(EMPLOYEE)
+  company_id            String?
+  is_active             Boolean                 @default(true)
+  job_title_permissions job_title_permissions[]
+  companies             companies?              @relation(fields: [company_id], references: [id])
+  policies              policies[]
+  users                 users[]
+
+  @@unique([company_id, name])
+  @@index([company_id, is_active])
+}
+
+model key_result_check_ins {
+  id             String      @id
+  key_result_id  String
+  user_id        String
+  previous_value Decimal     @db.Decimal(10, 2)
+  new_value      Decimal     @db.Decimal(10, 2)
+  notes          String?
+  created_at     DateTime    @default(now())
+  key_results    key_results @relation(fields: [key_result_id], references: [id], onDelete: Cascade)
+
+  @@index([key_result_id])
+}
+
+model key_results {
+  id                   String                 @id
+  goal_id              String
+  title                String
+  description          String?
+  target_value         Decimal                @db.Decimal(10, 2)
+  current_value        Decimal                @default(0) @db.Decimal(10, 2)
+  unit                 String                 @default("%")
+  progress             Int                    @default(0)
+  due_date             DateTime?              @db.Date
+  created_at           DateTime               @default(now())
+  updated_at           DateTime
+  key_result_check_ins key_result_check_ins[]
+  goals                goals                  @relation(fields: [goal_id], references: [id], onDelete: Cascade)
+
+  @@index([goal_id])
+}
+
+model kpi_assignments {
+  id                        String                    @id
+  cycle_id                  String
+  employee_id               String
+  kpi_definition_id         String
+  target                    Decimal                   @db.Decimal(15, 2)
+  weight                    Int                       @default(100)
+  created_at                DateTime                  @default(now())
+  updated_at                DateTime
+  actual_value              Decimal?                  @db.Decimal(10, 2)
+  notes                     String?
+  score                     Decimal?                  @db.Decimal(5, 2)
+  performance_review_cycles performance_review_cycles @relation(fields: [cycle_id], references: [id])
+  users                     users                     @relation(fields: [employee_id], references: [id])
+  kpi_definitions           kpi_definitions           @relation(fields: [kpi_definition_id], references: [id])
+  kpi_entries               kpi_entries[]
+
+  @@unique([cycle_id, employee_id, kpi_definition_id])
+  @@index([cycle_id, employee_id])
+  @@index([employee_id])
+}
+
+model kpi_definitions {
+  id              String            @id
+  company_id      String
+  job_family_id   String?
+  code            String
+  name            String
+  name_ar         String?
+  description     String?
+  unit            String
+  formula         Json?
+  thresholds      Json
+  source_type     KPISourceType     @default(MANUAL)
+  frequency       KPIFrequency      @default(MONTHLY)
+  is_active       Boolean           @default(true)
+  created_at      DateTime          @default(now())
+  updated_at      DateTime
+  kpi_assignments kpi_assignments[]
+  companies       companies         @relation(fields: [company_id], references: [id])
+  job_families    job_families?     @relation(fields: [job_family_id], references: [id])
+
+  @@unique([company_id, code])
+  @@index([company_id])
+  @@index([job_family_id])
+}
+
+model kpi_entries {
+  id              String          @id
+  assignment_id   String
+  period_start    DateTime
+  period_end      DateTime
+  value           Decimal         @db.Decimal(15, 2)
+  source          String?
+  created_by      String
+  created_at      DateTime        @default(now())
+  notes           String?
+  kpi_assignments kpi_assignments @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+
+  @@index([assignment_id])
+}
+
+model leave_balances {
+  id                       String             @id
+  company_id               String?
+  user_id                  String
+  leave_type_id            String
+  year                     Int
+  entitled                 Decimal            @default(0) @db.Decimal(5, 2)
+  carried_forward          Decimal            @default(0) @db.Decimal(5, 2)
+  used                     Decimal            @default(0) @db.Decimal(5, 2)
+  pending                  Decimal            @default(0) @db.Decimal(5, 2)
+  times_used               Int                @default(0)
+  carry_forward_expires_at DateTime?
+  created_at               DateTime           @default(now())
+  updated_at               DateTime
+  companies                companies?         @relation(fields: [company_id], references: [id])
+  leave_type_configs       leave_type_configs @relation(fields: [leave_type_id], references: [id])
+  users                    users              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, leave_type_id, year])
+  @@index([company_id])
+  @@index([leave_type_id])
+  @@index([user_id, year])
+}
+
+model leave_entitlement_tiers {
+  id                 String             @id
+  leave_type_id      String
+  min_service_years  Int
+  max_service_years  Int
+  entitlement_days   Int
+  created_at         DateTime           @default(now())
+  leave_type_configs leave_type_configs @relation(fields: [leave_type_id], references: [id], onDelete: Cascade)
+
+  @@unique([leave_type_id, min_service_years])
+  @@index([leave_type_id])
+}
+
+model leave_requests {
+  id                                              String              @id
+  user_id                                         String
+  type                                            LeaveType
+  start_date                                      DateTime            @db.Date
+  end_date                                        DateTime            @db.Date
+  reason                                          String
+  status                                          LeaveStatus         @default(PENDING)
+  approver_id                                     String?
+  approver_notes                                  String?
+  approved_at                                     DateTime?
+  created_at                                      DateTime            @default(now())
+  updated_at                                      DateTime
+  requested_days                                  Int                 @default(1)
+  approved_days                                   Int?
+  attachments                                     Json?
+  notes                                           String?             @db.VarChar(500)
+  current_step                                    ApprovalStep        @default(MANAGER)
+  manager_approver_id                             String?
+  manager_decision                                ApprovalDecision    @default(PENDING)
+  manager_decision_at                             DateTime?
+  manager_notes                                   String?             @db.VarChar(500)
+  hr_approver_id                                  String?
+  hr_decision                                     ApprovalDecision    @default(PENDING)
+  hr_decision_at                                  DateTime?
+  hr_decision_notes                               String?             @db.VarChar(500)
+  manager_attachments                             Json?
+  hr_attachments                                  Json?
+  company_id                                      String?
+  full_pay_days                                   Int?
+  leave_type_config_id                            String?
+  notice_days_provided                            Int?
+  partial_pay_days                                Int?
+  salary_impact                                   Decimal?            @db.Decimal(10, 2)
+  unpaid_days                                     Int?
+  users_leave_requests_approver_idTousers         users?              @relation("leave_requests_approver_idTousers", fields: [approver_id], references: [id])
+  companies                                       companies?          @relation(fields: [company_id], references: [id])
+  users_leave_requests_hr_approver_idTousers      users?              @relation("leave_requests_hr_approver_idTousers", fields: [hr_approver_id], references: [id])
+  leave_type_configs                              leave_type_configs? @relation(fields: [leave_type_config_id], references: [id])
+  users_leave_requests_manager_approver_idTousers users?              @relation("leave_requests_manager_approver_idTousers", fields: [manager_approver_id], references: [id])
+  users_leave_requests_user_idTousers             users               @relation("leave_requests_user_idTousers", fields: [user_id], references: [id])
+
+  @@index([company_id, status])
+  @@index([leave_type_config_id])
+  @@index([user_id, status])
+}
+
+model leave_type_configs {
+  id                             String                    @id
+  company_id                     String?
+  code                           String
+  name_ar                        String
+  name_en                        String?
+  description                    String?
+  category                       LeaveCategory             @default(BALANCED)
+  is_entitlement_based           Boolean                   @default(true)
+  default_entitlement            Int                       @default(0)
+  max_balance_cap                Int?
+  allow_carry_forward            Boolean                   @default(true)
+  max_carry_forward_days         Int?
+  carry_forward_expiry_months    Int?
+  is_paid                        Boolean                   @default(true)
+  payment_percentage             Int                       @default(100)
+  requires_attachment            Boolean                   @default(false)
+  attachment_required_after_days Int?
+  min_notice_days                Int                       @default(0)
+  min_request_days               Int                       @default(1)
+  max_request_days               Int?
+  allow_negative_balance         Boolean                   @default(false)
+  deduct_from_annual             Boolean                   @default(false)
+  is_one_time_only               Boolean                   @default(false)
+  is_active                      Boolean                   @default(true)
+  sort_order                     Int                       @default(0)
+  created_at                     DateTime                  @default(now())
+  updated_at                     DateTime
+  leave_balances                 leave_balances[]
+  leave_entitlement_tiers        leave_entitlement_tiers[]
+  leave_requests                 leave_requests[]
+  companies                      companies?                @relation(fields: [company_id], references: [id])
+  sick_pay_tiers                 sick_pay_tiers[]
+
+  @@unique([company_id, code])
+  @@index([company_id, is_active])
+}
+
+model letter_requests {
+  id                                               String           @id
+  user_id                                          String
+  type                                             LetterType
+  notes                                            String?          @db.VarChar(200)
+  attachments                                      Json?
+  status                                           LetterStatus     @default(PENDING)
+  approver_id                                      String?
+  approver_notes                                   String?
+  approved_at                                      DateTime?
+  created_at                                       DateTime         @default(now())
+  updated_at                                       DateTime
+  current_step                                     ApprovalStep     @default(MANAGER)
+  manager_approver_id                              String?
+  manager_decision                                 ApprovalDecision @default(PENDING)
+  manager_decision_at                              DateTime?
+  manager_notes                                    String?          @db.VarChar(500)
+  manager_attachments                              Json?
+  hr_approver_id                                   String?
+  hr_decision                                      ApprovalDecision @default(PENDING)
+  hr_decision_at                                   DateTime?
+  hr_decision_notes                                String?          @db.VarChar(500)
+  hr_attachments                                   Json?
+  company_id                                       String?
+  users_letter_requests_approver_idTousers         users?           @relation("letter_requests_approver_idTousers", fields: [approver_id], references: [id])
+  companies                                        companies?       @relation(fields: [company_id], references: [id])
+  users_letter_requests_hr_approver_idTousers      users?           @relation("letter_requests_hr_approver_idTousers", fields: [hr_approver_id], references: [id])
+  users_letter_requests_manager_approver_idTousers users?           @relation("letter_requests_manager_approver_idTousers", fields: [manager_approver_id], references: [id])
+  users_letter_requests_user_idTousers             users            @relation("letter_requests_user_idTousers", fields: [user_id], references: [id])
+
+  @@index([company_id, status])
+}
+
+model loan_payments {
+  id               String           @id
+  advance_id       String
+  amount           Decimal          @db.Decimal(10, 2)
+  payment_date     DateTime         @db.Date
+  payment_type     String           @default("SALARY_DEDUCTION")
+  payroll_run_id   String?
+  payslip_id       String?
+  notes            String?          @db.VarChar(500)
+  created_by_id    String?
+  created_at       DateTime         @default(now())
+  advance_requests advance_requests @relation(fields: [advance_id], references: [id], onDelete: Cascade)
+
+  @@index([advance_id])
+  @@index([payment_date])
+}
+
+model module_scores {
+  id            String   @id
+  cycle_id      String
+  employee_id   String
+  module        String
+  score         Decimal  @db.Decimal(5, 2)
+  computed_data Json
+  created_at    DateTime @default(now())
+
+  @@unique([cycle_id, employee_id, module])
+  @@index([cycle_id, employee_id])
+}
+
+model mudad_submissions {
+  id                String       @id
+  company_id        String
+  payroll_run_id    String
+  period            String
+  submission_type   String       @default("SALARY")
+  status            MudadStatus  @default(PENDING)
+  wps_file_url      String?
+  mudad_ref         String?
+  total_amount      Decimal      @db.Decimal(12, 2)
+  employee_count    Int
+  prepared_at       DateTime?
+  prepared_by       String?
+  submitted_at      DateTime?
+  submitted_by      String?
+  accepted_at       DateTime?
+  rejected_at       DateTime?
+  rejection_note    String?
+  file_hash_sha256  String?      @db.VarChar(64)
+  file_size         Int?
+  generator_version String?
+  notes             String?
+  created_at        DateTime     @default(now())
+  updated_at        DateTime
+  companies         companies    @relation(fields: [company_id], references: [id])
+  payroll_runs      payroll_runs @relation(fields: [payroll_run_id], references: [id])
+
+  @@unique([payroll_run_id, submission_type])
+  @@index([company_id, period])
+  @@index([status])
+}
+
+model notifications {
+  id          String           @id
+  user_id     String
+  type        NotificationType
+  title       String
+  title_en    String?
+  body        String
+  body_en     String?
+  data        Json?
+  is_read     Boolean          @default(false)
+  read_at     DateTime?
+  created_at  DateTime         @default(now())
+  company_id  String?
+  entity_id   String?
+  entity_type String?
+  companies   companies?       @relation(fields: [company_id], references: [id])
+  users       users            @relation(fields: [user_id], references: [id])
+
+  @@index([company_id])
+  @@index([user_id, is_read, created_at])
+  @@index([user_id, is_read])
+}
+
+model onboarding_processes {
+  id                   String                  @id
+  company_id           String
+  user_id              String
+  template_id          String
+  type                 OnboardingType
+  status               OnboardingProcessStatus @default(IN_PROGRESS)
+  start_date           DateTime                @default(now())
+  completed_at         DateTime?
+  created_at           DateTime                @default(now())
+  updated_at           DateTime
+  companies            companies               @relation(fields: [company_id], references: [id])
+  onboarding_templates onboarding_templates    @relation(fields: [template_id], references: [id])
+  users                users                   @relation(fields: [user_id], references: [id])
+  onboarding_tasks     onboarding_tasks[]
+
+  @@index([company_id, status])
+  @@index([user_id])
+}
+
+model onboarding_tasks {
+  id                   String               @id
+  process_id           String
+  title                String
+  title_en             String?
+  description          String?
+  assignee_id          String?
+  assigneeType         AssigneeType
+  status               OnboardingTaskStatus @default(PENDING)
+  due_date             DateTime
+  completed_at         DateTime?
+  completed_by         String?
+  photo_url            String?
+  notes                String?
+  created_at           DateTime             @default(now())
+  updated_at           DateTime
+  onboarding_processes onboarding_processes @relation(fields: [process_id], references: [id], onDelete: Cascade)
+
+  @@index([process_id, status])
+}
+
+model onboarding_template_tasks {
+  id                   String               @id
+  template_id          String
+  title                String
+  title_en             String?
+  description          String?
+  assigneeType         AssigneeType         @default(HR)
+  dueDays              Int                  @default(1)
+  priority             Int                  @default(1)
+  requires_photo       Boolean              @default(false)
+  created_at           DateTime             @default(now())
+  onboarding_templates onboarding_templates @relation(fields: [template_id], references: [id], onDelete: Cascade)
+
+  @@index([template_id])
+}
+
+model onboarding_templates {
+  id                        String                      @id
+  company_id                String
+  name                      String
+  name_en                   String?
+  description               String?
+  type                      OnboardingType              @default(JOINING)
+  isActive                  Boolean                     @default(true)
+  created_at                DateTime                    @default(now())
+  updated_at                DateTime
+  onboarding_processes      onboarding_processes[]
+  onboarding_template_tasks onboarding_template_tasks[]
+  companies                 companies                   @relation(fields: [company_id], references: [id])
+
+  @@index([company_id, type])
+}
+
+model payroll_adjustments {
+  id                 String                  @id
+  company_id         String
+  employee_id        String
+  case_id            String
+  payroll_period_id  String
+  adjustment_type    String
+  unit               AdjustmentUnit
+  value              Decimal                 @db.Decimal(10, 2)
+  amount             Decimal?                @db.Decimal(10, 2)
+  status             PayrollAdjustmentStatus @default(PENDING)
+  description        String?
+  effective_date     DateTime?               @db.Date
+  posted_at          DateTime?
+  reversed_at        DateTime?
+  created_at         DateTime                @default(now())
+  updated_at         DateTime
+  disciplinary_cases disciplinary_cases      @relation(fields: [case_id], references: [id])
+  companies          companies               @relation(fields: [company_id], references: [id])
+  users              users                   @relation(fields: [employee_id], references: [id])
+  payroll_periods    payroll_periods         @relation(fields: [payroll_period_id], references: [id])
+
+  @@unique([company_id, case_id])
+  @@index([company_id, employee_id, payroll_period_id, status])
+  @@index([employee_id, payroll_period_id])
+  @@index([payroll_period_id, status])
+}
+
+model payroll_journal_entries {
+  id              String          @id
+  ledger_id       String
+  account_code    String
+  account_name    String
+  debit           Decimal         @default(0) @db.Decimal(12, 2)
+  credit          Decimal         @default(0) @db.Decimal(12, 2)
+  description     String?
+  created_at      DateTime        @default(now())
+  payroll_ledgers payroll_ledgers @relation(fields: [ledger_id], references: [id], onDelete: Cascade)
+}
+
+model payroll_ledgers {
+  id                          String                    @id
+  run_id                      String                    @unique
+  company_id                  String
+  total_gross                 Decimal                   @default(0) @db.Decimal(12, 2)
+  total_deduction             Decimal                   @default(0) @db.Decimal(12, 2)
+  total_net                   Decimal                   @default(0) @db.Decimal(12, 2)
+  total_employer_contribution Decimal                   @default(0) @db.Decimal(12, 2)
+  status                      String                    @default("DRAFT")
+  created_at                  DateTime                  @default(now())
+  updated_at                  DateTime
+  payroll_journal_entries     payroll_journal_entries[]
+  payroll_runs                payroll_runs              @relation(fields: [run_id], references: [id], onDelete: Cascade)
+}
+
+model payroll_periods {
+  id                  String                @id
+  month               Int
+  year                Int
+  start_date          DateTime              @db.Date
+  end_date            DateTime              @db.Date
+  status              PayrollStatus         @default(DRAFT)
+  created_at          DateTime              @default(now())
+  updated_at          DateTime
+  company_id          String?
+  cut_off_date        DateTime?             @db.Date
+  inputs_locked_at    DateTime?
+  locked_at           DateTime?
+  locked_by           String?
+  disciplinary_cases  disciplinary_cases[]
+  payroll_adjustments payroll_adjustments[]
+  companies           companies?            @relation(fields: [company_id], references: [id])
+  payroll_runs        payroll_runs[]
+  payslips            payslips[]
+
+  @@unique([company_id, month, year])
+  @@index([company_id, status])
+}
+
+model payroll_runs {
+  id                  String              @id
+  period_id           String
+  run_date            DateTime            @default(now())
+  status              PayrollStatus       @default(DRAFT)
+  processed_by        String?
+  company_id          String?
+  updated_at          DateTime
+  created_at          DateTime            @default(now())
+  calculated_at       DateTime?
+  calculated_by       String?
+  finance_approved_at DateTime?
+  finance_approved_by String?
+  hr_approved_at      DateTime?
+  hr_approved_by      String?
+  locked_at           DateTime?
+  locked_by           String?
+  paid_at             DateTime?
+  adjustment_reason   String?
+  is_adjustment       Boolean             @default(false)
+  original_run_id     String?
+  mudad_submissions   mudad_submissions[]
+  payroll_ledgers     payroll_ledgers?
+  companies           companies?          @relation(fields: [company_id], references: [id])
+  payroll_runs        payroll_runs?       @relation("payroll_runsTopayroll_runs", fields: [original_run_id], references: [id])
+  other_payroll_runs  payroll_runs[]      @relation("payroll_runsTopayroll_runs")
+  payroll_periods     payroll_periods     @relation(fields: [period_id], references: [id])
+  payslips            payslips[]
+  wps_submissions     wps_submissions[]
+
+  @@index([company_id, status])
+  @@index([original_run_id])
+  @@index([period_id])
+}
+
+model payroll_settings {
+  id                                String                    @id
+  company_id                        String                    @unique
+  payroll_closing_day               Int                       @default(25)
+  hire_termination_calc_base        WorkDayCalculationBase    @default(CALENDAR_DAYS)
+  hire_termination_method           HireTerminationMethod     @default(EXCLUDE_WEEKENDS)
+  unpaid_leave_calc_base            WorkDayCalculationBase    @default(ACTUAL_WORKING_DAYS)
+  unpaid_leave_method               UnpaidLeaveMethod         @default(BASED_ON_SHIFTS)
+  split_unpaid_by_closing_date      Boolean                   @default(false)
+  overtime_calc_base                WorkDayCalculationBase    @default(ACTUAL_WORKING_DAYS)
+  overtime_method                   OvertimeCalculationMethod @default(BASED_ON_SHIFTS)
+  leave_allowance_calc_base         WorkDayCalculationBase    @default(CALENDAR_DAYS)
+  leave_allowance_method            LeaveAllowanceMethod      @default(BASIC_PLUS_HOUSING)
+  show_company_contributions        Boolean                   @default(true)
+  show_closing_date_on_payslip      Boolean                   @default(true)
+  deduct_absence_from_basic         Boolean                   @default(true)
+  show_actual_absence_days          Boolean                   @default(false)
+  enable_negative_balance_carryover Boolean                   @default(false)
+  settle_negative_as_transaction    Boolean                   @default(false)
+  round_salary_to_nearest           Int                       @default(0)
+  default_working_days_per_month    Int                       @default(30)
+  created_at                        DateTime                  @default(now())
+  updated_at                        DateTime
+  leave_daily_rate_divisor          Int                       @default(30)
+  companies                         companies                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
+}
+
+model payslip_lines {
+  id                String            @id
+  payslip_id        String
+  component_id      String
+  amount            Decimal           @db.Decimal(10, 2)
+  created_at        DateTime          @default(now())
+  description_ar    String?
+  rate              Decimal?          @db.Decimal(10, 4)
+  sign              String            @default("EARNING")
+  source_ref        String?
+  source_type       PayslipLineSource @default(STRUCTURE)
+  units             Decimal?          @db.Decimal(10, 2)
+  cost_center_id    String?
+  salary_components salary_components @relation(fields: [component_id], references: [id])
+  cost_centers      cost_centers?     @relation(fields: [cost_center_id], references: [id])
+  payslips          payslips          @relation(fields: [payslip_id], references: [id], onDelete: Cascade)
+
+  @@index([cost_center_id])
+  @@index([payslip_id, component_id])
+  @@index([payslip_id, source_type])
+}
+
+model payslips {
+  id                String          @id
+  employee_id       String
+  period_id         String
+  run_id            String?
+  base_salary       Decimal         @db.Decimal(10, 2)
+  gross_salary      Decimal         @db.Decimal(10, 2)
+  total_deductions  Decimal         @db.Decimal(10, 2)
+  net_salary        Decimal         @db.Decimal(10, 2)
+  status            PayrollStatus   @default(DRAFT)
+  created_at        DateTime        @default(now())
+  updated_at        DateTime
+  calculation_trace Json?
+  company_id        String?
+  payslip_lines     payslip_lines[]
+  companies         companies?      @relation(fields: [company_id], references: [id])
+  users             users           @relation(fields: [employee_id], references: [id])
+  payroll_periods   payroll_periods @relation(fields: [period_id], references: [id])
+  payroll_runs      payroll_runs?   @relation(fields: [run_id], references: [id])
+}
+
+model performance_audit_logs {
+  id          String   @id
+  company_id  String
+  actor_id    String
+  action      String
+  entity      String
+  entity_id   String
+  before_data Json?
+  after_data  Json?
+  created_at  DateTime @default(now())
+
+  @@index([actor_id])
+  @@index([company_id, entity])
+}
+
+model performance_competencies {
+  id                             String                           @id
+  model_id                       String
+  category                       UPEECompetencyCategory
+  name                           String
+  name_ar                        String?
+  description                    String?
+  created_at                     DateTime                         @default(now())
+  updated_at                     DateTime
+  performance_competency_models  performance_competency_models    @relation(fields: [model_id], references: [id], onDelete: Cascade)
+  performance_competency_rubrics performance_competency_rubrics[]
+  performance_competency_scores  performance_competency_scores[]
+
+  @@index([model_id])
+}
+
+model performance_competency_models {
+  id                       String                     @id
+  company_id               String
+  name                     String
+  name_ar                  String?
+  version                  Int                        @default(1)
+  is_active                Boolean                    @default(true)
+  created_at               DateTime                   @default(now())
+  updated_at               DateTime
+  performance_competencies performance_competencies[]
+  companies                companies                  @relation(fields: [company_id], references: [id])
+
+  @@index([company_id])
+}
+
+model performance_competency_rubrics {
+  id                       String                   @id
+  competency_id            String
+  level                    Int
+  behavior                 String
+  behavior_ar              String?
+  performance_competencies performance_competencies @relation(fields: [competency_id], references: [id], onDelete: Cascade)
+
+  @@unique([competency_id, level])
+}
+
+model performance_competency_scores {
+  id                       String                   @id
+  cycle_id                 String
+  employee_id              String
+  competency_id            String
+  rating                   Int
+  justification            String?
+  evidence_ids             Json?
+  scoredBy                 String
+  created_at               DateTime                 @default(now())
+  performance_competencies performance_competencies @relation(fields: [competency_id], references: [id])
+
+  @@index([cycle_id, employee_id])
+}
+
+model performance_evidences {
+  id          String       @id
+  cycle_id    String
+  employee_id String
+  module      String
+  entity_id   String
+  type        EvidenceType
+  url         String?
+  file_id     String?
+  notes       String?
+  created_at  DateTime     @default(now())
+
+  @@index([cycle_id, employee_id])
+}
+
+model performance_review_cycles {
+  id                        String                       @id
+  company_id                String
+  name                      String
+  name_en                   String?
+  type                      PerformanceReviewCycleType   @default(ANNUAL)
+  status                    PerformanceReviewCycleStatus @default(DRAFT)
+  period_start              DateTime                     @db.Date
+  period_end                DateTime                     @db.Date
+  self_review_start         DateTime?
+  self_review_end           DateTime?
+  manager_review_start      DateTime?
+  manager_review_end        DateTime?
+  feedback_start            DateTime?
+  feedback_end              DateTime?
+  calibration_start         DateTime?
+  calibration_end           DateTime?
+  include_self_review       Boolean                      @default(true)
+  include_360_feedback      Boolean                      @default(false)
+  include_goal_rating       Boolean                      @default(true)
+  include_competency_rating Boolean                      @default(true)
+  goal_weight               Int                          @default(40)
+  competency_weight         Int                          @default(40)
+  value_weight              Int                          @default(20)
+  competency_framework_id   String?
+  created_at                DateTime                     @default(now())
+  updated_at                DateTime
+  calibration_sessions      calibration_sessions[]
+  conduct_flags             conduct_flags[]
+  final_results             final_results[]
+  kpi_assignments           kpi_assignments[]
+  companies                 companies                    @relation(fields: [company_id], references: [id])
+  performance_reviews       performance_reviews[]
+  upee_360_requests         upee_360_requests[]
+
+  @@index([company_id, status])
+}
+
+model performance_reviews {
+  id                        String                    @id
+  company_id                String
+  cycle_id                  String
+  employee_id               String
+  manager_id                String
+  status                    PerformanceReviewStatus   @default(NOT_STARTED)
+  self_rating               Decimal?                  @db.Decimal(3, 2)
+  self_comments             String?
+  self_achievements         Json?
+  self_challenges           Json?
+  self_submitted_at         DateTime?
+  manager_rating            Decimal?                  @db.Decimal(3, 2)
+  manager_comments          String?
+  manager_strengths         Json?
+  manager_improvements      Json?
+  manager_submitted_at      DateTime?
+  final_rating              Decimal?                  @db.Decimal(3, 2)
+  final_comments            String?
+  calibration_notes         String?
+  calibrated_by             String?
+  calibrated_at             DateTime?
+  performance_score         Int?
+  potential_score           Int?
+  nine_box_position         String?
+  employee_acknowledged     Boolean                   @default(false)
+  employee_acknowledged_at  DateTime?
+  employee_disagreed        Boolean                   @default(false)
+  employee_disagree_reason  String?
+  ai_summary                String?
+  ai_bias_flags             Json?
+  ai_recommendations        Json?
+  created_at                DateTime                  @default(now())
+  updated_at                DateTime
+  competency_ratings        competency_ratings[]
+  development_plans         development_plans?
+  feedback_requests         feedback_requests[]
+  goal_ratings              goal_ratings[]
+  performance_review_cycles performance_review_cycles @relation(fields: [cycle_id], references: [id])
+
+  @@unique([cycle_id, employee_id])
+  @@index([company_id, status])
+  @@index([employee_id])
+  @@index([manager_id])
+}
+
+model permission_audit_logs {
+  id               String                @id
+  performed_by_id  String
+  target_user_id   String
+  target_user_name String
+  action           PermissionAuditAction
+  permission_code  String
+  permission_name  String
+  scope_details    String?
+  ip_address       String?
+  user_agent       String?
+  created_at       DateTime              @default(now())
+  scope            PermissionScope?
+  company_id       String?
+  companies        companies?            @relation(fields: [company_id], references: [id])
+
+  @@index([created_at])
+  @@index([performed_by_id])
+  @@index([permission_code])
+  @@index([target_user_id])
+}
+
+model permissions {
+  id                    String                  @id
+  code                  String                  @unique
+  name                  String
+  name_en               String?
+  category              String
+  description           String?
+  requires_permission   String?
+  is_active             Boolean                 @default(true)
+  sort_order            Int                     @default(0)
+  created_at            DateTime                @default(now())
+  updated_at            DateTime
+  job_title_permissions job_title_permissions[]
+  user_permissions      user_permissions[]
+
+  @@index([category])
+  @@index([code])
+}
+
+model pip_plans {
+  id             String      @id
+  cycle_id       String
+  employee_id    String
+  duration_days  Int
+  start_date     DateTime
+  end_date       DateTime
+  expectations   Json
+  weekly_reviews Json
+  status         PIPStatus   @default(ACTIVE)
+  outcome        PIPOutcome?
+  created_at     DateTime    @default(now())
+  updated_at     DateTime
+
+  @@unique([cycle_id, employee_id])
+}
+
+model policies {
+  id             String         @id
+  code           String
+  name_ar        String
+  name_en        String?
+  description    String?
+  type           PolicyType
+  scope          PolicyScope    @default(COMPANY)
+  effective_from DateTime
+  effective_to   DateTime?
+  branch_id      String?
+  department_id  String?
+  job_title_id   String?
+  employee_id    String?
+  settings       Json           @default("{}")
+  is_active      Boolean        @default(true)
+  priority       Int            @default(0)
+  created_by_id  String?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime
+  company_id     String?
+  scope_rank     Int            @default(1)
+  branches       branches?      @relation(fields: [branch_id], references: [id])
+  companies      companies?     @relation(fields: [company_id], references: [id])
+  departments    departments?   @relation(fields: [department_id], references: [id])
+  users          users?         @relation(fields: [employee_id], references: [id])
+  job_titles     job_titles?    @relation(fields: [job_title_id], references: [id])
+  policy_rules   policy_rules[]
+
+  @@unique([company_id, code])
+  @@index([branch_id])
+  @@index([company_id, type, scope, effective_from])
+  @@index([department_id])
+  @@index([effective_from, effective_to])
+  @@index([employee_id])
+  @@index([job_title_id])
+  @@index([type, scope, is_active])
+}
+
+model policy_rules {
+  id                  String             @id
+  policy_id           String
+  code                String
+  name_ar             String
+  conditions          Json               @default("{}")
+  value_type          String
+  value               String
+  is_active           Boolean            @default(true)
+  created_at          DateTime           @default(now())
+  updated_at          DateTime
+  output_component_id String?
+  output_sign         OutputSign         @default(EARNING)
+  rule_order          Int                @default(0)
+  salary_components   salary_components? @relation(fields: [output_component_id], references: [id])
+  policies            policies           @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@unique([policy_id, code])
+  @@index([output_component_id])
+  @@index([policy_id, is_active, rule_order])
+}
+
+model policy_simulation_runs {
+  id                       String         @id
+  policy_id                String
+  simulated_by             String
+  simulated_by_name        String
+  simulation_period        String
+  total_employees_affected Int
+  total_additions          Decimal        @default(0) @db.Decimal(12, 2)
+  total_deductions         Decimal        @default(0) @db.Decimal(12, 2)
+  results                  Json           @default("[]")
+  execution_time_ms        Int?
+  warnings_count           Int            @default(0)
+  warnings                 Json?          @default("[]")
+  created_at               DateTime       @default(now())
+  smart_policies           smart_policies @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@index([policy_id, created_at])
+}
+
+model raise_requests {
+  id                                              String           @id
+  user_id                                         String
+  type                                            RaiseType
+  amount                                          Decimal          @db.Decimal(10, 2)
+  effective_month                                 DateTime         @db.Date
+  notes                                           String?          @db.VarChar(200)
+  attachments                                     Json?
+  status                                          RaiseStatus      @default(PENDING)
+  current_step                                    ApprovalStep     @default(MANAGER)
+  manager_approver_id                             String?
+  manager_decision                                ApprovalDecision @default(PENDING)
+  manager_decision_at                             DateTime?
+  manager_notes                                   String?          @db.VarChar(500)
+  manager_attachments                             Json?
+  hr_approver_id                                  String?
+  hr_decision                                     ApprovalDecision @default(PENDING)
+  hr_decision_at                                  DateTime?
+  hr_decision_notes                               String?          @db.VarChar(500)
+  hr_attachments                                  Json?
+  created_at                                      DateTime         @default(now())
+  updated_at                                      DateTime
+  company_id                                      String?
+  applied_to_salary                               Boolean          @default(false)
+  approval_chain                                  Json?
+  ceo_approver_id                                 String?
+  ceo_decision                                    ApprovalDecision @default(PENDING)
+  ceo_decision_at                                 DateTime?
+  ceo_decision_notes                              String?          @db.VarChar(500)
+  finance_approver_id                             String?
+  finance_decision                                ApprovalDecision @default(PENDING)
+  finance_decision_at                             DateTime?
+  finance_decision_notes                          String?          @db.VarChar(500)
+  users_raise_requests_ceo_approver_idTousers     users?           @relation("raise_requests_ceo_approver_idTousers", fields: [ceo_approver_id], references: [id])
+  companies                                       companies?       @relation(fields: [company_id], references: [id])
+  users_raise_requests_finance_approver_idTousers users?           @relation("raise_requests_finance_approver_idTousers", fields: [finance_approver_id], references: [id])
+  users_raise_requests_hr_approver_idTousers      users?           @relation("raise_requests_hr_approver_idTousers", fields: [hr_approver_id], references: [id])
+  users_raise_requests_manager_approver_idTousers users?           @relation("raise_requests_manager_approver_idTousers", fields: [manager_approver_id], references: [id])
+  users_raise_requests_user_idTousers             users            @relation("raise_requests_user_idTousers", fields: [user_id], references: [id])
+
+  @@index([status, created_at])
+  @@index([user_id, status])
+}
+
+model recognition_reactions {
+  id             String       @id
+  recognition_id String
+  user_id        String
+  emoji          String
+  created_at     DateTime     @default(now())
+  recognitions   recognitions @relation(fields: [recognition_id], references: [id], onDelete: Cascade)
+
+  @@unique([recognition_id, user_id, emoji])
+}
+
+model recognitions {
+  id                    String                  @id
+  company_id            String
+  giver_id              String
+  receiver_id           String
+  type                  RecognitionType         @default(KUDOS)
+  message               String
+  core_value_id         String?
+  points_awarded        Int                     @default(0)
+  monetary_value        Decimal?                @db.Decimal(10, 2)
+  is_public             Boolean                 @default(true)
+  created_at            DateTime                @default(now())
+  recognition_reactions recognition_reactions[]
+  companies             companies               @relation(fields: [company_id], references: [id])
+
+  @@index([company_id, created_at])
+  @@index([giver_id])
+  @@index([receiver_id])
+}
+
+model refresh_tokens {
+  id          String   @id
+  token       String   @unique
+  user_id     String
+  device_info String?
+  ip_address  String?
+  expires_at  DateTime
+  created_at  DateTime @default(now())
+  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model registered_devices {
+  id                 String               @id
+  user_id            String
+  device_id          String
+  device_fingerprint String?
+  device_name        String?
+  device_model       String?
+  device_brand       String?
+  platform           DevicePlatform       @default(UNKNOWN)
+  os_version         String?
+  app_version        String?
+  status             DeviceStatus         @default(PENDING)
+  is_main_device     Boolean              @default(false)
+  approved_by        String?
+  approved_at        DateTime?
+  blocked_reason     String?
+  last_used_at       DateTime?
+  usage_count        Int                  @default(0)
+  created_at         DateTime             @default(now())
+  updated_at         DateTime
+  device_access_logs device_access_logs[]
+  users              users                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, device_id])
+  @@index([device_id])
+  @@index([user_id, status])
+}
+
+model retro_pays {
+  id             String         @id
+  employee_id    String
+  reason         String
+  effective_from DateTime
+  effective_to   DateTime
+  old_amount     Decimal        @db.Decimal(10, 2)
+  new_amount     Decimal        @db.Decimal(10, 2)
+  difference     Decimal        @db.Decimal(10, 2)
+  months_count   Int
+  total_amount   Decimal        @db.Decimal(10, 2)
+  status         RetroPayStatus @default(PENDING)
+  notes          String?
+  created_by_id  String?
+  approved_by_id String?
+  approved_at    DateTime?
+  paid_at        DateTime?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime
+  company_id     String?
+  companies      companies?     @relation(fields: [company_id], references: [id])
+  users          users          @relation(fields: [employee_id], references: [id])
+}
+
+model role_levels {
+  id                    String       @id
+  job_family_id         String
+  code                  String
+  name                  String
+  name_ar               String?
+  rank                  Int
+  is_manager            Boolean      @default(false)
+  weight_overrides      Json?
+  min_evidence_required Int?
+  created_at            DateTime     @default(now())
+  updated_at            DateTime
+  job_families          job_families @relation(fields: [job_family_id], references: [id], onDelete: Cascade)
+  users                 users[]
+
+  @@unique([job_family_id, code])
+}
+
+model salary_components {
+  id                     String                   @id
+  code                   String
+  name_ar                String
+  name_en                String?
+  type                   SalaryComponentType
+  nature                 SalaryComponentNature    @default(FIXED)
+  description            String?
+  gosi_eligible          Boolean                  @default(false)
+  ot_eligible            Boolean                  @default(false)
+  formula                String?
+  created_at             DateTime                 @default(now())
+  updated_at             DateTime
+  company_id             String?
+  decimals               Int                      @default(2)
+  effective_date         DateTime                 @default(now())
+  end_date               DateTime?
+  is_active              Boolean                  @default(true)
+  priority               Int                      @default(100)
+  rounding_mode          String                   @default("ROUND")
+  taxable                Boolean                  @default(false)
+  version                Int                      @default(1)
+  eos_eligible           Boolean                  @default(false)
+  is_prorated            Boolean                  @default(true)
+  payslip_lines          payslip_lines[]
+  policy_rules           policy_rules[]
+  companies              companies?               @relation(fields: [company_id], references: [id])
+  salary_structure_lines salary_structure_lines[]
+
+  @@unique([company_id, type, code, version])
+  @@index([company_id, is_active])
+  @@index([effective_date, end_date])
+}
+
+model salary_structure_lines {
+  id                String            @id
+  structure_id      String
+  component_id      String
+  amount            Decimal           @default(0) @db.Decimal(10, 2)
+  percentage        Decimal?          @db.Decimal(5, 2)
+  priority          Int               @default(0)
+  salary_components salary_components @relation(fields: [component_id], references: [id])
+  salary_structures salary_structures @relation(fields: [structure_id], references: [id], onDelete: Cascade)
+}
+
+model salary_structures {
+  id                          String                        @id
+  name                        String
+  description                 String?
+  is_active                   Boolean                       @default(true)
+  created_at                  DateTime                      @default(now())
+  updated_at                  DateTime
+  company_id                  String?
+  effective_date              DateTime                      @default(now())
+  end_date                    DateTime?
+  version                     Int                           @default(1)
+  employee_salary_assignments employee_salary_assignments[]
+  salary_structure_lines      salary_structure_lines[]
+  companies                   companies?                    @relation(fields: [company_id], references: [id])
+
+  @@unique([company_id, name, version])
+  @@index([company_id, is_active])
+  @@index([effective_date, end_date])
+}
+
+model sick_pay_tiers {
+  id                 String             @id
+  leave_type_id      String
+  from_day           Int
+  to_day             Int
+  payment_percent    Int
+  created_at         DateTime           @default(now())
+  leave_type_configs leave_type_configs @relation(fields: [leave_type_id], references: [id], onDelete: Cascade)
+
+  @@unique([leave_type_id, from_day])
+  @@index([leave_type_id])
+}
+
+model smart_policies {
+  id                               String                             @id
+  company_id                       String
+  original_text                    String
+  name                             String?
+  description                      String?
+  trigger_event                    SmartPolicyTrigger
+  trigger_sub_event                String?
+  parsed_rule                      Json
+  conditions                       Json                               @default("[]")
+  actions                          Json                               @default("[]")
+  scope_type                       String                             @default("ALL")
+  scope_id                         String?
+  scope_name                       String?
+  status                           SmartPolicyStatus                  @default(DRAFT)
+  is_active                        Boolean                            @default(false)
+  priority                         Int                                @default(0)
+  effective_from                   DateTime?
+  effective_to                     DateTime?
+  ai_explanation                   String?
+  clarification_needed             String?
+  execution_count                  Int                                @default(0)
+  last_executed_at                 DateTime?
+  total_amount_paid                Decimal                            @default(0) @db.Decimal(12, 2)
+  total_amount_deduct              Decimal                            @default(0) @db.Decimal(12, 2)
+  created_by_id                    String?
+  approved_by_id                   String?
+  approved_at                      DateTime?
+  created_at                       DateTime                           @default(now())
+  updated_at                       DateTime
+  current_version                  Int                                @default(1)
+  requires_approval                Boolean                            @default(true)
+  block_lower_priority             Boolean                            @default(false)
+  depends_on_policies              String[]
+  execution_group                  String?
+  execution_order                  Int                                @default(100)
+  policy_simulation_runs           policy_simulation_runs[]
+  companies                        companies                          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  smart_policy_analytics           smart_policy_analytics[]
+  smart_policy_approvals           smart_policy_approvals[]
+  smart_policy_exceptions          smart_policy_exceptions[]
+  smart_policy_executions          smart_policy_executions[]
+  smart_policy_occurrence_trackers smart_policy_occurrence_trackers[]
+  smart_policy_retro_applications  smart_policy_retro_applications[]
+  smart_policy_versions            smart_policy_versions[]
+
+  @@index([company_id, status, is_active])
+  @@index([company_id, trigger_event])
+  @@index([status, is_active])
+}
+
+model smart_policy_analytics {
+  id                      String         @id
+  policy_id               String
+  company_id              String
+  period                  String
+  employees_affected      Int
+  total_additions         Decimal        @db.Decimal(12, 2)
+  total_deductions        Decimal        @db.Decimal(12, 2)
+  avg_amount_per_employee Decimal        @db.Decimal(12, 2)
+  execution_count         Int
+  by_department           Json           @default("{}")
+  by_branch               Json           @default("{}")
+  by_job_title            Json           @default("{}")
+  previous_period_change  Decimal?       @db.Decimal(5, 2)
+  calculated_at           DateTime       @default(now())
+  companies               companies      @relation(fields: [company_id], references: [id])
+  smart_policies          smart_policies @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@unique([policy_id, period])
+  @@index([company_id, period])
+}
+
+model smart_policy_approvals {
+  id                String               @id
+  policy_id         String
+  submitted_by      String
+  submitted_by_name String
+  submitted_at      DateTime             @default(now())
+  required_level    String               @default("HR")
+  action            PolicyApprovalAction @default(SUBMITTED)
+  action_by         String?
+  action_by_name    String?
+  action_at         DateTime?
+  action_notes      String?
+  rejection_reason  String?
+  policy_version    Int
+  created_at        DateTime             @default(now())
+  smart_policies    smart_policies       @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@index([action, submitted_at])
+  @@index([policy_id, action])
+}
+
+model smart_policy_exceptions {
+  id              String         @id
+  policy_id       String
+  company_id      String
+  exception_type  String
+  target_id       String
+  target_name     String
+  reason          String?
+  exception_from  DateTime?
+  exception_to    DateTime?
+  is_active       Boolean        @default(true)
+  created_by      String
+  created_by_name String
+  created_at      DateTime       @default(now())
+  updated_at      DateTime
+  companies       companies      @relation(fields: [company_id], references: [id])
+  smart_policies  smart_policies @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@unique([policy_id, exception_type, target_id])
+  @@index([company_id])
+  @@index([policy_id, is_active])
+}
+
+model smart_policy_executions {
+  id                String         @id
+  policy_id         String
+  employee_id       String
+  employee_name     String
+  trigger_event     String
+  trigger_sub_event String?
+  trigger_data      Json?
+  conditions_met    Boolean
+  conditions_log    Json?
+  action_type       String?
+  action_value      Decimal?       @db.Decimal(10, 2)
+  action_result     Json?
+  is_success        Boolean
+  error_message     String?
+  payroll_period    String?
+  executed_at       DateTime       @default(now())
+  smart_policies    smart_policies @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id, executed_at])
+  @@index([policy_id, executed_at])
+  @@index([trigger_event])
+}
+
+model smart_policy_occurrence_trackers {
+  id               String                @id
+  policy_id        String
+  employee_id      String
+  occurrence_type  String
+  count            Int                   @default(0)
+  reset_period     OccurrenceResetPeriod @default(MONTHLY)
+  last_reset_at    DateTime              @default(now())
+  last_occurred_at DateTime?
+  last_event_data  Json?
+  created_at       DateTime              @default(now())
+  updated_at       DateTime
+  smart_policies   smart_policies        @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@unique([policy_id, employee_id, occurrence_type])
+  @@index([employee_id])
+  @@index([policy_id])
+}
+
+model smart_policy_retro_applications {
+  id                        String                 @id
+  policy_id                 String
+  company_id                String
+  start_period              String
+  end_period                String
+  periods                   String[]
+  total_employees_affected  Int                    @default(0)
+  total_additions           Decimal                @default(0) @db.Decimal(12, 2)
+  total_deductions          Decimal                @default(0) @db.Decimal(12, 2)
+  net_amount                Decimal                @default(0) @db.Decimal(12, 2)
+  results                   Json                   @default("[]")
+  status                    RetroApplicationStatus @default(PENDING)
+  requested_by              String
+  requested_by_name         String
+  requested_at              DateTime               @default(now())
+  reviewed_by               String?
+  reviewed_by_name          String?
+  reviewed_at               DateTime?
+  approved_by               String?
+  approved_by_name          String?
+  approved_at               DateTime?
+  applied_at                DateTime?
+  applied_to_payroll_period String?
+  notes                     String?
+  created_at                DateTime               @default(now())
+  updated_at                DateTime
+  companies                 companies              @relation(fields: [company_id], references: [id])
+  smart_policies            smart_policies         @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id, status])
+  @@index([policy_id, status])
+}
+
+model smart_policy_templates {
+  id                 String   @id
+  category           String
+  name               String
+  name_en            String?
+  description        String
+  original_text      String
+  parsed_rule        Json
+  legal_compliance   Json     @default("{}")
+  labor_law_articles String[]
+  usage_count        Int      @default(0)
+  rating             Decimal? @db.Decimal(2, 1)
+  rating_count       Int      @default(0)
+  is_public          Boolean  @default(true)
+  is_system_template Boolean  @default(false)
+  created_by         String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime
+
+  @@index([category, is_public])
+}
+
+model smart_policy_versions {
+  id              String         @id
+  policy_id       String
+  version         Int
+  original_text   String
+  parsed_rule     Json
+  conditions      Json           @default("[]")
+  actions         Json           @default("[]")
+  change_reason   String?
+  changed_by      String
+  changed_by_name String
+  created_at      DateTime       @default(now())
+  smart_policies  smart_policies @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+
+  @@unique([policy_id, version])
+  @@index([policy_id])
+}
+
+model submission_status_logs {
+  id                 String               @id
+  company_id         String
+  entity_type        SubmissionEntityType
+  entity_id          String
+  from_status        String?
+  to_status          String
+  changed_by_user_id String
+  changed_at         DateTime             @default(now())
+  reason             String?
+  external_ref       String?
+  meta               Json?
+  created_at         DateTime             @default(now())
+  companies          companies            @relation(fields: [company_id], references: [id])
+
+  @@index([changed_at])
+  @@index([company_id, entity_type, entity_id])
+}
+
+model succession_candidates {
+  id                  String           @id
+  plan_id             String
+  employee_id         String
+  readiness_level     String
+  risk_of_leaving     String?
+  development_actions Json?
+  notes               String?
+  created_at          DateTime         @default(now())
+  updated_at          DateTime
+  succession_plans    succession_plans @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+
+  @@unique([plan_id, employee_id])
+}
+
+model succession_plans {
+  id                    String                  @id
+  company_id            String
+  position_id           String
+  target_year           Int
+  created_at            DateTime                @default(now())
+  updated_at            DateTime
+  succession_candidates succession_candidates[]
+  companies             companies               @relation(fields: [company_id], references: [id])
+
+  @@unique([position_id, target_year])
+}
+
+model suspicious_attempts {
+  id           String     @id
+  user_id      String
+  attempt_type String
+  latitude     Decimal?   @db.Decimal(10, 8)
+  longitude    Decimal?   @db.Decimal(11, 8)
+  distance     Int?
+  device_info  String?
+  ip_address   String?
+  notes        String?
+  created_at   DateTime   @default(now())
+  company_id   String?
+  companies    companies? @relation(fields: [company_id], references: [id])
+  users        users      @relation(fields: [user_id], references: [id])
+}
+
+model system_settings {
+  id          String     @id
+  key         String
+  value       String
+  description String?
+  created_at  DateTime   @default(now())
+  updated_at  DateTime
+  company_id  String?
+  companies   companies? @relation(fields: [company_id], references: [id])
+
+  @@unique([key, company_id])
+}
+
+model task_activity_logs {
+  id          String   @id
+  task_id     String
+  user_id     String
+  action      String
+  old_value   String?
+  new_value   String?
+  description String?
+  created_at  DateTime @default(now())
+  tasks       tasks    @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  users       users    @relation(fields: [user_id], references: [id])
+
+  @@index([task_id])
+  @@index([user_id])
+}
+
+model task_approvals {
+  id         String             @id
+  task_id    String
+  user_id    String
+  action     TaskApprovalAction
+  comment    String?
+  created_at DateTime           @default(now())
+  tasks      tasks              @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  users      users              @relation(fields: [user_id], references: [id])
+
+  @@index([task_id])
+  @@index([user_id])
+}
+
+model task_assignments {
+  id             String   @id
+  task_id        String
+  user_id        String
+  assigned_at    DateTime @default(now())
+  assigned_by_id String?
+  tasks          tasks    @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  users          users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, user_id])
+}
+
+model task_attachments {
+  id             String   @id
+  task_id        String
+  uploaded_by_id String
+  file_name      String
+  file_size      Int
+  mime_type      String
+  storage_path   String
+  created_at     DateTime @default(now())
+  tasks          tasks    @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  users          users    @relation(fields: [uploaded_by_id], references: [id])
+
+  @@index([task_id])
+}
+
+model task_automations {
+  id              String            @id
+  company_id      String
+  created_by_id   String
+  name            String
+  description     String?
+  is_active       Boolean           @default(true)
+  trigger         AutomationTrigger
+  trigger_config  Json?
+  action          AutomationAction
+  action_config   Json?
+  category_id     String?
+  priority        TaskPriority?
+  last_run_at     DateTime?
+  run_count       Int               @default(0)
+  created_at      DateTime          @default(now())
+  updated_at      DateTime
+  automation_logs automation_logs[]
+  task_categories task_categories?  @relation(fields: [category_id], references: [id])
+  companies       companies         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  users           users             @relation(fields: [created_by_id], references: [id])
+
+  @@index([company_id])
+  @@index([is_active])
+}
+
+model task_categories {
+  id               String             @id
+  company_id       String
+  name             String
+  name_en          String?
+  color            String             @default("#3B82F6")
+  icon             String?
+  order            Int                @default(0)
+  is_active        Boolean            @default(true)
+  created_at       DateTime           @default(now())
+  updated_at       DateTime
+  task_automations task_automations[]
+  companies        companies          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  task_templates   task_templates[]
+  tasks            tasks[]
+
+  @@unique([company_id, name])
+  @@index([company_id, is_active])
+}
+
+model task_checklist_items {
+  id              String          @id
+  checklist_id    String
+  content         String
+  is_completed    Boolean         @default(false)
+  order           Int             @default(0)
+  completed_at    DateTime?
+  completed_by_id String?
+  created_at      DateTime        @default(now())
+  updated_at      DateTime
+  task_checklists task_checklists @relation(fields: [checklist_id], references: [id], onDelete: Cascade)
+
+  @@index([checklist_id])
+}
+
+model task_checklists {
+  id                   String                 @id
+  task_id              String
+  title                String
+  order                Int                    @default(0)
+  created_at           DateTime               @default(now())
+  updated_at           DateTime
+  task_checklist_items task_checklist_items[]
+  tasks                tasks                  @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@index([task_id])
+}
+
+model task_comments {
+  id                  String              @id
+  task_id             String
+  author_id           String
+  content             String
+  mentions            String[]            @default([])
+  is_edited           Boolean             @default(false)
+  edited_at           DateTime?
+  created_at          DateTime            @default(now())
+  updated_at          DateTime
+  parent_id           String?
+  comment_reactions   comment_reactions[]
+  users               users               @relation(fields: [author_id], references: [id])
+  task_comments       task_comments?      @relation("task_commentsTotask_comments", fields: [parent_id], references: [id], onDelete: Cascade)
+  other_task_comments task_comments[]     @relation("task_commentsTotask_comments")
+  tasks               tasks               @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@index([author_id])
+  @@index([parent_id])
+  @@index([task_id])
+}
+
+model task_dependencies {
+  id                                              String         @id
+  blocked_task_id                                 String
+  blocking_task_id                                String
+  created_at                                      DateTime       @default(now())
+  type                                            DependencyType @default(BLOCKS)
+  tasks_task_dependencies_blocked_task_idTotasks  tasks          @relation("task_dependencies_blocked_task_idTotasks", fields: [blocked_task_id], references: [id], onDelete: Cascade)
+  tasks_task_dependencies_blocking_task_idTotasks tasks          @relation("task_dependencies_blocking_task_idTotasks", fields: [blocking_task_id], references: [id], onDelete: Cascade)
+
+  @@unique([blocked_task_id, blocking_task_id])
+}
+
+model task_evidences {
+  id                                          String             @id
+  task_id                                     String
+  submitted_by_id                             String
+  description                                 String?
+  file_url                                    String?
+  file_name                                   String?
+  file_type                                   String?
+  file_size                                   Int?
+  latitude                                    Float?
+  longitude                                   Float?
+  location_name                               String?
+  status                                      TaskEvidenceStatus @default(PENDING)
+  verified_by_id                              String?
+  verified_at                                 DateTime?
+  verification_comment                        String?
+  created_at                                  DateTime           @default(now())
+  users_task_evidences_submitted_by_idTousers users              @relation("task_evidences_submitted_by_idTousers", fields: [submitted_by_id], references: [id])
+  tasks                                       tasks              @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  users_task_evidences_verified_by_idTousers  users?             @relation("task_evidences_verified_by_idTousers", fields: [verified_by_id], references: [id])
+
+  @@index([submitted_by_id])
+  @@index([task_id])
+}
+
+model task_templates {
+  id                 String           @id
+  company_id         String
+  name               String
+  name_en            String?
+  description        String?
+  category_id        String?
+  default_priority   TaskPriority     @default(MEDIUM)
+  default_due_days   Int?
+  checklist_template Json?
+  workflow_type      String?
+  is_active          Boolean          @default(true)
+  created_at         DateTime         @default(now())
+  updated_at         DateTime
+  task_categories    task_categories? @relation(fields: [category_id], references: [id])
+  companies          companies        @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  tasks              tasks[]
+
+  @@unique([company_id, name])
+  @@index([company_id, is_active])
+}
+
+model task_time_logs {
+  id          String    @id
+  task_id     String
+  user_id     String
+  start_time  DateTime
+  end_time    DateTime?
+  duration    Int?
+  description String?
+  is_billable Boolean   @default(false)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime
+  tasks       tasks     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  users       users     @relation(fields: [user_id], references: [id])
+
+  @@index([task_id])
+  @@index([user_id])
+}
+
+model task_watchers {
+  id             String   @id
+  task_id        String
+  user_id        String
+  watching_since DateTime @default(now())
+  tasks          tasks    @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  users          users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, user_id])
+}
+
+model tasks {
+  id                                                          String               @id
+  company_id                                                  String
+  title                                                       String
+  description                                                 String?
+  status                                                      TaskStatus           @default(TODO)
+  priority                                                    TaskPriority         @default(MEDIUM)
+  category_id                                                 String?
+  template_id                                                 String?
+  due_date                                                    DateTime?
+  start_date                                                  DateTime?
+  completed_at                                                DateTime?
+  created_by_id                                               String
+  assignee_id                                                 String?
+  recurrence_type                                             TaskRecurrenceType?
+  recurrence_end                                              DateTime?
+  parent_task_id                                              String?
+  progress                                                    Int                  @default(0)
+  tags                                                        String[]             @default([])
+  custom_fields                                               Json?
+  order                                                       Int                  @default(0)
+  created_at                                                  DateTime             @default(now())
+  updated_at                                                  DateTime
+  approved_at                                                 DateTime?
+  approver_id                                                 String?
+  escalated_at                                                DateTime?
+  is_escalated                                                Boolean              @default(false)
+  rejected_at                                                 DateTime?
+  rejection_reason                                            String?
+  review_requested_at                                         DateTime?
+  reviewed_at                                                 DateTime?
+  reviewer_id                                                 String?
+  sla_hours                                                   Int?
+  task_activity_logs                                          task_activity_logs[]
+  task_approvals                                              task_approvals[]
+  task_assignments                                            task_assignments[]
+  task_attachments                                            task_attachments[]
+  task_checklists                                             task_checklists[]
+  task_comments                                               task_comments[]
+  task_dependencies_task_dependencies_blocked_task_idTotasks  task_dependencies[]  @relation("task_dependencies_blocked_task_idTotasks")
+  task_dependencies_task_dependencies_blocking_task_idTotasks task_dependencies[]  @relation("task_dependencies_blocking_task_idTotasks")
+  task_evidences                                              task_evidences[]
+  task_time_logs                                              task_time_logs[]
+  task_watchers                                               task_watchers[]
+  users_tasks_approver_idTousers                              users?               @relation("tasks_approver_idTousers", fields: [approver_id], references: [id])
+  users_tasks_assignee_idTousers                              users?               @relation("tasks_assignee_idTousers", fields: [assignee_id], references: [id])
+  task_categories                                             task_categories?     @relation(fields: [category_id], references: [id])
+  companies                                                   companies            @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  users_tasks_created_by_idTousers                            users                @relation("tasks_created_by_idTousers", fields: [created_by_id], references: [id])
+  tasks                                                       tasks?               @relation("tasksTotasks", fields: [parent_task_id], references: [id])
+  other_tasks                                                 tasks[]              @relation("tasksTotasks")
+  users_tasks_reviewer_idTousers                              users?               @relation("tasks_reviewer_idTousers", fields: [reviewer_id], references: [id])
+  task_templates                                              task_templates?      @relation(fields: [template_id], references: [id])
+
+  @@index([company_id, assignee_id])
+  @@index([company_id, category_id])
+  @@index([company_id, created_by_id])
+  @@index([company_id, due_date])
+  @@index([company_id, status])
+}
+
+model upee_360_requests {
+  id                        String                    @id
+  cycle_id                  String
+  employee_id               String
+  rater_id                  String
+  raterType                 FeedbackRaterType
+  status                    UPEE360Status             @default(UPEE_PENDING)
+  anonymous                 Boolean                   @default(true)
+  sent_at                   DateTime?
+  completed_at              DateTime?
+  created_at                DateTime                  @default(now())
+  performance_review_cycles performance_review_cycles @relation(fields: [cycle_id], references: [id])
+  upee_feedback_answers     upee_feedback_answers[]
+
+  @@unique([cycle_id, employee_id, rater_id])
+  @@index([cycle_id, employee_id])
+}
+
+model upee_feedback_answers {
+  id                 String             @id
+  request_id         String
+  question_id        String
+  rating             Int?
+  comment            String?
+  created_at         DateTime           @default(now())
+  feedback_questions feedback_questions @relation(fields: [question_id], references: [id])
+  upee_360_requests  upee_360_requests  @relation(fields: [request_id], references: [id], onDelete: Cascade)
+
+  @@unique([request_id, question_id])
+}
+
+model user_custom_fields {
+  id            String   @id
+  user_id       String
+  field_name    String
+  field_value   String
+  field_type    String   @default("text")
+  source_header String?
+  imported_at   DateTime @default(now())
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+  users         users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, field_name])
+  @@index([field_name])
+  @@index([user_id])
+}
+
+model user_permission_employees {
+  id                 String           @id
+  user_permission_id String
+  employee_id        String
+  created_at         DateTime         @default(now())
+  user_permissions   user_permissions @relation(fields: [user_permission_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_permission_id, employee_id])
+  @@index([employee_id])
+  @@index([user_permission_id])
+}
+
+model user_permissions {
+  id                        String                      @id
+  user_id                   String
+  permission_id             String
+  scope                     PermissionScope             @default(SELF)
+  branch_id                 String?
+  department_id             String?
+  created_at                DateTime                    @default(now())
+  company_id                String?
+  user_permission_employees user_permission_employees[]
+  companies                 companies?                  @relation(fields: [company_id], references: [id])
+  permissions               permissions                 @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  users                     users                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, permission_id, scope, branch_id, department_id])
+  @@index([company_id])
+  @@index([permission_id])
+  @@index([scope, branch_id])
+  @@index([scope, department_id])
+  @@index([user_id])
+  @@index([user_id, permission_id])
+}
+
+model users {
+  id                                                            String                          @id
+  email                                                         String                          @unique
+  phone                                                         String?                         @unique
+  password                                                      String
+  first_name                                                    String
+  last_name                                                     String
+  avatar                                                        String?
+  employee_code                                                 String?
+  job_title                                                     String?
+  role                                                          Role                            @default(EMPLOYEE)
+  status                                                        UserStatus                      @default(ACTIVE)
+  salary                                                        Decimal?                        @db.Decimal(10, 2)
+  hire_date                                                     DateTime?
+  fcm_token                                                     String?
+  branch_id                                                     String?
+  department_id                                                 String?
+  manager_id                                                    String?
+  created_at                                                    DateTime                        @default(now())
+  updated_at                                                    DateTime
+  face_registered                                               Boolean                         @default(false)
+  annual_leave_days                                             Int                             @default(21)
+  used_leave_days                                               Int                             @default(0)
+  remaining_leave_days                                          Int                             @default(21)
+  is_super_admin                                                Boolean                         @default(false)
+  job_title_id                                                  String?
+  cost_center_id                                                String?
+  is_saudi                                                      Boolean                         @default(true)
+  nationality                                                   String?
+  national_id                                                   String?                         @unique
+  company_id                                                    String?
+  border_number                                                 String?
+  iqama_expiry_date                                             DateTime?                       @db.Date
+  iqama_number                                                  String?
+  passport_expiry_date                                          DateTime?                       @db.Date
+  passport_number                                               String?
+  profession                                                    String?
+  profession_code                                               String?
+  date_of_birth                                                 DateTime?                       @db.Date
+  gender                                                        String?
+  gosi_number                                                   String?                         @unique
+  marital_status                                                String?
+  jobFamilyId                                                   String?
+  roleLevelId                                                   String?
+  advance_requests_advance_requests_ceo_approver_idTousers      advance_requests[]              @relation("advance_requests_ceo_approver_idTousers")
+  advance_requests_advance_requests_finance_approver_idTousers  advance_requests[]              @relation("advance_requests_finance_approver_idTousers")
+  advance_requests_advance_requests_hr_approver_idTousers       advance_requests[]              @relation("advance_requests_hr_approver_idTousers")
+  advance_requests_advance_requests_manager_approver_idTousers  advance_requests[]              @relation("advance_requests_manager_approver_idTousers")
+  advance_requests_advance_requests_user_idTousers              advance_requests[]              @relation("advance_requests_user_idTousers")
+  approval_logs                                                 approval_logs[]
+  attendances                                                   attendances[]
+  audit_logs                                                    audit_logs[]
+  comment_reactions                                             comment_reactions[]
+  contracts                                                     contracts[]
+  custody_assignments_custody_assignments_approved_by_idTousers custody_assignments[]           @relation("custody_assignments_approved_by_idTousers")
+  custody_assignments_custody_assignments_assigned_by_idTousers custody_assignments[]           @relation("custody_assignments_assigned_by_idTousers")
+  custody_assignments_custody_assignments_employee_idTousers    custody_assignments[]           @relation("custody_assignments_employee_idTousers")
+  custody_maintenances                                          custody_maintenances[]
+  custody_returns_custody_returns_returned_by_idTousers         custody_returns[]               @relation("custody_returns_returned_by_idTousers")
+  custody_returns_custody_returns_reviewed_by_idTousers         custody_returns[]               @relation("custody_returns_reviewed_by_idTousers")
+  custody_transfers_custody_transfers_approved_by_idTousers     custody_transfers[]             @relation("custody_transfers_approved_by_idTousers")
+  custody_transfers_custody_transfers_from_employee_idTousers   custody_transfers[]             @relation("custody_transfers_from_employee_idTousers")
+  custody_transfers_custody_transfers_initiated_by_idTousers    custody_transfers[]             @relation("custody_transfers_initiated_by_idTousers")
+  custody_transfers_custody_transfers_to_employee_idTousers     custody_transfers[]             @relation("custody_transfers_to_employee_idTousers")
+  disciplinary_cases_disciplinary_cases_employee_idTousers      disciplinary_cases[]            @relation("disciplinary_cases_employee_idTousers")
+  disciplinary_cases_disciplinary_cases_manager_idTousers       disciplinary_cases[]            @relation("disciplinary_cases_manager_idTousers")
+  employee_bank_accounts                                        employee_bank_accounts[]
+  employee_disciplinary_records                                 employee_disciplinary_records[]
+  employee_documents                                            employee_documents[]
+  employee_location_logs                                        employee_location_logs[]
+  employee_salary_assignments                                   employee_salary_assignments[]
+  face_data                                                     face_data?
+  geofence_exit_events                                          geofence_exit_events[]
+  kpi_assignments                                               kpi_assignments[]
+  leave_balances                                                leave_balances[]
+  leave_requests_leave_requests_approver_idTousers              leave_requests[]                @relation("leave_requests_approver_idTousers")
+  leave_requests_leave_requests_hr_approver_idTousers           leave_requests[]                @relation("leave_requests_hr_approver_idTousers")
+  leave_requests_leave_requests_manager_approver_idTousers      leave_requests[]                @relation("leave_requests_manager_approver_idTousers")
+  leave_requests_leave_requests_user_idTousers                  leave_requests[]                @relation("leave_requests_user_idTousers")
+  letter_requests_letter_requests_approver_idTousers            letter_requests[]               @relation("letter_requests_approver_idTousers")
+  letter_requests_letter_requests_hr_approver_idTousers         letter_requests[]               @relation("letter_requests_hr_approver_idTousers")
+  letter_requests_letter_requests_manager_approver_idTousers    letter_requests[]               @relation("letter_requests_manager_approver_idTousers")
+  letter_requests_letter_requests_user_idTousers                letter_requests[]               @relation("letter_requests_user_idTousers")
+  notifications                                                 notifications[]
+  onboarding_processes                                          onboarding_processes[]
+  payroll_adjustments                                           payroll_adjustments[]
+  payslips                                                      payslips[]
+  policies                                                      policies[]
+  raise_requests_raise_requests_ceo_approver_idTousers          raise_requests[]                @relation("raise_requests_ceo_approver_idTousers")
+  raise_requests_raise_requests_finance_approver_idTousers      raise_requests[]                @relation("raise_requests_finance_approver_idTousers")
+  raise_requests_raise_requests_hr_approver_idTousers           raise_requests[]                @relation("raise_requests_hr_approver_idTousers")
+  raise_requests_raise_requests_manager_approver_idTousers      raise_requests[]                @relation("raise_requests_manager_approver_idTousers")
+  raise_requests_raise_requests_user_idTousers                  raise_requests[]                @relation("raise_requests_user_idTousers")
+  refresh_tokens                                                refresh_tokens[]
+  registered_devices                                            registered_devices[]
+  retro_pays                                                    retro_pays[]
+  suspicious_attempts                                           suspicious_attempts[]
+  task_activity_logs                                            task_activity_logs[]
+  task_approvals                                                task_approvals[]
+  task_assignments                                              task_assignments[]
+  task_attachments                                              task_attachments[]
+  task_automations                                              task_automations[]
+  task_comments                                                 task_comments[]
+  task_evidences_task_evidences_submitted_by_idTousers          task_evidences[]                @relation("task_evidences_submitted_by_idTousers")
+  task_evidences_task_evidences_verified_by_idTousers           task_evidences[]                @relation("task_evidences_verified_by_idTousers")
+  task_time_logs                                                task_time_logs[]
+  task_watchers                                                 task_watchers[]
+  tasks_tasks_approver_idTousers                                tasks[]                         @relation("tasks_approver_idTousers")
+  tasks_tasks_assignee_idTousers                                tasks[]                         @relation("tasks_assignee_idTousers")
+  tasks_tasks_created_by_idTousers                              tasks[]                         @relation("tasks_created_by_idTousers")
+  tasks_tasks_reviewer_idTousers                                tasks[]                         @relation("tasks_reviewer_idTousers")
+  user_custom_fields                                            user_custom_fields[]
+  user_permissions                                              user_permissions[]
+  branches                                                      branches?                       @relation(fields: [branch_id], references: [id])
+  companies                                                     companies?                      @relation(fields: [company_id], references: [id])
+  cost_centers                                                  cost_centers?                   @relation(fields: [cost_center_id], references: [id])
+  departments                                                   departments?                    @relation(fields: [department_id], references: [id])
+  job_families                                                  job_families?                   @relation(fields: [jobFamilyId], references: [id])
+  job_titles                                                    job_titles?                     @relation(fields: [job_title_id], references: [id])
+  users                                                         users?                          @relation("usersTousers", fields: [manager_id], references: [id])
+  other_users                                                   users[]                         @relation("usersTousers")
+  role_levels                                                   role_levels?                    @relation(fields: [roleLevelId], references: [id])
+  work_from_home                                                work_from_home[]
+
+  @@unique([company_id, employee_code])
+  @@index([company_id, status])
+}
+
+model work_from_home {
+  id          String     @id
+  user_id     String
+  date        DateTime   @db.Date
+  reason      String?
+  approved_by String?
+  created_at  DateTime   @default(now())
+  company_id  String?
+  companies   companies? @relation(fields: [company_id], references: [id])
+  users       users      @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, date])
+}
+
+model work_schedules {
+  id              String     @id
+  branch_id       String
+  day_of_week     Int
+  work_start_time String
+  work_end_time   String
+  is_working_day  Boolean    @default(true)
+  created_at      DateTime   @default(now())
+  updated_at      DateTime
+  company_id      String?
+  branches        branches   @relation(fields: [branch_id], references: [id])
+  companies       companies? @relation(fields: [company_id], references: [id])
+
+  @@unique([branch_id, day_of_week])
+}
+
+model wps_submissions {
+  id                String       @id
+  company_id        String
+  payroll_run_id    String
+  filename          String
+  file_format       String       @default("WPS")
+  file_url          String?
+  total_amount      Decimal      @db.Decimal(12, 2)
+  employee_count    Int
+  status            WpsStatus    @default(GENERATED)
+  bank_name         String?
+  bank_ref          String?
+  generated_at      DateTime     @default(now())
+  generated_by      String?
+  downloaded_at     DateTime?
+  submitted_at      DateTime?
+  processed_at      DateTime?
+  file_hash_sha256  String?      @db.VarChar(64)
+  generator_version String?
+  notes             String?
+  errors            Json?
+  created_at        DateTime     @default(now())
+  updated_at        DateTime
+  attachment_url    String?
+  downloaded_by     String?
+  submitted_by      String?
+  companies         companies    @relation(fields: [company_id], references: [id])
+  payroll_runs      payroll_runs @relation(fields: [payroll_run_id], references: [id])
+
+  @@index([company_id, status])
+  @@index([payroll_run_id])
+}
+
+enum AdjustmentUnit {
+  DAYS
+  HOURS
+  AMOUNT
+}
+
+enum AdvanceType {
+  BANK_TRANSFER
+  CASH
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  DELAYED
+}
+
+enum ApprovalRequestType {
+  LEAVE
+  ADVANCE
+  RAISE
+  PAYROLL
+  WPS
+}
+
+enum ApprovalStep {
+  MANAGER
+  HR
+  COMPLETED
+  FINANCE
+  CEO
+}
+
+enum AssigneeType {
+  HR
+  IT
+  MANAGER
+  FINANCE
+  EMPLOYEE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  EARLY_LEAVE
+  ABSENT
+  ON_LEAVE
+  WORK_FROM_HOME
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  SETTINGS_CHANGE
+  EXPORT
+  IMPORT
+}
+
+enum AuditModule {
+  AUTH
+  USER
+  PAYROLL
+  PAYSLIP
+  BANK_ACCOUNT
+  SALARY
+  LEAVE
+  ATTENDANCE
+  ADVANCE
+  GOSI
+  EOS
+  PERMISSION
+  POLICY
+  RETRO_PAY
+  LETTER
+  SETTINGS
+  MUDAD
+  WPS
+  CONTRACT
+  DISCIPLINARY
+}
+
+enum AutomationAction {
+  SEND_NOTIFICATION
+  CHANGE_STATUS
+  ASSIGN_USER
+  SET_PRIORITY
+  ADD_WATCHER
+  SEND_EMAIL
+  CREATE_SUBTASK
+}
+
+enum AutomationTrigger {
+  STATUS_CHANGED
+  DUE_DATE_NEAR
+  DUE_DATE_PASSED
+  TASK_CREATED
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  PRIORITY_CHANGED
+  COMMENT_ADDED
+  EVIDENCE_SUBMITTED
+}
+
+enum CalibrationStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  LOCKED
+}
+
+enum CaseEventType {
+  CASE_CREATED
+  HR_INITIAL_REVIEW
+  INFORMAL_ACTION_SENT
+  EMPLOYEE_INFORMAL_RESPONSE
+  OFFICIAL_INVESTIGATION_OPENED
+  HEARING_SCHEDULED
+  MINUTES_UPLOADED
+  DECISION_ISSUED
+  EMPLOYEE_ACKNOWLEDGED
+  EMPLOYEE_OBJECTED
+  OBJECTION_REVIEWED
+  FINALIZED
+  CANCELLED
+}
+
+enum CheckType {
+  CHECK_IN
+  CHECK_OUT
+}
+
+enum CompanyType {
+  OPERATIONAL
+  TECH
+  SALES
+  CREATIVE
+  ADMIN
+  HYBRID
+}
+
+enum CompetencyCategory {
+  CORE
+  LEADERSHIP
+  FUNCTIONAL
+  TECHNICAL
+  VALUE
+}
+
+enum ConductSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+  SUSPENDED
+  DRAFT
+  PENDING_EMPLOYEE
+  PENDING_EMPLOYER
+  PENDING_QIWA
+  REJECTED
+}
+
+enum ContractType {
+  PERMANENT
+  FIXED_TERM
+  PART_TIME
+  SEASONAL
+  PROBATION
+}
+
+enum CustodyAssignmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELIVERED
+  RETURNED
+  TRANSFERRED
+}
+
+enum CustodyCondition {
+  NEW
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum CustodyItemStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_MAINTENANCE
+  LOST
+  DAMAGED
+  DISPOSED
+  RESERVED
+}
+
+enum CustodyMaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANNOT_REPAIR
+}
+
+enum CustodyReturnStatus {
+  PENDING
+  INSPECTING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum CustodyTransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum DecisionType {
+  NO_VIOLATION
+  NOTICE
+  WARNING
+  FIRST_WARNING
+  SECOND_WARNING
+  FINAL_WARNING_TERMINATION
+  FINAL_TERMINATION_ART80
+  PROMOTION_DELAY
+  SALARY_DEDUCTION
+  SUSPENSION_WITH_PAY
+  SUSPENSION_WITHOUT_PAY
+}
+
+enum DeductionBasePolicy {
+  BASIC_ONLY
+  BASIC_FIXED
+  GROSS
+}
+
+enum DependencyType {
+  BLOCKS
+  BLOCKED_BY
+  RELATED
+  DUPLICATES
+}
+
+enum DevelopmentGoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+  UNKNOWN
+}
+
+enum DeviceStatus {
+  ACTIVE
+  PENDING
+  BLOCKED
+  INACTIVE
+}
+
+enum DisciplinaryStage {
+  MANAGER_REQUEST
+  HR_INITIAL_REVIEW
+  EMPLOYEE_INFORMAL_RESPONSE
+  OFFICIAL_INVESTIGATION
+  DECISION
+  OBJECTION
+  FINAL
+}
+
+enum DisciplinaryStatus {
+  SUBMITTED_TO_HR
+  HR_REJECTED
+  HR_INFORMAL_SENT
+  AWAITING_EMPLOYEE_INFORMAL
+  EMPLOYEE_REJECTED_INFORMAL
+  OFFICIAL_INVESTIGATION_OPENED
+  HEARING_SCHEDULED
+  INVESTIGATION_IN_PROGRESS
+  AWAITING_HR_DECISION
+  DECISION_ISSUED
+  AWAITING_EMPLOYEE_ACK
+  EMPLOYEE_OBJECTED
+  HR_REVIEWING_OBJECTION
+  FINALIZED_APPROVED
+  FINALIZED_CANCELLED
+  FINALIZED_CONTINUE_INVESTIGATION
+}
+
+enum DocumentType {
+  ID_CARD
+  IQAMA
+  PASSPORT
+  CONTRACT
+  CERTIFICATE
+  MEDICAL
+  BANK_LETTER
+  DRIVING_LICENSE
+  QUALIFICATION
+  OTHER
+}
+
+enum EvalPhilosophy {
+  RESULTS_FIRST
+  BALANCED
+  CULTURE_FIRST
+}
+
+enum EvidenceType {
+  URL_LINK
+  FILE_UPLOAD
+  DASHBOARD_SNAPSHOT
+  TICKET_REFERENCE
+  PR_COMMIT
+  CUSTOMER_FEEDBACK
+}
+
+enum FeedbackQuestionType {
+  RATING_1_5
+  RATING_1_10
+  TEXT
+  MULTIPLE_CHOICE
+}
+
+enum FeedbackRaterType {
+  SELF
+  MANAGER
+  PEER
+  STAKEHOLDER
+  CUSTOMER
+}
+
+enum FeedbackRequestStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  DECLINED
+  EXPIRED
+}
+
+enum GoalDataSource {
+  ATTENDANCE
+  LEAVES
+  TASKS
+  OVERTIME
+  POLICIES
+  TRAINING
+  CUSTODY
+  PERFORMANCE_REVIEWS
+  RECOGNITION
+  SALES
+  CUSTOM
+}
+
+enum GoalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  AT_RISK
+  BEHIND
+  ON_TRACK
+  EXCEEDED
+  COMPLETED
+  CANCELLED
+}
+
+enum GoalType {
+  INDIVIDUAL
+  TEAM
+  DEPARTMENT
+  COMPANY
+  OKR
+}
+
+enum HireTerminationMethod {
+  EXCLUDE_WEEKENDS
+  INCLUDE_ALL_DAYS
+  PRORATE_BY_CALENDAR
+}
+
+enum IDPStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum KPIFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum KPISourceType {
+  MANUAL
+  SYSTEM_SYNC
+  API_IMPORT
+  CSV_IMPORT
+}
+
+enum LeaveAllowanceMethod {
+  BASIC_SALARY
+  BASIC_PLUS_HOUSING
+  TOTAL_SALARY
+}
+
+enum LeaveCategory {
+  BALANCED
+  CASUAL
+  SICK
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  MODIFIED
+  MGR_APPROVED
+  MGR_REJECTED
+  DELAYED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  PERSONAL
+  EMERGENCY
+  NEW_BABY
+  MARRIAGE
+  BEREAVEMENT
+  HAJJ
+  EXAM
+  WORK_MISSION
+  UNPAID
+  EARLY_LEAVE
+  OTHER
+}
+
+enum LetterStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  MGR_APPROVED
+  MGR_REJECTED
+  DELAYED
+}
+
+enum LetterType {
+  SALARY_DEFINITION
+  SERVICE_CONFIRMATION
+  SALARY_ADJUSTMENT
+  PROMOTION
+  TRANSFER_ASSIGNMENT
+  RESIGNATION
+  TERMINATION
+  CLEARANCE
+  EXPERIENCE
+  SALARY_DEFINITION_DIRECTED
+  NOC
+  DELEGATION
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  EMERGENCY
+}
+
+enum MudadStatus {
+  PENDING
+  PREPARED
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  RESUBMITTED
+  RESUBMIT_REQUIRED
+}
+
+enum NotificationType {
+  LATE_CHECK_IN
+  EARLY_CHECK_OUT
+  EARLY_CHECK_IN
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  SUSPICIOUS_ACTIVITY
+  GENERAL
+  LETTER_APPROVED
+  LETTER_REJECTED
+  DISC_CASE_SUBMITTED
+  DISC_HR_REJECTED
+  DISC_INFORMAL_SENT
+  DISC_EMP_REJECTED_INFORMAL
+  DISC_HEARING_SCHEDULED
+  DISC_DECISION_ISSUED
+  DISC_EMP_OBJECTED
+  DISC_FINALIZED
+  EMP_EXIT_GEOFENCE
+  EMP_RETURN_GEOFENCE
+}
+
+enum OccurrenceResetPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  NEVER
+}
+
+enum OnboardingProcessStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum OnboardingTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum OnboardingType {
+  JOINING
+  OFFBOARDING
+  RETURN
+}
+
+enum OutputSign {
+  EARNING
+  DEDUCTION
+}
+
+enum OvertimeCalculationMethod {
+  BASED_ON_SHIFTS
+  BASED_ON_BASIC_ONLY
+  BASED_ON_TOTAL
+  BASED_ON_ELIGIBLE_COMPONENTS
+}
+
+enum PIPOutcome {
+  PASSED
+  EXTENDED
+  TERMINATED
+}
+
+enum PIPStatus {
+  ACTIVE
+  EXTENDED
+  COMPLETED
+  ESCALATED
+}
+
+enum PayrollAdjustmentStatus {
+  PENDING
+  POSTED
+  REVERSED
+  CANCELLED
+}
+
+enum PayrollStatus {
+  DRAFT
+  INPUTS_COLLECTED
+  CALCULATED
+  HR_REVIEWED
+  FINANCE_APPROVED
+  LOCKED
+  PAID
+  CANCELLED
+  ARCHIVED
+}
+
+enum PayslipLineSource {
+  STRUCTURE
+  POLICY
+  MANUAL
+  ADJUSTMENT
+  STATUTORY
+  SMART
+}
+
+enum PerformanceReviewCycleStatus {
+  DRAFT
+  PLANNING
+  ACTIVE
+  CALIBRATION
+  COMPLETED
+  ARCHIVED
+}
+
+enum PerformanceReviewCycleType {
+  ANNUAL
+  SEMI_ANNUAL
+  QUARTERLY
+  MONTHLY
+  PROJECT_BASED
+  CONTINUOUS
+}
+
+enum PerformanceReviewStatus {
+  NOT_STARTED
+  SELF_REVIEW
+  MANAGER_REVIEW
+  FEEDBACK_COLLECTION
+  CALIBRATION
+  ACKNOWLEDGED
+  COMPLETED
+}
+
+enum PermissionAuditAction {
+  ADDED
+  REMOVED
+  MODIFIED
+}
+
+enum PermissionScope {
+  SELF
+  TEAM
+  BRANCH
+  DEPARTMENT
+  ALL
+  CUSTOM
+}
+
+enum PolicyApprovalAction {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum PolicyScope {
+  COMPANY
+  BRANCH
+  DEPARTMENT
+  JOB_TITLE
+  EMPLOYEE
+}
+
+enum PolicyType {
+  OVERTIME
+  LEAVE
+  DEDUCTION
+  ALLOWANCE
+  ATTENDANCE
+  GENERAL
+}
+
+enum QiwaAuthStatus {
+  NOT_SUBMITTED
+  PENDING
+  AUTHENTICATED
+  REJECTED
+  EXPIRED
+}
+
+enum RaiseStatus {
+  PENDING
+  MGR_APPROVED
+  MGR_REJECTED
+  APPROVED
+  REJECTED
+  DELAYED
+  CANCELLED
+}
+
+enum RaiseType {
+  SALARY_INCREASE
+  ANNUAL_LEAVE_BONUS
+  BUSINESS_TRIP
+  BONUS
+  ALLOWANCE
+  OTHER
+}
+
+enum RatingBand {
+  EXCEPTIONAL
+  EXCEEDS
+  MEETS
+  PARTIALLY_MEETS
+  NEEDS_IMPROVEMENT
+}
+
+enum RecognitionType {
+  KUDOS
+  BADGE
+  AWARD
+  ACHIEVEMENT
+  SPOT_BONUS
+}
+
+enum ResultStatus {
+  DRAFT
+  SUBMITTED
+  CALIBRATED
+  FINALIZED
+  ARCHIVED
+}
+
+enum RetroApplicationStatus {
+  PENDING
+  CALCULATING
+  REVIEWED
+  APPROVED
+  APPLIED
+  CANCELLED
+}
+
+enum RetroPayStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  HR
+}
+
+enum SalaryComponentNature {
+  FIXED
+  VARIABLE
+  FORMULA
+}
+
+enum SalaryComponentType {
+  EARNING
+  DEDUCTION
+}
+
+enum SmartPolicyActionType {
+  ADD_TO_PAYROLL
+  DEDUCT_FROM_PAYROLL
+  SEND_NOTIFICATION
+  ALERT_HR
+  CREATE_RECORD
+}
+
+enum SmartPolicyStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum SmartPolicyTrigger {
+  ATTENDANCE
+  LEAVE
+  CUSTODY
+  PAYROLL
+  ANNIVERSARY
+  CONTRACT
+  DISCIPLINARY
+  PERFORMANCE
+  CUSTOM
+}
+
+enum SubmissionEntityType {
+  MUDAD
+  WPS
+  QIWA
+}
+
+enum TaskApprovalAction {
+  SUBMITTED_FOR_REVIEW
+  REVIEWED
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum TaskEvidenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TaskPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskRecurrenceType {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  COMPLETED
+  CANCELLED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum UPEE360Status {
+  UPEE_PENDING
+  UPEE_SENT
+  UPEE_IN_PROGRESS
+  UPEE_COMPLETED
+  UPEE_EXPIRED
+}
+
+enum UPEECompetencyCategory {
+  UPEE_CORE
+  UPEE_FUNCTIONAL
+  UPEE_LEADERSHIP
+}
+
+enum UnpaidLeaveMethod {
+  BASED_ON_SHIFTS
+  BASED_ON_CALENDAR
+  BASED_ON_WORKING_DAYS
+}
+
+enum UpdateRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum UpdateRequestType {
+  FACE_UPDATE
+  DEVICE_UPDATE
+  BOTH
+  DEVICE_CHANGE
+  PROFILE_UPDATE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum WorkDayCalculationBase {
+  CALENDAR_DAYS
+  ACTUAL_WORKING_DAYS
+  FIXED_30_DAYS
+}
+
+enum WpsStatus {
+  GENERATED
+  DOWNLOADED
+  SUBMITTED
+  PROCESSING
+  PROCESSED
+  FAILED
+}

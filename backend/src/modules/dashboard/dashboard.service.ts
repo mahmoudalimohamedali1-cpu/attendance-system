@@ -1,13 +1,14 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { DashboardSummaryDto, DashboardHealthDto, DashboardExceptionsDto, DashboardTrendsDto } from './dto/dashboard.dto';
+import { DashboardSummaryDto, DashboardHealthDto, DashboardExceptionsDto, DashboardTrendsDto, DashboardMudadMetricsDto } from './dto/dashboard.dto';
 import Redis from 'ioredis';
 
 const CACHE_TTL = {
     SUMMARY: 60,      // 1 minute
-    HEALTH: 60,       // 1 minute  
+    HEALTH: 60,       // 1 minute
     EXCEPTIONS: 120,  // 2 minutes
     TRENDS: 300,      // 5 minutes
+    MUDAD_METRICS: 120, // 2 minutes
 };
 
 @Injectable()
@@ -465,6 +466,63 @@ export class DashboardService {
             newThisMonth,
             onLeaveToday,
             pendingApprovals: pendingLeaves + pendingAdvances
+        };
+    }
+
+    /**
+     * MUDAD Compliance Metrics (CACHED)
+     */
+    async getMudadMetrics(companyId: string, year?: number): Promise<DashboardMudadMetricsDto> {
+        const currentYear = year || new Date().getFullYear();
+        const cacheKey = `dashboard:mudad-metrics:${companyId}:${currentYear}`;
+        return this.cached(cacheKey, CACHE_TTL.MUDAD_METRICS, () => this._getMudadMetricsImpl(companyId, currentYear));
+    }
+
+    private async _getMudadMetricsImpl(companyId: string, year: number): Promise<DashboardMudadMetricsDto> {
+        // Get all MUDAD submissions for the specified year
+        const submissions = await this.prisma.mudadSubmission.findMany({
+            where: {
+                companyId,
+                period: { startsWith: String(year) },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        // Calculate metrics
+        const totalSubmissions = submissions.length;
+        const pendingCount = submissions.filter(s => s.status === 'PENDING').length;
+        const preparedCount = submissions.filter(s => s.status === 'PREPARED').length;
+        const submittedCount = submissions.filter(s => s.status === 'SUBMITTED').length;
+        const acceptedCount = submissions.filter(s => s.status === 'ACCEPTED').length;
+        const rejectedCount = submissions.filter(s => s.status === 'REJECTED').length;
+        const resubmitRequiredCount = submissions.filter(s => s.status === 'RESUBMIT_REQUIRED').length;
+
+        const totalAmount = submissions.reduce((sum, s) => sum + Number(s.totalAmount), 0);
+
+        // Calculate compliance rate (accepted / total submitted)
+        const totalProcessed = acceptedCount + rejectedCount;
+        const complianceRate = totalProcessed > 0 ? (acceptedCount / totalProcessed) * 100 : 0;
+
+        // Get last submission date
+        const lastSubmission = submissions.find(s => s.submittedAt);
+        const lastSubmissionDate = lastSubmission?.submittedAt;
+
+        // Calculate next due date (end of current month)
+        const now = new Date();
+        const nextDueDate = new Date(now.getFullYear(), now.getMonth() + 1, 5); // 5th of next month
+
+        return {
+            totalSubmissions,
+            pendingCount,
+            preparedCount,
+            submittedCount,
+            acceptedCount,
+            rejectedCount,
+            resubmitRequiredCount,
+            totalAmount,
+            complianceRate,
+            lastSubmissionDate,
+            nextDueDate,
         };
     }
 }

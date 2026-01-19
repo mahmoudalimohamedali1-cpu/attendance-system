@@ -357,7 +357,7 @@ export class GeniusActionsService {
             }
         }
 
-        const task = await (this.prisma.task.create as any)({
+        const task = await (this.prisma.tasks.create as any)({
             data: {
                 title,
                 description: description || '',
@@ -487,7 +487,7 @@ export class GeniusActionsService {
         }
 
         try {
-            const task = await this.prisma.task.findFirst({
+            const task = await this.prisma.tasks.findFirst({
                 where: { companyId: context.companyId, title: { contains: title, mode: 'insensitive' } },
                 include: { assignee: { select: { firstName: true, lastName: true } } }
             });
@@ -709,7 +709,7 @@ export class GeniusActionsService {
             assigneeId = assignee.id;
         }
 
-        const task = await (this.prisma.task.create as any)({
+        const task = await (this.prisma.tasks.create as any)({
             data: {
                 title,
                 description: '',
@@ -766,7 +766,7 @@ export class GeniusActionsService {
             return { success: false, message: '❌ يرجى تحديد المهمة' };
         }
 
-        const task = await this.prisma.task.findFirst({
+        const task = await this.prisma.tasks.findFirst({
             where: {
                 companyId: context.companyId,
                 title: { contains: titleMatch[1], mode: 'insensitive' }
@@ -777,7 +777,7 @@ export class GeniusActionsService {
             return { success: false, message: '❌ المهمة غير موجودة' };
         }
 
-        await this.prisma.task.update({
+        await this.prisma.tasks.update({
             where: { id: task.id },
             data: { status: 'COMPLETED', completedAt: new Date() } as any
         });
