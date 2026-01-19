@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TargetingService, TargetRule } from './targeting.service';
-import { PostStatus, PostType, VisibilityType, Prisma, MentionType } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PostStatus, PostType, VisibilityType, Prisma, MentionType, NotificationType } from '@prisma/client';
 import { CreatePostDto, PostTargetDto, PostAttachmentDto, PostMentionDto } from './dto';
 import { UpdatePostDto } from './dto';
 
@@ -113,6 +114,7 @@ export class SocialFeedService {
   constructor(
     private prisma: PrismaService,
     private targetingService: TargetingService,
+    private notificationsService: NotificationsService,
   ) {}
 
   // ==================== جلب الفيد ====================
@@ -599,7 +601,190 @@ export class SocialFeedService {
 
     this.logger.log(`تم إنشاء منشور جديد: ${post.id} بواسطة ${authorId}`);
 
+    // إرسال الإشعارات للمنشورات المنشورة
+    if (post.status === PostStatus.PUBLISHED) {
+      await this.sendNewPostNotifications(post, companyId, authorId);
+    }
+
     return post as PostWithRelations;
+  }
+
+  /**
+   * إرسال إشعارات المنشور الجديد
+   */
+  private async sendNewPostNotifications(
+    post: any,
+    companyId: string,
+    authorId: string,
+  ): Promise<void> {
+    try {
+      // جلب بيانات الكاتب للإشعار
+      const author = await this.prisma.user.findUnique({
+        where: { id: authorId },
+        select: { firstName: true, lastName: true },
+      });
+
+      const authorName = author ? `${author.firstName} ${author.lastName}` : 'مستخدم';
+      const postTitle = post.title || post.content.substring(0, 50) + (post.content.length > 50 ? '...' : '');
+      const postTypeLabel = this.getPostTypeLabel(post.type);
+
+      // 1. إشعار الأشخاص المذكورين في المنشور
+      if (post.mentions && post.mentions.length > 0) {
+        await this.sendMentionNotifications(
+          companyId,
+          authorId,
+          authorName,
+          post.id,
+          post.mentions,
+          'POST',
+        );
+      }
+
+      // 2. إشعار الجمهور المستهدف (للإعلانات والمنشورات الهامة)
+      if (post.type === PostType.ANNOUNCEMENT || post.requireAcknowledge) {
+        await this.sendPostToTargetedUsersNotification(
+          companyId,
+          authorId,
+          post.id,
+          postTypeLabel,
+          postTitle,
+          authorName,
+        );
+      }
+    } catch (error) {
+      // لا نريد أن يفشل إنشاء المنشور بسبب فشل الإشعارات
+      this.logger.error(`فشل إرسال إشعارات المنشور: ${post.id}`, error);
+    }
+  }
+
+  /**
+   * إرسال إشعارات للأشخاص المذكورين
+   */
+  private async sendMentionNotifications(
+    companyId: string,
+    mentionedByUserId: string,
+    mentionedByName: string,
+    entityId: string,
+    mentions: Array<{ mentionType: string; mentionId: string }>,
+    entityType: 'POST' | 'COMMENT',
+  ): Promise<void> {
+    try {
+      // جمع معرفات المستخدمين المذكورين
+      const userMentionIds = mentions
+        .filter((m) => m.mentionType === MentionType.USER)
+        .map((m) => m.mentionId)
+        .filter((id) => id !== mentionedByUserId); // استبعاد الشخص الذي قام بالإشارة
+
+      if (userMentionIds.length === 0) return;
+
+      const title = entityType === 'POST'
+        ? 'تمت الإشارة إليك في منشور'
+        : 'تمت الإشارة إليك في تعليق';
+
+      const body = `قام ${mentionedByName} بالإشارة إليك`;
+
+      await this.notificationsService.createMany(
+        companyId,
+        userMentionIds,
+        NotificationType.GENERAL,
+        title,
+        body,
+        entityType === 'POST' ? 'POST' : 'COMMENT',
+        entityId,
+        { mentionedBy: mentionedByUserId },
+      );
+
+      this.logger.log(`تم إرسال إشعارات الإشارة لـ ${userMentionIds.length} مستخدم`);
+    } catch (error) {
+      this.logger.error('فشل إرسال إشعارات الإشارة', error);
+    }
+  }
+
+  /**
+   * إرسال إشعارات للجمهور المستهدف
+   */
+  private async sendPostToTargetedUsersNotification(
+    companyId: string,
+    authorId: string,
+    postId: string,
+    postTypeLabel: string,
+    postTitle: string,
+    authorName: string,
+  ): Promise<void> {
+    try {
+      // جلب بيانات المنشور مع قواعد الاستهداف
+      const post = await this.prisma.post.findUnique({
+        where: { id: postId },
+        include: {
+          targets: {
+            select: {
+              targetType: true,
+              targetValue: true,
+              isExclusion: true,
+            },
+          },
+        },
+      });
+
+      if (!post) return;
+
+      // تحويل قواعد الاستهداف إلى الصيغة المطلوبة
+      const targetRules: TargetRule[] = post.targets.map((t) => ({
+        targetType: t.targetType,
+        targetValue: t.targetValue,
+        isExclusion: t.isExclusion,
+      }));
+
+      // جلب المستخدمين المستهدفين
+      const targetedUsers = await this.targetingService.getTargetedUserIds(
+        companyId,
+        post.visibilityType,
+        targetRules,
+        authorId,
+      );
+
+      // استبعاد الكاتب من الإشعارات وتحديد حد أقصى
+      const maxNotifications = 1000;
+      const userIdsToNotify = targetedUsers
+        .filter((id) => id !== authorId)
+        .slice(0, maxNotifications);
+
+      if (userIdsToNotify.length === 0) return;
+
+      const title = `${postTypeLabel} جديد`;
+      const body = `نشر ${authorName}: ${postTitle}`;
+
+      await this.notificationsService.createMany(
+        companyId,
+        userIdsToNotify,
+        NotificationType.GENERAL,
+        title,
+        body,
+        'POST',
+        postId,
+        { authorId, postType: postTypeLabel },
+      );
+
+      this.logger.log(`تم إرسال إشعارات المنشور لـ ${userIdsToNotify.length} مستخدم`);
+    } catch (error) {
+      this.logger.error('فشل إرسال إشعارات الجمهور المستهدف', error);
+    }
+  }
+
+  /**
+   * الحصول على تسمية نوع المنشور
+   */
+  private getPostTypeLabel(type: PostType): string {
+    const labels: Record<PostType, string> = {
+      [PostType.POST]: 'منشور',
+      [PostType.ANNOUNCEMENT]: 'إعلان',
+      [PostType.POLICY]: 'سياسة',
+      [PostType.NEWS]: 'خبر',
+      [PostType.EVENT]: 'فعالية',
+      [PostType.POLL]: 'استطلاع',
+      [PostType.AD]: 'إعلان ترويجي',
+    };
+    return labels[type] || 'منشور';
   }
 
   // ==================== تحديث منشور ====================
@@ -1957,6 +2142,16 @@ export class SocialFeedService {
 
     this.logger.log(`تم إضافة تعليق على المنشور: ${postId} بواسطة ${authorId}`);
 
+    // إرسال الإشعارات
+    await this.sendCommentNotifications(
+      companyId,
+      post,
+      comment,
+      authorId,
+      mentions,
+      parentId,
+    );
+
     return {
       id: comment.id,
       content: comment.content,
@@ -1965,6 +2160,77 @@ export class SocialFeedService {
       createdAt: comment.createdAt,
       author: comment.author,
     };
+  }
+
+  /**
+   * إرسال إشعارات التعليق الجديد
+   */
+  private async sendCommentNotifications(
+    companyId: string,
+    post: any,
+    comment: any,
+    authorId: string,
+    mentions?: string[],
+    parentId?: string,
+  ): Promise<void> {
+    try {
+      const commenterName = `${comment.author.firstName} ${comment.author.lastName}`;
+
+      // 1. إشعار صاحب المنشور (إذا لم يكن هو المعلق)
+      if (post.authorId !== authorId) {
+        await this.notificationsService.create({
+          companyId,
+          userId: post.authorId,
+          type: NotificationType.GENERAL,
+          title: 'تعليق جديد على منشورك',
+          body: `علق ${commenterName} على منشورك`,
+          entityType: 'COMMENT',
+          entityId: comment.id,
+          data: { postId: post.id, commenterId: authorId },
+        });
+      }
+
+      // 2. إشعار صاحب التعليق الأصلي (في حالة الرد)
+      if (parentId) {
+        const parentComment = await this.prisma.postComment.findUnique({
+          where: { id: parentId },
+          select: { authorId: true },
+        });
+
+        if (parentComment && parentComment.authorId !== authorId && parentComment.authorId !== post.authorId) {
+          await this.notificationsService.create({
+            companyId,
+            userId: parentComment.authorId,
+            type: NotificationType.GENERAL,
+            title: 'رد جديد على تعليقك',
+            body: `رد ${commenterName} على تعليقك`,
+            entityType: 'COMMENT',
+            entityId: comment.id,
+            data: { postId: post.id, parentCommentId: parentId, replierId: authorId },
+          });
+        }
+      }
+
+      // 3. إشعار الأشخاص المذكورين في التعليق
+      if (mentions && mentions.length > 0) {
+        const mentionObjects = mentions.map((mentionId) => ({
+          mentionType: MentionType.USER,
+          mentionId,
+        }));
+
+        await this.sendMentionNotifications(
+          companyId,
+          authorId,
+          commenterName,
+          comment.id,
+          mentionObjects,
+          'COMMENT',
+        );
+      }
+    } catch (error) {
+      // لا نريد أن يفشل إضافة التعليق بسبب فشل الإشعارات
+      this.logger.error(`فشل إرسال إشعارات التعليق: ${comment.id}`, error);
+    }
   }
 
   /**
