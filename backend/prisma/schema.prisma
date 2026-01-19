@@ -2696,20 +2696,21 @@ model SmartPolicyRetroApplication {
 }
 
 model SmartPolicyTemplate {
-  id             String              @id @default(uuid())
-  nameAr         String?             @map("name_ar")
-  nameEn         String?             @map("name_en")
-  descriptionAr  String?             @map("description_ar")
-  descriptionEn  String?             @map("description_en")
-  triggerEvent   SmartPolicyTrigger? @map("trigger_event")
-  category       String
-  baseRule       Json?               @map("base_rule")
-  recommendedFor String?             @map("recommended_for")
-  usageCount     Int                 @default(0) @map("usage_count")
-  isActive       Boolean             @default(true) @map("is_active")
-  companyId      String?             @map("company_id")
-  company        Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt      DateTime            @default(now()) @map("created_at")
+  id               String              @id @default(uuid())
+  nameAr           String?             @map("name_ar")
+  nameEn           String?             @map("name_en")
+  descriptionAr    String?             @map("description_ar")
+  descriptionEn    String?             @map("description_en")
+  triggerEvent     SmartPolicyTrigger? @map("trigger_event")
+  category         String
+  baseRule         Json?               @map("base_rule")
+  recommendedFor   String?             @map("recommended_for")
+  usageCount       Int                 @default(0) @map("usage_count")
+  isActive         Boolean             @default(true) @map("is_active")
+  isSystemTemplate Boolean             @default(false) @map("is_system_template")
+  companyId        String?             @map("company_id")
+  company          Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt        DateTime            @default(now()) @map("created_at")
 
   @@map("smart_policy_templates")
 }
