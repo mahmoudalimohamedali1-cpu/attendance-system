@@ -2514,6 +2514,9 @@ model SmartPolicy {
   // الإجراءات المحللة
   actions Json @default("[]")
 
+  // === Issue #21: AND/OR Logic Support ===
+  conditionLogic String @default("ALL") @map("condition_logic")
+
   // النطاق: لمن تُطبق السياسة
   scopeType String  @default("ALL") @map("scope_type") // ALL, EMPLOYEE, DEPARTMENT, BRANCH, JOB_TITLE
   scopeId   String? @map("scope_id") // معرف الهدف (إن وُجد)
@@ -2697,14 +2700,22 @@ model SmartPolicyRetroApplication {
 
 model SmartPolicyTemplate {
   id               String              @id @default(uuid())
+  name             String?             @map("name")
   nameAr           String?             @map("name_ar")
   nameEn           String?             @map("name_en")
   descriptionAr    String?             @map("description_ar")
   descriptionEn    String?             @map("description_en")
   triggerEvent     SmartPolicyTrigger? @map("trigger_event")
   category         String
-  baseRule         Json?               @map("base_rule")
+  description      String?             @map("description") @db.Text
+  originalText     String?             @map("original_text") @db.Text
+  parsedRule       Json?               @map("parsed_rule")
   recommendedFor   String?             @map("recommended_for")
+  legalCompliance  Json?               @map("legal_compliance")
+  laborLawArticles Json?               @map("labor_law_articles")
+  isPublic         Boolean             @default(true) @map("is_public")
+  rating           Decimal?            @default(0) @db.Decimal(3, 1)
+  ratingCount      Int                 @default(0) @map("rating_count")
   usageCount       Int                 @default(0) @map("usage_count")
   isActive         Boolean             @default(true) @map("is_active")
   isSystemTemplate Boolean             @default(false) @map("is_system_template")
