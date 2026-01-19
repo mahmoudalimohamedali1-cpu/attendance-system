@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/l10n/app_localizations.dart';
 import '../bloc/letters_bloc.dart';
 
 class CreateLetterRequestPage extends StatefulWidget {
@@ -191,9 +191,9 @@ class _CreateLetterRequestPageState extends State<CreateLetterRequestPage> {
 
       final attachmentPaths = _attachments.map((f) => f.path).toList();
 
-      print('📤 Letter request data: $requestData');
-      print('📎 Attachments: ${attachmentPaths.length}');
-      print('🚀 Submitting letter request...');
+      debugPrint('📤 Letter request data: $requestData');
+      debugPrint('📎 Attachments: ${attachmentPaths.length}');
+      debugPrint('🚀 Submitting letter request...');
 
       context.read<LettersBloc>().add(CreateLetterWithAttachmentsEvent(
         requestData,
@@ -223,7 +223,7 @@ class _CreateLetterRequestPageState extends State<CreateLetterRequestPage> {
             _isSubmitting = false;
             _isUploadingFiles = false;
           });
-          print('❌ Error state received: ${state.message}');
+          debugPrint('❌ Error state received: ${state.message}');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('فشل إرسال الطلب: ${state.message}'),
@@ -252,7 +252,7 @@ class _CreateLetterRequestPageState extends State<CreateLetterRequestPage> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _selectedType,
+                initialValue: _selectedType,
                 decoration: InputDecoration(
                   labelText: 'اختر نوع الخطاب',
                   border: OutlineInputBorder(
@@ -356,8 +356,8 @@ class _CreateLetterRequestPageState extends State<CreateLetterRequestPage> {
                         ),
                       ),
                       if (_attachments.length >= 5)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8.0),
                           child: Text(
                             'الحد الأقصى 5 مرفقات',
                             style: TextStyle(color: AppTheme.warningColor, fontSize: 12),

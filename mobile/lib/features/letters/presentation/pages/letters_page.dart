@@ -159,7 +159,7 @@ class _LettersPageState extends State<LettersPage> with SingleTickerProviderStat
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
+                        const Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
                         const SizedBox(height: 16),
                         Text(state.message),
                         const SizedBox(height: 16),
@@ -224,14 +224,14 @@ class _LettersPageState extends State<LettersPage> with SingleTickerProviderStat
                                       _getTypeLabel(letter['type'] ?? ''),
                                       style: const TextStyle(fontSize: 12),
                                     ),
-                                    backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                                   ),
                                   Chip(
                                     label: Text(
                                       _getStatusLabel(letter['status'] ?? ''),
                                       style: const TextStyle(fontSize: 12),
                                     ),
-                                    backgroundColor: _getStatusColor(letter['status'] ?? '').withOpacity(0.1),
+                                    backgroundColor: _getStatusColor(letter['status'] ?? '').withValues(alpha: 0.1),
                                     labelStyle: TextStyle(
                                       color: _getStatusColor(letter['status'] ?? ''),
                                     ),

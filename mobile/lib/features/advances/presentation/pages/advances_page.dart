@@ -135,7 +135,7 @@ class _AdvancesPageState extends State<AdvancesPage> {
                                           color: AppTheme.primaryColor.withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(10),
                                         ),
-                                        child: Icon(Icons.account_balance_wallet, color: AppTheme.primaryColor),
+                                        child: const Icon(Icons.account_balance_wallet, color: AppTheme.primaryColor),
                                       ),
                                       const SizedBox(width: 12),
                                       Column(

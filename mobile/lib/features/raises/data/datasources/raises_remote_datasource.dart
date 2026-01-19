@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // lib/features/raises/data/datasources/raises_remote_datasource.dart
 import '../../../../core/network/api_client.dart';
 import '../models/raise_request_model.dart';
@@ -26,12 +27,12 @@ class RaisesRemoteDatasourceImpl implements RaisesRemoteDatasource {
     // First, upload attachments if any
     List<String>? uploadedAttachments;
     if (dto.attachmentPaths != null && dto.attachmentPaths!.isNotEmpty) {
-      print('📤 Uploading ${dto.attachmentPaths!.length} attachments...');
+      debugPrint('📤 Uploading ${dto.attachmentPaths!.length} attachments...');
       final uploadResponse = await apiClient.uploadRaiseAttachments(dto.attachmentPaths!);
       final uploadData = uploadResponse.data as Map<String, dynamic>;
       final files = uploadData['files'] as List<dynamic>;
       uploadedAttachments = files.map((f) => f['path'] as String).toList();
-      print('✅ Uploaded attachments: $uploadedAttachments');
+      debugPrint('✅ Uploaded attachments: $uploadedAttachments');
     }
     
     // Create the request data with uploaded attachment URLs

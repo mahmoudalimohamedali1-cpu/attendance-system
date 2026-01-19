@@ -87,7 +87,7 @@ class _RequestReturnPageState extends ConsumerState<RequestReturnPage> {
             const Text('حالة العهدة عند الإرجاع *', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _condition,
+              initialValue: _condition,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),

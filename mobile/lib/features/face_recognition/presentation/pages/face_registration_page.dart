@@ -318,7 +318,7 @@ class _FaceRegistrationPageState extends State<FaceRegistrationPage> with Widget
                 ovalWidth: _ovalWidth,
                 ovalHeight: _ovalHeight,
                 borderColor: _faceDetected ? Colors.green : Colors.white,
-                overlayColor: Colors.black.withOpacity(0.6),
+                overlayColor: Colors.black.withValues(alpha: 0.6),
               ),
             ),
           ),
@@ -332,7 +332,7 @@ class _FaceRegistrationPageState extends State<FaceRegistrationPage> with Widget
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
-                  color: _statusColor.withOpacity(0.9),
+                  color: _statusColor.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -444,7 +444,7 @@ class _FaceRegistrationPageState extends State<FaceRegistrationPage> with Widget
                     boxShadow: _faceDetected
                         ? [
                             BoxShadow(
-                              color: Colors.green.withOpacity(0.5),
+                              color: Colors.green.withValues(alpha: 0.5),
                               blurRadius: 20,
                               spreadRadius: 5,
                             ),
@@ -536,7 +536,7 @@ class FaceOverlayPainter extends CustomPainter {
     );
 
     // رسم علامات الزوايا
-    final cornerLength = 30.0;
+    const cornerLength = 30.0;
     final cornerPaint = Paint()
       ..color = borderColor
       ..style = PaintingStyle.stroke

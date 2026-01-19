@@ -36,7 +36,7 @@ class _IssueDecisionDialogState extends State<IssueDecisionDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: _decisionType,
+              initialValue: _decisionType,
               decoration: const InputDecoration(labelText: 'نوع القرار', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'VERBAL_WARNING', child: Text('إنذار شفهي')),

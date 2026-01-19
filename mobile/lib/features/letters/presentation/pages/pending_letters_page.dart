@@ -1,10 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/letters_bloc.dart';
-import 'letter_details_page.dart';
 
 class PendingLettersPage extends StatefulWidget {
   const PendingLettersPage({super.key});
@@ -17,7 +16,7 @@ class _PendingLettersPageState extends State<PendingLettersPage> {
   @override
   void initState() {
     super.initState();
-    print('🔄 Initializing PendingLettersPage');
+    debugPrint('🔄 Initializing PendingLettersPage');
     context.read<LettersBloc>().add(const GetPendingLettersEvent());
   }
 
@@ -71,7 +70,7 @@ class _PendingLettersPageState extends State<PendingLettersPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
+                  const Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
                   const SizedBox(height: 16),
                   Text(state.message, style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 16),
@@ -88,7 +87,7 @@ class _PendingLettersPageState extends State<PendingLettersPage> {
 
           if (state is LettersLoaded) {
             final letters = state.letters;
-            print('📋 LettersLoaded state: ${letters.length} letters');
+            debugPrint('📋 LettersLoaded state: ${letters.length} letters');
 
             if (letters.isEmpty) {
               return Center(
@@ -150,7 +149,7 @@ class _PendingLettersPageState extends State<PendingLettersPage> {
                                     _getTypeLabel(letter['type'] ?? ''),
                                     style: const TextStyle(fontSize: 12),
                                   ),
-                                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                                 ),
                               ],
                             ),

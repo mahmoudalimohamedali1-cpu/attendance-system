@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../domain/repositories/letters_repository.dart';
@@ -129,15 +130,15 @@ class LettersBloc extends Bloc<LettersEvent, LettersState> {
       
       // رفع المرفقات أولاً إذا وجدت
       if (event.attachmentPaths.isNotEmpty) {
-        print('📎 Uploading ${event.attachmentPaths.length} attachments...');
+        debugPrint('📎 Uploading ${event.attachmentPaths.length} attachments...');
         try {
           final uploadResult = await repository.uploadAttachments(event.attachmentPaths);
           if (uploadResult is Map && uploadResult.containsKey('files')) {
             uploadedAttachments = uploadResult['files'] as List<dynamic>?;
           }
-          print('✅ Attachments uploaded: $uploadedAttachments');
+          debugPrint('✅ Attachments uploaded: $uploadedAttachments');
         } catch (uploadError) {
-          print('⚠️ Failed to upload attachments: $uploadError. Proceeding without attachments.');
+          debugPrint('⚠️ Failed to upload attachments: $uploadError. Proceeding without attachments.');
         }
       }
       
@@ -147,15 +148,15 @@ class LettersBloc extends Bloc<LettersEvent, LettersState> {
         requestData['attachments'] = uploadedAttachments;
       }
       
-      print('📤 Creating letter request: $requestData');
+      debugPrint('📤 Creating letter request: $requestData');
       
       // إنشاء الطلب
       await repository.createLetterRequest(requestData);
-      print('✅ Letter request created successfully');
+      debugPrint('✅ Letter request created successfully');
       emit(LetterCreatedSuccess());
       add(const GetMyLettersEvent());
     } catch (e) {
-      print('❌ Error creating letter: $e');
+      debugPrint('❌ Error creating letter: $e');
       emit(LettersError(ErrorHandler.handleError(e, defaultMessage: 'فشل إرسال طلب الخطاب')));
     }
   }
@@ -174,25 +175,25 @@ class LettersBloc extends Bloc<LettersEvent, LettersState> {
   Future<void> _onGetPendingLetters(GetPendingLettersEvent event, Emitter<LettersState> emit) async {
     emit(LettersLoading());
     try {
-      print('📥 Getting pending letters with params: ${event.params}');
+      debugPrint('📥 Getting pending letters with params: ${event.params}');
       final result = await repository.getPendingLetterRequests(event.params ?? {});
-      print('📥 Result type: ${result.runtimeType}');
+      debugPrint('📥 Result type: ${result.runtimeType}');
       
       List<dynamic> letters;
       if (result is Map) {
         letters = result['data'] ?? [];
-        print('📥 Found ${letters.length} pending letters');
+        debugPrint('📥 Found ${letters.length} pending letters');
       } else if (result is List) {
         letters = result;
-        print('📥 Found ${letters.length} pending letters (direct list)');
+        debugPrint('📥 Found ${letters.length} pending letters (direct list)');
       } else {
-        print('⚠️ Unexpected result type: ${result.runtimeType}');
+        debugPrint('⚠️ Unexpected result type: ${result.runtimeType}');
         letters = [];
       }
       
       emit(LettersLoaded(letters));
     } catch (e) {
-      print('❌ Error in _onGetPendingLetters: $e');
+      debugPrint('❌ Error in _onGetPendingLetters: $e');
       emit(LettersError(ErrorHandler.handleError(e, defaultMessage: 'فشل تحميل الطلبات المعلقة')));
     }
   }

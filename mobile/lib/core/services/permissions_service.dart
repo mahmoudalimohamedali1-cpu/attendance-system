@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../network/api_client.dart';
 import '../di/injection.dart';
 
@@ -56,9 +57,9 @@ class PermissionsService {
           .where((code) => code.isNotEmpty)
           .toList();
       
-      print('✅ Fetched ${_permissionCodes.length} permissions: $_permissionCodes');
+      debugPrint('✅ Fetched ${_permissionCodes.length} permissions: $_permissionCodes');
     } catch (e) {
-      print('❌ Failed to fetch permissions: $e');
+      debugPrint('❌ Failed to fetch permissions: $e');
       _permissionCodes = [];
     }
   }
@@ -81,7 +82,7 @@ PermissionsService getPermissionsService() {
       final apiClient = getIt<ApiClient>();
       _permissionsServiceInstance = PermissionsService(apiClient);
     } catch (e) {
-      print('❌ Failed to create PermissionsService: $e');
+      debugPrint('❌ Failed to create PermissionsService: $e');
       rethrow;
     }
   }

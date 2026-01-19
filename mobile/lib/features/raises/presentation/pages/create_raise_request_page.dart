@@ -335,7 +335,7 @@ class _CreateRaiseRequestPageState extends State<CreateRaiseRequestPage> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.attach_file, color: AppTheme.primaryColor),
+                                const Icon(Icons.attach_file, color: AppTheme.primaryColor),
                                 const SizedBox(width: 8),
                                 const Text(
                                   'المرفقات',
@@ -398,7 +398,7 @@ class _CreateRaiseRequestPageState extends State<CreateRaiseRequestPage> {
                                         width: 50,
                                         height: 50,
                                         decoration: BoxDecoration(
-                                          color: Colors.blue.withOpacity(0.1),
+                                          color: Colors.blue.withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: const Icon(Icons.description, color: Colors.blue),
@@ -481,7 +481,7 @@ class _AttachmentOption extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: AppTheme.primaryColor, size: 28),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -24,9 +25,9 @@ void main() async {
   // Initialize Firebase first
   try {
     await Firebase.initializeApp();
-    print('✅ Firebase initialized');
+    debugPrint('✅ Firebase initialized');
   } catch (e) {
-    print('⚠️ Firebase initialization failed: $e');
+    debugPrint('⚠️ Firebase initialization failed: $e');
     // Continue without Firebase - app should still work
   }
   
@@ -34,14 +35,14 @@ void main() async {
     // Initialize Hive
     await Hive.initFlutter();
   } catch (e) {
-    print('⚠️ Error initializing Hive: $e');
+    debugPrint('⚠️ Error initializing Hive: $e');
   }
   
   try {
     // Initialize dependency injection
     await configureDependencies();
   } catch (e) {
-    print('❌ Error configuring dependencies: $e');
+    debugPrint('❌ Error configuring dependencies: $e');
     // Continue anyway - some dependencies might still work
   }
   
@@ -49,10 +50,10 @@ void main() async {
     // Initialize Notification Service (non-blocking)
     final notificationService = getIt<NotificationService>();
     notificationService.initialize().catchError((error) {
-      print('⚠️ Error initializing NotificationService: $error');
+      debugPrint('⚠️ Error initializing NotificationService: $error');
     });
   } catch (e) {
-    print('⚠️ Error getting NotificationService: $e');
+    debugPrint('⚠️ Error getting NotificationService: $e');
   }
   
   // Set preferred orientations
@@ -62,7 +63,7 @@ void main() async {
       DeviceOrientation.portraitDown,
     ]);
   } catch (e) {
-    print('⚠️ Error setting orientations: $e');
+    debugPrint('⚠️ Error setting orientations: $e');
   }
   
   // Set system UI overlay style
@@ -81,7 +82,7 @@ class AttendanceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('🚀 Building AttendanceApp...');
+    debugPrint('🚀 Building AttendanceApp...');
     
     // Create blocs with error handling
     AuthBloc? authBloc;
@@ -94,45 +95,45 @@ class AttendanceApp extends StatelessWidget {
     
     try {
       authBloc = getIt<AuthBloc>();
-      print('✅ AuthBloc created');
+      debugPrint('✅ AuthBloc created');
     } catch (e) {
-      print('❌ Error creating AuthBloc: $e');
+      debugPrint('❌ Error creating AuthBloc: $e');
     }
     
     try {
       attendanceBloc = getIt<AttendanceBloc>();
     } catch (e) {
-      print('❌ Error creating AttendanceBloc: $e');
+      debugPrint('❌ Error creating AttendanceBloc: $e');
     }
     
     try {
       notificationsBloc = getIt<NotificationsBloc>();
     } catch (e) {
-      print('❌ Error creating NotificationsBloc: $e');
+      debugPrint('❌ Error creating NotificationsBloc: $e');
     }
     
     try {
       settingsBloc = getIt<SettingsBloc>();
     } catch (e) {
-      print('❌ Error creating SettingsBloc: $e');
+      debugPrint('❌ Error creating SettingsBloc: $e');
     }
     
     try {
       leavesBloc = getIt<LeavesBloc>();
     } catch (e) {
-      print('❌ Error creating LeavesBloc: $e');
+      debugPrint('❌ Error creating LeavesBloc: $e');
     }
     
     try {
       lettersBloc = getIt<LettersBloc>();
     } catch (e) {
-      print('❌ Error creating LettersBloc: $e');
+      debugPrint('❌ Error creating LettersBloc: $e');
     }
     
     try {
       raisesBloc = getIt<RaisesBloc>();
     } catch (e) {
-      print('❌ Error creating RaisesBloc: $e');
+      debugPrint('❌ Error creating RaisesBloc: $e');
     }
     
     // If critical blocs failed, show error screen

@@ -1,5 +1,6 @@
 /// إعدادات التطبيق - Configuration
 /// يحتوي على جميع الإعدادات المركزية للتطبيق
+library;
 
 class AppConfig {
   // ==================== API Configuration ====================

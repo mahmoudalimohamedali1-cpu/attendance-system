@@ -1,12 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/services/permissions_service.dart';
 import '../../../leaves/presentation/bloc/leaves_bloc.dart';
 import '../../../letters/presentation/bloc/letters_bloc.dart';
-import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Unified page showing all pending requests (Leaves, Letters) in tabs
 class PendingRequestsPage extends StatefulWidget {
@@ -47,12 +46,12 @@ class _PendingRequestsPageState extends State<PendingRequestsPage> with SingleTi
   }
 
   void _loadLeaves() {
-    print('🔄 Loading pending leaves');
+    debugPrint('🔄 Loading pending leaves');
     context.read<LeavesBloc>().add(const GetPendingLeavesEvent());
   }
 
   void _loadLetters() {
-    print('🔄 Loading pending letters');
+    debugPrint('🔄 Loading pending letters');
     context.read<LettersBloc>().add(const GetPendingLettersEvent());
   }
 
@@ -209,7 +208,7 @@ class _PendingLeavesTab extends StatelessWidget {
                               ),
                               Chip(
                                 label: Text(_getTypeLabel(leave['type'] ?? ''), style: const TextStyle(fontSize: 11)),
-                                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                                 padding: EdgeInsets.zero,
                               ),
                             ],
@@ -362,7 +361,7 @@ class _PendingLettersTab extends StatelessWidget {
                               ),
                               Chip(
                                 label: Text(_getTypeLabel(letter['type'] ?? ''), style: const TextStyle(fontSize: 11)),
-                                backgroundColor: Colors.orange.withOpacity(0.1),
+                                backgroundColor: Colors.orange.withValues(alpha: 0.1),
                                 padding: EdgeInsets.zero,
                               ),
                             ],

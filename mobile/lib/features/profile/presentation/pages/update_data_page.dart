@@ -3,10 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:get_it/get_it.dart';
 
 import '../../../../core/services/device_service.dart';
-import '../../../../core/config/app_config.dart';
 
 /// صفحة تحديث بيانات الحضور (الوجه والجهاز)
 class UpdateDataPage extends StatefulWidget {
@@ -19,7 +18,6 @@ class UpdateDataPage extends StatefulWidget {
 class _UpdateDataPageState extends State<UpdateDataPage> {
   final DeviceService _deviceService = DeviceService();
   final TextEditingController _reasonController = TextEditingController();
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   
   UpdateType _selectedType = UpdateType.both;
   DeviceInfo? _deviceInfo;
@@ -309,7 +307,7 @@ class _UpdateDataPageState extends State<UpdateDataPage> {
                     _buildDeviceRow(
                       Icons.fingerprint,
                       'معرف الجهاز',
-                      _deviceInfo!.deviceId.substring(0, 16) + '...',
+                      '${_deviceInfo!.deviceId.substring(0, 16)}...',
                     ),
                   ],
                 ),
@@ -425,7 +423,19 @@ class _UpdateDataPageState extends State<UpdateDataPage> {
   }
 
   Future<void> _submitRequest() async {
-    if (!_validateData()) return;
+    if (!_validateData()) {
+      String errorMsg = 'يرجى استكمال البيانات المطلوبة:\n';
+      if (_selectedType == UpdateType.faceOnly && _capturedFaceImage == null) {
+        errorMsg += '• يجب التقاط صورة الوجه';
+      } else if (_selectedType == UpdateType.deviceOnly && _deviceInfo == null) {
+        errorMsg += '• جاري تحميل بيانات الجهاز، يرجى الانتظار';
+      } else if ((_selectedType == UpdateType.both || _selectedType == UpdateType.deviceChange)) {
+        if (_capturedFaceImage == null) errorMsg += '• يجب التقاط صورة الوجه\n';
+        if (_deviceInfo == null) errorMsg += '• جاري تحميل بيانات الجهاز';
+      }
+      _showError(errorMsg);
+      return;
+    }
     
     setState(() => _isLoading = true);
     
@@ -471,21 +481,8 @@ class _UpdateDataPageState extends State<UpdateDataPage> {
         requestData['newDeviceAppVersion'] = _deviceInfo!.appVersion;
       }
       
-      // Create Dio instance with base URL
-      final dio = Dio(BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      ));
-      
-      // Add auth token from secure storage
-      final token = await _secureStorage.read(key: 'access_token');
-      if (token != null && token.isNotEmpty) {
-        dio.options.headers['Authorization'] = 'Bearer $token';
-      }
+      // Use the DI Dio instance with AuthInterceptor for automatic token refresh
+      final dio = GetIt.I<Dio>();
       
       // Send the request
       final response = await dio.post('/data-update/request', data: requestData);
@@ -571,7 +568,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
   bool _isInitialized = false;
   bool _isCapturing = false;
   String _statusMessage = 'جاري تهيئة الكاميرا...';
-  bool _faceDetected = false;
+  final bool _faceDetected = false;
 
   @override
   void initState() {
@@ -644,7 +641,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
           // Status message
           Container(
             padding: const EdgeInsets.all(12),
-            color: _faceDetected ? Colors.green.withOpacity(0.8) : Colors.blue.withOpacity(0.8),
+            color: _faceDetected ? Colors.green.withValues(alpha: 0.8) : Colors.blue.withValues(alpha: 0.8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -821,7 +818,7 @@ class FaceGuidePainter extends CustomPainter {
     final borderColor = isDetected ? Colors.green : Colors.white;
     
     final paint = Paint()
-      ..color = borderColor.withOpacity(0.8)
+      ..color = borderColor.withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
 
@@ -837,7 +834,7 @@ class FaceGuidePainter extends CustomPainter {
     
     // رسم الخلفية الداكنة خارج الإطار
     final backgroundPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
+      ..color = Colors.black.withValues(alpha: 0.5)
       ..style = PaintingStyle.fill;
     
     final path = Path()
@@ -853,7 +850,7 @@ class FaceGuidePainter extends CustomPainter {
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
     
-    final cornerLength = 25.0;
+    const cornerLength = 25.0;
     
     // الزاوية العلوية اليسرى
     canvas.drawLine(

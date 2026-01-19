@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/services/storage_service.dart';
@@ -130,7 +131,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             }
           }
         } catch (e) {
-          print('⚠️ Error checking auth status: $e');
+          debugPrint('⚠️ Error checking auth status: $e');
           // If anything fails, show unauthenticated
         }
       }
@@ -143,8 +144,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         rememberMe: rememberMe,
       ));
     } catch (e) {
-      print('❌ Critical error in CheckAuthStatus: $e');
-      emit(AuthUnauthenticated());
+      debugPrint('❌ Critical error in CheckAuthStatus: $e');
+      emit(const AuthUnauthenticated());
     }
   }
 
@@ -169,7 +170,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         try {
           await getPermissionsService().fetchMyPermissions();
         } catch (e) {
-          print('⚠️ Failed to fetch permissions: $e');
+          debugPrint('⚠️ Failed to fetch permissions: $e');
         }
         
         // Send FCM token to backend after successful login
@@ -182,14 +183,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final fcmToken = await notificationService.getFCMToken();
       if (fcmToken != null) {
-        print('📱 Sending FCM token to backend: $fcmToken');
+        debugPrint('📱 Sending FCM token to backend: $fcmToken');
         await authRepository.updateFcmToken(fcmToken);
-        print('✅ FCM token sent successfully');
+        debugPrint('✅ FCM token sent successfully');
       } else {
-        print('⚠️ FCM token is null');
+        debugPrint('⚠️ FCM token is null');
       }
     } catch (e) {
-      print('❌ Failed to send FCM token: $e');
+      debugPrint('❌ Failed to send FCM token: $e');
       // Don't emit error - FCM token update is not critical
     }
   }

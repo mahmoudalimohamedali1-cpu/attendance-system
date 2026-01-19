@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -37,6 +38,11 @@ import '../../features/custody/presentation/pages/request_return_page.dart';
 import '../../features/custody/presentation/pages/request_transfer_page.dart';
 import '../../features/custody/presentation/pages/sign_custody_page.dart';
 import '../../features/custody/data/datasources/custody_remote_datasource.dart';
+import '../../features/performance/presentation/pages/performance_reviews_page.dart';
+import '../../features/goals/presentation/pages/my_goals_page.dart';
+import '../../features/recognition/presentation/pages/recognition_page.dart';
+import '../../features/attendance/presentation/pages/monthly_report_page.dart';
+import '../../features/requests/presentation/pages/my_requests_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -78,7 +84,7 @@ class AppRouter {
         }
       } catch (e) {
         // If there's an error reading auth state, go to login
-        print('⚠️ Error in router redirect: $e');
+        debugPrint('⚠️ Error in router redirect: $e');
         return '/login';
       }
 
@@ -117,7 +123,7 @@ class AppRouter {
           GoRoute(
             path: '/pending',
             name: 'pending-requests',
-            parentNavigatorKey: _rootNavigatorKey,
+
             builder: (context, state) => const PendingRequestsPage(),
           ),
           GoRoute(
@@ -294,6 +300,36 @@ class AppRouter {
             name: 'my-custody',
             builder: (context, state) => const MyCustodyPage(),
           ),
+          // Performance Reviews route
+          GoRoute(
+            path: '/performance-reviews',
+            name: 'performance-reviews',
+            builder: (context, state) => const PerformanceReviewsPage(),
+          ),
+          // Goals route
+          GoRoute(
+            path: '/my-goals',
+            name: 'my-goals',
+            builder: (context, state) => const MyGoalsPage(),
+          ),
+          // Recognition route
+          GoRoute(
+            path: '/recognition',
+            name: 'recognition',
+            builder: (context, state) => const RecognitionPage(),
+          ),
+          // Monthly Report route
+          GoRoute(
+            path: '/monthly-report',
+            name: 'monthly-report',
+            builder: (context, state) => const MonthlyReportPage(),
+          ),
+          // My Requests route (unified requests page)
+          GoRoute(
+            path: '/my-requests',
+            name: 'my-requests',
+            builder: (context, state) => const MyRequestsPage(),
+          ),
         ],
       ),
       // Custody sub-routes (outside shell for full screen)
@@ -394,56 +430,79 @@ class _SplashPageState extends State<_SplashPage> {
           height: double.infinity,
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
               colors: [
-                Color(0xFF1565C0),
-                Color(0xFF0D47A1),
+                Color(0xFF6C5CE7),
+                Color(0xFF5B4CC4),
+                Color(0xFF4834D4),
               ],
             ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo
+              // Logo with animation
               Container(
-                width: 120,
-                height: 120,
+                width: 130,
+                height: 130,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(36),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
                     ),
                   ],
                 ),
                 child: const Icon(
                   Icons.access_time_rounded,
-                  size: 60,
-                  color: Color(0xFF1565C0),
+                  size: 70,
+                  color: Color(0xFF6C5CE7),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
               const Text(
                 'نظام الحضور',
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
+                  letterSpacing: 1,
                 ),
               ),
-              const SizedBox(height: 50),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Attendance System',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 60),
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.9)),
+                ),
               ),
               const SizedBox(height: 20),
               const Text(
                 'جاري التحميل...',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: Colors.white70,
                 ),
               ),

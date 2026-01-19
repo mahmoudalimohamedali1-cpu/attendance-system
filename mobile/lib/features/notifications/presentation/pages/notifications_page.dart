@@ -239,12 +239,12 @@ class _NotificationCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: isRead ? null : AppTheme.primaryColor.withOpacity(0.05),
+      color: isRead ? null : AppTheme.primaryColor.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isRead
             ? BorderSide.none
-            : BorderSide(color: AppTheme.primaryColor.withOpacity(0.2)),
+            : BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
       ),
       child: InkWell(
         onTap: onTap,
@@ -257,7 +257,7 @@ class _NotificationCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 24),

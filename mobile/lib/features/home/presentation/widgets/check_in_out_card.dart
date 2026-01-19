@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -130,22 +131,46 @@ class _CheckInOutCardState extends State<CheckInOutCard> {
           hasCheckedOut = _lastKnownCheckedOut ?? false;
         }
 
-        return Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white,
+                Colors.grey.shade50,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             child: Column(
               children: [
                 Row(
                   children: [
-                    const Icon(
-                      Icons.touch_app_outlined,
-                      color: AppTheme.primaryColor,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.touch_app_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Text(
                       'تسجيل الحضور والانصراف',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -154,7 +179,7 @@ class _CheckInOutCardState extends State<CheckInOutCard> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 
                 Row(
                   children: [
@@ -522,7 +547,7 @@ class _FaceVerificationScreenState extends State<FaceVerificationScreen> {
           // Status bar
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            color: _statusColor.withOpacity(0.9),
+            color: _statusColor.withValues(alpha: 0.9),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -724,7 +749,7 @@ class _FaceGuidePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final color = isDetected ? Colors.green : Colors.white;
     final paint = Paint()
-      ..color = color.withOpacity(0.8)
+      ..color = color.withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
 
@@ -735,7 +760,7 @@ class _FaceGuidePainter extends CustomPainter {
 
     // Background overlay
     final bgPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
+      ..color = Colors.black.withValues(alpha: 0.5)
       ..style = PaintingStyle.fill;
 
     final path = Path()
@@ -772,64 +797,105 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 100,
+      height: 110,
       decoration: BoxDecoration(
-        color: isDone
-            ? Colors.grey[200]
+        gradient: isDone
+            ? LinearGradient(
+                colors: [Colors.grey.shade100, Colors.grey.shade200],
+              )
             : isEnabled
-                ? color.withOpacity(0.1)
-                : Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      color.withValues(alpha: 0.08),
+                      color.withValues(alpha: 0.15),
+                    ],
+                  )
+                : null,
+        color: !isDone && !isEnabled ? Colors.grey[100] : null,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDone
               ? Colors.grey[300]!
               : isEnabled
-                  ? color.withOpacity(0.3)
+                  ? color.withValues(alpha: 0.3)
                   : Colors.grey[200]!,
           width: 2,
         ),
+        boxShadow: isEnabled ? [
+          BoxShadow(
+            color: color.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ] : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: isEnabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (isLoading)
                   SizedBox(
-                    width: 32,
-                    height: 32,
+                    width: 36,
+                    height: 36,
                     child: CircularProgressIndicator(
                       strokeWidth: 3,
                       valueColor: AlwaysStoppedAnimation<Color>(color),
                     ),
                   )
                 else if (isDone)
-                  const Icon(
-                    Icons.check_circle,
-                    size: 32,
-                    color: Colors.grey,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      size: 24,
+                      color: Colors.grey,
+                    ),
                   )
                 else
-                  Icon(
-                    icon,
-                    size: 32,
-                    color: isEnabled ? color : Colors.grey,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [color, color.withValues(alpha: 0.7)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 24,
+                      color: Colors.white,
+                    ),
                   ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
-                  isDone ? 'تم' : title,
+                  isDone ? 'تم ✓' : title,
                   style: TextStyle(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                     color: isDone
                         ? Colors.grey
                         : isEnabled
                             ? color
-                            : Colors.grey,
+                            : Colors.grey[400],
                   ),
                 ),
               ],

@@ -1,11 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/l10n/app_localizations.dart';
 import '../bloc/leaves_bloc.dart';
-import 'leave_details_page.dart';
 
 class PendingLeavesPage extends StatefulWidget {
   const PendingLeavesPage({super.key});
@@ -18,7 +17,7 @@ class _PendingLeavesPageState extends State<PendingLeavesPage> {
   @override
   void initState() {
     super.initState();
-    print('🔄 Initializing PendingLeavesPage');
+    debugPrint('🔄 Initializing PendingLeavesPage');
     context.read<LeavesBloc>().add(const GetPendingLeavesEvent());
   }
 
@@ -75,7 +74,7 @@ class _PendingLeavesPageState extends State<PendingLeavesPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
+                  const Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
                   const SizedBox(height: 16),
                   Text(state.message, style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 16),
@@ -92,7 +91,7 @@ class _PendingLeavesPageState extends State<PendingLeavesPage> {
 
           if (state is LeavesLoaded) {
             final leaves = state.leaves;
-            print('📋 LeavesLoaded state: ${leaves.length} leaves');
+            debugPrint('📋 LeavesLoaded state: ${leaves.length} leaves');
 
             if (leaves.isEmpty) {
               return Center(
@@ -160,7 +159,7 @@ class _PendingLeavesPageState extends State<PendingLeavesPage> {
                                     _getTypeLabel(leave['type'] ?? ''),
                                     style: const TextStyle(fontSize: 12),
                                   ),
-                                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                                 ),
                               ],
                             ),

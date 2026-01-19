@@ -85,7 +85,7 @@ class _CreateCaseViewState extends State<_CreateCaseView> {
                 const SizedBox(height: 8),
                 if (state is DisciplinaryUsersLoaded)
                   DropdownButtonFormField<String>(
-                    value: _selectedEmployeeId,
+                    initialValue: _selectedEmployeeId,
                     decoration: _inputDecoration('اختر الموظف'),
                     items: state.users.map((u) {
                       final name = '${u['firstName']} ${u['lastName'] ?? ''}';
@@ -171,7 +171,7 @@ class _CreateCaseViewState extends State<_CreateCaseView> {
                 _buildSectionHeader('تصنيف المخالفة', Icons.category),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: _violationType,
+                  initialValue: _violationType,
                   decoration: _inputDecoration(''),
                   items: const [
                     DropdownMenuItem(value: 'ATTENDANCE', child: Text('تأخير / غياب / انصراف مبكر')),
@@ -457,7 +457,7 @@ class _CreateCaseViewState extends State<_CreateCaseView> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
       ],
     );

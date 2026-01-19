@@ -1,9 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/services/permissions_service.dart';
 import '../bloc/leaves_bloc.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -83,19 +83,19 @@ class _LeavesPageState extends State<LeavesPage> with SingleTickerProviderStateM
             builder: (context, authState) {
               if (authState is AuthAuthenticated) {
                 final userRole = authState.user.role;
-                print('👤 User role: $userRole');
+                debugPrint('👤 User role: $userRole');
                 
                 if (_canViewPendingRequests(userRole)) {
                   return IconButton(
                     icon: const Icon(Icons.pending_actions),
                     tooltip: 'الطلبات المعلقة',
                     onPressed: () {
-                      print('🔘 Navigating to unified pending requests page');
+                      debugPrint('🔘 Navigating to unified pending requests page');
                       context.push('/pending');
                     },
                   );
                 } else {
-                  print('⚠️ User role $userRole does not have permission to view pending leaves');
+                  debugPrint('⚠️ User role $userRole does not have permission to view pending leaves');
                 }
               }
               return const SizedBox.shrink();
@@ -412,7 +412,7 @@ class _LeaveCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -432,7 +432,7 @@ class _LeaveCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -546,7 +546,7 @@ class _RequestTypeCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 28),

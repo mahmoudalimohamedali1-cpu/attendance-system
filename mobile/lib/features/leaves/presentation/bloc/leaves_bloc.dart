@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../domain/repositories/leaves_repository.dart';
@@ -128,19 +129,19 @@ class LeavesBloc extends Bloc<LeavesEvent, LeavesState> {
       
       // رفع المرفقات أولاً إذا وجدت
       if (event.attachmentPaths.isNotEmpty) {
-        print('📎 Uploading ${event.attachmentPaths.length} attachments...');
-        print('📎 Paths: ${event.attachmentPaths}');
+        debugPrint('📎 Uploading ${event.attachmentPaths.length} attachments...');
+        debugPrint('📎 Paths: ${event.attachmentPaths}');
         try {
           final uploadResult = await repository.uploadAttachments(event.attachmentPaths);
-          print('📎 Upload result: $uploadResult');
+          debugPrint('📎 Upload result: $uploadResult');
           if (uploadResult is Map && uploadResult.containsKey('files')) {
             uploadedAttachments = uploadResult['files'] as List<dynamic>?;
           }
-          print('✅ Attachments uploaded: $uploadedAttachments');
+          debugPrint('✅ Attachments uploaded: $uploadedAttachments');
         } catch (uploadError) {
-          print('❌ Upload failed: $uploadError');
+          debugPrint('❌ Upload failed: $uploadError');
           // استمر بدون المرفقات إذا فشل الرفع
-          print('⚠️ Continuing without attachments...');
+          debugPrint('⚠️ Continuing without attachments...');
         }
       }
       
@@ -150,16 +151,16 @@ class LeavesBloc extends Bloc<LeavesEvent, LeavesState> {
         requestData['attachments'] = uploadedAttachments;
       }
       
-      print('📤 Creating leave request: $requestData');
+      debugPrint('📤 Creating leave request: $requestData');
       
       // إنشاء الطلب
       await repository.createLeaveRequest(requestData);
-      print('✅ Leave request created successfully');
+      debugPrint('✅ Leave request created successfully');
       emit(LeaveCreatedSuccess()); // إرسال حالة النجاح أولاً
       // ثم تحديث القائمة
       add(const GetMyLeavesEvent());
     } catch (e) {
-      print('❌ Error creating leave: $e');
+      debugPrint('❌ Error creating leave: $e');
       emit(LeavesError(ErrorHandler.handleError(e, defaultMessage: 'فشل إرسال طلب الإجازة')));
     }
   }
@@ -178,27 +179,27 @@ class LeavesBloc extends Bloc<LeavesEvent, LeavesState> {
   Future<void> _onGetPendingLeaves(GetPendingLeavesEvent event, Emitter<LeavesState> emit) async {
     emit(LeavesLoading());
     try {
-      print('📥 Getting pending leaves with params: ${event.params}');
+      debugPrint('📥 Getting pending leaves with params: ${event.params}');
       final result = await repository.getPendingLeaveRequests(event.params ?? {});
-      print('📥 Result type: ${result.runtimeType}');
-      print('📥 Result: $result');
+      debugPrint('📥 Result type: ${result.runtimeType}');
+      debugPrint('📥 Result: $result');
       
       // Handle different response structures
       List<dynamic> leaves;
       if (result is Map) {
         leaves = result['data'] ?? [];
-        print('📥 Found ${leaves.length} pending leaves');
+        debugPrint('📥 Found ${leaves.length} pending leaves');
       } else if (result is List) {
         leaves = result;
-        print('📥 Found ${leaves.length} pending leaves (direct list)');
+        debugPrint('📥 Found ${leaves.length} pending leaves (direct list)');
       } else {
-        print('⚠️ Unexpected result type: ${result.runtimeType}');
+        debugPrint('⚠️ Unexpected result type: ${result.runtimeType}');
         leaves = [];
       }
       
       emit(LeavesLoaded(leaves));
     } catch (e) {
-      print('❌ Error in _onGetPendingLeaves: $e');
+      debugPrint('❌ Error in _onGetPendingLeaves: $e');
       emit(LeavesError(ErrorHandler.handleError(e, defaultMessage: 'فشل تحميل الطلبات المعلقة')));
     }
   }

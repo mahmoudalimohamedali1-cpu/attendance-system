@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 
 class ApiClient {
@@ -69,14 +70,14 @@ class ApiClient {
   // Leaves endpoints
   Future<Response> createLeaveRequest(Map<String, dynamic> data) async {
     // Log the data being sent for debugging
-    print('📤 Sending leave request to: ${_dio.options.baseUrl}/leaves');
-    print('📤 Data: $data');
+    debugPrint('📤 Sending leave request to: ${_dio.options.baseUrl}/leaves');
+    debugPrint('📤 Data: $data');
     try {
       final response = await _dio.post('/leaves', data: data);
-      print('✅ Response: ${response.statusCode}');
+      debugPrint('✅ Response: ${response.statusCode}');
       return response;
     } catch (e) {
-      print('❌ Error in createLeaveRequest: $e');
+      debugPrint('❌ Error in createLeaveRequest: $e');
       rethrow;
     }
   }
@@ -90,7 +91,7 @@ class ApiClient {
         await MultipartFile.fromFile(path, filename: path.split('/').last),
       ));
     }
-    print('📤 Uploading ${filePaths.length} attachments');
+    debugPrint('📤 Uploading ${filePaths.length} attachments');
     return await _dio.post('/leaves/upload-attachments', data: formData);
   }
 
@@ -104,15 +105,15 @@ class ApiClient {
 
   // Manager/Admin endpoints for leave approvals
   Future<Response> getPendingLeaveRequests(Map<String, dynamic> params) async {
-    print('📤 Fetching pending leaves from: ${_dio.options.baseUrl}/leaves/pending/all');
-    print('📤 Params: $params');
+    debugPrint('📤 Fetching pending leaves from: ${_dio.options.baseUrl}/leaves/pending/all');
+    debugPrint('📤 Params: $params');
     try {
       final response = await _dio.get('/leaves/pending/all', queryParameters: params);
-      print('✅ Pending leaves response: ${response.statusCode}');
-      print('✅ Response data: ${response.data}');
+      debugPrint('✅ Pending leaves response: ${response.statusCode}');
+      debugPrint('✅ Response data: ${response.data}');
       return response;
     } catch (e) {
-      print('❌ Error fetching pending leaves: $e');
+      debugPrint('❌ Error fetching pending leaves: $e');
       rethrow;
     }
   }
@@ -153,14 +154,14 @@ class ApiClient {
 
   // Letters endpoints
   Future<Response> createLetterRequest(Map<String, dynamic> data) async {
-    print('📤 Sending letter request to: ${_dio.options.baseUrl}/letters');
-    print('📤 Data: $data');
+    debugPrint('📤 Sending letter request to: ${_dio.options.baseUrl}/letters');
+    debugPrint('📤 Data: $data');
     try {
       final response = await _dio.post('/letters', data: data);
-      print('✅ Response: ${response.statusCode}');
+      debugPrint('✅ Response: ${response.statusCode}');
       return response;
     } catch (e) {
-      print('❌ Error in createLetterRequest: $e');
+      debugPrint('❌ Error in createLetterRequest: $e');
       rethrow;
     }
   }
@@ -173,7 +174,7 @@ class ApiClient {
         await MultipartFile.fromFile(path, filename: path.split('/').last),
       ));
     }
-    print('📤 Uploading ${filePaths.length} attachments');
+    debugPrint('📤 Uploading ${filePaths.length} attachments');
     return await _dio.post('/letters/upload-attachments', data: formData);
   }
 
@@ -187,14 +188,14 @@ class ApiClient {
 
   // Manager/Admin endpoints for letter approvals
   Future<Response> getPendingLetterRequests(Map<String, dynamic> params) async {
-    print('📤 Fetching pending letters from: ${_dio.options.baseUrl}/letters/pending/all');
-    print('📤 Params: $params');
+    debugPrint('📤 Fetching pending letters from: ${_dio.options.baseUrl}/letters/pending/all');
+    debugPrint('📤 Params: $params');
     try {
       final response = await _dio.get('/letters/pending/all', queryParameters: params);
-      print('✅ Pending letters response: ${response.statusCode}');
+      debugPrint('✅ Pending letters response: ${response.statusCode}');
       return response;
     } catch (e) {
-      print('❌ Error fetching pending letters: $e');
+      debugPrint('❌ Error fetching pending letters: $e');
       rethrow;
     }
   }
@@ -213,27 +214,27 @@ class ApiClient {
 
   // Permissions endpoints
   Future<Response> getMyPermissions() async {
-    print('📤 Fetching my permissions from: ${_dio.options.baseUrl}/permissions/my');
+    debugPrint('📤 Fetching my permissions from: ${_dio.options.baseUrl}/permissions/my');
     try {
       final response = await _dio.get('/permissions/my');
-      print('✅ Permissions response: ${response.statusCode}');
+      debugPrint('✅ Permissions response: ${response.statusCode}');
       return response;
     } catch (e) {
-      print('❌ Error fetching permissions: $e');
+      debugPrint('❌ Error fetching permissions: $e');
       rethrow;
     }
   }
 
   // Raises endpoints
   Future<Response> createRaiseRequest(Map<String, dynamic> data) async {
-    print('📤 Sending raise request to: ${_dio.options.baseUrl}/raises');
-    print('📤 Data: $data');
+    debugPrint('📤 Sending raise request to: ${_dio.options.baseUrl}/raises');
+    debugPrint('📤 Data: $data');
     try {
       final response = await _dio.post('/raises', data: data);
-      print('✅ Response: ${response.statusCode}');
+      debugPrint('✅ Response: ${response.statusCode}');
       return response;
     } catch (e) {
-      print('❌ Error in createRaiseRequest: $e');
+      debugPrint('❌ Error in createRaiseRequest: $e');
       rethrow;
     }
   }
@@ -258,7 +259,7 @@ class ApiClient {
         await MultipartFile.fromFile(path, filename: path.split('/').last),
       ));
     }
-    print('📤 Uploading ${filePaths.length} raise attachments');
+    debugPrint('📤 Uploading ${filePaths.length} raise attachments');
     return await _dio.post('/raises/upload-attachments', data: formData);
   }
 
@@ -332,7 +333,7 @@ class ApiClient {
         await MultipartFile.fromFile(path, filename: path.split('/').last),
       ));
     }
-    print('📤 Uploading ${filePaths.length} disciplinary attachments for case $caseId');
+    debugPrint('📤 Uploading ${filePaths.length} disciplinary attachments for case $caseId');
     return await _dio.post('/disciplinary/cases/$caseId/upload-files', data: formData);
   }
 

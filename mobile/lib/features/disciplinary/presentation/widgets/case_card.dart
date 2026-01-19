@@ -129,7 +129,7 @@ class DisciplinaryCaseCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Color(caseItem.statusColor).withOpacity(0.15),
+        color: Color(caseItem.statusColor).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(

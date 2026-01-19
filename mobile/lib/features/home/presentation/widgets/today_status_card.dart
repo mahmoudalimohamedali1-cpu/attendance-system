@@ -35,30 +35,61 @@ class TodayStatusCard extends StatelessWidget {
           }
         }
 
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white,
+                statusColor.withValues(alpha: 0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: statusColor.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+            border: Border.all(
+              color: statusColor.withValues(alpha: 0.2),
+              width: 1,
+            ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        gradient: LinearGradient(
+                          colors: [
+                            statusColor,
+                            statusColor.withValues(alpha: 0.7),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: statusColor.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Icon(
                         statusIcon,
-                        color: statusColor,
+                        color: Colors.white,
+                        size: 28,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,9 +100,10 @@ class TodayStatusCard extends StatelessWidget {
                               color: Colors.grey[600],
                             ),
                           ),
+                          const SizedBox(height: 4),
                           Text(
                             statusText,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: statusColor,
                             ),
@@ -83,54 +115,83 @@ class TodayStatusCard extends StatelessWidget {
                 ),
                 
                 if (attendance != null && attendance.checkInTime != null) ...[
-                  const Divider(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _TimeItem(
-                          title: 'وقت الحضور',
-                          time: attendance.checkInTime!,
-                          icon: Icons.login,
-                          color: AppTheme.successColor,
-                        ),
-                      ),
-                      if (attendance.checkOutTime != null)
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
                         Expanded(
                           child: _TimeItem(
-                            title: 'وقت الانصراف',
-                            time: attendance.checkOutTime!,
-                            icon: Icons.logout,
-                            color: AppTheme.primaryColor,
+                            title: 'وقت الحضور',
+                            time: attendance.checkInTime!,
+                            icon: Icons.login_rounded,
+                            color: AppTheme.successColor,
                           ),
                         ),
-                    ],
+                        if (attendance.checkOutTime != null) ...[
+                          Container(
+                            height: 40,
+                            width: 1,
+                            color: Colors.grey.shade300,
+                          ),
+                          Expanded(
+                            child: _TimeItem(
+                              title: 'وقت الانصراف',
+                              time: attendance.checkOutTime!,
+                              icon: Icons.logout_rounded,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                   
                   if (attendance.checkOutTime != null) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.infoColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.infoColor.withValues(alpha: 0.1),
+                            AppTheme.infoColor.withValues(alpha: 0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.infoColor.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.schedule,
-                            size: 18,
-                            color: AppTheme.infoColor,
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.infoColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.schedule,
+                              size: 18,
+                              color: AppTheme.infoColor,
+                            ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 12),
                           Text(
                             'إجمالي ساعات العمل: ${_formatDuration(attendance.workingMinutes)}',
                             style: const TextStyle(
                               color: AppTheme.infoColor,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
                           ),
                         ],
@@ -174,29 +235,29 @@ class _TimeItem extends StatelessWidget {
     final timeFormat = DateFormat('hh:mm a', 'ar');
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 4),
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 18, color: color),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             Text(
-              timeFormat.format(time),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+              title,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey[600],
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          timeFormat.format(time),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
       ],
     );
   }
 }
-

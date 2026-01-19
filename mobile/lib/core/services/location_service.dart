@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -159,7 +158,8 @@ class LocationService {
     }
     
     // 4. فحص عمر الموقع (location age)
-    final locationAge = DateTime.now().difference(position.timestamp ?? DateTime.now());
+    final positionTimestamp = position.timestamp ?? DateTime.now();
+    final locationAge = DateTime.now().difference(positionTimestamp);
     if (locationAge.inSeconds > 30) {
       _logger.w('⚠️ SUSPICIOUS: Location is ${locationAge.inSeconds}s old');
       // لا نرفض بناءً على العمر فقط، لكن نسجل
@@ -183,55 +183,8 @@ class LocationService {
     _logger.i('✅ Location check PASSED - appears genuine');
     return MockCheckResult(isMock: false, reason: null);
   }
-
-  /// فحص وجود تطبيقات Mock Location
-  Future<bool> _checkForMockLocationApps() async {
-    try {
-      if (!Platform.isAndroid) return false;
-      
-      final androidInfo = await _deviceInfo.androidInfo;
-      
-      // قائمة تطبيقات Mock Location المعروفة
-      final mockAppPackages = [
-        'com.lexa.fakegps',
-        'com.incorporateapps.fakegps',
-        'com.fakegps.mock',
-        'com.blogspot.newapphorizons.fakegps',
-        'com.gsmartstudio.fakegps',
-        'com.lkr.fakelocation',
-        'com.location.faker',
-        'com.evezzon.locationmock',
-        'com.mock.gps',
-        'com.fakegps.route',
-        'ru.gavrikov.mocklocations',
-      ];
-
-      // لا يمكن فحص التطبيقات المثبتة مباشرة من Flutter
-      // لكن يمكن الاعتماد على isMocked flag
-      
-      // فحص إذا كان الجهاز rooted (مؤشر على احتمالية التلاعب)
-      // final isEmulator = !androidInfo.isPhysicalDevice;
-      // if (isEmulator) {
-      //   _logger.i('Running on emulator');
-      // }
-
-      return false; // نعتمد على فحوصات أخرى
-    } catch (e) {
-      _logger.e('Error checking for mock apps: $e');
-      return false;
-    }
-  }
-
-  /// فحص Developer Options
-  Future<bool> _checkDeveloperOptions() async {
-    try {
-      if (!Platform.isAndroid) return false;
-      // لا يمكن فحص هذا مباشرة من Flutter بدون Native Code
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
+  // Note: _checkForMockLocationApps and _checkDeveloperOptions were removed
+  // as they cannot be implemented without native code and their results weren't used
 
   /// حساب المسافة بين نقطتين بالمتر
   double calculateDistance(

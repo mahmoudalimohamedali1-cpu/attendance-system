@@ -102,6 +102,12 @@ model Company {
   taskTemplates  TaskTemplate[]
   sprints        Sprint[]
 
+  // relations to production models
+  costCenterAllocations   CostCenterAllocation[]
+  goals                   Goal[]
+  kpiDefinitions          KPIDefinition[]
+  performanceReviewCycles PerformanceReviewCycle[]
+
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   shiftTemplates        ShiftTemplate[]
@@ -165,7 +171,7 @@ model PayrollSettings {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // ========== تاريخ إغلاق الرواتب ==========
-  payrollClosingDay Int @default(25) @map("payroll_closing_day") // 0-28
+  payrollClosingDay Int @default(25) @map("payroll_closing_day")
 
   // ========== حساب التوظيف وإنهاء الخدمات ==========
   hireTerminationCalcBase WorkDayCalculationBase @default(CALENDAR_DAYS) @map("hire_termination_calc_base")
@@ -174,7 +180,7 @@ model PayrollSettings {
   // ========== حساب الإجازات غير المدفوعة ==========
   unpaidLeaveCalcBase      WorkDayCalculationBase @default(ACTUAL_WORKING_DAYS) @map("unpaid_leave_calc_base")
   unpaidLeaveMethod        UnpaidLeaveMethod      @default(BASED_ON_SHIFTS) @map("unpaid_leave_method")
-  splitUnpaidByClosingDate Boolean                @default(false) @map("split_unpaid_by_closing_date") // تقسيم بناءً على تاريخ الإغلاق
+  splitUnpaidByClosingDate Boolean                @default(false) @map("split_unpaid_by_closing_date")
 
   // ========== حساب ساعات العمل الإضافي ==========
   overtimeCalcBase WorkDayCalculationBase    @default(ACTUAL_WORKING_DAYS) @map("overtime_calc_base")
@@ -185,19 +191,112 @@ model PayrollSettings {
   leaveAllowanceMethod   LeaveAllowanceMethod   @default(BASIC_PLUS_HOUSING) @map("leave_allowance_method")
 
   // ========== إعدادات قسيمة الراتب ==========
-  showCompanyContributions Boolean @default(true) @map("show_company_contributions") // إظهار مساهمات الشركة
-  showClosingDateOnPayslip Boolean @default(true) @map("show_closing_date_on_payslip") // إظهار تاريخ الإغلاق
-  deductAbsenceFromBasic   Boolean @default(true) @map("deduct_absence_from_basic") // اقتطاع الغياب من الأساسي
-  showActualAbsenceDays    Boolean @default(false) @map("show_actual_absence_days") // إظهار حساب أيام الغياب الفعلي
+  showCompanyContributions Boolean @default(true) @map("show_company_contributions")
+  showClosingDateOnPayslip Boolean @default(true) @map("show_closing_date_on_payslip")
+  deductAbsenceFromBasic   Boolean @default(true) @map("deduct_absence_from_basic")
+  showActualAbsenceDays    Boolean @default(false) @map("show_actual_absence_days")
 
   // ========== أرصدة الرواتب السلبية ==========
-  enableNegativeBalanceCarryover Boolean @default(false) @map("enable_negative_balance_carryover") // ترحيل الرصيد السلبي
-  settleNegativeAsTransaction    Boolean @default(false) @map("settle_negative_as_transaction") // تسوية كحركة خارجية
+  enableNegativeBalanceCarryover Boolean @default(false) @map("enable_negative_balance_carryover")
+  settleNegativeAsTransaction    Boolean @default(false) @map("settle_negative_as_transaction")
 
   // ========== إعدادات إضافية ==========
-  roundSalaryToNearest       Int @default(0) @map("round_salary_to_nearest") // تقريب الراتب (0 = بدون تقريب)
+  roundSalaryToNearest       Int @default(0) @map("round_salary_to_nearest")
   defaultWorkingDaysPerMonth Int @default(30) @map("default_working_days_per_month")
-  leaveDailyRateDivisor      Int @default(30) @map("leave_daily_rate_divisor") // مقسم الراتب اليومي للإجازات
+  leaveDailyRateDivisor      Int @default(30) @map("leave_daily_rate_divisor")
+
+  // ========== حقول الإنتاج المضافة ==========
+  overtimeMultiplier             Float    @default(1.5) @map("overtime_multiplier")
+  gracePeriodMinutes             Int      @default(15) @map("grace_period_minutes")
+  weekendOvertimeMultiplier      Float    @default(2.0) @map("weekend_overtime_multiplier")
+  holidayOvertimeMultiplier      Float    @default(2.0) @map("holiday_overtime_multiplier")
+  nightShiftAllowancePercent     Float    @default(0) @map("night_shift_allowance_percent")
+  maxDeductionPercent            Float    @default(50) @map("max_deduction_percent")
+  minNetSalary                   Float    @default(0) @map("min_net_salary")
+  autoLockDay                    Int      @default(0) @map("auto_lock_day")
+  defaultCurrency                String   @default("SAR") @map("default_currency")
+  enableMultiCurrency            Boolean  @default(false) @map("enable_multi_currency")
+  enableBonusTracking            Boolean  @default(true) @map("enable_bonus_tracking")
+  bonusCalculationMethod         String   @default("FIXED") @map("bonus_calculation_method")
+  enableCommission               Boolean  @default(false) @map("enable_commission")
+  commissionCalculationBase      String   @default("SALES") @map("commission_calculation_base")
+  enableAllowanceCategories      Boolean  @default(true) @map("enable_allowance_categories")
+  maxAllowancePercent            Float    @default(100) @map("max_allowance_percent")
+  enableTaxCalculation           Boolean  @default(false) @map("enable_tax_calculation")
+  taxCalculationMethod           String   @default("EXEMPT") @map("tax_calculation_method")
+  enableSalaryAdvance            Boolean  @default(true) @map("enable_salary_advance")
+  maxAdvancePercent              Float    @default(50) @map("max_advance_percent")
+  enableLoanDeduction            Boolean  @default(true) @map("enable_loan_deduction")
+  maxLoanDeductionPercent        Float    @default(30) @map("max_loan_deduction_percent")
+  enableApprovalWorkflow         Boolean  @default(false) @map("enable_approval_workflow")
+  approvalLevels                 Int      @default(1) @map("approval_levels")
+  enableBankTransfer             Boolean  @default(true) @map("enable_bank_transfer")
+  defaultBankCode                String   @default("") @map("default_bank_code")
+  enableRetroactivePay           Boolean  @default(true) @map("enable_retroactive_pay")
+  retroactiveMonthsLimit         Int      @default(3) @map("retroactive_months_limit")
+  enableEosCalculation           Boolean  @default(true) @map("enable_eos_calculation")
+  eosCalculationMethod           String   @default("SAUDI_LABOR_LAW") @map("eos_calculation_method")
+  enableGosiCalculation          Boolean  @default(true) @map("enable_gosi_calculation")
+  gosiEmployeePercent            Float    @default(9.75) @map("gosi_employee_percent")
+  gosiEmployerPercent            Float    @default(11.75) @map("gosi_employer_percent")
+  enableVacationEncashment       Boolean  @default(true) @map("enable_vacation_encashment")
+  vacationEncashmentMethod       String   @default("ON_TERMINATION") @map("vacation_encashment_method")
+  enableAttendancePenalty        Boolean  @default(true) @map("enable_attendance_penalty")
+  lateDeductionMethod            String   @default("PER_MINUTE") @map("late_deduction_method")
+  lateThresholdMinutes           Int      @default(120) @map("late_threshold_minutes")
+  absenceDeductionMethod         String   @default("DAILY_RATE") @map("absence_deduction_method")
+  absenceProgressiveRate         Float    @default(1.0) @map("absence_progressive_rate")
+  enableEarlyDeparturePenalty    Boolean  @default(false) @map("enable_early_departure_penalty")
+  earlyDepartureDeductionMethod  String   @default("PER_MINUTE") @map("early_departure_deduction_method")
+  earlyDepartureThresholdMinutes Int      @default(120) @map("early_departure_threshold_minutes")
+  enableCumulativeLateDeduction  Boolean  @default(false) @map("enable_cumulative_late_deduction")
+  lateCountForDayDeduction       Int      @default(3) @map("late_count_for_day_deduction")
+  gosiMaxSalary                  Float    @default(45000) @map("gosi_max_salary")
+  enableSanedCalculation         Boolean  @default(true) @map("enable_saned_calculation")
+  sanedEmployeePercent           Float    @default(0.75) @map("saned_employee_percent")
+  sanedEmployerPercent           Float    @default(0.75) @map("saned_employer_percent")
+  hazardRatePercent              Float    @default(2.0) @map("hazard_rate_percent")
+  enablePayslipEmail             Boolean  @default(true) @map("enable_payslip_email")
+  payslipLanguage                String   @default("AR") @map("payslip_language")
+  enableOvertimeCap              Boolean  @default(false) @map("enable_overtime_cap")
+  maxOvertimeHoursPerMonth       Int      @default(50) @map("max_overtime_hours_per_month")
+  enableAutoPayrollGeneration    Boolean  @default(false) @map("enable_auto_payroll_generation")
+  autoPayrollGenerationDay       Int      @default(25) @map("auto_payroll_generation_day")
+  enablePayrollAuditTrail        Boolean  @default(true) @map("enable_payroll_audit_trail")
+  enableSalaryRounding           Boolean  @default(false) @map("enable_salary_rounding")
+  salaryRoundingMethod           String   @default("NEAREST") @map("salary_rounding_method")
+  enableDepartmentBudget         Boolean  @default(false) @map("enable_department_budget")
+  enableCostCenterTracking       Boolean  @default(false) @map("enable_cost_center_tracking")
+  defaultPayrollExportFormat     String   @default("EXCEL") @map("default_payroll_export_format")
+  enableSickLeaveDeduction       Boolean? @default(true) @map("enable_sick_leave_deduction")
+  sickLeavePartialPayPercent     Float?   @default(75) @map("sick_leave_partial_pay_percent")
+  sickLeaveFullPayDays           Int?     @default(30) @map("sick_leave_full_pay_days")
+  sickLeavePartialPayDays        Int?     @default(60) @map("sick_leave_partial_pay_days")
+  sickLeaveUnpaidDays            Int?     @default(30) @map("sick_leave_unpaid_days")
+  calculationMethod              String?  @default("STANDARD") @map("calculation_method")
+  payslipTemplate                String?  @default("DEFAULT") @map("payslip_template")
+  showSalaryBreakdown            Boolean? @default(true) @map("show_salary_breakdown")
+  showYtdTotals                  Boolean? @default(true) @map("show_ytd_totals")
+  autoCalculateEos               Boolean? @default(true) @map("auto_calculate_eos")
+  eosFirstYearsRate              Float?   @default(0.5) @map("eos_first_years_rate")
+  eosLaterYearsRate              Float?   @default(1.0) @map("eos_later_years_rate")
+  eosThresholdYears              Int?     @default(5) @map("eos_threshold_years")
+  eosContractualRate             Float?   @default(1.0) @map("eos_contractual_rate")
+  dailyWorkingHours              Float?   @default(8) @map("daily_working_hours")
+  weeklyWorkingDays              Int?     @default(5) @map("weekly_working_days")
+  overtimeRate                   Float?   @default(1.5) @map("overtime_rate")
+  weekendOvertimeRate            Float?   @default(2.0) @map("weekend_overtime_rate")
+  holidayOvertimeRate            Float?   @default(2.0) @map("holiday_overtime_rate")
+  lateDeductionRate              Float?   @default(1.0) @map("late_deduction_rate")
+  absenceDeductionRate           Float?   @default(1.0) @map("absence_deduction_rate")
+  includeHousingInGosi           Boolean? @default(true) @map("include_housing_in_gosi")
+  includeTransportInGosi         Boolean? @default(false) @map("include_transport_in_gosi")
+  defaultLeaveDays               Int?     @default(21) @map("default_leave_days")
+  leaveCarryOverDays             Int?     @default(5) @map("leave_carry_over_days")
+  probationLeaveEnabled          Boolean? @default(false) @map("probation_leave_enabled")
+  autoApproveLeave               Boolean? @default(false) @map("auto_approve_leave")
+  enableOvertimeApproval         Boolean? @default(true) @map("enable_overtime_approval")
+  workingDaysPerWeek             Int?     @default(5) @map("working_days_per_week")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -348,6 +447,14 @@ model User {
 
   // سجل الموافقات (Audit)
   approvalLogs ApprovalLog[]
+
+  // relations to production models
+  costCenterAllocations CostCenterAllocation[]
+  goals                 Goal[]
+  goalCheckIns          GoalCheckIn[]
+  keyResultCheckIns     KeyResultCheckIn[]
+  kpiAssignments        KPIAssignment[]
+  performanceReviews    PerformanceReview[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -801,6 +908,11 @@ enum AttendanceStatus {
   ABSENT // غائب
   ON_LEAVE // إجازة
   WORK_FROM_HOME // عمل من المنزل
+  OFF_DAY // يوم راحة
+  HOLIDAY // إجازة رسمية
+  EXCUSED // غياب بعذر
+  WFM // عمل من المنزل (Advanced)
+  MOCKED // موقع وهمي
 }
 
 enum CheckType {
@@ -919,6 +1031,9 @@ enum LeaveCategory {
   CASUAL // إجازات عارضة (زواج، وفاة)
   SICK // إجازات مرضية
   UNPAID // بدون راتب
+  SICK_PAID
+  SICK_PARTIAL
+  OTHER
 }
 
 // إعدادات أنواع الإجازات - Dynamic Leave Type Configuration
@@ -1889,9 +2004,21 @@ model CostCenter {
   code        String   @unique
   name        String
   description String?
-  users       User[]
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // production fields
+  effective_from          DateTime? @default(now()) @db.Timestamp(6)
+  is_allow_overbudget     Boolean?  @default(false)
+  budget_alert_threshold  Float?    @default(90)
+  is_mandatory_in_payroll Boolean?  @default(false)
+
+  users User[]
+
+  // relations to production models
+  allocations        CostCenterAllocation[] @relation("cost_center_allocations_cost_center_idTocost_centers")
+  primaryAllocations CostCenterAllocation[] @relation("cost_center_allocations_primary_cost_center_idTocost_centers")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, code])
   @@map("cost_centers")
@@ -5402,19 +5529,25 @@ enum PerformanceReviewCycleStatus {
   DRAFT
   PLANNING
   ACTIVE
+  SELF_REVIEW
+  MANAGER_REVIEW
   CALIBRATION
   COMPLETED
-  ARCHIVED
+  CANCELLED
 }
 
 enum PerformanceReviewStatus {
   NOT_STARTED
+  PENDING
   SELF_REVIEW
+  SELF_REVIEW_PENDING
+  SELF_REVIEW_COMPLETED
   MANAGER_REVIEW
-  FEEDBACK_COLLECTION
+  MANAGER_REVIEW_PENDING
+  MANAGER_REVIEW_COMPLETED
   CALIBRATION
-  ACKNOWLEDGED
   COMPLETED
+  CANCELLED
 }
 
 enum GoalType {
@@ -5429,13 +5562,14 @@ enum GoalStatus {
   DRAFT
   PENDING_APPROVAL
   APPROVED
+  ACTIVE
   IN_PROGRESS
-  AT_RISK
-  BEHIND
   ON_TRACK
+  AT_RISK
   EXCEEDED
   COMPLETED
   CANCELLED
+  ON_HOLD
 }
 
 enum GoalDataSource {
@@ -6008,4 +6142,295 @@ enum PolicyApprovalAction {
   APPROVE
   REJECT
   REQUEST_CHANGES
+}
+
+// ==================== Missing Production Models ====================
+
+model CostCenterAllocation {
+  id                  String    @id @default(uuid())
+  companyId           String?   @map("company_id")
+  userId              String    @map("user_id")
+  costCenterId        String    @map("cost_center_id")
+  primaryCostCenterId String?   @map("primary_cost_center_id")
+  percentage          Decimal   @db.Decimal(5, 2)
+  effectiveFrom       DateTime  @default(now()) @map("effective_from")
+  effectiveTo         DateTime? @map("effective_to")
+  allocationType      String    @default("POSITION") @map("allocation_type")
+  reason              String?
+  isActive            Boolean   @default(true) @map("is_active")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  company           Company?    @relation(fields: [companyId], references: [id])
+  costCenter        CostCenter  @relation("cost_center_allocations_cost_center_idTocost_centers", fields: [costCenterId], references: [id])
+  primaryCostCenter CostCenter? @relation("cost_center_allocations_primary_cost_center_idTocost_centers", fields: [primaryCostCenterId], references: [id])
+
+  @@unique([userId, costCenterId, effectiveFrom])
+  @@index([costCenterId])
+  @@index([effectiveFrom, effectiveTo])
+  @@index([userId, isActive])
+  @@map("cost_center_allocations")
+}
+
+model Goal {
+  id                   String          @id @default(uuid())
+  companyId            String          @map("company_id")
+  ownerId              String          @map("owner_id")
+  managerId            String?         @map("manager_id")
+  type                 GoalType        @default(INDIVIDUAL)
+  status               GoalStatus      @default(DRAFT)
+  title                String
+  titleEn              String?         @map("title_en")
+  description          String?
+  startDate            DateTime?       @map("start_date") @db.Date
+  dueDate              DateTime?       @map("due_date") @db.Date
+  completedAt          DateTime?       @map("completed_at")
+  targetValue          Decimal?        @map("target_value") @db.Decimal(10, 2)
+  currentValue         Decimal?        @map("current_value") @db.Decimal(10, 2)
+  unit                 String?
+  progress             Int             @default(0)
+  weight               Int             @default(100)
+  category             String?
+  isStretch            Boolean         @default(false) @map("is_stretch")
+  parentGoalId         String?         @map("parent_goal_id")
+  alignedCompanyGoalId String?         @map("aligned_company_goal_id")
+  approvedBy           String?         @map("approved_by")
+  approvedAt           DateTime?       @map("approved_at")
+  rejectionReason      String?         @map("rejection_reason")
+  aiGenerated          Boolean         @default(false) @map("ai_generated")
+  aiPrompt             String?         @map("ai_prompt")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+  autoCalculated       Boolean         @default(false) @map("auto_calculated")
+  dataSource           GoalDataSource? @map("data_source")
+  dataSourceConfig     Json?           @map("data_source_config")
+  lastSyncAt           DateTime?       @map("last_sync_at")
+  employeeId           String?         @map("employee_id") @db.VarChar(255)
+
+  goalCheckIns GoalCheckIn[]
+  goalRatings  GoalRating[]
+  company      Company       @relation(fields: [companyId], references: [id])
+  parentGoal   Goal?         @relation("GoalToGoal", fields: [parentGoalId], references: [id])
+  subGoals     Goal[]        @relation("GoalToGoal")
+  keyResults   KeyResult[]
+
+  @@index([companyId, ownerId])
+  @@index([companyId, status])
+  @@index([dataSource])
+  @@index([type])
+  @@map("goals")
+}
+
+model KeyResult {
+  id                String             @id @default(uuid())
+  goalId            String             @map("goal_id")
+  title             String
+  description       String?
+  targetValue       Decimal            @map("target_value") @db.Decimal(10, 2)
+  currentValue      Decimal            @default(0) @map("current_value") @db.Decimal(10, 2)
+  unit              String             @default("%")
+  progress          Int                @default(0)
+  dueDate           DateTime?          @map("due_date") @db.Date
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  keyResultCheckIns KeyResultCheckIn[]
+  goal              Goal               @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("key_results")
+}
+
+model KeyResultCheckIn {
+  id            String    @id @default(uuid())
+  keyResultId   String    @map("key_result_id")
+  userId        String    @map("user_id")
+  previousValue Decimal   @map("previous_value") @db.Decimal(10, 2)
+  newValue      Decimal   @map("new_value") @db.Decimal(10, 2)
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  keyResults    KeyResult @relation(fields: [keyResultId], references: [id], onDelete: Cascade)
+
+  @@index([keyResultId])
+  @@map("key_result_check_ins")
+}
+
+model GoalCheckIn {
+  id            String   @id @default(uuid())
+  goalId        String   @map("goal_id")
+  userId        String   @map("user_id")
+  previousValue Decimal  @map("previous_value") @db.Decimal(10, 2)
+  newValue      Decimal  @map("new_value") @db.Decimal(10, 2)
+  statusUpdate  String?  @map("status_update")
+  blockers      String?
+  nextSteps     String?  @map("next_steps")
+  confidence    Int?
+  createdAt     DateTime @default(now()) @map("created_at")
+  goals         Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("goal_check_ins")
+}
+
+model GoalRating {
+  id                String            @id @default(uuid())
+  reviewId          String            @map("review_id")
+  goalId            String            @map("goal_id")
+  selfRating        Decimal?          @map("self_rating") @db.Decimal(3, 2)
+  selfComments      String?           @map("self_comments")
+  managerRating     Decimal?          @map("manager_rating") @db.Decimal(3, 2)
+  managerComments   String?           @map("manager_comments")
+  finalRating       Decimal?          @map("final_rating") @db.Decimal(3, 2)
+  weight            Int               @default(100)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  goals             Goal              @relation(fields: [goalId], references: [id])
+  performanceReview PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, goalId])
+  @@map("goal_ratings")
+}
+
+model KPIDefinition {
+  id          String          @id @default(uuid())
+  companyId   String          @map("company_id")
+  jobFamilyId String?         @map("job_family_id")
+  code        String
+  name        String
+  nameAr      String?         @map("name_ar")
+  description String?
+  unit        String
+  formula     Json?
+  thresholds  Json
+  sourceType  KPISourceType   @default(MANUAL) @map("source_type")
+  frequency   KPIFrequency    @default(MONTHLY)
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  assignments KPIAssignment[]
+  company     Company         @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([jobFamilyId])
+  @@map("kpi_definitions")
+}
+
+model KPIAssignment {
+  id              String                 @id @default(uuid())
+  cycleId         String                 @map("cycle_id")
+  employeeId      String                 @map("employee_id")
+  kpiDefinitionId String                 @map("kpi_definition_id")
+  target          Decimal                @db.Decimal(15, 2)
+  weight          Int                    @default(100)
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  actualValue     Decimal?               @map("actual_value") @db.Decimal(10, 2)
+  notes           String?
+  score           Decimal?               @db.Decimal(5, 2)
+  cycle           PerformanceReviewCycle @relation(fields: [cycleId], references: [id])
+  user            User                   @relation(fields: [employeeId], references: [id])
+  kpiDefinition   KPIDefinition          @relation(fields: [kpiDefinitionId], references: [id])
+  kpiEntries      KPIEntry[]
+
+  @@unique([cycleId, employeeId, kpiDefinitionId])
+  @@index([cycleId, employeeId])
+  @@index([employeeId])
+  @@map("kpi_assignments")
+}
+
+model KPIEntry {
+  id            String        @id @default(uuid())
+  assignmentId  String        @map("assignment_id")
+  periodStart   DateTime      @map("period_start")
+  periodEnd     DateTime      @map("period_end")
+  value         Decimal       @db.Decimal(15, 2)
+  source        String?
+  createdBy     String        @map("created_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  notes         String?
+  kpiAssignment KPIAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId])
+  @@map("kpi_entries")
+}
+
+model PerformanceReviewCycle {
+  id                      String                       @id @default(uuid())
+  companyId               String                       @map("company_id")
+  name                    String
+  nameEn                  String?                      @map("name_en")
+  type                    PerformanceReviewCycleType   @default(ANNUAL)
+  status                  PerformanceReviewCycleStatus @default(DRAFT)
+  periodStart             DateTime                     @map("period_start") @db.Date
+  periodEnd               DateTime                     @map("period_end") @db.Date
+  selfReviewStart         DateTime?                    @map("self_review_start")
+  selfReviewEnd           DateTime?                    @map("self_review_end")
+  managerReviewStart      DateTime?                    @map("manager_review_start")
+  managerReviewEnd        DateTime?                    @map("manager_review_end")
+  feedbackStart           DateTime?                    @map("feedback_start")
+  feedbackEnd             DateTime?                    @map("feedback_end")
+  calibrationStart        DateTime?                    @map("calibration_start")
+  calibrationEnd          DateTime?                    @map("calibration_end")
+  includeSelfReview       Boolean                      @default(true) @map("include_self_review")
+  include360Feedback      Boolean                      @default(false) @map("include_360_feedback")
+  includeGoalRating       Boolean                      @default(true) @map("include_goal_rating")
+  includeCompetencyRating Boolean                      @default(true) @map("include_competency_rating")
+  goalWeight              Int                          @default(40) @map("goal_weight")
+  competencyWeight        Int                          @default(40) @map("competency_weight")
+  valueWeight             Int                          @default(20) @map("value_weight")
+  competencyFrameworkId   String?                      @map("competency_framework_id")
+  createdAt               DateTime                     @default(now()) @map("created_at")
+  updatedAt               DateTime                     @updatedAt @map("updated_at")
+
+  kpiAssignments     KPIAssignment[]
+  company            Company             @relation(fields: [companyId], references: [id])
+  performanceReviews PerformanceReview[]
+
+  @@index([companyId, status])
+  @@map("performance_review_cycles")
+}
+
+model PerformanceReview {
+  id                     String                  @id @default(uuid())
+  companyId              String                  @map("company_id")
+  cycleId                String                  @map("cycle_id")
+  employeeId             String                  @map("employee_id")
+  managerId              String                  @map("manager_id")
+  status                 PerformanceReviewStatus @default(PENDING)
+  selfRating             Decimal?                @map("self_rating") @db.Decimal(3, 2)
+  selfComments           String?                 @map("self_comments")
+  selfAchievements       Json?                   @map("self_achievements")
+  selfChallenges         Json?                   @map("self_challenges")
+  selfSubmittedAt        DateTime?               @map("self_submitted_at")
+  managerRating          Decimal?                @map("manager_rating") @db.Decimal(3, 2)
+  managerComments        String?                 @map("manager_comments")
+  managerStrengths       Json?                   @map("manager_strengths")
+  managerImprovements    Json?                   @map("manager_improvements")
+  managerSubmittedAt     DateTime?               @map("manager_submitted_at")
+  finalRating            Decimal?                @map("final_rating") @db.Decimal(3, 2)
+  finalComments          String?                 @map("final_comments")
+  calibrationNotes       String?                 @map("calibration_notes")
+  calibratedBy           String?                 @map("calibrated_by")
+  calibratedAt           DateTime?               @map("calibrated_at")
+  performanceScore       Int?                    @map("performance_score")
+  potentialScore         Int?                    @map("potential_score")
+  nineBoxPosition        String?                 @map("nine_box_position")
+  employeeAcknowledged   Boolean                 @default(false) @map("employee_acknowledged")
+  employeeAcknowledgedAt DateTime?               @map("employee_acknowledged_at")
+  employeeDisagreed      Boolean                 @default(false) @map("employee_disagreed")
+  employeeDisagreeReason String?                 @map("employee_disagree_reason")
+  aiSummary              String?                 @map("ai_summary")
+  aiBiasFlags            Json?                   @map("ai_bias_flags")
+  aiRecommendations      Json?                   @map("ai_recommendations")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+
+  cycle       PerformanceReviewCycle @relation(fields: [cycleId], references: [id])
+  goalRatings GoalRating[]
+
+  @@unique([cycleId, employeeId])
+  @@index([companyId, status])
+  @@index([employeeId])
+  @@index([managerId])
+  @@map("performance_reviews")
 }

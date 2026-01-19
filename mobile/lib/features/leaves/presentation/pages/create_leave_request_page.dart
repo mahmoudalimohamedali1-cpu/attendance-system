@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -25,7 +26,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   final _reasonController = TextEditingController();
   final List<File> _attachments = [];
   bool _isSubmitting = false;
-  bool _isUploadingFiles = false;
+  final bool _isUploadingFiles = false;
 
   final _leaveTypes = [
     {'value': 'ANNUAL', 'label': 'إجازة سنوية'},
@@ -206,8 +207,8 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
       // إضافة المرفقات إذا وجدت
       final attachmentPaths = _attachments.map((f) => f.path).toList();
       
-      print('📤 Leave request data: $requestData');
-      print('📎 Attachments: ${attachmentPaths.length}');
+      debugPrint('📤 Leave request data: $requestData');
+      debugPrint('📎 Attachments: ${attachmentPaths.length}');
       
       context.read<LeavesBloc>().add(CreateLeaveWithAttachmentsEvent(
         requestData,
@@ -220,9 +221,9 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   Widget build(BuildContext context) {
     return BlocListener<LeavesBloc, LeavesState>(
       listener: (context, state) {
-        print('🔔 LeavesBloc state: $state');
+        debugPrint('🔔 LeavesBloc state: $state');
         if (state is LeaveCreatedSuccess) {
-          print('✅ Leave request successful!');
+          debugPrint('✅ Leave request successful!');
           setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -232,7 +233,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
           );
           context.pop();
         } else if (state is LeavesError) {
-          print('❌ Leave request error: ${state.message}');
+          debugPrint('❌ Leave request error: ${state.message}');
           setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -241,7 +242,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
             ),
           );
         } else if (state is LeavesLoading) {
-          print('⏳ Loading...');
+          debugPrint('⏳ Loading...');
         }
       },
       child: Scaffold(
@@ -273,7 +274,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
+                                const Text(
                                   'رصيد الإجازات المتبقي',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
@@ -317,7 +318,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
 
               // Leave Type
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: InputDecoration(
                 labelText: context.tr('leave_type'),
                 prefixIcon: const Icon(Icons.category),
@@ -418,7 +419,7 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.attach_file, color: AppTheme.primaryColor),
+                            const Icon(Icons.attach_file, color: AppTheme.primaryColor),
                             const SizedBox(width: 8),
                             const Text(
                               'المرفقات',

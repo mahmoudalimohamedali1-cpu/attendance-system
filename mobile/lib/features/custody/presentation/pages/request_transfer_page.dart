@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -119,7 +120,7 @@ class _RequestTransferPageState extends ConsumerState<RequestTransferPage> {
             const Text('الموظف المستلم *', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedEmployeeId,
+              initialValue: _selectedEmployeeId,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'اختر الموظف...',

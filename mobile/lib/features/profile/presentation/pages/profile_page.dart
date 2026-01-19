@@ -262,7 +262,7 @@ class _OverviewTab extends StatelessWidget {
               context.read<AuthBloc>().add(LogoutEvent());
               context.go('/login');
             },
-            child: Text(
+            child: const Text(
               'تسجيل الخروج',
               style: TextStyle(color: AppTheme.errorColor),
             ),
@@ -293,7 +293,7 @@ class _DocumentsTab extends StatelessWidget {
         }
 
         if (documents.isEmpty) {
-          return _EmptyState(
+          return const _EmptyState(
             icon: Icons.folder_open,
             title: 'لا توجد مستندات',
             subtitle: 'لم يتم إضافة أي مستندات بعد',
@@ -375,10 +375,10 @@ class _DocumentCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.description,
                 color: AppTheme.primaryColor,
                 size: 28,
@@ -426,7 +426,7 @@ class _DocumentCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -516,7 +516,7 @@ class _SkillsTab extends StatelessWidget {
     }
 
     if (skills.isEmpty) {
-      return _EmptyState(
+      return const _EmptyState(
         icon: Icons.psychology,
         title: 'لا توجد مهارات',
         subtitle: 'لم يتم إضافة أي مهارات بعد',
@@ -549,7 +549,7 @@ class _SkillsTab extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
+                          color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
@@ -585,7 +585,7 @@ class _SkillsTab extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
+                          color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -599,7 +599,7 @@ class _SkillsTab extends StatelessWidget {
                       ),
                       if (skill['isVerified'] == true) ...[
                         const SizedBox(width: 8),
-                        Icon(
+                        const Icon(
                           Icons.verified,
                           color: AppTheme.successColor,
                           size: 20,
@@ -713,7 +713,7 @@ class _EmergencyContactsTab extends StatelessWidget {
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: SizedBox(
                     height: MediaQuery.of(context).size.height * 0.6,
-                    child: _EmptyState(
+                    child: const _EmptyState(
                       icon: Icons.contact_emergency,
                       title: 'لا توجد جهات اتصال للطوارئ',
                       subtitle: 'أضف جهات اتصال للطوارئ للتواصل في حالات الطوارئ',
@@ -738,7 +738,7 @@ class _EmergencyContactsTab extends StatelessWidget {
                               width: 50,
                               height: 50,
                               decoration: BoxDecoration(
-                                color: AppTheme.errorColor.withOpacity(0.1),
+                                color: AppTheme.errorColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Center(
@@ -790,11 +790,11 @@ class _EmergencyContactsTab extends StatelessWidget {
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      Icon(Icons.phone, size: 14, color: AppTheme.primaryColor),
+                                      const Icon(Icons.phone, size: 14, color: AppTheme.primaryColor),
                                       const SizedBox(width: 4),
                                       Text(
                                         contact.phone,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           color: AppTheme.primaryColor,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -831,45 +831,59 @@ class _ProfileHeader extends StatelessWidget {
           onTap: () => context.push('/profile/edit'),
           child: Stack(
             children: [
+              // Gradient border container
               Container(
-                width: 100,
-                height: 100,
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                  ),
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primaryColor.withOpacity(0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: user.avatar != null && user.avatar.isNotEmpty
-                      ? Image.network(
-                          user.avatar,
-                          fit: BoxFit.cover,
-                          width: 100,
-                          height: 100,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _buildInitialsAvatar(),
-                        )
-                      : _buildInitialsAvatar(),
+                child: Container(
+                  width: 108,
+                  height: 108,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  padding: const EdgeInsets.all(3),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(21),
+                    child: user.avatar != null && user.avatar.isNotEmpty
+                        ? Image.network(
+                            user.avatar,
+                            fit: BoxFit.cover,
+                            width: 100,
+                            height: 100,
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildInitialsAvatar(),
+                          )
+                        : _buildInitialsAvatar(),
+                  ),
                 ),
               ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor,
-                    borderRadius: BorderRadius.circular(10),
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 4,
+                        color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                        blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
@@ -877,24 +891,38 @@ class _ProfileHeader extends StatelessWidget {
                   child: const Icon(
                     Icons.camera_alt,
                     color: Colors.white,
-                    size: 16,
+                    size: 18,
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Text(
           user.fullName,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
-        Text(
-          user.jobTitle ?? '',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.grey[600],
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.secondaryColor.withValues(alpha: 0.15),
+                AppTheme.primaryColor.withValues(alpha: 0.15),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            user.jobTitle ?? '',
+            style: const TextStyle(
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -907,7 +935,7 @@ class _ProfileHeader extends StatelessWidget {
       height: 100,
       decoration: BoxDecoration(
         gradient: AppTheme.primaryGradient,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(21),
       ),
       child: Center(
         child: Text(
@@ -938,26 +966,53 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            color.withValues(alpha: 0.03),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(
+          color: color.withValues(alpha: 0.1),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: LinearGradient(
+                      colors: [color, color.withValues(alpha: 0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: Colors.white, size: 22),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -966,7 +1021,20 @@ class _InfoCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Divider(height: 24),
+            const SizedBox(height: 16),
+            Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    color.withValues(alpha: 0.2),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             ...items,
           ],
         ),
@@ -995,7 +1063,7 @@ class _InfoItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 20, color: AppTheme.primaryColor),
@@ -1049,10 +1117,10 @@ class _LeaveBalanceCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.beach_access,
                     color: AppTheme.primaryColor,
                     size: 28,
@@ -1072,7 +1140,7 @@ class _LeaveBalanceCard extends StatelessWidget {
                       ),
                       Text(
                         '$remaining يوم',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.primaryColor,
@@ -1090,7 +1158,7 @@ class _LeaveBalanceCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: total > 0 ? (total - remaining) / total : 0,
                 backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                 minHeight: 10,
               ),
             ),
@@ -1136,19 +1204,67 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(
-          title,
-          style: TextStyle(color: color),
+    final tileColor = color ?? AppTheme.primaryColor;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: tileColor.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: tileColor.withValues(alpha: 0.1),
         ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: color),
-        onTap: onTap,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: tileColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: tileColor, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

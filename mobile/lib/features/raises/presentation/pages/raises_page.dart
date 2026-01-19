@@ -175,7 +175,7 @@ class _RaisesPageState extends State<RaisesPage> {
                     margin: const EdgeInsets.only(bottom: 12),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: _getStatusColor(request.status).withOpacity(0.2),
+                        backgroundColor: _getStatusColor(request.status).withValues(alpha: 0.2),
                         child: Icon(
                           _getTypeIcon(request.type),
                           color: _getStatusColor(request.status),
@@ -205,7 +205,7 @@ class _RaisesPageState extends State<RaisesPage> {
                       trailing: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(request.status).withOpacity(0.2),
+                          color: _getStatusColor(request.status).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(

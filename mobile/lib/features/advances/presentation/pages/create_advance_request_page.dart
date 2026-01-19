@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -196,7 +197,7 @@ class _CreateAdvanceRequestPageState extends State<CreateAdvanceRequestPage> {
       // Upload attachments if any (simplified - you can implement full upload)
       if (_attachments.isNotEmpty) {
         // For now, skip attachments upload - can be added later
-        print('📎 Attachments count: ${_attachments.length} (upload not implemented yet)');
+        debugPrint('📎 Attachments count: ${_attachments.length} (upload not implemented yet)');
       }
 
       await apiClient.dio.post('/advances', data: data);
@@ -252,7 +253,7 @@ class _CreateAdvanceRequestPageState extends State<CreateAdvanceRequestPage> {
 
             // نوع السلفة
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: const InputDecoration(
                 labelText: 'الغرض',
                 prefixIcon: Icon(Icons.category),
@@ -385,7 +386,7 @@ class _CreateAdvanceRequestPageState extends State<CreateAdvanceRequestPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.attach_file, color: AppTheme.primaryColor),
+                            const Icon(Icons.attach_file, color: AppTheme.primaryColor),
                             const SizedBox(width: 8),
                             const Text('المرفقات', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(width: 8),

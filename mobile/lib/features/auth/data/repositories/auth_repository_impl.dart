@@ -68,7 +68,7 @@ class AuthRepositoryImpl implements AuthRepository {
           errorString.contains('connection') ||
           errorString.contains('network') ||
           errorString.contains('timeout')) {
-        return Left(NetworkFailure('لا يمكن الاتصال بالسيرفر. تحقق من اتصالك بالإنترنت'));
+        return const Left(NetworkFailure('لا يمكن الاتصال بالسيرفر. تحقق من اتصالك بالإنترنت'));
       }
       return Left(ServerFailure('فشل تسجيل الدخول: ${e.toString()}'));
     }
@@ -94,7 +94,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await _storageService.clearAll();
       return Left(AuthFailure(e.message));
     } catch (e) {
-      return Left(AuthFailure('فشل تجديد التوكن'));
+      return const Left(AuthFailure('فشل تجديد التوكن'));
     }
   }
 
@@ -119,7 +119,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure('فشل إرسال رابط إعادة التعيين'));
+      return const Left(ServerFailure('فشل إرسال رابط إعادة التعيين'));
     }
   }
 
@@ -138,7 +138,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await _remoteDataSource.updateFcmToken(fcmToken);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure('فشل تحديث FCM token'));
+      return const Left(ServerFailure('فشل تحديث FCM token'));
     }
   }
 
@@ -151,7 +151,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure('فشل جلب بيانات المستخدم'));
+      return const Left(ServerFailure('فشل جلب بيانات المستخدم'));
     }
   }
 
@@ -166,7 +166,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure('فشل تحديث بيانات المستخدم'));
+      return const Left(ServerFailure('فشل تحديث بيانات المستخدم'));
     }
   }
 
@@ -184,7 +184,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure('فشل تغيير كلمة المرور'));
+      return const Left(ServerFailure('فشل تغيير كلمة المرور'));
     }
   }
 

@@ -53,7 +53,7 @@ class MonthlyStatsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Row(
+            const Row(
               children: [
                 Expanded(
                   child: _SummaryItem(
@@ -104,36 +104,36 @@ class MonthlyStatsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _DetailRow(
+            const _DetailRow(
               label: 'إجمالي أيام العمل',
               value: '22 يوم',
               icon: Icons.calendar_month,
             ),
-            _DetailRow(
+            const _DetailRow(
               label: 'أيام الحضور',
               value: '20 يوم',
               icon: Icons.check,
               color: AppTheme.successColor,
             ),
-            _DetailRow(
+            const _DetailRow(
               label: 'أيام التأخير',
               value: '2 يوم',
               icon: Icons.schedule,
               color: AppTheme.warningColor,
             ),
-            _DetailRow(
+            const _DetailRow(
               label: 'أيام الغياب',
               value: '0 يوم',
               icon: Icons.cancel,
               color: AppTheme.errorColor,
             ),
-            _DetailRow(
+            const _DetailRow(
               label: 'أيام الإجازة',
               value: '0 يوم',
               icon: Icons.beach_access,
               color: AppTheme.infoColor,
             ),
-            _DetailRow(
+            const _DetailRow(
               label: 'العمل من المنزل',
               value: '2 يوم',
               icon: Icons.home,
@@ -162,18 +162,18 @@ class MonthlyStatsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _DetailRow(
+            const _DetailRow(
               label: 'إجمالي ساعات العمل',
               value: '160 ساعة',
               icon: Icons.access_time,
             ),
-            _DetailRow(
+            const _DetailRow(
               label: 'دقائق التأخير',
               value: '25 دقيقة',
               icon: Icons.timer_off,
               color: AppTheme.warningColor,
             ),
-            _DetailRow(
+            const _DetailRow(
               label: 'الساعات الإضافية',
               value: '5 ساعات',
               icon: Icons.add_circle,
@@ -206,7 +206,7 @@ class _SummaryItem extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 28),

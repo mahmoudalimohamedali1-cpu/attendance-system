@@ -133,8 +133,8 @@ class _DisciplinaryDetailView extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(caseDetails.statusColor).withOpacity(0.1),
-              Color(caseDetails.statusColor).withOpacity(0.05),
+              Color(caseDetails.statusColor).withValues(alpha: 0.1),
+              Color(caseDetails.statusColor).withValues(alpha: 0.05),
             ],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
@@ -152,7 +152,7 @@ class _DisciplinaryDetailView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Color(caseDetails.statusColor).withOpacity(0.2),
+                color: Color(caseDetails.statusColor).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(

@@ -92,7 +92,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure('فشل جلب بيانات الحضور'));
+      return const Left(ServerFailure('فشل جلب بيانات الحضور'));
     }
   }
 
@@ -122,7 +122,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure('فشل جلب سجل الحضور'));
+      return const Left(ServerFailure('فشل جلب سجل الحضور'));
     }
   }
 
@@ -146,7 +146,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure('فشل جلب الإحصائيات'));
+      return const Left(ServerFailure('فشل جلب الإحصائيات'));
     }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -54,16 +55,16 @@ import '../../features/profile/presentation/bloc/profile_bloc.dart';
 final getIt = GetIt.instance;
 
 Future<void> configureDependencies() async {
-  print('🔧 Starting dependency injection...');
+  debugPrint('🔧 Starting dependency injection...');
   
   // External dependencies
   SharedPreferences? sharedPreferences;
   try {
     sharedPreferences = await SharedPreferences.getInstance();
     getIt.registerSingleton<SharedPreferences>(sharedPreferences);
-    print('✅ SharedPreferences registered');
+    debugPrint('✅ SharedPreferences registered');
   } catch (e) {
-    print('❌ Error initializing SharedPreferences: $e');
+    debugPrint('❌ Error initializing SharedPreferences: $e');
     rethrow;
   }
   
@@ -73,9 +74,9 @@ Future<void> configureDependencies() async {
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     getIt.registerSingleton<FlutterSecureStorage>(secureStorage);
-    print('✅ FlutterSecureStorage registered');
+    debugPrint('✅ FlutterSecureStorage registered');
   } catch (e) {
-    print('❌ Error initializing FlutterSecureStorage: $e');
+    debugPrint('❌ Error initializing FlutterSecureStorage: $e');
     rethrow;
   }
   
@@ -84,9 +85,9 @@ Future<void> configureDependencies() async {
     getIt.registerLazySingleton<StorageService>(
       () => StorageService(getIt<SharedPreferences>(), getIt<FlutterSecureStorage>()),
     );
-    print('✅ StorageService registered');
+    debugPrint('✅ StorageService registered');
   } catch (e) {
-    print('❌ Error registering StorageService: $e');
+    debugPrint('❌ Error registering StorageService: $e');
   }
   
   getIt.registerLazySingleton<LocationService>(
@@ -98,15 +99,15 @@ Future<void> configureDependencies() async {
   );
   
   // تسجيل خدمة تتبع الموقع (يتم التسجيل بعد ApiClient)
-  print('✅ Services registered');
+  debugPrint('✅ Services registered');
   
   // Network - استخدام الإعدادات من AppConfig
-  print('🔧 Setting up Network...');
+  debugPrint('🔧 Setting up Network...');
   try {
     final dio = Dio(BaseOptions(
       baseUrl: AppConfig.apiBaseUrl,
-      connectTimeout: Duration(milliseconds: AppConfig.connectionTimeout),
-      receiveTimeout: Duration(milliseconds: AppConfig.receiveTimeout),
+      connectTimeout: const Duration(milliseconds: AppConfig.connectionTimeout),
+      receiveTimeout: const Duration(milliseconds: AppConfig.receiveTimeout),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -116,22 +117,22 @@ Future<void> configureDependencies() async {
     // Add AuthInterceptor - make sure StorageService is registered first
     try {
       dio.interceptors.add(AuthInterceptor(getIt<StorageService>()));
-      print('✅ AuthInterceptor added');
+      debugPrint('✅ AuthInterceptor added');
     } catch (e) {
-      print('⚠️ Warning: Could not add AuthInterceptor: $e');
+      debugPrint('⚠️ Warning: Could not add AuthInterceptor: $e');
       // Continue without auth interceptor - app should still work
     }
     
     dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: true,
-      logPrint: (obj) => print('🌐 API: $obj'),
+      logPrint: (obj) => debugPrint('🌐 API: $obj'),
     ));
     
     getIt.registerSingleton<Dio>(dio);
-    print('✅ Dio registered');
+    debugPrint('✅ Dio registered');
   } catch (e) {
-    print('❌ Error setting up Network: $e');
+    debugPrint('❌ Error setting up Network: $e');
     rethrow;
   }
   
@@ -143,7 +144,7 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<LocationTrackingService>(
     () => LocationTrackingService(getIt<ApiClient>(), getIt<LocationService>()),
   );
-  print('✅ LocationTrackingService registered');
+  debugPrint('✅ LocationTrackingService registered');
   
   // Data sources
   getIt.registerLazySingleton<AuthRemoteDataSource>(
@@ -196,14 +197,14 @@ Future<void> configureDependencies() async {
   );
   
   // Use cases
-  print('🔧 Registering Use Cases...');
+  debugPrint('🔧 Registering Use Cases...');
   try {
     getIt.registerLazySingleton<LoginUseCase>(
       () => LoginUseCase(getIt<AuthRepository>()),
     );
-    print('✅ LoginUseCase registered');
+    debugPrint('✅ LoginUseCase registered');
   } catch (e) {
-    print('❌ Error registering LoginUseCase: $e');
+    debugPrint('❌ Error registering LoginUseCase: $e');
     rethrow;
   }
   
@@ -211,9 +212,9 @@ Future<void> configureDependencies() async {
     getIt.registerLazySingleton<LogoutUseCase>(
       () => LogoutUseCase(getIt<AuthRepository>()),
     );
-    print('✅ LogoutUseCase registered');
+    debugPrint('✅ LogoutUseCase registered');
   } catch (e) {
-    print('❌ Error registering LogoutUseCase: $e');
+    debugPrint('❌ Error registering LogoutUseCase: $e');
     rethrow;
   }
   
@@ -221,9 +222,9 @@ Future<void> configureDependencies() async {
     getIt.registerLazySingleton<RefreshTokenUseCase>(
       () => RefreshTokenUseCase(getIt<AuthRepository>()),
     );
-    print('✅ RefreshTokenUseCase registered');
+    debugPrint('✅ RefreshTokenUseCase registered');
   } catch (e) {
-    print('❌ Error registering RefreshTokenUseCase: $e');
+    debugPrint('❌ Error registering RefreshTokenUseCase: $e');
     rethrow;
   }
   
@@ -243,15 +244,15 @@ Future<void> configureDependencies() async {
     () => GetTodayAttendanceUseCase(getIt<AttendanceRepository>()),
   );
   
-  print('✅ All Use Cases registered');
+  debugPrint('✅ All Use Cases registered');
   
   // Blocs
-  print('🔧 Registering Blocs...');
+  debugPrint('🔧 Registering Blocs...');
   
   try {
     getIt.registerFactory<AuthBloc>(
       () {
-        print('🔧 Creating AuthBloc instance...');
+        debugPrint('🔧 Creating AuthBloc instance...');
         return AuthBloc(
           loginUseCase: getIt<LoginUseCase>(),
           logoutUseCase: getIt<LogoutUseCase>(),
@@ -262,9 +263,9 @@ Future<void> configureDependencies() async {
         );
       },
     );
-    print('✅ AuthBloc registered');
+    debugPrint('✅ AuthBloc registered');
   } catch (e) {
-    print('❌ Error registering AuthBloc: $e');
+    debugPrint('❌ Error registering AuthBloc: $e');
     rethrow;
   }
   
@@ -306,5 +307,5 @@ Future<void> configureDependencies() async {
     ),
   );
 
-  print('✅ All Blocs registered');
+  debugPrint('✅ All Blocs registered');
 }

@@ -250,14 +250,8 @@ class FaceNetService {
     for (int i = 0; i < embedding1.length; i++) {
       distance += (embedding1[i] - embedding2[i]) * (embedding1[i] - embedding2[i]);
     }
-    distance = distance > 0 ? distance.abs() : 0;
-    distance = distance != 0 ? (distance as double) : 0.0;
-    
-    // حساب الجذر التربيعي
-    double sqrtDistance = 0;
-    if (distance > 0) {
-      sqrtDistance = _sqrt(distance);
-    }
+    distance = distance.abs();
+    final sqrtDistance = _sqrt(distance);
 
     // حساب التشابه
     double similarity = (1 - sqrtDistance).clamp(0.0, 1.0);

@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../../../../core/config/api_config.dart';
 import '../../../../core/network/api_client.dart';
 import '../../domain/entities/task_entity.dart';
 
@@ -13,10 +10,12 @@ class TasksRemoteDataSource {
   /// Get all tasks assigned to current user
   Future<List<TaskEntity>> getMyTasks() async {
     try {
-      final response = await _apiClient.get('/tasks/my-tasks');
+      final response = await _apiClient.dio.get('/tasks/my-tasks');
       
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final List<dynamic> data = response.data is List 
+            ? response.data 
+            : response.data['data'] ?? [];
         return data.map((json) => TaskEntity.fromJson(json)).toList();
       } else {
         throw Exception('Failed to load tasks: ${response.statusCode}');
@@ -29,10 +28,12 @@ class TasksRemoteDataSource {
   /// Get single task by ID
   Future<TaskEntity> getTaskById(String taskId) async {
     try {
-      final response = await _apiClient.get('/tasks/$taskId');
+      final response = await _apiClient.dio.get('/tasks/$taskId');
       
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
+        final Map<String, dynamic> data = response.data is Map<String, dynamic>
+            ? response.data
+            : response.data['data'];
         return TaskEntity.fromJson(data);
       } else {
         throw Exception('Failed to load task: ${response.statusCode}');
@@ -45,13 +46,15 @@ class TasksRemoteDataSource {
   /// Update task status
   Future<TaskEntity> updateTaskStatus(String taskId, String newStatus) async {
     try {
-      final response = await _apiClient.patch(
+      final response = await _apiClient.dio.patch(
         '/tasks/$taskId',
-        body: {'status': newStatus},
+        data: {'status': newStatus},
       );
       
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
+        final Map<String, dynamic> data = response.data is Map<String, dynamic>
+            ? response.data
+            : response.data['data'];
         return TaskEntity.fromJson(data);
       } else {
         throw Exception('Failed to update task: ${response.statusCode}');
@@ -64,9 +67,9 @@ class TasksRemoteDataSource {
   /// Add comment to task
   Future<void> addComment(String taskId, String content) async {
     try {
-      final response = await _apiClient.post(
+      final response = await _apiClient.dio.post(
         '/tasks/$taskId/comments',
-        body: {'content': content},
+        data: {'content': content},
       );
       
       if (response.statusCode != 200 && response.statusCode != 201) {

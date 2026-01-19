@@ -194,7 +194,7 @@ class _LetterDetailsPageState extends State<LetterDetailsPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
+                  const Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
                   const SizedBox(height: 16),
                   Text(state.message),
                   const SizedBox(height: 16),
@@ -235,10 +235,10 @@ class _LetterDetailsPageState extends State<LetterDetailsPage> {
                             children: [
                               CircleAvatar(
                                 radius: 30,
-                                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                                 child: Text(
                                   '${(user['firstName'] ?? '').toString().substring(0, 1)}${(user['lastName'] ?? '').toString().substring(0, 1)}',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: AppTheme.primaryColor,
@@ -318,7 +318,7 @@ class _LetterDetailsPageState extends State<LetterDetailsPage> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.attach_file, color: AppTheme.primaryColor),
+                                const Icon(Icons.attach_file, color: AppTheme.primaryColor),
                                 const SizedBox(width: 8),
                                 Text(
                                   'المرفقات (${attachments.length})',
