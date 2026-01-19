@@ -413,9 +413,12 @@ export class PayrollRunsService {
             orderBy: { createdAt: 'desc' }
         });
 
+        const excludedIds = new Set(dto.excludedEmployeeIds || []);
+
         const employees = await this.prisma.user.findMany({
             where: {
                 companyId,
+                id: dto.employeeIds ? { in: dto.employeeIds } : undefined,
                 branchId: dto.branchId || undefined,
                 status: 'ACTIVE',
                 salaryAssignments: { some: { isActive: true } }
@@ -444,7 +447,34 @@ export class PayrollRunsService {
                     }
                 }
             } as any
-        });
+        }) as any[];
+
+        // تطبيق فلتر الموظفين المستثنين
+        const filteredEmployees = employees.filter(emp => !excludedIds.has(emp.id));
+
+        if (filteredEmployees.length === 0) {
+            return {
+                period: {
+                    id: period.id,
+                    month: period.month,
+                    year: period.year,
+                    name: `${period.month}/${period.year}`,
+                },
+                summary: {
+                    totalEmployees: 0,
+                    totalBaseSalary: 0,
+                    totalGross: 0,
+                    totalDeductions: 0,
+                    totalNet: 0,
+                    totalGosi: 0,
+                    totalAdvances: 0,
+                },
+                employees: [],
+                byBranch: [],
+                byDepartment: [],
+                gosiEnabled: !!gosiConfig,
+            };
+        }
 
         // ✅ Using Decimal for all totals
         let totalGross: Decimal = ZERO;
@@ -458,7 +488,7 @@ export class PayrollRunsService {
         const byDepartment: Record<string, { count: number; gross: Decimal; net: Decimal }> = {};
         const employeePreviews: any[] = [];
 
-        for (const employee of employees) {
+        for (const employee of filteredEmployees) {
             const assignment = (employee as any).salaryAssignments?.[0];
             if (!assignment) continue;
 
@@ -526,7 +556,7 @@ export class PayrollRunsService {
                 lastName: employee.lastName,
                 branch: branchName,
                 department: deptName,
-                jobTitle: (employee as any).jobTitle?.titleAr || 'غير محدد',
+                jobTitle: (employee as any).jobTitleRef?.titleAr || 'غير محدد',
                 isSaudi: employee.isSaudi || false,
                 baseSalary: toNumber(toDecimal(assignment.baseSalary)),
                 gross: toNumber(finalGross),
@@ -582,7 +612,7 @@ export class PayrollRunsService {
                 name: `${period.month}/${period.year}`,
             },
             summary: {
-                totalEmployees: employees.length,
+                totalEmployees: filteredEmployees.length,
                 totalBaseSalary: toNumber(totalBaseSalary),
                 totalGross: toNumber(totalGross),
                 totalDeductions: toNumber(totalDeductions),
@@ -596,7 +626,7 @@ export class PayrollRunsService {
                 grossChangePercent: previousMonth.gross > 0 ? ((toNumber(totalGross) - previousMonth.gross) / previousMonth.gross * 100) : 0,
                 netChange: toNumber(totalNet) - previousMonth.net,
                 netChangePercent: previousMonth.net > 0 ? ((toNumber(totalNet) - previousMonth.net) / previousMonth.net * 100) : 0,
-                headcountChange: employees.length - previousMonth.headcount,
+                headcountChange: filteredEmployees.length - previousMonth.headcount,
             } : null,
             byBranch: Object.entries(byBranch).map(([name, data]) => ({
                 name,

@@ -168,5 +168,36 @@ export class LocationTrackingController {
         const date = dateStr ? new Date(dateStr) : undefined;
         return this.locationTrackingService.getExitEvents(requesterId, targetUserId, companyId, date);
     }
+
+    // ==================== الموظفين المنقطعين (Offline Detection) ====================
+
+    @Get('offline/current')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'الموظفين المنقطعين حالياً' })
+    @ApiResponse({ status: 200, description: 'قائمة الموظفين المنقطعين' })
+    async getOfflineEmployees(@Req() req: any) {
+        const companyId = req.user.companyId;
+        return this.locationTrackingService.getOfflineEmployees(companyId);
+    }
+
+    @Get('offline/history')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'سجل انقطاعات الموظفين' })
+    @ApiQuery({ name: 'startDate', required: true, type: String })
+    @ApiQuery({ name: 'endDate', required: true, type: String })
+    async getOfflineHistory(
+        @Req() req: any,
+        @Query('startDate') startDate: string,
+        @Query('endDate') endDate: string,
+    ) {
+        const companyId = req.user.companyId;
+        return this.locationTrackingService.getOfflineHistory(
+            companyId,
+            new Date(startDate),
+            new Date(endDate),
+        );
+    }
 }
 

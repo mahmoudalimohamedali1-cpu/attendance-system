@@ -373,6 +373,8 @@ export class PolicyContextService {
         // جلب بيانات الحضور
         const attendance = await this.getAttendanceData(employeeId, month, year, workingDays);
 
+        this.logger.debug(`Attendance for ${employeeId}: present=${attendance.currentPeriod.presentDays}, absent=${attendance.currentPeriod.absentDays}, late=${attendance.currentPeriod.lateDays}, workingDays=${workingDays}`);
+
         return {
             employee: {
                 id: user.id,
@@ -1312,9 +1314,20 @@ export class PolicyContextService {
     }
 
     private calculateWorkingDays(month: number, year: number): number {
-        const daysInMonth = new Date(year, month, 0).getDate();
-        const weekends = Math.floor(daysInMonth / 7) * 2;
-        return daysInMonth - weekends;
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0); // Last day of month
+        let workingDays = 0;
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dayOfWeek = d.getDay();
+            // Sunday (0) to Thursday (4) are working days as per system standard
+            if (dayOfWeek >= 0 && dayOfWeek <= 4) {
+                workingDays++;
+            }
+        }
+
+        this.logger.debug(`Calculated working days for ${year}-${month}: ${workingDays}`);
+        return workingDays;
     }
 
     /**

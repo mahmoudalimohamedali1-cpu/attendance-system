@@ -33,6 +33,7 @@ model Company {
   payrollPeriods       PayrollPeriod[]
   payrollRuns          PayrollRun[]
   holidays             Holiday[]
+  holidayAssignments   HolidayAssignment[]
   gosiConfigs          GosiConfig[]
   departments          Department[]
   workSchedules        WorkSchedule[]
@@ -74,7 +75,12 @@ model Company {
   leaveBalances    LeaveBalance[]
 
   // السياسات الذكية (AI-Powered)
-  smartPolicies SmartPolicy[]
+  smartPolicies                 SmartPolicy[]
+  smartPolicyTemplates          SmartPolicyTemplate[]
+  smartPolicyExceptions         SmartPolicyException[]
+  smartPolicyOccurrenceTrackers SmartPolicyOccurrenceTracker[]
+  smartPolicyRetroApplications  SmartPolicyRetroApplication[]
+  policySimulationRuns          PolicySimulationRun[]
 
   // نظام تتبع الموقع (Location Tracking)
   employeeLocationLogs EmployeeLocationLog[]
@@ -444,6 +450,12 @@ model User {
   taskAutomations             TaskAutomation[]
   taskAttachments             TaskAttachment[]
   employeeDebtLedgers         EmployeeDebtLedger[]         @relation("EmployeeDebts")
+
+  // Holidays & Smart Policies (Restored)
+  holidayAssignments            HolidayAssignment[]
+  smartPolicyExceptions         SmartPolicyException[]
+  smartPolicyOccurrenceTrackers SmartPolicyOccurrenceTracker[]
+  smartPolicyRetroApplications  SmartPolicyRetroApplication[]
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -1349,7 +1361,32 @@ model Holiday {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Restored fields
+  isPaid             Boolean                @default(true) @map("is_paid")
+  applicationType    HolidayApplicationType @default(ALL) @map("application_type")
+  countAsWorkDay     Boolean                @default(false) @map("count_as_work_day")
+  overtimeMultiplier Decimal                @default(2.0) @map("overtime_multiplier") @db.Decimal(3, 2)
+  notes              String?
+  holidayAssignments HolidayAssignment[]
+
   @@map("holidays")
+}
+
+model HolidayAssignment {
+  id         String   @id @default(uuid())
+  holidayId  String   @map("holiday_id")
+  companyId  String   @map("company_id")
+  employeeId String   @map("employee_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  holiday Holiday @relation(fields: [holidayId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([holidayId])
+  @@index([companyId])
+  @@index([employeeId])
+  @@map("holiday_assignments")
 }
 
 // ==================== إعدادات النظام ====================
@@ -2409,6 +2446,15 @@ model SmartPolicy {
   // سجل التنفيذات
   executions SmartPolicyExecution[]
 
+  // Restored Relations
+  analytics          SmartPolicyAnalytics[]
+  approvals          SmartPolicyApproval[]
+  exceptions         SmartPolicyException[]
+  occurrenceTrackers SmartPolicyOccurrenceTracker[]
+  retroApplications  SmartPolicyRetroApplication[]
+  versions           SmartPolicyVersion[]
+  simulationRuns     PolicySimulationRun[]
+
   @@index([companyId, status, isActive])
   @@index([companyId, triggerEvent])
   @@index([status, isActive])
@@ -2452,6 +2498,150 @@ model SmartPolicyExecution {
   @@index([employeeId, executedAt])
   @@index([triggerEvent])
   @@map("smart_policy_executions")
+}
+
+model SmartPolicyAnalytics {
+  id               String      @id @default(uuid())
+  policyId         String      @map("policy_id")
+  totalTriggered   Int         @default(0) @map("total_triggered")
+  conditionsMet    Int         @default(0) @map("conditions_met")
+  totalAdditions   Decimal     @default(0) @map("total_additions") @db.Decimal(12, 2)
+  totalDeductions  Decimal     @default(0) @map("total_deductions") @db.Decimal(12, 2)
+  lastCalculated   DateTime    @default(now()) @map("last_calculated")
+  totalEmployees   Int         @default(0) @map("total_employees")
+  avgExecutionTime Int?        @map("avg_execution_time")
+  smartPolicy      SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@map("smart_policy_analytics")
+}
+
+model SmartPolicyApproval {
+  id             String                @id @default(uuid())
+  policyId       String                @map("policy_id")
+  requestedBy    String                @map("requested_by")
+  requestedAt    DateTime              @default(now()) @map("requested_at")
+  status         SmartPolicyStatus     @default(PENDING)
+  approvedBy     String?               @map("approved_by")
+  actionAt       DateTime?             @map("action_at")
+  action         PolicyApprovalAction?
+  comments       String?
+  proposedChange Json?                 @map("proposed_change")
+  smartPolicy    SmartPolicy           @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@map("smart_policy_approvals")
+}
+
+model SmartPolicyException {
+  id              String      @id @default(uuid())
+  policyId        String      @map("policy_id")
+  employeeId      String      @map("employee_id")
+  companyId       String      @map("company_id")
+  exceptionReason String?     @map("exception_reason")
+  startDate       DateTime?   @map("start_date")
+  endDate         DateTime?   @map("end_date")
+  createdBy       String      @map("created_by")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  smartPolicy     SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([policyId, employeeId])
+  @@map("smart_policy_exceptions")
+}
+
+model SmartPolicyOccurrenceTracker {
+  id               String                @id @default(uuid())
+  policyId         String                @map("policy_id")
+  employeeId       String                @map("employee_id")
+  occurrenceCount  Int                   @default(0) @map("occurrence_count")
+  lastOccurrence   DateTime?             @map("last_occurrence")
+  resetPeriod      OccurrenceResetPeriod @default(NEVER) @map("reset_period")
+  nextResetDate    DateTime?             @map("next_reset_date")
+  totalImpactValue Decimal               @default(0) @map("total_impact_value") @db.Decimal(12, 2)
+  companyId        String                @map("company_id")
+  smartPolicy      SmartPolicy           @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  company          Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user             User                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, employeeId])
+  @@map("smart_policy_occurrence_trackers")
+}
+
+model SmartPolicyRetroApplication {
+  id             String                 @id @default(uuid())
+  policyId       String                 @map("policy_id")
+  employeeId     String                 @map("employee_id")
+  period         String                 @map("period")
+  status         RetroApplicationStatus @default(PENDING)
+  originalAmount Decimal                @map("original_amount") @db.Decimal(12, 2)
+  newAmount      Decimal                @map("new_amount") @db.Decimal(12, 2)
+  difference     Decimal                @db.Decimal(12, 2)
+  appliedBy      String?                @map("applied_by")
+  appliedAt      DateTime?              @map("applied_at")
+  companyId      String                 @map("company_id")
+  smartPolicy    SmartPolicy            @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  company        Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user           User                   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([policyId, period])
+  @@map("smart_policy_retro_applications")
+}
+
+model SmartPolicyTemplate {
+  id             String             @id @default(uuid())
+  nameAr         String             @map("name_ar")
+  nameEn         String?            @map("name_en")
+  descriptionAr  String?            @map("description_ar")
+  descriptionEn  String?            @map("description_en")
+  triggerEvent   SmartPolicyTrigger @map("trigger_event")
+  category       String
+  baseRule       Json               @map("base_rule")
+  recommendedFor String?            @map("recommended_for")
+  usageCount     Int                @default(0) @map("usage_count")
+  isActive       Boolean            @default(true) @map("is_active")
+  companyId      String?            @map("company_id")
+  company        Company?           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  @@map("smart_policy_templates")
+}
+
+model SmartPolicyVersion {
+  id            String      @id @default(uuid())
+  policyId      String      @map("policy_id")
+  versionNumber Int         @map("version_number")
+  ruleSnapshot  Json        @map("rule_snapshot")
+  createdBy     String      @map("created_by")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  changeLog     String?     @map("change_log")
+  smartPolicy   SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, versionNumber])
+  @@map("smart_policy_versions")
+}
+
+model PolicySimulationRun {
+  id                     String      @id @default(uuid())
+  policyId               String      @map("policy_id")
+  simulatedBy            String      @map("simulated_by")
+  simulatedByName        String      @map("simulated_by_name")
+  simulationPeriod       String      @map("simulation_period")
+  totalEmployeesAffected Int         @map("total_employees_affected")
+  totalAdditions         Decimal     @default(0) @map("total_additions") @db.Decimal(12, 2)
+  totalDeductions        Decimal     @default(0) @map("total_deductions") @db.Decimal(12, 2)
+  results                Json        @default("[]")
+  executionTimeMs        Int?        @map("execution_time_ms")
+  warningsCount          Int         @default(0) @map("warnings_count")
+  warnings               Json?       @default("[]")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  startDate              DateTime?   @default(now()) @map("start_date") @db.Timestamp(6)
+  endDate                DateTime?   @default(now()) @map("end_date") @db.Timestamp(6)
+  companyId              String      @map("company_id")
+  smartPolicy            SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  company                Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId, createdAt])
+  @@map("policy_simulation_runs")
 }
 
 // ==================== Government Compliance Tracking ====================
@@ -5787,4 +5977,35 @@ model EmployeeOfflineEvent {
   @@index([userId, isResolved])
   @@index([companyId, isResolved, notified])
   @@map("employee_offline_events")
+}
+
+enum HolidayApplicationType {
+  ALL
+  SAUDI_ONLY
+  NON_SAUDI_ONLY
+  SPECIFIC_BRANCH
+  SPECIFIC_DEPT
+  SPECIFIC_JOB_TITLE
+}
+
+enum OccurrenceResetPeriod {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+  NEVER
+}
+
+enum RetroApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+  CANCELLED
+}
+
+enum PolicyApprovalAction {
+  APPROVE
+  REJECT
+  REQUEST_CHANGES
 }

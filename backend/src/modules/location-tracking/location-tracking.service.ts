@@ -573,4 +573,83 @@ export class LocationTrackingService {
             this.logger.error('❌ Failed to cleanup old location data:', error);
         }
     }
+
+    // ==================== Offline Detection Methods ====================
+
+    /**
+     * الحصول على الموظفين المنقطعين حالياً
+     */
+    async getOfflineEmployees(companyId: string) {
+        const events = await this.prisma.employeeOfflineEvent.findMany({
+            where: {
+                companyId,
+                isResolved: false,
+            },
+            orderBy: { startedAt: 'desc' },
+        });
+
+        // إضافة بيانات الموظفين
+        const enrichedEvents = await Promise.all(
+            events.map(async (event) => {
+                const user = await this.prisma.user.findUnique({
+                    where: { id: event.userId },
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        department: { select: { name: true } },
+                    },
+                });
+
+                return {
+                    ...event,
+                    employeeName: user ? `${user.firstName} ${user.lastName}` : 'غير معروف',
+                    employeeCode: user?.employeeCode,
+                    departmentName: user?.department?.name,
+                    offlineDuration: Math.round((new Date().getTime() - event.startedAt.getTime()) / (1000 * 60)),
+                };
+            }),
+        );
+
+        return enrichedEvents;
+    }
+
+    /**
+     * الحصول على سجل انقطاعات الموظفين
+     */
+    async getOfflineHistory(companyId: string, startDate: Date, endDate: Date) {
+        const events = await this.prisma.employeeOfflineEvent.findMany({
+            where: {
+                companyId,
+                startedAt: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            orderBy: { startedAt: 'desc' },
+        });
+
+        // إضافة بيانات الموظفين
+        const enrichedEvents = await Promise.all(
+            events.map(async (event) => {
+                const user = await this.prisma.user.findUnique({
+                    where: { id: event.userId },
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                    },
+                });
+
+                return {
+                    ...event,
+                    employeeName: user ? `${user.firstName} ${user.lastName}` : 'غير معروف',
+                    employeeCode: user?.employeeCode,
+                };
+            }),
+        );
+
+        return enrichedEvents;
+    }
 }
+
