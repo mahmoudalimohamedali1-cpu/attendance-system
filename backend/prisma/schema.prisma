@@ -425,24 +425,25 @@ model User {
   projectActivities      ProjectActivity[]  @relation("ProjectActivityUser")
 
   // Other relations
-  shifts                      Shift[]
+  shifts                      Shift[]                      @relation("UserShifts")
   shiftSwapManaged            ShiftSwapRequest[]           @relation("ShiftSwapManager")
   shiftSwapRequested          ShiftSwapRequest[]           @relation("ShiftSwapRequester")
   shiftSwapTargeted           ShiftSwapRequest[]           @relation("ShiftSwapTarget")
-  shiftBids                   ShiftBid[]
-  policyViolationPredictions  PolicyViolationPrediction[]
-  profileUpdateRequests       ProfileUpdateRequest[]
-  emergencyContacts           EmergencyContact[]
-  trainingRequests            TrainingRequest[]
-  surveyResponses             SurveyResponse[]
-  articleFeedbacks            ArticleFeedback[]
-  offlineSyncQueues           OfflineSyncQueue[]
-  userNotificationPreferences UserNotificationPreferences?
-  locationProofs              LocationProof[]
-  teamCalendarEvents          TeamCalendarEvent[]
+  shiftBids                   ShiftBid[]                   @relation("ShiftBidUser")
+  policyViolationPredictions  PolicyViolationPrediction[]  @relation("PolicyPredictionUser")
+  profileUpdateRequests       ProfileUpdateRequest[]       @relation("ProfileUpdateRequests")
+  profileUpdateReviewed       ProfileUpdateRequest[]       @relation("ProfileUpdateReviewer")
+  emergencyContacts           EmergencyContact[]           @relation("EmergencyContacts")
+  trainingRequests            TrainingRequest[]            @relation("TrainingRequests")
+  surveyResponses             SurveyResponse[]             @relation("SurveyResponses")
+  articleFeedbacks            ArticleFeedback[]            @relation("ArticleFeedback")
+  offlineSyncQueues           OfflineSyncQueue[]           @relation("OfflineSyncQueue")
+  userNotificationPreferences UserNotificationPreferences? @relation("NotificationPreferences")
+  locationProofs              LocationProof[]              @relation("LocationProofs")
+  teamCalendarEvents          TeamCalendarEvent[]          @relation("TeamCalendarEvents")
   taskAutomations             TaskAutomation[]
   taskAttachments             TaskAttachment[]
-  employeeDebtLedgers         EmployeeDebtLedger[]
+  employeeDebtLedgers         EmployeeDebtLedger[]         @relation("EmployeeDebts")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
