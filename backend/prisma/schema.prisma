@@ -454,7 +454,8 @@ model User {
   goalCheckIns          GoalCheckIn[]
   keyResultCheckIns     KeyResultCheckIn[]
   kpiAssignments        KPIAssignment[]
-  performanceReviews    PerformanceReview[]
+  performanceReviews    PerformanceReview[]    @relation("EmployeeReviews")
+  managedReviews        PerformanceReview[]    @relation("ManagerReviews")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6164,6 +6165,7 @@ model CostCenterAllocation {
   company           Company?    @relation(fields: [companyId], references: [id])
   costCenter        CostCenter  @relation("cost_center_allocations_cost_center_idTocost_centers", fields: [costCenterId], references: [id])
   primaryCostCenter CostCenter? @relation("cost_center_allocations_primary_cost_center_idTocost_centers", fields: [primaryCostCenterId], references: [id])
+  user              User        @relation(fields: [userId], references: [id])
 
   @@unique([userId, costCenterId, effectiveFrom])
   @@index([costCenterId])
@@ -6210,6 +6212,7 @@ model Goal {
   goalCheckIns GoalCheckIn[]
   goalRatings  GoalRating[]
   company      Company       @relation(fields: [companyId], references: [id])
+  owner        User          @relation(fields: [ownerId], references: [id])
   parentGoal   Goal?         @relation("GoalToGoal", fields: [parentGoalId], references: [id])
   subGoals     Goal[]        @relation("GoalToGoal")
   keyResults   KeyResult[]
@@ -6249,6 +6252,7 @@ model KeyResultCheckIn {
   notes         String?
   createdAt     DateTime  @default(now()) @map("created_at")
   keyResults    KeyResult @relation(fields: [keyResultId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id])
 
   @@index([keyResultId])
   @@map("key_result_check_ins")
@@ -6266,6 +6270,7 @@ model GoalCheckIn {
   confidence    Int?
   createdAt     DateTime @default(now()) @map("created_at")
   goals         Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id])
 
   @@index([goalId])
   @@map("goal_check_ins")
@@ -6426,6 +6431,8 @@ model PerformanceReview {
   updatedAt              DateTime                @updatedAt @map("updated_at")
 
   cycle       PerformanceReviewCycle @relation(fields: [cycleId], references: [id])
+  employee    User                   @relation("EmployeeReviews", fields: [employeeId], references: [id])
+  manager     User                   @relation("ManagerReviews", fields: [managerId], references: [id])
   goalRatings GoalRating[]
 
   @@unique([cycleId, employeeId])
