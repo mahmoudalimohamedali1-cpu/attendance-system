@@ -579,7 +579,9 @@ model User {
   successionCandidates SuccessionCandidate[]
 
   // Social Feed (المنشورات والتواصل الاجتماعي)
-  postsAuthored Post[] @relation("PostAuthor")
+  postsAuthored Post[]          @relation("PostAuthor")
+  postReactions PostReaction[]  @relation("PostReactions")
+  postComments  PostComment[]   @relation("PostComments")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -6581,6 +6583,28 @@ enum VisibilityType {
   PRIVATE // خاص
 }
 
+// نوع الاستهداف (ABAC Targeting)
+enum TargetType {
+  BRANCH // فرع
+  DEPARTMENT // قسم
+  TEAM // فريق
+  USER // مستخدم محدد
+  ROLE // دور وظيفي
+  JOB_TITLE // مسمى وظيفي
+  GRADE // درجة وظيفية
+  CONTRACT_TYPE // نوع العقد
+  SHIFT // وردية
+  LOCATION // موقع
+  TAG // وسم
+}
+
+// نوع الإشارة (@mention)
+enum MentionType {
+  USER // إشارة لمستخدم
+  TEAM // إشارة لفريق
+  DEPARTMENT // إشارة لقسم
+}
+
 model Post {
   id        String  @id @default(uuid())
   companyId String  @map("company_id")
@@ -6625,15 +6649,17 @@ model Post {
   maxImpressions Int?      @map("max_impressions") // الحد الأقصى للظهور
   promotedUntil  DateTime? @map("promoted_until") // تاريخ انتهاء الترويج
 
+  // العلاقات - الاستهداف والتفاعلات
+  targets   PostTarget[]
+  reactions PostReaction[]
+  comments  PostComment[]
+  mentions  PostMention[]
+
   // العلاقات (ستضاف في المهام اللاحقة)
-  // targets       PostTarget[]
-  // reactions     PostReaction[]
-  // comments      PostComment[]
   // views         PostView[]
   // impressions   PostImpression[]
   // acknowledges  PostAcknowledge[]
   // attachments   PostAttachment[]
-  // mentions      PostMention[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6642,4 +6668,90 @@ model Post {
   @@index([authorId])
   @@index([companyId, isPinned])
   @@map("posts")
+}
+
+// نموذج استهداف المنشور (ABAC Targeting)
+model PostTarget {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  targetType  TargetType @map("target_type")
+  targetValue String     @map("target_value") // قيمة الاستهداف (معرف الفرع، القسم، المستخدم، إلخ)
+
+  // قواعد الشمول/الاستثناء
+  isExclusion Boolean @default(false) @map("is_exclusion") // استثناء بدلاً من شمول
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([postId])
+  @@index([targetType, targetValue])
+  @@map("post_targets")
+}
+
+// نموذج التفاعلات على المنشور (Like, Love, Celebrate)
+model PostReaction {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  user   User   @relation("PostReactions", fields: [userId], references: [id])
+
+  emoji String // رمز التفاعل (like, love, celebrate, support, insightful, etc.)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([postId, userId, emoji]) // مستخدم واحد يمكنه إضافة كل نوع تفاعل مرة واحدة
+  @@index([postId])
+  @@index([userId])
+  @@map("post_reactions")
+}
+
+// نموذج التعليقات على المنشور
+model PostComment {
+  id       String @id @default(uuid())
+  postId   String @map("post_id")
+  post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId String @map("author_id")
+  author   User   @relation("PostComments", fields: [authorId], references: [id])
+
+  content  String   @db.Text // محتوى التعليق
+  mentions String[] @default([]) // قائمة معرفات المستخدمين المذكورين
+
+  // التعديل
+  isEdited Boolean   @default(false) @map("is_edited")
+  editedAt DateTime? @map("edited_at")
+
+  // الردود المتسلسلة (Threading)
+  parentId String?       @map("parent_id")
+  parent   PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  PostComment[] @relation("CommentReplies")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("post_comments")
+}
+
+// نموذج الإشارات (@mentions) في المنشور
+model PostMention {
+  id     String @id @default(uuid())
+  postId String @map("post_id")
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  mentionType MentionType @map("mention_type")
+  mentionId   String      @map("mention_id") // معرف المستخدم، الفريق، أو القسم
+
+  // موقع الإشارة في المحتوى (لتمييزها بصرياً)
+  startIndex Int? @map("start_index")
+  endIndex   Int? @map("end_index")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([postId])
+  @@index([mentionType, mentionId])
+  @@map("post_mentions")
 }
