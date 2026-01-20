@@ -81,12 +81,12 @@ const SocialFeedPage: React.FC = () => {
     // Current user for components
     const currentUser = user
         ? {
-              id: user.id,
-              name: `${user.firstName} ${user.lastName}`,
-              avatar: user.avatar,
-              jobTitle: user.jobTitle,
-              department: user.department?.name,
-          }
+            id: user.id,
+            name: `${user.firstName} ${user.lastName}`,
+            avatar: user.avatar,
+            jobTitle: user.jobTitle,
+            department: user.department?.name,
+        }
         : undefined;
 
     // Feed query with infinite scroll
@@ -271,6 +271,7 @@ const SocialFeedPage: React.FC = () => {
 
     // Handle reaction
     const handleReact = (postId: string, reactionType: ReactionType) => {
+        console.log('handleReact called:', { postId, reactionType });
         reactMutation.mutate({ postId, reactionType });
     };
 
