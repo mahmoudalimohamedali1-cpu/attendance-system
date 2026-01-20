@@ -123,7 +123,7 @@ const SocialFeedPage: React.FC = () => {
             return nextPage <= totalPages ? nextPage : undefined;
         },
         initialPageParam: 1,
-        staleTime: 30000, // 30 seconds
+        staleTime: 0, // Always fetch fresh data
     });
 
     // Selected post detail query
