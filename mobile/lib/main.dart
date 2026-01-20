@@ -18,6 +18,7 @@ import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/leaves/presentation/bloc/leaves_bloc.dart';
 import 'features/letters/presentation/bloc/letters_bloc.dart';
 import 'features/raises/presentation/bloc/raises_bloc.dart';
+import 'features/tasks/presentation/bloc/tasks_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -92,6 +93,7 @@ class AttendanceApp extends StatelessWidget {
     LeavesBloc? leavesBloc;
     LettersBloc? lettersBloc;
     RaisesBloc? raisesBloc;
+    TasksBloc? tasksBloc;
     
     try {
       authBloc = getIt<AuthBloc>();
@@ -136,6 +138,12 @@ class AttendanceApp extends StatelessWidget {
       debugPrint('❌ Error creating RaisesBloc: $e');
     }
     
+    try {
+      tasksBloc = getIt<TasksBloc>();
+    } catch (e) {
+      debugPrint('❌ Error creating TasksBloc: $e');
+    }
+    
     // If critical blocs failed, show error screen
     if (authBloc == null || settingsBloc == null) {
       return MaterialApp(
@@ -175,6 +183,7 @@ class AttendanceApp extends StatelessWidget {
         if (leavesBloc != null) BlocProvider.value(value: leavesBloc),
         if (lettersBloc != null) BlocProvider.value(value: lettersBloc),
         if (raisesBloc != null) BlocProvider.value(value: raisesBloc),
+        if (tasksBloc != null) BlocProvider.value(value: tasksBloc),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, settingsState) {

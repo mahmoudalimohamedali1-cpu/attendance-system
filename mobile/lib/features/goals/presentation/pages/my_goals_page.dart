@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 
-class MyGoalsPage extends ConsumerStatefulWidget {
+class MyGoalsPage extends StatefulWidget {
   const MyGoalsPage({super.key});
 
   @override
-  ConsumerState<MyGoalsPage> createState() => _MyGoalsPageState();
+  State<MyGoalsPage> createState() => _MyGoalsPageState();
 }
 
-class _MyGoalsPageState extends ConsumerState<MyGoalsPage> {
+class _MyGoalsPageState extends State<MyGoalsPage> {
   List<dynamic> _goals = [];
   bool _loading = true;
   String? _error;

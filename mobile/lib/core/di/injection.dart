@@ -52,6 +52,11 @@ import '../../features/notifications/presentation/bloc/notifications_bloc.dart';
 import '../../features/settings/presentation/bloc/settings_bloc.dart';
 import '../../features/profile/presentation/bloc/profile_bloc.dart';
 
+import '../../features/tasks/data/datasources/tasks_remote_datasource.dart';
+import '../../features/tasks/data/repositories/tasks_repository_impl.dart';
+import '../../features/tasks/domain/repositories/tasks_repository.dart';
+import '../../features/tasks/presentation/bloc/tasks_bloc.dart';
+
 final getIt = GetIt.instance;
 
 Future<void> configureDependencies() async {
@@ -305,6 +310,19 @@ Future<void> configureDependencies() async {
       storageService: getIt<StorageService>(),
       apiClient: getIt<ApiClient>(),
     ),
+  );
+
+  // Tasks feature
+  getIt.registerLazySingleton<TasksRemoteDataSource>(
+    () => TasksRemoteDataSource(getIt<ApiClient>()),
+  );
+  
+  getIt.registerLazySingleton<TasksRepository>(
+    () => TasksRepositoryImpl(getIt<TasksRemoteDataSource>()),
+  );
+  
+  getIt.registerFactory<TasksBloc>(
+    () => TasksBloc(getIt<TasksRepository>()),
   );
 
   debugPrint('✅ All Blocs registered');

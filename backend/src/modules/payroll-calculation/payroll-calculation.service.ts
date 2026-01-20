@@ -333,15 +333,19 @@ export class PayrollCalculationService {
     }
 
     private async getPeriodAttendanceData(employeeId: string, companyId: string, startDate: Date, endDate: Date) {
-        // جلب بيانات الفرع للموظف للحصول على أيام العمل وإعدادات رمضان
-        // Fetch employee's branch to get workingDays and Ramadan configuration
+        // جلب بيانات الفرع والقسم للموظف للحصول على أيام العمل وإعدادات رمضان
+        // Fetch employee with branch and department for workingDays hierarchy
         const employee = await this.prisma.user.findFirst({
             where: { id: employeeId, companyId },
-            include: { branch: true },
+            include: { branch: true, department: true },
         });
-        // Type cast branch to access Ramadan fields (added in schema but may not be in prisma client yet)
-        const branch = employee?.branch as any;
-        const branchWorkingDays = branch?.workingDays;
+        // Type cast to access fields that may not be in prisma client yet
+        const emp = employee as any;
+        const branch = emp?.branch as any;
+        const department = emp?.department as any;
+
+        // 📅 Working days hierarchy: Employee → Department → Branch
+        const effectiveWorkingDays = emp?.workingDays || department?.workingDays || branch?.workingDays || '0,1,2,3,4';
 
         // 🌙 Calculate expected daily minutes based on Ramadan mode
         const branchConfig: BranchRamadanConfig = {
@@ -376,8 +380,9 @@ export class PayrollCalculationService {
 
         for (const att of attendances) {
             const dayOfWeek = new Date(att.date).getDay(); // 0 = Sunday, 6 = Saturday
-            // استخدام الدالة الجديدة للتحقق من العطلة بناءً على إعدادات الفرع
-            const isWeekend = this.isWeekendDay(dayOfWeek, branchWorkingDays);
+            // استخدام الدالة الجديدة للتحقق من العطلة بناءً على إعدادات الموظف/القسم/الفرع
+            const isWeekend = this.isWeekendDay(dayOfWeek, effectiveWorkingDays);
+
 
             if (att.status === 'PRESENT' || att.status === 'LATE') {
                 presentDays++;

@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 
-class PerformanceReviewsPage extends ConsumerStatefulWidget {
+class PerformanceReviewsPage extends StatefulWidget {
   const PerformanceReviewsPage({super.key});
 
   @override
-  ConsumerState<PerformanceReviewsPage> createState() => _PerformanceReviewsPageState();
+  State<PerformanceReviewsPage> createState() => _PerformanceReviewsPageState();
 }
 
-class _PerformanceReviewsPageState extends ConsumerState<PerformanceReviewsPage> {
+class _PerformanceReviewsPageState extends State<PerformanceReviewsPage> {
   List<dynamic> _reviews = [];
   bool _loading = true;
   String? _error;
