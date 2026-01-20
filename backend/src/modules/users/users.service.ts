@@ -148,6 +148,7 @@ export class UsersService {
           avatar: true,
           employeeCode: true,
           jobTitle: true,
+          jobTitleId: true, // ← إضافة ID الدرجة الوظيفية
           role: true,
           status: true,
           hireDate: true,
@@ -158,10 +159,13 @@ export class UsersService {
           branch: { select: { id: true, name: true } },
           department: { select: { id: true, name: true } },
           manager: { select: { id: true, firstName: true, lastName: true } },
+          jobTitleRef: { select: { id: true, name: true, nameEn: true, level: true, isDirectManager: true } }, // ← إضافة بيانات الدرجة
           faceData: { select: { faceImage: true, registeredAt: true } },
           nationality: true,
           isSaudi: true,
+          costCenterId: true, // ← إضافة ID مركز التكلفة
           costCenter: { select: { id: true, name_ar: true, code: true } },
+          salary: true, // ← إضافة الراتب
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
