@@ -40,7 +40,7 @@ interface CommentSectionProps {
     onDeleteComment?: (postId: string, commentId: string) => Promise<void>;
     onReportComment?: (postId: string, commentId: string) => void;
     onLoadMore?: () => void;
-    onLoadReplies?: (commentId: string) => void;
+    onLoadReplies?: (commentId: string) => Promise<PostComment[] | undefined>;
     maxVisibleReplies?: number;
 }
 
@@ -448,10 +448,15 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [replyContent, setReplyContent] = useState('');
     const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+    const [loadedReplies, setLoadedReplies] = useState<Record<string, PostComment[]>>({});
+    const [loadingReplies, setLoadingReplies] = useState<Set<string>>(new Set());
     const [optimisticComments, setOptimisticComments] = useState<PostComment[]>([]);
 
-    // Merge optimistic comments with actual comments
-    const displayComments = [...optimisticComments, ...comments];
+    // Merge optimistic comments with actual comments, and inject loaded replies
+    const displayComments = [...optimisticComments, ...comments].map(comment => ({
+        ...comment,
+        replies: loadedReplies[comment.id] || comment.replies || [],
+    }));
 
     const handleSubmitComment = async () => {
         if (!newComment.trim() || !onAddComment) return;
@@ -520,21 +525,47 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         onReportComment?.(postId, commentId);
     };
 
-    const toggleReplies = (commentId: string) => {
-        setExpandedReplies((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(commentId)) {
+    const toggleReplies = async (commentId: string) => {
+        const isExpanded = expandedReplies.has(commentId);
+
+        if (isExpanded) {
+            // Collapse
+            setExpandedReplies((prev) => {
+                const newSet = new Set(prev);
                 newSet.delete(commentId);
-            } else {
-                newSet.add(commentId);
-                // Load replies if not already loaded
-                const comment = comments.find((c) => c.id === commentId);
-                if (comment && (!comment.replies || comment.replies.length === 0) && comment.repliesCount > 0) {
-                    onLoadReplies?.(commentId);
+                return newSet;
+            });
+        } else {
+            // Expand and load replies if needed
+            setExpandedReplies((prev) => new Set([...prev, commentId]));
+
+            // Check if we need to load replies
+            const comment = displayComments.find((c) => c.id === commentId);
+            const hasRepliesLoaded = loadedReplies[commentId] && loadedReplies[commentId].length > 0;
+            const hasRepliesInComment = comment?.replies && comment.replies.length > 0;
+
+            if (!hasRepliesLoaded && !hasRepliesInComment && comment && comment.repliesCount > 0 && onLoadReplies) {
+                // Start loading
+                setLoadingReplies((prev) => new Set([...prev, commentId]));
+                try {
+                    const replies = await onLoadReplies(commentId);
+                    if (replies) {
+                        setLoadedReplies((prev) => ({
+                            ...prev,
+                            [commentId]: replies,
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Failed to load replies:', error);
+                } finally {
+                    setLoadingReplies((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(commentId);
+                        return newSet;
+                    });
                 }
             }
-            return newSet;
-        });
+        }
     };
 
     return (
