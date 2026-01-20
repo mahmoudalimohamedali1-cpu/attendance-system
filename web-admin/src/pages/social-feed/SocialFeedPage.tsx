@@ -362,6 +362,9 @@ const SocialFeedPage: React.FC = () => {
     }, []);
 
     // Track impressions for visible posts
+    // DISABLED: This was causing database overload with continuous requests
+    // TODO: Add proper rate limiting and tracking before re-enabling
+    /*
     useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
@@ -383,6 +386,7 @@ const SocialFeedPage: React.FC = () => {
 
         return () => observer.disconnect();
     }, [posts]);
+    */
 
     return (
         <Box

@@ -28,6 +28,12 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
   bool _isSubmitting = false;
   final bool _isUploadingFiles = false;
 
+  // حساب عدد الأيام المطلوبة
+  int get _requestedDays {
+    if (_startDate == null || _endDate == null) return 0;
+    return _endDate!.difference(_startDate!).inDays + 1;
+  }
+
   final _leaveTypes = [
     {'value': 'ANNUAL', 'label': 'إجازة سنوية'},
     {'value': 'SICK', 'label': 'إجازة مرضية'},
@@ -383,6 +389,100 @@ class _CreateLeaveRequestPageState extends State<CreateLeaveRequestPage> {
                 ),
               ],
             ),
+            
+            // عرض عدد الأيام المحسوبة وتأثيرها على الرصيد
+            if (_startDate != null && _endDate != null)
+              BlocBuilder<AuthBloc, AuthState>(
+                builder: (context, authState) {
+                  final remaining = authState is AuthAuthenticated 
+                      ? (authState.user.remainingLeaveDays ?? 0) 
+                      : 0;
+                  final afterRequest = remaining - _requestedDays;
+                  final isInsufficient = afterRequest < 0;
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isInsufficient 
+                          ? Colors.red.withOpacity(0.1)
+                          : Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isInsufficient ? Colors.red : Colors.green,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today,
+                                  color: isInsufficient ? Colors.red : Colors.green,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'الأيام المطلوبة:',
+                                  style: TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isInsufficient ? Colors.red : Colors.green,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                '$_requestedDays يوم',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('الرصيد بعد الطلب:'),
+                            Text(
+                              '$afterRequest يوم',
+                              style: TextStyle(
+                                color: isInsufficient ? Colors.red : Colors.green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isInsufficient) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(Icons.warning, color: Colors.red, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'رصيد الإجازات غير كافي! سيتم خصم ${afterRequest.abs()} يوم من راتبك',
+                                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
             const SizedBox(height: 20),
 
             // Reason
