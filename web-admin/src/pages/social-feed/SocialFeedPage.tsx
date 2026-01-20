@@ -174,16 +174,48 @@ const SocialFeedPage: React.FC = () => {
         },
     });
 
-    // React to post mutation
+    // React to post mutation with optimistic update
     const reactMutation = useMutation({
         mutationFn: ({ postId, reactionType }: { postId: string; reactionType: ReactionType }) =>
             socialFeedService.reactToPost(postId, reactionType),
-        onSuccess: async (_, { postId }) => {
-            console.log('Mutation success, refetching feed...');
-            // Force refetch the feed to get updated data
-            await refetchFeed();
-            // Also invalidate for any other queries
-            queryClient.invalidateQueries({ queryKey: ['social-feed-post', postId] });
+        onMutate: async ({ postId, reactionType }) => {
+            // Cancel any outgoing refetches
+            await queryClient.cancelQueries({ queryKey: ['social-feed'] });
+
+            // Snapshot the previous value
+            const previousData = queryClient.getQueryData(['social-feed', activeFilter, searchQuery]);
+
+            // Optimistically update the cache
+            queryClient.setQueryData(['social-feed', activeFilter, searchQuery], (old: any) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    pages: old.pages.map((page: any) => ({
+                        ...page,
+                        items: page.items.map((post: any) => {
+                            if (post.id === postId) {
+                                return {
+                                    ...post,
+                                    userReaction: reactionType.toLowerCase(),
+                                };
+                            }
+                            return post;
+                        }),
+                    })),
+                };
+            });
+
+            return { previousData };
+        },
+        onError: (err, variables, context) => {
+            // Rollback on error
+            if (context?.previousData) {
+                queryClient.setQueryData(['social-feed', activeFilter, searchQuery], context.previousData);
+            }
+        },
+        onSettled: () => {
+            // Refetch to sync with server
+            queryClient.invalidateQueries({ queryKey: ['social-feed'] });
         },
     });
 
