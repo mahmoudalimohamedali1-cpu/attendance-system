@@ -89,5 +89,29 @@ export class CreateBranchDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean = true;
+
+  // 🌙 إعدادات رمضان
+  @ApiProperty({ description: 'تفعيل وضع رمضان', default: false })
+  @IsOptional()
+  @IsBoolean()
+  ramadanModeEnabled?: boolean = false;
+
+  @ApiProperty({ description: 'ساعات العمل في رمضان (6 ساعات بموجب القانون)', default: 6 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(12)
+  ramadanWorkHours?: number = 6;
+
+  @ApiProperty({ description: 'وقت بداية العمل في رمضان', required: false, example: '09:00' })
+  @IsOptional()
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: 'صيغة الوقت غير صحيحة (HH:MM)' })
+  ramadanWorkStartTime?: string;
+
+  @ApiProperty({ description: 'وقت نهاية العمل في رمضان', required: false, example: '15:00' })
+  @IsOptional()
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: 'صيغة الوقت غير صحيحة (HH:MM)' })
+  ramadanWorkEndTime?: string;
 }
+
 
