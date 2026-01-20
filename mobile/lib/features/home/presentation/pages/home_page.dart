@@ -13,6 +13,7 @@ import '../widgets/check_in_out_card.dart';
 import '../widgets/quick_stats_card.dart';
 import '../widgets/today_status_card.dart';
 import '../widgets/letter_request_card.dart';
+import '../widgets/announcements_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -132,6 +133,9 @@ class _HomePageState extends State<HomePage> {
                     _buildSectionTitle('📊 إحصائيات الشهر', isDark),
                     const SizedBox(height: 12),
                     const QuickStatsCard(),
+                    const SizedBox(height: 20),
+                    // Announcements Section
+                    const AnnouncementsWidget(),
                     const SizedBox(height: 20),
                     // Recent Letters
                     const LetterRequestCard(),
@@ -445,6 +449,12 @@ class _QuickActionsCard extends StatelessWidget {
               onTap: () => context.go('/my-tasks'),
             ),
             _QuickActionButton(
+              icon: Icons.forum,
+              label: 'التواصل',
+              color: Colors.pink,
+              onTap: () => context.go('/social-feed'),
+            ),
+            _QuickActionButton(
               icon: Icons.flag,
               label: 'أهدافي',
               color: Colors.green,
@@ -455,12 +465,6 @@ class _QuickActionsCard extends StatelessWidget {
               label: 'التقييم',
               color: Colors.amber,
               onTap: () => context.go('/performance-reviews'),
-            ),
-            _QuickActionButton(
-              icon: Icons.emoji_events,
-              label: 'التقدير',
-              color: Colors.purple,
-              onTap: () => context.go('/recognition'),
             ),
           ],
         ),

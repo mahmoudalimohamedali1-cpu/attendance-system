@@ -79,6 +79,7 @@ import { api } from '@/services/api.service';
 import { useAuthStore } from '@/store/auth.store';
 import { MudadComplianceCard } from '@/components/dashboard/MudadComplianceCard';
 import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
+import { AnnouncementsBanner } from '@/components/dashboard/AnnouncementsBanner';
 import { calendarEventsService, CalendarEvent as ServiceCalendarEvent } from '@/services/calendar-events.service';
 
 interface DashboardStats {
@@ -500,6 +501,9 @@ export const DashboardPage = () => {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         مرحباً بك! هذه نظرة عامة على النظام اليوم
       </Typography>
+
+      {/* Announcements Banner */}
+      <AnnouncementsBanner />
 
       {/* Quick Actions for MANAGER role */}
       {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (

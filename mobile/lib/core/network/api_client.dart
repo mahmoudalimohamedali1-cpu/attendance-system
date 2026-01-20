@@ -343,5 +343,54 @@ class ApiClient {
   Future<Response> updateLocation(Map<String, dynamic> data) async {
     return await _dio.post('/location-tracking/update', data: data);
   }
+
+  // ==================== Social Feed endpoints ====================
+
+  /// جلب المنشورات (Feed)
+  Future<Response> getSocialFeed(Map<String, dynamic> params) async {
+    debugPrint('📤 Fetching social feed from: ${_dio.options.baseUrl}/social-feed');
+    return await _dio.get('/social-feed', queryParameters: params);
+  }
+
+  /// جلب منشور واحد
+  Future<Response> getSocialPost(String postId) async {
+    return await _dio.get('/social-feed/$postId');
+  }
+
+  /// إنشاء منشور جديد
+  Future<Response> createSocialPost(Map<String, dynamic> data) async {
+    debugPrint('📤 Creating social post');
+    return await _dio.post('/social-feed', data: data);
+  }
+
+  /// إضافة تفاعل (Reaction)
+  Future<Response> addReaction(String postId, String reactionType) async {
+    return await _dio.post('/social-feed/$postId/react', data: {'emoji': reactionType});
+  }
+
+  /// إزالة تفاعل
+  Future<Response> removeReaction(String postId) async {
+    return await _dio.delete('/social-feed/$postId/react');
+  }
+
+  /// جلب التعليقات
+  Future<Response> getComments(String postId, Map<String, dynamic> params) async {
+    return await _dio.get('/social-feed/$postId/comments', queryParameters: params);
+  }
+
+  /// إضافة تعليق
+  Future<Response> addComment(String postId, Map<String, dynamic> data) async {
+    return await _dio.post('/social-feed/$postId/comments', data: data);
+  }
+
+  /// حذف تعليق
+  Future<Response> deleteComment(String postId, String commentId) async {
+    return await _dio.delete('/social-feed/$postId/comments/$commentId');
+  }
+
+  /// الإقرار بالمنشور
+  Future<Response> acknowledgePost(String postId) async {
+    return await _dio.post('/social-feed/$postId/acknowledge');
+  }
 }
 

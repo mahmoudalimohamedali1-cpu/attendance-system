@@ -43,6 +43,9 @@ import '../../features/goals/presentation/pages/my_goals_page.dart';
 import '../../features/recognition/presentation/pages/recognition_page.dart';
 import '../../features/attendance/presentation/pages/monthly_report_page.dart';
 import '../../features/requests/presentation/pages/my_requests_page.dart';
+import '../../features/social_feed/presentation/pages/social_feed_page.dart';
+import '../../features/social_feed/presentation/pages/post_detail_page.dart';
+import '../../features/social_feed/data/models/post_model.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -330,6 +333,12 @@ class AppRouter {
             name: 'my-requests',
             builder: (context, state) => const MyRequestsPage(),
           ),
+          // Social Feed routes
+          GoRoute(
+            path: '/social-feed',
+            name: 'social-feed',
+            builder: (context, state) => const SocialFeedPage(),
+          ),
         ],
       ),
       // Custody sub-routes (outside shell for full screen)
@@ -355,6 +364,15 @@ class AppRouter {
         builder: (context, state) {
           final assignment = state.extra as CustodyAssignmentModel;
           return SignCustodyPage(assignment: assignment);
+        },
+      ),
+      // Social Feed Post Detail (full screen)
+      GoRoute(
+        path: '/social-feed/post',
+        name: 'social-feed-post',
+        builder: (context, state) {
+          final post = state.extra as Post;
+          return PostDetailPage(post: post);
         },
       ),
     ],
