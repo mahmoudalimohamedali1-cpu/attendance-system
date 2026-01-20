@@ -178,9 +178,11 @@ const SocialFeedPage: React.FC = () => {
     const reactMutation = useMutation({
         mutationFn: ({ postId, reactionType }: { postId: string; reactionType: ReactionType }) =>
             socialFeedService.reactToPost(postId, reactionType),
-        onSuccess: (_, { postId }) => {
-            // Update the post in the feed cache
-            queryClient.invalidateQueries({ queryKey: ['social-feed'] });
+        onSuccess: async (_, { postId }) => {
+            console.log('Mutation success, refetching feed...');
+            // Force refetch the feed to get updated data
+            await refetchFeed();
+            // Also invalidate for any other queries
             queryClient.invalidateQueries({ queryKey: ['social-feed-post', postId] });
         },
     });
