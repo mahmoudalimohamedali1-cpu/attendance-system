@@ -100,6 +100,23 @@ export class AttendanceController {
     return this.attendanceService.getMonthlyStats(userId, companyId, year, month);
   }
 
+  @Get('my-monthly-stats')
+  @ApiOperation({ summary: 'إحصائيات الحضور الشهرية (query params)' })
+  @ApiResponse({ status: 200, description: 'إحصائيات الشهر' })
+  @ApiQuery({ name: 'year', required: false, description: 'السنة' })
+  @ApiQuery({ name: 'month', required: false, description: 'الشهر (1-12)' })
+  async getMyMonthlyStats(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+  ) {
+    const now = new Date();
+    const yearNum = year ? parseInt(year, 10) : now.getFullYear();
+    const monthNum = month ? parseInt(month, 10) : now.getMonth() + 1;
+    return this.attendanceService.getMonthlyStats(userId, companyId, yearNum, monthNum);
+  }
+
   // ============ Permission-Based Endpoints (uses PermissionsService) ============
 
   @Get('admin/all')

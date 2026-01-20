@@ -867,6 +867,12 @@ model Branch {
   // أيام العمل
   workingDays String @default("1,2,3,4,5") @map("working_days") // 0=الأحد, 6=السبت
 
+  // إعدادات رمضان
+  ramadanModeEnabled   Boolean @default(false) @map("ramadan_mode_enabled") // تفعيل وضع رمضان
+  ramadanWorkHours     Int     @default(6) @map("ramadan_work_hours") // ساعات العمل في رمضان (6 ساعات بموجب القانون)
+  ramadanWorkStartTime String? @map("ramadan_work_start_time") // وقت بداية العمل في رمضان (اختياري)
+  ramadanWorkEndTime   String? @map("ramadan_work_end_time") // وقت نهاية العمل في رمضان (اختياري)
+
   users          User[]
   departments    Department[]
   attendances    Attendance[]

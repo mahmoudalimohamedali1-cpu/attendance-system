@@ -1,35 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/datasources/custody_remote_datasource.dart';
+import '../../../../core/di/injection.dart';
 
-class MyCustodyPage extends ConsumerStatefulWidget {
+class MyCustodyPage extends StatefulWidget {
   const MyCustodyPage({super.key});
 
   @override
-  ConsumerState<MyCustodyPage> createState() => _MyCustodyPageState();
+  State<MyCustodyPage> createState() => _MyCustodyPageState();
 }
 
-class _MyCustodyPageState extends ConsumerState<MyCustodyPage> {
+class _MyCustodyPageState extends State<MyCustodyPage> {
   List<CustodyAssignmentModel> _items = [];
   bool _loading = true;
   String? _error;
+  late CustodyRemoteDataSource _datasource;
 
   @override
   void initState() {
     super.initState();
+    // استخدام Dio من dependency injection
+    final dio = getIt<Dio>();
+    _datasource = CustodyRemoteDataSource(dio);
     _loadData();
   }
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
-      final datasource = ref.read(custodyDataSourceProvider);
-      final data = await datasource.getMyCustody();
+      final data = await _datasource.getMyCustody();
       setState(() {
         _items = data;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       setState(() {
@@ -288,15 +292,3 @@ class _MyCustodyPageState extends ConsumerState<MyCustodyPage> {
     );
   }
 }
-
-// Provider for the data source
-final custodyDataSourceProvider = Provider<CustodyRemoteDataSource>((ref) {
-  // Get dio instance from the existing dioProvider
-  // For now, create a basic Dio instance with the base URL
-  final dio = Dio(BaseOptions(
-    baseUrl: 'https://72.61.239.170/api/v1',
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 30),
-  ));
-  return CustodyRemoteDataSource(dio);
-});

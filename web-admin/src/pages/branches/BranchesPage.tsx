@@ -110,6 +110,11 @@ export const BranchesPage = () => {
     earlyCheckOutPeriod: 0,
     workingDays: '0,1,2,3,4', // السبت-الأربعاء
     isActive: true,
+    // إعدادات رمضان
+    ramadanModeEnabled: false,
+    ramadanWorkHours: 6,
+    ramadanWorkStartTime: '09:00',
+    ramadanWorkEndTime: '15:00',
   });
 
   // Department state
@@ -834,6 +839,64 @@ export const BranchesPage = () => {
                   />
                 }
                 label="الفرع نشط"
+              />
+            </Grid>
+
+            {/* إعدادات رمضان */}
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" gutterBottom sx={{ mt: 2 }}>
+                🌙 إعدادات شهر رمضان
+              </Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                وفقاً لنظام العمل السعودي، تُخفض ساعات العمل للمسلمين إلى 6 ساعات يومياً خلال رمضان
+              </Alert>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={branchForm.ramadanModeEnabled}
+                    onChange={(e) => setBranchForm({ ...branchForm, ramadanModeEnabled: e.target.checked })}
+                    color="warning"
+                  />
+                }
+                label="تفعيل وضع رمضان"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                label="ساعات العمل في رمضان"
+                type="number"
+                value={branchForm.ramadanWorkHours}
+                onChange={(e) => setBranchForm({ ...branchForm, ramadanWorkHours: parseInt(e.target.value) })}
+                disabled={!branchForm.ramadanModeEnabled}
+                helperText="6 ساعات للمسلمين بموجب القانون"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              {/* placeholder */}
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="وقت بداية العمل في رمضان"
+                type="time"
+                value={branchForm.ramadanWorkStartTime}
+                onChange={(e) => setBranchForm({ ...branchForm, ramadanWorkStartTime: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                disabled={!branchForm.ramadanModeEnabled}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="وقت نهاية العمل في رمضان"
+                type="time"
+                value={branchForm.ramadanWorkEndTime}
+                onChange={(e) => setBranchForm({ ...branchForm, ramadanWorkEndTime: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                disabled={!branchForm.ramadanModeEnabled}
               />
             </Grid>
           </Grid>
