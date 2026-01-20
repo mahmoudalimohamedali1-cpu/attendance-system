@@ -179,8 +179,8 @@ const SocialFeedPage: React.FC = () => {
         mutationFn: ({ postId, reactionType }: { postId: string; reactionType: ReactionType }) =>
             socialFeedService.reactToPost(postId, reactionType),
         onSuccess: () => {
-            // Invalidate queries to refetch fresh data
-            queryClient.invalidateQueries({ queryKey: ['social-feed'] });
+            // Force refetch all social-feed queries
+            queryClient.refetchQueries({ queryKey: ['social-feed'] });
         },
     });
 
