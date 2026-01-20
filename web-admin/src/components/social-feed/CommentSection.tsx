@@ -63,6 +63,7 @@ const formatRelativeTime = (dateString: string): string => {
 
 // Helper to get initials from name
 const getInitials = (name: string): string => {
+    if (!name) return '??';
     return name
         .split(' ')
         .map((n) => n[0])

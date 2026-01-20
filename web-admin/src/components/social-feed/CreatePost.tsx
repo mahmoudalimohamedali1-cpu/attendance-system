@@ -148,6 +148,7 @@ const targetTypeLabels: Record<TargetType, string> = {
 
 // Helper to get initials from name
 const getInitials = (name: string): string => {
+    if (!name) return '??';
     return name
         .split(' ')
         .map((n) => n[0])
@@ -305,8 +306,8 @@ export const CreatePost: React.FC<CreatePostProps> = ({
             const type: AttachmentPreview['type'] = file.type.startsWith('image/')
                 ? 'IMAGE'
                 : file.type.startsWith('video/')
-                ? 'VIDEO'
-                : 'DOCUMENT';
+                    ? 'VIDEO'
+                    : 'DOCUMENT';
 
             newAttachments.push({
                 id: `temp-${Date.now()}-${i}`,
@@ -393,16 +394,16 @@ export const CreatePost: React.FC<CreatePostProps> = ({
                                     fontSize: '0.7rem',
                                     ...(postType === type
                                         ? {
-                                              background: `linear-gradient(135deg, ${config.gradient[0]}, ${config.gradient[1]})`,
-                                              color: 'white',
-                                              '& .MuiChip-icon': { color: 'white' },
-                                          }
+                                            background: `linear-gradient(135deg, ${config.gradient[0]}, ${config.gradient[1]})`,
+                                            color: 'white',
+                                            '& .MuiChip-icon': { color: 'white' },
+                                        }
                                         : {
-                                              background: 'rgba(0, 0, 0, 0.05)',
-                                              '&:hover': {
-                                                  background: `linear-gradient(135deg, ${config.gradient[0]}20, ${config.gradient[1]}20)`,
-                                              },
-                                          }),
+                                            background: 'rgba(0, 0, 0, 0.05)',
+                                            '&:hover': {
+                                                background: `linear-gradient(135deg, ${config.gradient[0]}20, ${config.gradient[1]}20)`,
+                                            },
+                                        }),
                                 }}
                             />
                         </Tooltip>
@@ -412,7 +413,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({
 
             {/* Error Alert */}
             {error && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => {}}>
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => { }}>
                     {error}
                 </Alert>
             )}
