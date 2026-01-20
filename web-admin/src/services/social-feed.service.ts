@@ -235,6 +235,10 @@ export const socialFeedService = {
     getComments: (postId: string, options?: { page?: number; limit?: number }): Promise<CommentsResponse> =>
         api.get<CommentsResponse>(`/social-feed/${postId}/comments`, { params: options }),
 
+    // Replies for a specific comment
+    getReplies: (postId: string, commentId: string, options?: { page?: number; limit?: number }): Promise<CommentsResponse> =>
+        api.get<CommentsResponse>(`/social-feed/${postId}/comments`, { params: { ...options, parentId: commentId } }),
+
     addComment: (postId: string, data: CreateCommentDto): Promise<PostComment> =>
         api.post<PostComment>(`/social-feed/${postId}/comments`, data),
 

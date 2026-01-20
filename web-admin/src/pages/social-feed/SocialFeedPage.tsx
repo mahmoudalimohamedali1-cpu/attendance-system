@@ -308,6 +308,33 @@ const SocialFeedPage: React.FC = () => {
         await deleteCommentMutation.mutateAsync({ postId, commentId });
     };
 
+    // Handle load replies for a comment
+    const handleLoadReplies = async (commentId: string) => {
+        if (!selectedPostId) return;
+        try {
+            const response = await socialFeedService.getReplies(selectedPostId, commentId, { limit: 10 });
+            // Transform replies to match expected format
+            const transformedReplies = response.items.map((item: any) => ({
+                ...item,
+                author: {
+                    id: item.author?.id,
+                    name: item.author?.name || `${item.author?.firstName || ''} ${item.author?.lastName || ''}`.trim() || 'مستخدم',
+                    avatar: item.author?.avatar,
+                    jobTitle: item.author?.jobTitle,
+                },
+                repliesCount: item._count?.replies || item.repliesCount || 0,
+            }));
+            // Update the comments with the loaded replies
+            // This is a simple approach - in production you might want to use React Query for this
+            console.log('Loaded replies:', transformedReplies);
+            // Return the replies for the CommentSection to use
+            return transformedReplies;
+        } catch (error) {
+            console.error('Failed to load replies:', error);
+            showSnackbar('حدث خطأ أثناء تحميل الردود', 'error');
+        }
+    };
+
     // Handle delete post
     const handleDeletePost = (postId: string) => {
         if (window.confirm('هل أنت متأكد من حذف هذا المنشور؟')) {
@@ -810,6 +837,7 @@ const SocialFeedPage: React.FC = () => {
                                 currentUser={currentUser}
                                 onAddComment={handleAddComment}
                                 onDeleteComment={handleDeleteComment}
+                                onLoadReplies={handleLoadReplies}
                                 onLoadMore={() => fetchMoreComments()}
                             />
                         </Box>
