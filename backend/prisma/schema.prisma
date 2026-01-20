@@ -867,12 +867,13 @@ model Branch {
   // أيام العمل
   workingDays String @default("1,2,3,4,5") @map("working_days") // 0=الأحد, 6=السبت
 
-  users        User[]
-  departments  Department[]
-  attendances  Attendance[]
-  schedules    WorkSchedule[]
-  policies     Policy[] // سياسات على مستوى الفرع
-  custodyItems CustodyItem[] // العهد في هذا الفرع
+  users          User[]
+  departments    Department[]
+  attendances    Attendance[]
+  schedules      WorkSchedule[]
+  policies       Policy[] // سياسات على مستوى الفرع
+  custodyItems   CustodyItem[] // العهد في هذا الفرع
+  breakSchedules BranchBreakSchedule[] // جدول الاستراحات الثابتة
 
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
@@ -880,6 +881,56 @@ model Branch {
 
   @@unique([companyId, name])
   @@map("branches")
+}
+
+// ==================== جدول الاستراحات الثابتة للفرع ====================
+
+// نوع الاستراحة الثابتة
+enum ScheduledBreakType {
+  DHUHR_PRAYER // صلاة الظهر
+  ASR_PRAYER // صلاة العصر
+  LUNCH // استراحة الغداء
+  REST // استراحة راحة
+  OTHER // أخرى
+}
+
+// جدول استراحات الفرع
+model BranchBreakSchedule {
+  id        String  @id @default(uuid())
+  companyId String? @map("company_id")
+  branchId  String  @map("branch_id")
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  // نوع الاستراحة
+  name   String // اسم الاستراحة (صلاة الظهر، غداء، إلخ)
+  nameEn String?            @map("name_en")
+  type   ScheduledBreakType @default(OTHER)
+
+  // أوقات الاستراحة
+  startTime String @map("start_time") // e.g., "12:00"
+  endTime   String @map("end_time") // e.g., "12:30"
+
+  // مدة الاستراحة بالدقائق (تُحسب تلقائياً أو تُدخل يدوياً)
+  durationMinutes Int @map("duration_minutes")
+
+  // هل الاستراحة مدفوعة؟ (لا تُخصم من ساعات العمل)
+  isPaid Boolean @default(true) @map("is_paid")
+
+  // أيام تطبيق الاستراحة (0-6, مفصولة بفاصلة) فارغ = كل الأيام
+  applicableDays String? @map("applicable_days") // e.g., "0,1,2,3,4" 
+
+  // هل الاستراحة مفعّلة؟
+  isActive Boolean @default(true) @map("is_active")
+
+  // ترتيب العرض
+  sortOrder Int @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@index([companyId])
+  @@map("branch_break_schedules")
 }
 
 model Department {
