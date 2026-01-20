@@ -52,11 +52,13 @@ import {
   Inbox,
   SupervisorAccount,
   AccessTime,
+  AccountBalanceWallet,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { api } from '@/services/api.service';
 import { API_CONFIG } from '@/config/api';
+import { LeaveBalanceDashboard } from '@/components/leaves/LeaveBalanceDashboard';
 
 interface Attachment {
   filename: string;
@@ -148,10 +150,11 @@ export const LeavesPage = () => {
   const [approvalNote, setApprovalNote] = useState('');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
-  // Tab mapping: 0=Manager Inbox, 1=HR Inbox, 2=PENDING, 3=MGR_APPROVED, 4=APPROVED, 5=REJECTED
-  const isManagerInbox = tabValue === 0;
-  const isHRInbox = tabValue === 1;
-  const statusFilter = tabValue === 2 ? 'PENDING' : tabValue === 3 ? 'MGR_APPROVED' : tabValue === 4 ? 'APPROVED' : 'REJECTED';
+  // Tab mapping: 0=Balance Dashboard, 1=Manager Inbox, 2=HR Inbox, 3=PENDING, 4=MGR_APPROVED, 5=APPROVED, 6=REJECTED
+  const isBalanceDashboard = tabValue === 0;
+  const isManagerInbox = tabValue === 1;
+  const isHRInbox = tabValue === 2;
+  const statusFilter = tabValue === 3 ? 'PENDING' : tabValue === 4 ? 'MGR_APPROVED' : tabValue === 5 ? 'APPROVED' : 'REJECTED';
 
   // Manager Inbox Query
   const { data: managerInbox, isLoading: managerLoading } = useQuery<LeaveRequest[]>({
@@ -475,6 +478,11 @@ export const LeavesPage = () => {
             variant="scrollable"
             scrollButtons="auto"
           >
+            <Tab
+              icon={<AccountBalanceWallet />}
+              iconPosition="start"
+              label="أرصدتي"
+            />
             <Tab
               icon={<Badge badgeContent={managerInbox?.length || 0} color="warning"><Inbox /></Badge>}
               iconPosition="start"

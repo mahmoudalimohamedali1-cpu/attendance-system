@@ -100,6 +100,16 @@ export class LeavesController {
     return this.leavesService.getMyLeaveRequests(userId, companyId, query);
   }
 
+  @Get('my/balances')
+  @ApiOperation({ summary: 'أرصدة الإجازات الخاصة بي' })
+  @ApiResponse({ status: 200, description: 'أرصدة جميع أنواع الإجازات مع التفاصيل' })
+  async getMyLeaveBalances(
+    @CurrentUser('id') userId: string,
+    @Query('year') year?: number,
+  ) {
+    return this.leavesService.getEmployeeLeaveBalances(userId, year);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'تفاصيل طلب إجازة' })
   @ApiResponse({ status: 200, description: 'تفاصيل الطلب' })

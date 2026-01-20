@@ -448,16 +448,39 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [replyContent, setReplyContent] = useState('');
     const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+    const [optimisticComments, setOptimisticComments] = useState<PostComment[]>([]);
+
+    // Merge optimistic comments with actual comments
+    const displayComments = [...optimisticComments, ...comments];
 
     const handleSubmitComment = async () => {
         if (!newComment.trim() || !onAddComment) return;
 
-        setIsSubmitting(true);
+        const content = newComment.trim();
+
+        // Create optimistic comment for instant display
+        const optimisticComment: PostComment = {
+            id: `optimistic-${Date.now()}`,
+            postId,
+            content,
+            author: currentUser || { id: 'unknown', name: 'أنت' },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            repliesCount: 0,
+        };
+
+        // Add optimistic comment immediately
+        setOptimisticComments(prev => [optimisticComment, ...prev]);
+        setNewComment('');
+
+        // Send to server in background
         try {
-            await onAddComment(postId, newComment.trim());
-            setNewComment('');
-        } finally {
-            setIsSubmitting(false);
+            await onAddComment(postId, content);
+            // Remove optimistic comment after server confirms (actual comment will come from refetch)
+            setOptimisticComments(prev => prev.filter(c => c.id !== optimisticComment.id));
+        } catch {
+            // Remove optimistic comment on error
+            setOptimisticComments(prev => prev.filter(c => c.id !== optimisticComment.id));
         }
     };
 
@@ -598,7 +621,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
             </Box>
 
             {/* Comments list */}
-            {comments.length === 0 && !isLoading ? (
+            {displayComments.length === 0 && !isLoading ? (
                 <Box
                     sx={{
                         py: 4,
@@ -611,7 +634,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                 </Box>
             ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {comments.map((comment) => (
+                    {displayComments.map((comment) => (
                         <Box key={comment.id}>
                             <SingleComment
                                 comment={comment}

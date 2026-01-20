@@ -24,6 +24,183 @@ export class LeavesService {
     private timezoneService: TimezoneService,
   ) { }
 
+  /**
+   * الحصول على أرصدة جميع أنواع الإجازات للموظف
+   * يعرض تفاصيل كل نوع إجازة مع الاستحقاق والمستخدم والمتبقي
+   */
+  async getEmployeeLeaveBalances(userId: string, year?: number) {
+    const targetYear = year || new Date().getFullYear();
+
+    // Get user data
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        companyId: true,
+        hireDate: true,
+        annualLeaveDays: true,
+        remainingLeaveDays: true,
+      },
+    });
+
+    if (!user || !user.companyId) {
+      throw new NotFoundException('المستخدم غير موجود');
+    }
+
+    // Get all leave types for the company
+    const leaveTypes = await this.prisma.leaveTypeConfig.findMany({
+      where: {
+        companyId: user.companyId,
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    // Get leave balances for the user
+    const balances = await this.prisma.leaveBalance.findMany({
+      where: {
+        userId,
+        year: targetYear,
+      },
+      include: {
+        leaveType: true,
+      },
+    });
+
+    // Get pending and approved leave requests for current year
+    const leaveRequests = await this.prisma.leaveRequest.findMany({
+      where: {
+        userId,
+        startDate: {
+          gte: new Date(targetYear, 0, 1),
+          lte: new Date(targetYear, 11, 31),
+        },
+      },
+      select: {
+        id: true,
+        type: true,
+        leaveTypeConfigId: true,
+        status: true,
+        requestedDays: true,
+        approvedDays: true,
+      },
+    });
+
+    // Build response with all types
+    const balanceDetails = leaveTypes.map((leaveType) => {
+      const balance = balances.find(b => b.leaveTypeId === leaveType.id);
+      const typeRequests = leaveRequests.filter(r =>
+        r.leaveTypeConfigId === leaveType.id || r.type === leaveType.code
+      );
+
+      const pendingDays = typeRequests
+        .filter(r => ['PENDING', 'MGR_APPROVED'].includes(r.status))
+        .reduce((sum, r) => sum + (r.requestedDays || 0), 0);
+
+      const usedDays = typeRequests
+        .filter(r => r.status === 'APPROVED')
+        .reduce((sum, r) => sum + (r.approvedDays || r.requestedDays || 0), 0);
+
+      const entitled = balance ? Number(balance.entitled) : leaveType.defaultEntitlement;
+      const carriedForward = balance ? Number(balance.carriedForward) : 0;
+      const totalAvailable = entitled + carriedForward;
+      const remaining = totalAvailable - usedDays - pendingDays;
+
+      // Calculate percentage for progress bar
+      const usagePercentage = totalAvailable > 0
+        ? Math.round(((usedDays + pendingDays) / totalAvailable) * 100)
+        : 0;
+
+      return {
+        id: leaveType.id,
+        code: leaveType.code,
+        nameAr: leaveType.nameAr,
+        nameEn: leaveType.nameEn,
+        category: leaveType.category,
+        isPaid: leaveType.isPaid,
+        color: this.getLeaveTypeColor(leaveType.category),
+        icon: this.getLeaveTypeIcon(leaveType.category),
+
+        // Balances
+        entitled,
+        carriedForward,
+        totalAvailable,
+        used: usedDays,
+        pending: pendingDays,
+        remaining: Math.max(0, remaining),
+
+        // Progress
+        usagePercentage: Math.min(100, usagePercentage),
+        isLowBalance: remaining <= 3 && totalAvailable > 0,
+        allowNegativeBalance: leaveType.allowNegativeBalance,
+
+        // Details
+        maxCarryForward: leaveType.maxCarryForwardDays,
+        maxBalanceCap: leaveType.maxBalanceCap,
+      };
+    });
+
+    // Calculate totals
+    const totals = {
+      totalEntitled: balanceDetails.reduce((sum, b) => sum + b.entitled, 0),
+      totalUsed: balanceDetails.reduce((sum, b) => sum + b.used, 0),
+      totalPending: balanceDetails.reduce((sum, b) => sum + b.pending, 0),
+      totalRemaining: balanceDetails.reduce((sum, b) => sum + b.remaining, 0),
+    };
+
+    return {
+      year: targetYear,
+      employee: {
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        hireDate: user.hireDate,
+      },
+      balances: balanceDetails,
+      totals,
+      lastUpdated: new Date(),
+    };
+  }
+
+  /**
+   * Get color for leave type category
+   */
+  private getLeaveTypeColor(category: string): string {
+    const colors: Record<string, string> = {
+      ANNUAL: '#4CAF50',
+      SICK: '#FF9800',
+      EMERGENCY: '#F44336',
+      UNPAID: '#9E9E9E',
+      MATERNITY: '#E91E63',
+      PATERNITY: '#2196F3',
+      HAJJ: '#795548',
+      MARRIAGE: '#9C27B0',
+      DEATH: '#607D8B',
+      OFFICIAL: '#3F51B5',
+    };
+    return colors[category] || '#757575';
+  }
+
+  /**
+   * Get icon for leave type category
+   */
+  private getLeaveTypeIcon(category: string): string {
+    const icons: Record<string, string> = {
+      ANNUAL: 'beach_access',
+      SICK: 'local_hospital',
+      EMERGENCY: 'warning',
+      UNPAID: 'money_off',
+      MATERNITY: 'child_care',
+      PATERNITY: 'face',
+      HAJJ: 'mosque',
+      MARRIAGE: 'favorite',
+      DEATH: 'sentiment_very_dissatisfied',
+      OFFICIAL: 'business',
+    };
+    return icons[category] || 'event';
+  }
+
   async createLeaveRequest(userId: string, companyId: string, createLeaveDto: CreateLeaveRequestDto) {
     const { type, startDate, endDate, reason, notes, attachments } = createLeaveDto;
     const leaveNotes = reason || notes || '';
