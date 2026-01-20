@@ -476,8 +476,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         // Send to server in background
         try {
             await onAddComment(postId, content);
-            // Remove optimistic comment after server confirms (actual comment will come from refetch)
-            setOptimisticComments(prev => prev.filter(c => c.id !== optimisticComment.id));
+            // Don't remove optimistic comment here - it will be replaced by actual data from parent refetch
         } catch {
             // Remove optimistic comment on error
             setOptimisticComments(prev => prev.filter(c => c.id !== optimisticComment.id));

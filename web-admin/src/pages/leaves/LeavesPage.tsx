@@ -501,7 +501,9 @@ export const LeavesPage = () => {
         </Box>
 
         <CardContent>
-          {isLoading ? (
+          {isBalanceDashboard ? (
+            <LeaveBalanceDashboard />
+          ) : isLoading ? (
             <Box display="flex" justifyContent="center" py={4}>
               <CircularProgress />
             </Box>
