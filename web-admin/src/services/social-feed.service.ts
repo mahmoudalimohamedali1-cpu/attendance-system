@@ -222,7 +222,7 @@ export const socialFeedService = {
 
     // Reactions
     reactToPost: (postId: string, reactionType: ReactionType): Promise<{ success: boolean; reactions: ReactionSummary[] }> =>
-        api.post<{ success: boolean; reactions: ReactionSummary[] }>(`/social-feed/${postId}/react`, { reactionType }),
+        api.post<{ success: boolean; reactions: ReactionSummary[] }>(`/social-feed/${postId}/react`, { emoji: reactionType.toLowerCase() }),
 
     removeReaction: (postId: string): Promise<{ success: boolean; reactions: ReactionSummary[] }> =>
         api.delete<{ success: boolean; reactions: ReactionSummary[] }>(`/social-feed/${postId}/react`),
