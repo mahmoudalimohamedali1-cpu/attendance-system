@@ -66,6 +66,7 @@ const SocialFeedPage: React.FC = () => {
     const [showScrollTop, setShowScrollTop] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const [localReactions, setLocalReactions] = useState<Record<string, string>>({});
 
     // Snackbar state
     const [snackbar, setSnackbar] = useState<{
@@ -178,9 +179,13 @@ const SocialFeedPage: React.FC = () => {
     const reactMutation = useMutation({
         mutationFn: ({ postId, reactionType }: { postId: string; reactionType: ReactionType }) =>
             socialFeedService.reactToPost(postId, reactionType),
-        onSuccess: () => {
-            // Force refetch all social-feed queries
-            queryClient.refetchQueries({ queryKey: ['social-feed'] });
+        onMutate: ({ postId, reactionType }) => {
+            // Update local state immediately
+            setLocalReactions(prev => ({ ...prev, [postId]: reactionType.toLowerCase() }));
+        },
+        onSettled: () => {
+            // Sync with server in background
+            queryClient.invalidateQueries({ queryKey: ['social-feed'] });
         },
     });
 
@@ -244,7 +249,11 @@ const SocialFeedPage: React.FC = () => {
     });
 
     // Flatten posts from all pages
-    const posts: Post[] = feedData?.pages.flatMap((page) => page.items) || [];
+    // Flatten posts and apply local reactions
+    const posts: Post[] = (feedData?.pages.flatMap((page) => page.items) || []).map(post => ({
+        ...post,
+        userReaction: (localReactions[post.id] ?? post.userReaction) as ReactionType | undefined,
+    }));
 
     // Show snackbar helper
     const showSnackbar = (message: string, severity: 'success' | 'error' | 'info') => {
