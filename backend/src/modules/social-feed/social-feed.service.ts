@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TargetingService, TargetRule } from './targeting.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
 import { PostStatus, PostType, VisibilityType, Prisma, MentionType, NotificationType } from '@prisma/client';
 import { CreatePostDto, PostTargetDto, PostAttachmentDto, PostMentionDto } from './dto';
 import { UpdatePostDto } from './dto';
@@ -164,6 +165,7 @@ export class SocialFeedService {
     private prisma: PrismaService,
     private targetingService: TargetingService,
     private notificationsService: NotificationsService,
+    private permissionsService: PermissionsService,
   ) { }
 
   // ==================== Content Sanitization (XSS Prevention) ====================
@@ -808,6 +810,18 @@ export class SocialFeedService {
     companyId: string,
     dto: CreatePostDto,
   ): Promise<PostWithRelations> {
+    // التحقق من صلاحية إنشاء إعلان رسمي
+    if (dto.type === PostType.ANNOUNCEMENT) {
+      const canCreateAnnouncement = await this.permissionsService.hasPermission(
+        authorId,
+        companyId,
+        'SOCIAL_FEED_ANNOUNCEMENT',
+      );
+      if (!canCreateAnnouncement) {
+        throw new ForbiddenException('ليس لديك صلاحية إنشاء إعلان رسمي');
+      }
+    }
+
     // تنظيف المحتوى من XSS قبل الحفظ
     const sanitizedTitle = this.sanitizeTitle(dto.title);
     const sanitizedTitleEn = this.sanitizeTitle(dto.titleEn);
@@ -1363,8 +1377,15 @@ export class SocialFeedService {
 
     // التحقق من صلاحية الحذف
     if (existingPost.authorId !== userId) {
-      // هنا يمكن إضافة فحص للأدمن/HR
-      throw new ForbiddenException('ليس لديك صلاحية لحذف هذا المنشور');
+      // فحص صلاحية حذف منشورات الآخرين
+      const canDeleteAny = await this.permissionsService.hasPermission(
+        userId,
+        companyId,
+        'SOCIAL_FEED_DELETE_ANY',
+      );
+      if (!canDeleteAny) {
+        throw new ForbiddenException('ليس لديك صلاحية لحذف هذا المنشور');
+      }
     }
 
     // أرشفة المنشور بدلاً من الحذف الفعلي
@@ -1620,9 +1641,20 @@ export class SocialFeedService {
    */
   async togglePinPost(
     postId: string,
+    userId: string,
     companyId: string,
     pinnedUntil?: Date,
   ): Promise<PostWithRelations> {
+    // التحقق من صلاحية التثبيت
+    const canPin = await this.permissionsService.hasPermission(
+      userId,
+      companyId,
+      'SOCIAL_FEED_PIN',
+    );
+    if (!canPin) {
+      throw new ForbiddenException('ليس لديك صلاحية تثبيت المنشورات');
+    }
+
     const post = await this.prisma.post.findFirst({
       where: {
         id: postId,
@@ -1633,6 +1665,7 @@ export class SocialFeedService {
     if (!post) {
       throw new NotFoundException('المنشور غير موجود');
     }
+
 
     const updatedPost = await this.prisma.post.update({
       where: { id: postId },

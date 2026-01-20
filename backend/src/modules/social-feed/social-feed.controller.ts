@@ -34,7 +34,7 @@ import { PostType, TargetType } from '@prisma/client';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('social-feed')
 export class SocialFeedController {
-  constructor(private readonly socialFeedService: SocialFeedService) {}
+  constructor(private readonly socialFeedService: SocialFeedService) { }
 
   // ==================== نقاط نهاية الفيد ====================
 
@@ -552,11 +552,12 @@ export class SocialFeedController {
   @ApiParam({ name: 'id', description: 'معرف المنشور' })
   async togglePinPost(
     @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
     @CurrentUser('companyId') companyId: string,
     @Body() body?: { pinnedUntil?: string },
   ) {
     const pinnedUntil = body?.pinnedUntil ? new Date(body.pinnedUntil) : undefined;
-    return this.socialFeedService.togglePinPost(postId, companyId, pinnedUntil);
+    return this.socialFeedService.togglePinPost(postId, userId, companyId, pinnedUntil);
   }
 
   @Delete(':id/pin')
