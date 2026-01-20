@@ -164,7 +164,7 @@ export class SocialFeedService {
     private prisma: PrismaService,
     private targetingService: TargetingService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   // ==================== Content Sanitization (XSS Prevention) ====================
 
@@ -861,38 +861,38 @@ export class SocialFeedService {
         // إنشاء قواعد الاستهداف
         targets: dto.targets
           ? {
-              create: dto.targets.map((target: PostTargetDto) => ({
-                targetType: target.targetType,
-                targetValue: target.targetValue,
-                isExclusion: target.isExclusion || false,
-              })),
-            }
+            create: dto.targets.map((target: PostTargetDto) => ({
+              targetType: target.targetType,
+              targetValue: target.targetValue,
+              isExclusion: target.isExclusion || false,
+            })),
+          }
           : undefined,
         // إنشاء المرفقات
         attachments: dto.attachments
           ? {
-              create: dto.attachments.map((attachment: PostAttachmentDto) => ({
-                fileName: attachment.fileName,
-                fileUrl: attachment.fileUrl,
-                fileType: attachment.fileType,
-                mimeType: attachment.mimeType,
-                fileSize: attachment.fileSize,
-                thumbnailUrl: attachment.thumbnailUrl,
-                altText: attachment.altText,
-                description: attachment.description,
-              })),
-            }
+            create: dto.attachments.map((attachment: PostAttachmentDto) => ({
+              fileName: attachment.fileName,
+              fileUrl: attachment.fileUrl,
+              fileType: attachment.fileType,
+              mimeType: attachment.mimeType,
+              fileSize: attachment.fileSize,
+              thumbnailUrl: attachment.thumbnailUrl,
+              altText: attachment.altText,
+              description: attachment.description,
+            })),
+          }
           : undefined,
         // إنشاء الإشارات
         mentions: dto.mentions
           ? {
-              create: dto.mentions.map((mention: PostMentionDto) => ({
-                mentionType: mention.mentionType as MentionType,
-                mentionId: mention.mentionId,
-                startIndex: mention.startIndex,
-                endIndex: mention.endIndex,
-              })),
-            }
+            create: dto.mentions.map((mention: PostMentionDto) => ({
+              mentionType: mention.mentionType as MentionType,
+              mentionId: mention.mentionId,
+              startIndex: mention.startIndex,
+              endIndex: mention.endIndex,
+            })),
+          }
           : undefined,
       },
       include: {
@@ -2278,17 +2278,17 @@ export class SocialFeedService {
       throw new BadRequestException('نوع التفاعل غير صالح');
     }
 
-    // إضافة أو تحديث التفاعل (upsert)
-    const reaction = await this.prisma.postReaction.upsert({
+    // حذف أي تفاعل سابق من المستخدم على هذا المنشور أولاً
+    await this.prisma.postReaction.deleteMany({
       where: {
-        postId_userId_emoji: {
-          postId,
-          userId,
-          emoji,
-        },
+        postId,
+        userId,
       },
-      update: {}, // لا تغيير إذا موجود
-      create: {
+    });
+
+    // إضافة التفاعل الجديد
+    const reaction = await this.prisma.postReaction.create({
+      data: {
         postId,
         userId,
         emoji,
