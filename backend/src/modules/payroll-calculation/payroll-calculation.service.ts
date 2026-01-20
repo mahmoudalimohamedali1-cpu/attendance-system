@@ -63,6 +63,42 @@ export class PayrollCalculationService {
     ) { }
 
     /**
+     * تحويل أيام العمل من نص إلى مصفوفة أرقام
+     * Parse workingDays string like "1,2,3,4,5" to number array [1,2,3,4,5]
+     * Default: Sunday-Thursday (Saudi weekend: Friday-Saturday)
+     */
+    private parseWorkingDays(workingDays?: string): number[] {
+        if (!workingDays) {
+            return [0, 1, 2, 3, 4]; // Default: Sun-Thu (0-4)
+        }
+        return workingDays.split(',').map(d => parseInt(d.trim(), 10)).filter(d => !isNaN(d));
+    }
+
+    /**
+     * التحقق هل اليوم عطلة أسبوعية
+     * Check if a day is a weekend based on workingDays config
+     */
+    private isWeekendDay(dayOfWeek: number, workingDays?: string): boolean {
+        const workDays = this.parseWorkingDays(workingDays);
+        return !workDays.includes(dayOfWeek);
+    }
+
+    /**
+     * حساب أيام العمل مع مراعاة إعدادات أيام العمل
+     * Calculate working days with configurable weekend
+     */
+    private getWorkingDaysInPeriodWithConfig(startDate: Date, endDate: Date, workingDays?: string): number {
+        const workDays = this.parseWorkingDays(workingDays);
+        let count = 0;
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            if (workDays.includes(d.getDay())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
      * حساب عدد أيام الفترة حسب طريقة الحساب
      */
     private getDaysInPeriod(startDate: Date, endDate: Date, method: CalculationMethod): number {
@@ -295,6 +331,14 @@ export class PayrollCalculationService {
     }
 
     private async getPeriodAttendanceData(employeeId: string, companyId: string, startDate: Date, endDate: Date) {
+        // جلب بيانات الفرع للموظف للحصول على أيام العمل
+        // Fetch employee's branch to get workingDays configuration
+        const employee = await this.prisma.user.findFirst({
+            where: { id: employeeId, companyId },
+            select: { branch: { select: { workingDays: true } } },
+        });
+        const branchWorkingDays = employee?.branch?.workingDays;
+
         const attendances = await this.prisma.attendance.findMany({
             where: {
                 userId: employeeId,
@@ -314,8 +358,9 @@ export class PayrollCalculationService {
         let totalEarlyDepartureMinutes = 0; // دقائق الانصراف المبكر
 
         for (const att of attendances) {
-            const dayOfWeek = new Date(att.date).getDay(); // 0 = Sunday, 5 = Friday, 6 = Saturday
-            const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Friday or Saturday
+            const dayOfWeek = new Date(att.date).getDay(); // 0 = Sunday, 6 = Saturday
+            // استخدام الدالة الجديدة للتحقق من العطلة بناءً على إعدادات الفرع
+            const isWeekend = this.isWeekendDay(dayOfWeek, branchWorkingDays);
 
             if (att.status === 'PRESENT' || att.status === 'LATE') {
                 presentDays++;

@@ -197,6 +197,7 @@ export class UsersService {
         bankAccounts: true,
         contracts: true,
         costCenter: true,
+        jobTitleRef: true,
       },
     });
 

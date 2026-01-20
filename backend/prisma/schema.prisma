@@ -590,8 +590,8 @@ model User {
   postAcknowledges PostAcknowledge[] @relation("PostAcknowledges")
 
   // Calendar Events (أحداث التقويم)
-  eventsCreated    Event[]           @relation("EventCreator")
-  eventAttendances EventAttendee[]   @relation("EventAttendee")
+  eventsCreated    Event[]         @relation("EventCreator")
+  eventAttendances EventAttendee[] @relation("EventAttendee")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -996,6 +996,9 @@ model Attendance {
   checkOutFaceVerified   Boolean @default(false) @map("check_out_face_verified")
   checkOutFaceConfidence Float?  @map("check_out_face_confidence")
 
+  // استراحات الموظف خلال اليوم
+  breaks Break[]
+
   // أحداث الخروج من النطاق
   geofenceExitEvents GeofenceExitEvent[]
 
@@ -1007,6 +1010,62 @@ model Attendance {
   @@index([userId, date])
   @@index([branchId, date])
   @@map("attendances")
+}
+
+// ==================== نظام تتبع الاستراحات (Break Time Management) ====================
+
+// أنواع الاستراحات
+enum BreakType {
+  PRAYER // استراحة الصلاة
+  LUNCH // استراحة الغداء
+  PERSONAL // استراحة شخصية
+  REST // استراحة راحة
+  OTHER // أخرى
+}
+
+// حالة الاستراحة
+enum BreakStatus {
+  ACTIVE // جارية - لم تنتهِ بعد
+  COMPLETED // منتهية - تم تسجيل وقت النهاية
+  CANCELLED // ملغاة
+}
+
+// نموذج تسجيل الاستراحات
+model Break {
+  id        String  @id @default(uuid())
+  companyId String? @map("company_id")
+
+  // ربط بالحضور
+  attendanceId String     @map("attendance_id")
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  // ربط بالموظف
+  userId String @map("user_id")
+
+  // نوع الاستراحة
+  type   BreakType   @default(PERSONAL)
+  status BreakStatus @default(ACTIVE)
+
+  // أوقات الاستراحة
+  startTime DateTime  @map("start_time")
+  endTime   DateTime? @map("end_time")
+
+  // مدة الاستراحة بالدقائق (تُحسب تلقائياً عند الإنهاء)
+  durationMinutes Int? @map("duration_minutes")
+
+  // هل الاستراحة مدفوعة؟ (لا تُخصم من ساعات العمل)
+  isPaid Boolean @default(false) @map("is_paid")
+
+  // ملاحظات
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([attendanceId])
+  @@index([userId, startTime])
+  @@index([companyId, startTime])
+  @@map("breaks")
 }
 
 // سجل محاولات التحقق بالوجه
@@ -6785,7 +6844,7 @@ model PostView {
 
   // معلومات المشاهدة
   viewedAt   DateTime @default(now()) @map("viewed_at") // وقت المشاهدة
-  duration   Int?     // مدة المشاهدة بالثواني (اختياري)
+  duration   Int? // مدة المشاهدة بالثواني (اختياري)
   deviceType String?  @map("device_type") // WEB, MOBILE, TABLET
   ipAddress  String?  @map("ip_address") // عنوان IP للتحليلات
 
@@ -6799,16 +6858,16 @@ model PostView {
 
 // نموذج ظهورات المنشور (Impressions Tracking - للإحصائيات)
 model PostImpression {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id     String  @id @default(uuid())
+  postId String  @map("post_id")
+  post   Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
   userId String? @map("user_id") // قد يكون null للمستخدمين غير المسجلين
   user   User?   @relation("PostImpressions", fields: [userId], references: [id])
 
   // معلومات الظهور
   impressedAt DateTime @default(now()) @map("impressed_at") // وقت الظهور
-  source      String?  // مصدر الظهور: FEED, SEARCH, NOTIFICATION, DIRECT_LINK
-  position    Int?     // موقع المنشور في الـ Feed عند الظهور
+  source      String? // مصدر الظهور: FEED, SEARCH, NOTIFICATION, DIRECT_LINK
+  position    Int? // موقع المنشور في الـ Feed عند الظهور
   deviceType  String?  @map("device_type") // WEB, MOBILE, TABLET
   sessionId   String?  @map("session_id") // معرف الجلسة للتتبع
 
@@ -6911,9 +6970,9 @@ model Event {
 
   // معلومات الحدث (ثنائي اللغة)
   title         String
-  titleEn       String?  @map("title_en")
-  description   String?  @db.Text
-  descriptionEn String?  @map("description_en") @db.Text
+  titleEn       String? @map("title_en")
+  description   String? @db.Text
+  descriptionEn String? @map("description_en") @db.Text
 
   // التوقيت
   startAt  DateTime @map("start_at")
