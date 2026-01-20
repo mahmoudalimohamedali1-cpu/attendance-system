@@ -102,6 +102,13 @@ const reactionIcons: Record<ReactionType, React.ReactElement> = {
     INSIGHTFUL: <Lightbulb sx={{ fontSize: 20 }} />,
 };
 
+// Helper to normalize reaction type from backend (lowercase) to frontend config (UPPERCASE)
+const normalizeReaction = (reaction: string | null | undefined): ReactionType | null => {
+    if (!reaction) return null;
+    const upper = reaction.toUpperCase() as ReactionType;
+    return reactionConfig[upper] ? upper : null;
+};
+
 // Helper to format relative time in Arabic
 const formatRelativeTime = (dateString: string): string => {
     const date = new Date(dateString);
@@ -456,26 +463,30 @@ export const PostCard: React.FC<PostCardProps> = ({
                     {totalReactions > 0 && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Box sx={{ display: 'flex', ml: -0.5 }}>
-                                {topReactions.map((reaction, index) => (
-                                    <Box
-                                        key={reaction.type}
-                                        sx={{
-                                            width: 24,
-                                            height: 24,
-                                            borderRadius: '50%',
-                                            bgcolor: reactionConfig[reaction.type].color,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            ml: index > 0 ? -1 : 0,
-                                            border: '2px solid white',
-                                            fontSize: '0.75rem',
-                                            zIndex: 3 - index,
-                                        }}
-                                    >
-                                        {reactionConfig[reaction.type].emoji}
-                                    </Box>
-                                ))}
+                                {topReactions.map((reaction, index) => {
+                                    const normalizedType = normalizeReaction(reaction.type as unknown as string);
+                                    if (!normalizedType) return null;
+                                    return (
+                                        <Box
+                                            key={reaction.type}
+                                            sx={{
+                                                width: 24,
+                                                height: 24,
+                                                borderRadius: '50%',
+                                                bgcolor: reactionConfig[normalizedType].color,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                ml: index > 0 ? -1 : 0,
+                                                border: '2px solid white',
+                                                fontSize: '0.75rem',
+                                                zIndex: 3 - index,
+                                            }}
+                                        >
+                                            {reactionConfig[normalizedType].emoji}
+                                        </Box>
+                                    );
+                                })}
                             </Box>
                             <Typography variant="caption" color="text.secondary">
                                 {totalReactions} تفاعل
@@ -517,22 +528,22 @@ export const PostCard: React.FC<PostCardProps> = ({
                         <Button
                             size="small"
                             startIcon={
-                                post.userReaction ? (
+                                normalizeReaction(post.userReaction) ? (
                                     <Box component="span" sx={{ fontSize: '1.25rem' }}>
-                                        {reactionConfig[post.userReaction].emoji}
+                                        {reactionConfig[normalizeReaction(post.userReaction)!].emoji}
                                     </Box>
                                 ) : (
                                     <ThumbUp sx={{ fontSize: 18 }} />
                                 )
                             }
                             sx={{
-                                color: post.userReaction ? reactionConfig[post.userReaction].color : 'text.secondary',
-                                fontWeight: post.userReaction ? 600 : 400,
+                                color: normalizeReaction(post.userReaction) ? reactionConfig[normalizeReaction(post.userReaction)!].color : 'text.secondary',
+                                fontWeight: normalizeReaction(post.userReaction) ? 600 : 400,
                                 '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
                             }}
                             onClick={handleReactionClick}
                         >
-                            {post.userReaction ? reactionConfig[post.userReaction].label : 'إعجاب'}
+                            {normalizeReaction(post.userReaction) ? reactionConfig[normalizeReaction(post.userReaction)!].label : 'إعجاب'}
                         </Button>
                     </Tooltip>
 
