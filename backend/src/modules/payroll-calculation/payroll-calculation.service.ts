@@ -333,13 +333,28 @@ export class PayrollCalculationService {
     }
 
     private async getPeriodAttendanceData(employeeId: string, companyId: string, startDate: Date, endDate: Date) {
-        // جلب بيانات الفرع للموظف للحصول على أيام العمل
-        // Fetch employee's branch to get workingDays configuration
+        // جلب بيانات الفرع للموظف للحصول على أيام العمل وإعدادات رمضان
+        // Fetch employee's branch to get workingDays and Ramadan configuration
         const employee = await this.prisma.user.findFirst({
             where: { id: employeeId, companyId },
-            select: { branch: { select: { workingDays: true } } },
+            include: { branch: true },
         });
-        const branchWorkingDays = employee?.branch?.workingDays;
+        // Type cast branch to access Ramadan fields (added in schema but may not be in prisma client yet)
+        const branch = employee?.branch as any;
+        const branchWorkingDays = branch?.workingDays;
+
+        // 🌙 Calculate expected daily minutes based on Ramadan mode
+        const branchConfig: BranchRamadanConfig = {
+            ramadanModeEnabled: branch?.ramadanModeEnabled ?? false,
+            ramadanWorkHours: branch?.ramadanWorkHours ?? 6,
+            ramadanWorkStartTime: branch?.ramadanWorkStartTime ?? null,
+            ramadanWorkEndTime: branch?.ramadanWorkEndTime ?? null,
+            workStartTime: branch?.workStartTime ?? '09:00',
+            workEndTime: branch?.workEndTime ?? '17:00',
+        };
+        const expectedDailyMinutes = getExpectedDailyMinutes(branchConfig);
+        const isRamadanActive = branchConfig.ramadanModeEnabled;
+
 
         const attendances = await this.prisma.attendance.findMany({
             where: {
@@ -412,8 +427,13 @@ export class PayrollCalculationService {
             recordsCount: attendances.length,
             lateCount, // عدد مرات التأخير (للخصم التراكمي)
             earlyDepartureMinutes: totalEarlyDepartureMinutes, // دقائق الانصراف المبكر
+            // 🌙 Ramadan-aware work hours
+            isRamadanActive,
+            expectedDailyMinutes,
+            expectedDailyHours: expectedDailyMinutes / 60,
         };
     }
+
 
     async calculateForEmployee(
         employeeId: string,
