@@ -17,6 +17,7 @@ import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { AttendanceStatus, NotificationType } from '@prisma/client';
 import { SmartPolicyTrigger } from '@prisma/client';
 import { SmartPolicyTriggerService } from '../smart-policies/smart-policy-trigger.service';
+import { getRamadanWorkSchedule, type BranchRamadanConfig } from './ramadan.helper';
 
 @Injectable()
 export class AttendanceService {
@@ -173,9 +174,20 @@ export class AttendanceService {
 
     // Parse work times and get current time in branch timezone
     // حساب الوقت الحالي في المنطقة الزمنية للفرع
-    const workStartTime = this.parseTime(
-      user.department?.workStartTime || user.branch.workStartTime,
-    );
+    // 🌙 Use Ramadan schedule if enabled
+    const branchConfig: BranchRamadanConfig = {
+      ramadanModeEnabled: (user.branch as any).ramadanModeEnabled ?? false,
+      ramadanWorkHours: (user.branch as any).ramadanWorkHours ?? 6,
+      ramadanWorkStartTime: (user.branch as any).ramadanWorkStartTime,
+      ramadanWorkEndTime: (user.branch as any).ramadanWorkEndTime,
+      workStartTime: user.branch.workStartTime,
+      workEndTime: user.branch.workEndTime,
+    };
+    const ramadanSchedule = getRamadanWorkSchedule(branchConfig, {
+      workStartTime: user.department?.workStartTime,
+      workEndTime: user.department?.workEndTime,
+    });
+    const workStartTime = this.parseTime(ramadanSchedule.workStartTime);
     const now = new Date();
     const currentMinutes = this.getCurrentMinutesInTimezone(timezone);
     const startMinutes = workStartTime.hours * 60 + workStartTime.minutes;
@@ -564,9 +576,20 @@ export class AttendanceService {
 
     // Calculate working time and early leave in branch timezone
     // حساب الوقت الحالي في المنطقة الزمنية للفرع
-    const workEndTime = this.parseTime(
-      user.department?.workEndTime || user.branch.workEndTime,
-    );
+    // 🌙 Use Ramadan schedule if enabled
+    const branchConfig: BranchRamadanConfig = {
+      ramadanModeEnabled: (user.branch as any).ramadanModeEnabled ?? false,
+      ramadanWorkHours: (user.branch as any).ramadanWorkHours ?? 6,
+      ramadanWorkStartTime: (user.branch as any).ramadanWorkStartTime,
+      ramadanWorkEndTime: (user.branch as any).ramadanWorkEndTime,
+      workStartTime: user.branch.workStartTime,
+      workEndTime: user.branch.workEndTime,
+    };
+    const ramadanSchedule = getRamadanWorkSchedule(branchConfig, {
+      workStartTime: user.department?.workStartTime,
+      workEndTime: user.department?.workEndTime,
+    });
+    const workEndTime = this.parseTime(ramadanSchedule.workEndTime);
     const now = new Date();
     const currentMinutes = this.getCurrentMinutesInTimezone(timezone);
     const endMinutes = workEndTime.hours * 60 + workEndTime.minutes;
@@ -601,11 +624,8 @@ export class AttendanceService {
     const checkInTime = new Date(attendance.checkInTime);
     const workingMinutes = Math.floor((now.getTime() - checkInTime.getTime()) / 60000);
 
-    // Calculate overtime
-    const expectedWorkMinutes =
-      (workEndTime.hours * 60 + workEndTime.minutes) -
-      (this.parseTime(user.department?.workStartTime || user.branch.workStartTime).hours * 60 +
-        this.parseTime(user.department?.workStartTime || user.branch.workStartTime).minutes);
+    // Calculate overtime using Ramadan-aware expected hours
+    const expectedWorkMinutes = ramadanSchedule.expectedWorkMinutes;
     const overtimeMinutes = Math.max(0, workingMinutes - expectedWorkMinutes);
 
     // Update attendance
