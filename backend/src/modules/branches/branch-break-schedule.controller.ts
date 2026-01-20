@@ -9,7 +9,7 @@ import {
     UseGuards,
     Request,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BranchBreakScheduleService, CreateBreakScheduleDto, UpdateBreakScheduleDto } from './branch-break-schedule.service';
 
 @Controller('branches/:branchId/break-schedules')
