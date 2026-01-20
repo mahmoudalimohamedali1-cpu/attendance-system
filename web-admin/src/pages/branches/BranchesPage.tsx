@@ -216,6 +216,11 @@ export const BranchesPage = () => {
         earlyCheckOutPeriod: Number((branch as any).earlyCheckOutPeriod) || 0,
         workingDays: (branch as any).workingDays || '0,1,2,3,4',
         isActive: branch.isActive,
+        // إعدادات رمضان
+        ramadanModeEnabled: (branch as any).ramadanModeEnabled || false,
+        ramadanWorkHours: Number((branch as any).ramadanWorkHours) || 6,
+        ramadanWorkStartTime: (branch as any).ramadanWorkStartTime || '09:00',
+        ramadanWorkEndTime: (branch as any).ramadanWorkEndTime || '15:00',
       });
     } else {
       setSelectedBranch(null);
@@ -234,6 +239,11 @@ export const BranchesPage = () => {
         earlyCheckOutPeriod: 0,
         workingDays: '0,1,2,3,4',
         isActive: true,
+        // إعدادات رمضان
+        ramadanModeEnabled: false,
+        ramadanWorkHours: 6,
+        ramadanWorkStartTime: '09:00',
+        ramadanWorkEndTime: '15:00',
       });
     }
     setOpenBranchDialog(true);

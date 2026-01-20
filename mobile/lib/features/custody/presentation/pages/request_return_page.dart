@@ -1,23 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../../data/datasources/custody_remote_datasource.dart';
-import 'my_custody_page.dart';
+import '../../../../core/di/injection.dart';
 
-class RequestReturnPage extends ConsumerStatefulWidget {
+class RequestReturnPage extends StatefulWidget {
   final CustodyAssignmentModel assignment;
   
   const RequestReturnPage({super.key, required this.assignment});
 
   @override
-  ConsumerState<RequestReturnPage> createState() => _RequestReturnPageState();
+  State<RequestReturnPage> createState() => _RequestReturnPageState();
 }
 
-class _RequestReturnPageState extends ConsumerState<RequestReturnPage> {
+class _RequestReturnPageState extends State<RequestReturnPage> {
   final _formKey = GlobalKey<FormState>();
   String _condition = 'GOOD';
   String _reason = '';
   String _damageDescription = '';
   bool _loading = false;
+  late CustodyRemoteDataSource _datasource;
+
+  @override
+  void initState() {
+    super.initState();
+    final dio = getIt<Dio>();
+    _datasource = CustodyRemoteDataSource(dio);
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -25,8 +33,7 @@ class _RequestReturnPageState extends ConsumerState<RequestReturnPage> {
 
     setState(() => _loading = true);
     try {
-      final datasource = ref.read(custodyDataSourceProvider);
-      await datasource.requestReturn(
+      await _datasource.requestReturn(
         assignmentId: widget.assignment.id,
         conditionOnReturn: _condition,
         returnReason: _reason.isNotEmpty ? _reason : null,

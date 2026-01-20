@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../../data/datasources/custody_remote_datasource.dart';
-import 'my_custody_page.dart';
+import '../../../../core/di/injection.dart';
 
-class SignCustodyPage extends ConsumerStatefulWidget {
+class SignCustodyPage extends StatefulWidget {
   final CustodyAssignmentModel assignment;
   
   const SignCustodyPage({super.key, required this.assignment});
 
   @override
-  ConsumerState<SignCustodyPage> createState() => _SignCustodyPageState();
+  State<SignCustodyPage> createState() => _SignCustodyPageState();
 }
 
-class _SignCustodyPageState extends ConsumerState<SignCustodyPage> {
+class _SignCustodyPageState extends State<SignCustodyPage> {
   bool _loading = false;
   final List<Offset> _signaturePoints = [];
+  late CustodyRemoteDataSource _datasource;
+
+  @override
+  void initState() {
+    super.initState();
+    final dio = getIt<Dio>();
+    _datasource = CustodyRemoteDataSource(dio);
+  }
   
   Future<void> _submit() async {
     if (_signaturePoints.isEmpty) {
@@ -26,10 +34,9 @@ class _SignCustodyPageState extends ConsumerState<SignCustodyPage> {
 
     setState(() => _loading = true);
     try {
-      final datasource = ref.read(custodyDataSourceProvider);
       // Convert signature points to base64 or store as-is
       final signatureData = _signaturePoints.map((p) => '${p.dx},${p.dy}').join('|');
-      await datasource.signAssignment(widget.assignment.id, signatureData);
+      await _datasource.signAssignment(widget.assignment.id, signatureData);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

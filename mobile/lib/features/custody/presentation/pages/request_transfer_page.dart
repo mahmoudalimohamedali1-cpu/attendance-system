@@ -1,40 +1,39 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../data/datasources/custody_remote_datasource.dart';
-import 'my_custody_page.dart';
+import '../../../../core/di/injection.dart';
 
-class RequestTransferPage extends ConsumerStatefulWidget {
+class RequestTransferPage extends StatefulWidget {
   final CustodyAssignmentModel assignment;
   
   const RequestTransferPage({super.key, required this.assignment});
 
   @override
-  ConsumerState<RequestTransferPage> createState() => _RequestTransferPageState();
+  State<RequestTransferPage> createState() => _RequestTransferPageState();
 }
 
-class _RequestTransferPageState extends ConsumerState<RequestTransferPage> {
+class _RequestTransferPageState extends State<RequestTransferPage> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedEmployeeId;
   String _reason = '';
   String _notes = '';
   bool _loading = false;
   List<Map<String, dynamic>> _employees = [];
+  late CustodyRemoteDataSource _datasource;
+  late Dio _dio;
 
   @override
   void initState() {
     super.initState();
+    _dio = getIt<Dio>();
+    _datasource = CustodyRemoteDataSource(_dio);
     _loadEmployees();
   }
 
   Future<void> _loadEmployees() async {
     try {
-      final dio = Dio(BaseOptions(
-        baseUrl: 'https://72.61.239.170/api/v1',
-        connectTimeout: const Duration(seconds: 30),
-      ));
-      final response = await dio.get('/users', queryParameters: {'status': 'ACTIVE'});
+      final response = await _dio.get('/users', queryParameters: {'status': 'ACTIVE'});
       setState(() {
         _employees = (response.data as List).map((e) => {
           'id': e['id'],
@@ -58,8 +57,7 @@ class _RequestTransferPageState extends ConsumerState<RequestTransferPage> {
 
     setState(() => _loading = true);
     try {
-      final datasource = ref.read(custodyDataSourceProvider);
-      await datasource.requestTransfer(
+      await _datasource.requestTransfer(
         custodyItemId: widget.assignment.custodyItemId,
         toEmployeeId: _selectedEmployeeId!,
         reason: _reason.isNotEmpty ? _reason : null,
