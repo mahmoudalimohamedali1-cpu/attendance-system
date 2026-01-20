@@ -41,6 +41,7 @@ import { PostCard } from '@/components/social-feed/PostCard';
 import { CreatePost } from '@/components/social-feed/CreatePost';
 import { CommentSection } from '@/components/social-feed/CommentSection';
 import { FeedFilters, FeedFilterType } from '@/components/social-feed/FeedFilters';
+import { usePermissions, SOCIAL_FEED_PERMISSIONS } from '@/hooks/usePermissions';
 
 /**
  * SocialFeedPage - Main social feed page with infinite scroll
@@ -58,6 +59,7 @@ const SocialFeedPage: React.FC = () => {
     const { user } = useAuthStore();
     const observerTarget = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const { hasPermission } = usePermissions();
 
     // State
     const [activeFilter, setActiveFilter] = useState<FeedFilterType>('all');
@@ -547,6 +549,8 @@ const SocialFeedPage: React.FC = () => {
                                 onCancel={() => setShowCreatePost(false)}
                                 isSubmitting={createPostMutation.isPending}
                                 error={createPostMutation.isError ? 'حدث خطأ أثناء نشر المنشور' : null}
+                                canCreateAnnouncement={hasPermission(SOCIAL_FEED_PERMISSIONS.ANNOUNCEMENT)}
+                                canPinPost={hasPermission(SOCIAL_FEED_PERMISSIONS.PIN)}
                             />
                         </Box>
                     ) : (
@@ -627,6 +631,7 @@ const SocialFeedPage: React.FC = () => {
                                         onAcknowledge={handleAcknowledge}
                                         onDelete={handleDeletePost}
                                         onClick={handlePostClick}
+                                        canDeleteAny={hasPermission(SOCIAL_FEED_PERMISSIONS.DELETE_ANY)}
                                         compact
                                     />
                                 </Box>

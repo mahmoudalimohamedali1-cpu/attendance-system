@@ -63,6 +63,8 @@ interface PostCardProps {
     showActions?: boolean;
     compact?: boolean;
     currentUserId?: string;
+    /** Permission flag: can delete any post (admin/HR) */
+    canDeleteAny?: boolean;
 }
 
 // Post type configuration with Arabic labels
@@ -173,6 +175,7 @@ export const PostCard: React.FC<PostCardProps> = ({
     showActions = true,
     compact = false,
     currentUserId,
+    canDeleteAny = false,
 }) => {
     const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
     const [showReactionPicker, setShowReactionPicker] = useState(false);
@@ -180,6 +183,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
     const typeConfig = postTypeConfig[post.type];
     const isOwner = currentUserId === post.author.id;
+    const canDelete = isOwner || canDeleteAny;
     const totalReactions = post.reactions.reduce((sum, r) => sum + r.count, 0);
     const topReactions = [...post.reactions].sort((a, b) => b.count - a.count).slice(0, 3);
 
@@ -714,19 +718,21 @@ export const PostCard: React.FC<PostCardProps> = ({
                             </ListItemIcon>
                             <ListItemText>تعديل</ListItemText>
                         </MenuItem>
-                        <MenuItem
-                            onClick={() => {
-                                handleMenuClose();
-                                onDelete?.(post.id);
-                            }}
-                            sx={{ color: 'error.main' }}
-                        >
-                            <ListItemIcon>
-                                <Delete fontSize="small" color="error" />
-                            </ListItemIcon>
-                            <ListItemText>حذف</ListItemText>
-                        </MenuItem>
                     </>
+                )}
+                {canDelete && (
+                    <MenuItem
+                        onClick={() => {
+                            handleMenuClose();
+                            onDelete?.(post.id);
+                        }}
+                        sx={{ color: 'error.main' }}
+                    >
+                        <ListItemIcon>
+                            <Delete fontSize="small" color="error" />
+                        </ListItemIcon>
+                        <ListItemText>حذف</ListItemText>
+                    </MenuItem>
                 )}
 
                 {!isOwner && (

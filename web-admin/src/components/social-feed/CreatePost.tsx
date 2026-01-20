@@ -68,6 +68,10 @@ interface CreatePostProps {
     };
     defaultType?: PostType;
     showAdvancedOptions?: boolean;
+    /** Permission flag: can user create ANNOUNCEMENT posts? */
+    canCreateAnnouncement?: boolean;
+    /** Permission flag: can user pin posts? */
+    canPinPost?: boolean;
 }
 
 // Post type configuration with Arabic labels
@@ -186,6 +190,8 @@ export const CreatePost: React.FC<CreatePostProps> = ({
     availableTargets,
     defaultType = 'POST',
     showAdvancedOptions = true,
+    canCreateAnnouncement = false,
+    canPinPost = false,
 }) => {
     // Form state
     const [content, setContent] = useState('');
@@ -381,33 +387,39 @@ export const CreatePost: React.FC<CreatePostProps> = ({
 
                 {/* Post Type Selector */}
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                    {Object.entries(postTypeConfig).map(([type, config]) => (
-                        <Tooltip key={type} title={config.description}>
-                            <Chip
-                                size="small"
-                                icon={config.icon}
-                                label={config.label}
-                                onClick={() => setPostType(type as PostType)}
-                                sx={{
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                    fontSize: '0.7rem',
-                                    ...(postType === type
-                                        ? {
-                                            background: `linear-gradient(135deg, ${config.gradient[0]}, ${config.gradient[1]})`,
-                                            color: 'white',
-                                            '& .MuiChip-icon': { color: 'white' },
-                                        }
-                                        : {
-                                            background: 'rgba(0, 0, 0, 0.05)',
-                                            '&:hover': {
-                                                background: `linear-gradient(135deg, ${config.gradient[0]}20, ${config.gradient[1]}20)`,
-                                            },
-                                        }),
-                                }}
-                            />
-                        </Tooltip>
-                    ))}
+                    {Object.entries(postTypeConfig)
+                        .filter(([type]) => {
+                            // Filter out ANNOUNCEMENT if user doesn't have permission
+                            if (type === 'ANNOUNCEMENT' && !canCreateAnnouncement) return false;
+                            return true;
+                        })
+                        .map(([type, config]) => (
+                            <Tooltip key={type} title={config.description}>
+                                <Chip
+                                    size="small"
+                                    icon={config.icon}
+                                    label={config.label}
+                                    onClick={() => setPostType(type as PostType)}
+                                    sx={{
+                                        cursor: 'pointer',
+                                        fontWeight: 600,
+                                        fontSize: '0.7rem',
+                                        ...(postType === type
+                                            ? {
+                                                background: `linear-gradient(135deg, ${config.gradient[0]}, ${config.gradient[1]})`,
+                                                color: 'white',
+                                                '& .MuiChip-icon': { color: 'white' },
+                                            }
+                                            : {
+                                                background: 'rgba(0, 0, 0, 0.05)',
+                                                '&:hover': {
+                                                    background: `linear-gradient(135deg, ${config.gradient[0]}20, ${config.gradient[1]}20)`,
+                                                },
+                                            }),
+                                    }}
+                                />
+                            </Tooltip>
+                        ))}
                 </Box>
             </Box>
 
