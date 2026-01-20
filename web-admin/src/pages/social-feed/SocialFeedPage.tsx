@@ -207,9 +207,10 @@ const SocialFeedPage: React.FC = () => {
         mutationFn: ({ postId, content, parentId }: { postId: string; content: string; parentId?: string }) =>
             socialFeedService.addComment(postId, { content, parentId }),
         onSuccess: (_, { postId }) => {
-            queryClient.invalidateQueries({ queryKey: ['post-comments', postId] });
-            queryClient.invalidateQueries({ queryKey: ['social-feed'] });
-            queryClient.invalidateQueries({ queryKey: ['social-feed-post', postId] });
+            // Force immediate refetch for faster update
+            queryClient.refetchQueries({ queryKey: ['post-comments', postId] });
+            queryClient.refetchQueries({ queryKey: ['social-feed'] });
+            showSnackbar('تم إضافة التعليق', 'success');
         },
         onError: () => {
             showSnackbar('حدث خطأ أثناء إضافة التعليق', 'error');
