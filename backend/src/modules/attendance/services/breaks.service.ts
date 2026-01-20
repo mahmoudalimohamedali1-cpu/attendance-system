@@ -4,8 +4,16 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { StartBreakDto, EndBreakDto } from '../dto/break.dto';
-import { BreakStatus, BreakType } from '@prisma/client';
+import { StartBreakDto, EndBreakDto, BreakType } from '../dto/break.dto';
+
+/**
+ * حالات الاستراحة - معرّفة محلياً
+ */
+enum BreakStatus {
+    ACTIVE = 'ACTIVE',
+    COMPLETED = 'COMPLETED',
+    CANCELLED = 'CANCELLED',
+}
 
 @Injectable()
 export class BreaksService {

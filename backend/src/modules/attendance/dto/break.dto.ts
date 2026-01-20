@@ -1,5 +1,15 @@
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { BreakType } from '@prisma/client';
+
+/**
+ * أنواع الاستراحات - معرّفة محلياً لتجنب مشاكل Prisma
+ */
+export enum BreakType {
+    PRAYER = 'PRAYER',
+    LUNCH = 'LUNCH',
+    PERSONAL = 'PERSONAL',
+    REST = 'REST',
+    OTHER = 'OTHER',
+}
 
 /**
  * DTO لبدء استراحة
@@ -10,7 +20,7 @@ export class StartBreakDto {
 
     @IsEnum(BreakType)
     @IsOptional()
-    type?: BreakType = 'PERSONAL' as BreakType;
+    type?: BreakType = BreakType.PERSONAL;
 
     @IsString()
     @IsOptional()
