@@ -273,6 +273,9 @@ export class UsersService {
       include: {
         branch: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        jobTitleRef: { select: { id: true, name: true, nameEn: true, level: true, isDirectManager: true } },
+        costCenter: { select: { id: true, name_ar: true, code: true } },
       },
     });
 

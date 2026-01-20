@@ -75,16 +75,21 @@ export class JobTitlesService {
     }
 
     /**
-     * الحصول على المستخدمين الذين لديهم درجة وظيفية مدير مباشر
+     * الحصول على المستخدمين الذين يمكنهم أن يكونوا مديرين مباشرين
+     * يشمل: المستخدمين بدرجة وظيفية "مدير مباشر" + المستخدمين بدور MANAGER أو ADMIN
      */
     async findDirectManagerUsers(companyId: string) {
+        // جلب المستخدمين بدرجة وظيفية "مدير مباشر" أو بدور MANAGER/ADMIN
         return this.prisma.user.findMany({
             where: {
                 companyId,
-                jobTitleRef: {
-                    isDirectManager: true,
-                },
                 status: 'ACTIVE',
+                OR: [
+                    // المستخدمين بدرجة وظيفية مدير مباشر
+                    { jobTitleRef: { isDirectManager: true } },
+                    // المستخدمين بدور MANAGER أو ADMIN
+                    { role: { in: ['MANAGER', 'ADMIN'] } },
+                ],
             },
             select: {
                 id: true,
@@ -92,6 +97,7 @@ export class JobTitlesService {
                 lastName: true,
                 email: true,
                 jobTitle: true,
+                role: true,
                 jobTitleRef: {
                     select: {
                         name: true,

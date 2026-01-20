@@ -35,6 +35,7 @@ import {
   FormGroup,
   FormLabel,
   FormControl,
+  MenuItem,
 } from '@mui/material';
 import {
   Add,
@@ -47,8 +48,10 @@ import {
   AccountTree,
   MyLocation,
   Map,
+  Coffee,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
+import { BranchBreakSchedules } from '@/components/branches/BranchBreakSchedules';
 
 interface Branch {
   id: string;
@@ -86,7 +89,7 @@ interface Department {
 export const BranchesPage = () => {
   const queryClient = useQueryClient();
   const [tabValue, setTabValue] = useState(0);
-  
+
   // Branch state
   const [openBranchDialog, setOpenBranchDialog] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
@@ -163,7 +166,7 @@ export const BranchesPage = () => {
     nameEn: string;
     branchId: string;
   }
-  
+
   const createDeptMutation = useMutation({
     mutationFn: (data: DeptPayload) => api.post('/branches/departments', data),
     onSuccess: () => {
@@ -346,14 +349,14 @@ export const BranchesPage = () => {
   const handleSubmitDept = async () => {
     if (selectedDept) {
       // تحديث قسم موجود (فرع واحد فقط)
-      updateDeptMutation.mutate({ 
-        id: selectedDept.id, 
-        data: { name: deptForm.name, nameEn: deptForm.nameEn, branchId: deptForm.branchId } 
+      updateDeptMutation.mutate({
+        id: selectedDept.id,
+        data: { name: deptForm.name, nameEn: deptForm.nameEn, branchId: deptForm.branchId }
       });
     } else {
       // إنشاء قسم جديد لكل فرع محدد
       if (deptForm.branchIds.length === 0) return;
-      
+
       try {
         for (const branchId of deptForm.branchIds) {
           await createDeptMutation.mutateAsync({
@@ -387,6 +390,7 @@ export const BranchesPage = () => {
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
           <Tab icon={<Business />} iconPosition="start" label="الفروع" />
           <Tab icon={<AccountTree />} iconPosition="start" label="الأقسام" />
+          <Tab icon={<Coffee />} iconPosition="start" label="جداول الاستراحات" />
         </Tabs>
       </Box>
 
@@ -598,6 +602,44 @@ export const BranchesPage = () => {
         </>
       )}
 
+      {/* Break Schedules Tab */}
+      {tabValue === 2 && (
+        <>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              اختر الفرع لإدارة جداول الاستراحات الخاصة به
+            </Typography>
+            <TextField
+              select
+              label="اختر الفرع"
+              value={selectedBranch?.id || ''}
+              onChange={(e) => {
+                const branch = branches?.find(b => b.id === e.target.value);
+                if (branch) setSelectedBranch(branch);
+              }}
+              sx={{ minWidth: 300 }}
+            >
+              {branches?.filter(b => b.isActive).map((branch) => (
+                <MenuItem key={branch.id} value={branch.id}>
+                  {branch.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+
+          {selectedBranch ? (
+            <BranchBreakSchedules
+              branchId={selectedBranch.id}
+              branchName={selectedBranch.name}
+            />
+          ) : (
+            <Alert severity="info">
+              اختر فرعاً من القائمة أعلاه لعرض وإدارة جداول الاستراحات
+            </Alert>
+          )}
+        </>
+      )}
+
       {/* Add/Edit Branch Dialog */}
       <Dialog open={openBranchDialog} onClose={handleCloseBranchDialog} maxWidth="md" fullWidth>
         <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>
@@ -666,7 +708,7 @@ export const BranchesPage = () => {
                 </Box>
               </Box>
             </Grid>
-            
+
             {locationError && (
               <Grid item xs={12}>
                 <Alert severity="error" onClose={() => setLocationError(null)}>
@@ -674,7 +716,7 @@ export const BranchesPage = () => {
                 </Alert>
               </Grid>
             )}
-            
+
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
@@ -705,7 +747,7 @@ export const BranchesPage = () => {
                 helperText="المسافة المسموح بها لتسجيل الحضور"
               />
             </Grid>
-            
+
             {branchForm.latitude && branchForm.longitude && (
               <Grid item xs={12}>
                 <Alert severity="info" icon={<LocationOn />}>
@@ -836,7 +878,7 @@ export const BranchesPage = () => {
                 placeholder="مثال: IT Department"
               />
             </Grid>
-            
+
             {/* عند التعديل: اختيار فرع واحد فقط */}
             {selectedDept ? (
               <Grid item xs={12}>
@@ -894,9 +936,9 @@ export const BranchesPage = () => {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Business fontSize="small" color="action" />
                             <Typography>{branch.name}</Typography>
-                            <Chip 
-                              size="small" 
-                              label={`${branch._count?.users || 0} موظف`} 
+                            <Chip
+                              size="small"
+                              label={`${branch._count?.users || 0} موظف`}
                               variant="outlined"
                             />
                           </Box>
@@ -921,9 +963,9 @@ export const BranchesPage = () => {
             color="secondary"
             onClick={handleSubmitDept}
             disabled={
-              createDeptMutation.isPending || 
-              updateDeptMutation.isPending || 
-              !deptForm.name || 
+              createDeptMutation.isPending ||
+              updateDeptMutation.isPending ||
+              !deptForm.name ||
               (selectedDept ? !deptForm.branchId : deptForm.branchIds.length === 0)
             }
           >
