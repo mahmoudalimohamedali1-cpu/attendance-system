@@ -157,9 +157,18 @@ const SocialFeedPage: React.FC = () => {
         enabled: !!selectedPostId,
     });
 
-    // Flatten comments from all pages
+    // Flatten comments from all pages and transform author format
     const comments: PostComment[] =
-        commentsData?.pages.flatMap((page) => page.items) || [];
+        commentsData?.pages.flatMap((page) => page.items.map((item: any) => ({
+            ...item,
+            author: {
+                id: item.author?.id,
+                name: item.author?.name || `${item.author?.firstName || ''} ${item.author?.lastName || ''}`.trim() || 'مستخدم',
+                avatar: item.author?.avatar,
+                jobTitle: item.author?.jobTitle,
+            },
+            repliesCount: item._count?.replies || item.repliesCount || 0,
+        }))) || [];
     const totalComments = commentsData?.pages[0]?.total || 0;
 
     // Create post mutation
