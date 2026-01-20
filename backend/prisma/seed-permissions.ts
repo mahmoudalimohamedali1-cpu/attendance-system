@@ -123,6 +123,14 @@ const enterprisePermissions = [
     { code: 'DISC_EMPLOYEE_RESPONSE', name: 'رد على التحقيق', nameEn: 'Respond to Investigation', category: 'الجزاءات' },
     { code: 'DISC_VIEW_ALL', name: 'عرض كل التحقيقات', nameEn: 'View All Investigations', category: 'الجزاءات' },
     { code: 'DISC_VIEW_SELF', name: 'عرض تحقيقاتي', nameEn: 'View My Investigations', category: 'الجزاءات' },
+
+    // === التواصل الاجتماعي (Social Feed) ===
+    { code: 'SOCIAL_FEED_VIEW', name: 'عرض المنشورات', nameEn: 'View Posts', category: 'التواصل الاجتماعي' },
+    { code: 'SOCIAL_FEED_POST', name: 'إنشاء منشور', nameEn: 'Create Post', category: 'التواصل الاجتماعي' },
+    { code: 'SOCIAL_FEED_ANNOUNCEMENT', name: 'إنشاء إعلان رسمي', nameEn: 'Create Announcement', category: 'التواصل الاجتماعي' },
+    { code: 'SOCIAL_FEED_PIN', name: 'تثبيت المنشورات', nameEn: 'Pin Posts', category: 'التواصل الاجتماعي' },
+    { code: 'SOCIAL_FEED_DELETE_ANY', name: 'حذف أي منشور', nameEn: 'Delete Any Post', category: 'التواصل الاجتماعي' },
+    { code: 'SOCIAL_FEED_MODERATE', name: 'إدارة التعليقات', nameEn: 'Moderate Comments', category: 'التواصل الاجتماعي' },
 ];
 
 async function seedPermissions() {

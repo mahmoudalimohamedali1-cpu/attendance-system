@@ -252,6 +252,17 @@ export class LeavesController {
     return this.leavesService.getAllLeaveRequests(companyId, query);
   }
 
+  @Post('admin/fix-entitlements')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'تصحيح استحقاقات الإجازات حسب نظام العمل السعودي' })
+  @ApiResponse({ status: 200, description: 'تم تحديث الاستحقاقات' })
+  async fixLeaveEntitlements(
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.leavesService.fixLeaveEntitlements(companyId);
+  }
+
   // ============ Work From Home ============
 
   @Post('work-from-home')

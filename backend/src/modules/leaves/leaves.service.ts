@@ -201,6 +201,56 @@ export class LeavesService {
     return icons[category] || 'event';
   }
 
+  /**
+   * تصحيح استحقاقات أنواع الإجازات حسب نظام العمل السعودي
+   */
+  async fixLeaveEntitlements(companyId: string) {
+    const updates = [
+      { code: 'ANNUAL', defaultEntitlement: 21 },
+      { code: 'SICK', defaultEntitlement: 30 },
+      { code: 'MARRIAGE', defaultEntitlement: 5 },
+      { code: 'BEREAVEMENT', defaultEntitlement: 5 },
+      { code: 'NEW_BABY', defaultEntitlement: 3 },
+      { code: 'HAJJ', defaultEntitlement: 15 },
+      { code: 'EXAM', defaultEntitlement: 0 },
+      { code: 'BUSINESS_TRIP', defaultEntitlement: 0 },
+      { code: 'UNPAID', defaultEntitlement: 0 },
+    ];
+
+    const results = [];
+
+    for (const update of updates) {
+      const result = await this.prisma.leaveTypeConfig.updateMany({
+        where: { companyId, code: update.code },
+        data: { defaultEntitlement: update.defaultEntitlement },
+      });
+      results.push({ code: update.code, updated: result.count });
+    }
+
+    // تحديث أرصدة الموظفين
+    const currentYear = new Date().getFullYear();
+    const leaveTypes = await this.prisma.leaveTypeConfig.findMany({
+      where: { companyId },
+    });
+
+    for (const leaveType of leaveTypes) {
+      await this.prisma.leaveBalance.updateMany({
+        where: {
+          leaveTypeId: leaveType.id,
+          year: currentYear,
+        },
+        data: {
+          entitled: leaveType.defaultEntitlement,
+        },
+      });
+    }
+
+    return {
+      message: 'تم تحديث استحقاقات الإجازات بنجاح حسب نظام العمل السعودي',
+      updates: results,
+    };
+  }
+
   async createLeaveRequest(userId: string, companyId: string, createLeaveDto: CreateLeaveRequestDto) {
     const { type, startDate, endDate, reason, notes, attachments } = createLeaveDto;
     const leaveNotes = reason || notes || '';
