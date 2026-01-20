@@ -663,7 +663,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                                 sx={{
                                     fontSize: '1.5rem',
                                     transition: 'transform 0.2s ease',
-                                    bgcolor: post.userReaction === type ? `${reactionConfig[type].color}20` : 'transparent',
+                                    bgcolor: normalizeReaction(post.userReaction) === type ? `${reactionConfig[type].color}20` : 'transparent',
                                     '&:hover': {
                                         transform: 'scale(1.3)',
                                         bgcolor: `${reactionConfig[type].color}20`,
