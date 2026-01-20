@@ -255,6 +255,13 @@ export class PayrollCalculationService {
                     enableDepartmentBudget: companySettings.enableDepartmentBudget,
                     enableCostCenterTracking: companySettings.enableCostCenterTracking,
                     defaultPayrollExportFormat: companySettings.defaultPayrollExportFormat,
+
+                    // === إعدادات خصم الإجازات المرضية ===
+                    enableSickLeaveDeduction: companySettings.enableSickLeaveDeduction ?? true,
+                    sickLeaveFullPayDays: companySettings.sickLeaveFullPayDays ?? 30,
+                    sickLeavePartialPayPercent: companySettings.sickLeavePartialPayPercent ?? 75,
+                    sickLeavePartialPayDays: companySettings.sickLeavePartialPayDays ?? 60,
+                    sickLeaveUnpaidDays: companySettings.sickLeaveUnpaidDays ?? 30,
                 };
 
                 mergedSettings = { ...mergedSettings, ...mappedSettings };
@@ -771,6 +778,113 @@ export class PayrollCalculationService {
                 `(${toFixed(nightShiftHours)} hours, ${toFixed(nightShiftAllowancePercent)}%)`);
         }
 
+        // 5. حساب خصم الإجازات المرضية (حسب نظام العمل السعودي)
+        // ✅ Using Decimal for precision
+        let sickLeaveDeduction: Decimal = ZERO;
+        let sickLeaveDeductionDetails: { fullPayDays: number; partialPayDays: number; unpaidDays: number; totalDeduction: number } | null = null;
+
+        if (settings.enableSickLeaveDeduction !== false) {
+            // أولاً: جلب leaveTypeId للإجازة المرضية
+            const sickLeaveType = await this.prisma.leaveTypeConfig.findFirst({
+                where: { companyId, code: 'SICK' },
+                select: { id: true }
+            });
+
+            // جلب الإجازات المرضية المعتمدة في هذه الفترة
+            const sickLeaves = sickLeaveType ? await this.prisma.leaveRequest.findMany({
+                where: {
+                    userId: employeeId,
+                    companyId,
+                    status: 'APPROVED',
+                    startDate: { lte: endDate },
+                    endDate: { gte: startDate },
+                    leaveTypeId: sickLeaveType.id
+                } as any
+            }) : [];
+
+            if (sickLeaves.length > 0) {
+                // حساب مجموع أيام المرضية في هذه الفترة
+                let sickDaysInPeriod = 0;
+                for (const leave of sickLeaves) {
+                    const leaveStart = new Date(Math.max(startDate.getTime(), new Date(leave.startDate).getTime()));
+                    const leaveEnd = new Date(Math.min(endDate.getTime(), new Date(leave.endDate).getTime()));
+                    const days = Math.floor((leaveEnd.getTime() - leaveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+                    sickDaysInPeriod += days;
+                }
+
+                // جلب إجمالي أيام المرضية المستخدمة من بداية السنة
+                const yearStart = new Date(effectiveYear, 0, 1);
+                const totalSickLeavesThisYear = await this.prisma.leaveRequest.findMany({
+                    where: {
+                        userId: employeeId,
+                        companyId,
+                        status: 'APPROVED',
+                        startDate: { gte: yearStart, lte: endDate },
+                        leaveTypeId: sickLeaveType!.id
+                    } as any
+                });
+
+                let totalSickDaysThisYear = 0;
+                for (const leave of totalSickLeavesThisYear) {
+                    const leaveStart = new Date(Math.max(yearStart.getTime(), new Date(leave.startDate).getTime()));
+                    const leaveEnd = new Date(Math.min(endDate.getTime(), new Date(leave.endDate).getTime()));
+                    const days = Math.floor((leaveEnd.getTime() - leaveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+                    totalSickDaysThisYear += days;
+                }
+
+                // حساب الخصم التدريجي حسب نظام العمل السعودي
+                const fullPayDays = settings.sickLeaveFullPayDays || 30;
+                const partialPayPercent = settings.sickLeavePartialPayPercent || 75;
+                const partialPayDays = settings.sickLeavePartialPayDays || 60;
+                const unpaidDays = settings.sickLeaveUnpaidDays || 30;
+
+                let fullPayCount = 0;
+                let partialPayCount = 0;
+                let unpaidCount = 0;
+                let deductionAmount: Decimal = ZERO;
+
+                // التكرار على كل يوم مرضي في الفترة
+                const previousSickDays = totalSickDaysThisYear - sickDaysInPeriod;
+                for (let i = 0; i < sickDaysInPeriod; i++) {
+                    const dayNumber = previousSickDays + i + 1;
+
+                    if (dayNumber <= fullPayDays) {
+                        // أول 30 يوم: راتب كامل (0% خصم)
+                        fullPayCount++;
+                    } else if (dayNumber <= fullPayDays + partialPayDays) {
+                        // 31-90: راتب جزئي (خصم 25%)
+                        partialPayCount++;
+                        const dailyDeduction = mul(dailyRateAbsence, div(sub(100, partialPayPercent), 100));
+                        deductionAmount = add(deductionAmount, dailyDeduction);
+                    } else {
+                        // بعد 90 يوم: بدون راتب (100% خصم)
+                        unpaidCount++;
+                        deductionAmount = add(deductionAmount, dailyRateAbsence);
+                    }
+                }
+
+                sickLeaveDeduction = round(deductionAmount);
+                sickLeaveDeductionDetails = {
+                    fullPayDays: fullPayCount,
+                    partialPayDays: partialPayCount,
+                    unpaidDays: unpaidCount,
+                    totalDeduction: toNumber(sickLeaveDeduction)
+                };
+
+                if (isPositive(sickLeaveDeduction)) {
+                    this.logger.debug(`Sick leave deduction for ${employeeId}: ${toFixed(sickLeaveDeduction)} SAR ` +
+                        `(${sickDaysInPeriod} days: ${fullPayCount} full, ${partialPayCount} partial, ${unpaidCount} unpaid)`);
+
+                    trace.push({
+                        step: 'SICK_LEAVE_DEDUCTION',
+                        description: 'خصم الإجازة المرضية (حسب نظام العمل السعودي)',
+                        formula: `إجمالي ${sickDaysInPeriod} يوم مرضي: ${fullPayCount} براتب كامل، ${partialPayCount} براتب جزئي (${partialPayPercent}%)، ${unpaidCount} بدون راتب`,
+                        result: toNumber(sickLeaveDeduction),
+                    });
+                }
+            }
+        }
+
         // --- Policy Evaluation ---
         const gosiConfig = await this.prisma.gosiConfig.findFirst({
             where: { isActive: true, companyId },
@@ -1057,7 +1171,25 @@ export class PayrollCalculationService {
             });
         }
 
-        // ✅ إضافة خصم الانصراف المبكر (إذا مفعل ويوجد خصم)
+        // ✅ إضافة خصم الإجازة المرضية (حسب نظام العمل السعودي)
+        if (isPositive(sickLeaveDeduction)) {
+            const details = sickLeaveDeductionDetails!;
+            policyLines.push({
+                componentId: 'SYS-SICK-LEAVE',
+                componentCode: 'SICK_LEAVE_DED',
+                componentName: 'خصم الإجازة المرضية',
+                sign: 'DEDUCTION',
+                amount: toNumber(round(sickLeaveDeduction)),
+                descriptionAr: `خصم مرضية: ${details.partialPayDays} يوم براتب جزئي + ${details.unpaidDays} يوم بدون راتب`,
+                source: {
+                    policyId: 'SAUDI_LABOR_LAW',
+                    policyCode: 'SLL_ART117',
+                    ruleId: 'SICK_LEAVE_DEDUCTION',
+                    ruleCode: 'SLL_117',
+                },
+                gosiEligible: false,
+            });
+        }
         if (isPositive(earlyDepartureDeduction)) {
             policyLines.push({
                 componentId: 'SYS-EARLY-DEP',
