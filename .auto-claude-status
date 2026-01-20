@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "025-mudad-integration",
+  "spec": "044-company-social-feed-ads-announcem",
   "state": "building",
   "subtasks": {
-    "completed": 8,
-    "total": 11,
+    "completed": 36,
+    "total": 37,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Workflow Integration",
+    "current": "Integration & Polish",
     "id": null,
-    "total": 3
+    "total": 4
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 10,
-    "started_at": "2026-01-17T09:56:53.071569"
+    "number": 1665,
+    "started_at": "2026-01-19T18:34:02.402876"
   },
-  "last_update": "2026-01-17T10:28:09.538936"
+  "last_update": "2026-01-19T23:42:29.323138"
 }

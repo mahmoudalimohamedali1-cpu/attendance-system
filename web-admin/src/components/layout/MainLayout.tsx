@@ -54,6 +54,7 @@ import {
   LocalShipping as LogisticsIcon,
   Speed as SpeedIcon,
   Link as LinkIcon,
+  Forum as ForumIcon,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
@@ -97,6 +98,7 @@ const allMenuItems: MenuItem[] = [
   { text: 'المهام', icon: <AutoAwesome />, path: '/tasks', requiredPermission: ['EMPLOYEES_VIEW', 'EMPLOYEES_EDIT'] },
   { text: '👥 تعاون الفريق', icon: <People />, path: '/team-collaboration', requiredRole: 'ADMIN' },
   { text: '📊 إدارة المشاريع', icon: <AccountTree />, path: '/projects', requiredRole: 'ADMIN' },
+  { text: '📢 ساحة التواصل', icon: <ForumIcon />, path: '/social-feed' },
   { text: '🧠 المساعد الذكي', icon: <AutoAwesome />, path: '/genius-ai' },
   { text: '📊 التحليلات التنبؤية', icon: <InsightsIcon />, path: '/ai-predictive' },
   { text: 'الإجازات', icon: <EventNote />, path: '/leaves', requiredPermission: ['LEAVES_VIEW', 'LEAVES_APPROVE', 'LEAVES_APPROVE_MANAGER', 'LEAVES_APPROVE_HR'] },

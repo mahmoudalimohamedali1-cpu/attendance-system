@@ -78,6 +78,8 @@ import { ar } from 'date-fns/locale';
 import { api } from '@/services/api.service';
 import { useAuthStore } from '@/store/auth.store';
 import { MudadComplianceCard } from '@/components/dashboard/MudadComplianceCard';
+import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
+import { calendarEventsService, CalendarEvent as ServiceCalendarEvent } from '@/services/calendar-events.service';
 
 interface DashboardStats {
   employees: { total: number; active: number };
@@ -181,6 +183,25 @@ export const DashboardPage = () => {
     queryFn: () => api.get('/reports/weekly-summary'),
     enabled: !stats || !('isEmployeeDashboard' in stats),
   });
+
+  // Calendar events query for the widget
+  const { data: calendarEventsData } = useQuery<ServiceCalendarEvent[]>({
+    queryKey: ['calendar-events-upcoming'],
+    queryFn: () => calendarEventsService.getUpcomingEvents(14), // Get events for the next 14 days
+    refetchInterval: 300000, // Refetch every 5 minutes
+  });
+
+  // Transform calendar events for the widget
+  const calendarEvents = (calendarEventsData || []).map((event) => ({
+    id: event.id,
+    title: event.title,
+    startAt: new Date(event.startAt),
+    endAt: new Date(event.endAt),
+    type: event.eventType.toLowerCase() as 'meeting' | 'interview' | 'payroll' | 'holiday' | 'deadline' | 'announcement' | 'other',
+    location: event.location || undefined,
+    meetingLink: event.meetingLink || undefined,
+    isAllDay: event.isAllDay,
+  }));
 
   // Mutations for manager requests
   const leaveRequestMutation = useMutation({
@@ -966,6 +987,17 @@ export const DashboardPage = () => {
               </List>
             </CardContent>
           </Card>
+        </Grid>
+
+        {/* Calendar Widget */}
+        <Grid item xs={12} md={6} lg={4}>
+          <CalendarWidget
+            events={calendarEvents}
+            onEventClick={(event) => {
+              navigate(`/calendar?event=${event.id}`);
+            }}
+            onViewAll={() => navigate('/calendar')}
+          />
         </Grid>
 
         {/* Weekly Chart */}

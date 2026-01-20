@@ -33,7 +33,6 @@ model Company {
   payrollPeriods       PayrollPeriod[]
   payrollRuns          PayrollRun[]
   holidays             Holiday[]
-  holidayAssignments   HolidayAssignment[]
   gosiConfigs          GosiConfig[]
   departments          Department[]
   workSchedules        WorkSchedule[]
@@ -75,12 +74,7 @@ model Company {
   leaveBalances    LeaveBalance[]
 
   // السياسات الذكية (AI-Powered)
-  smartPolicies                 SmartPolicy[]
-  smartPolicyTemplates          SmartPolicyTemplate[]
-  smartPolicyExceptions         SmartPolicyException[]
-  smartPolicyOccurrenceTrackers SmartPolicyOccurrenceTracker[]
-  smartPolicyRetroApplications  SmartPolicyRetroApplication[]
-  policySimulationRuns          PolicySimulationRun[]
+  smartPolicies SmartPolicy[]
 
   // نظام تتبع الموقع (Location Tracking)
   employeeLocationLogs EmployeeLocationLog[]
@@ -94,45 +88,9 @@ model Company {
   absencePredictions   AbsencePrediction[]
   predictionAccuracies PredictionAccuracy[]
   absencePatterns      AbsencePattern[]
-  saudizationConfig    SaudizationConfig?
 
-  // Tasks & Sprints
-  tasks          Task[]
-  taskCategories TaskCategory[]
-  taskTemplates  TaskTemplate[]
-  sprints        Sprint[]
-
-  // relations to production models
-  costCenterAllocations   CostCenterAllocation[]
-  goals                   Goal[]
-  kpiDefinitions          KPIDefinition[]
-  performanceReviewCycles PerformanceReviewCycle[]
-
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
-  shiftTemplates        ShiftTemplate[]
-  shiftSchedules        ShiftSchedule[]
-  shifts                Shift[]
-  shiftRules            ShiftRule[]
-  shiftOptimizationRuns ShiftOptimizationRun[]
-  employeeSurveys       EmployeeSurvey[]
-  knowledgeBaseArticles KnowledgeBaseArticle[]
-  teamCalendarEvents    TeamCalendarEvent[]
-  programs              Program[]
-  projects              Project[]
-  projectTemplates      ProjectTemplate[]
-  taskAutomations       TaskAutomation[]
-  employeeDebtLedgers   EmployeeDebtLedger[]
-
-  // Recognition & Succession Planning
-  recognitions    Recognition[]
-  successionPlans SuccessionPlan[]
-
-  // Social Feed (المنشورات والتواصل الاجتماعي)
-  posts Post[]
-
-  // Calendar Events (أحداث التقويم)
-  events Event[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("companies")
 }
@@ -181,7 +139,7 @@ model PayrollSettings {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // ========== تاريخ إغلاق الرواتب ==========
-  payrollClosingDay Int @default(25) @map("payroll_closing_day")
+  payrollClosingDay Int @default(25) @map("payroll_closing_day") // 0-28
 
   // ========== حساب التوظيف وإنهاء الخدمات ==========
   hireTerminationCalcBase WorkDayCalculationBase @default(CALENDAR_DAYS) @map("hire_termination_calc_base")
@@ -190,7 +148,7 @@ model PayrollSettings {
   // ========== حساب الإجازات غير المدفوعة ==========
   unpaidLeaveCalcBase      WorkDayCalculationBase @default(ACTUAL_WORKING_DAYS) @map("unpaid_leave_calc_base")
   unpaidLeaveMethod        UnpaidLeaveMethod      @default(BASED_ON_SHIFTS) @map("unpaid_leave_method")
-  splitUnpaidByClosingDate Boolean                @default(false) @map("split_unpaid_by_closing_date")
+  splitUnpaidByClosingDate Boolean                @default(false) @map("split_unpaid_by_closing_date") // تقسيم بناءً على تاريخ الإغلاق
 
   // ========== حساب ساعات العمل الإضافي ==========
   overtimeCalcBase WorkDayCalculationBase    @default(ACTUAL_WORKING_DAYS) @map("overtime_calc_base")
@@ -201,112 +159,19 @@ model PayrollSettings {
   leaveAllowanceMethod   LeaveAllowanceMethod   @default(BASIC_PLUS_HOUSING) @map("leave_allowance_method")
 
   // ========== إعدادات قسيمة الراتب ==========
-  showCompanyContributions Boolean @default(true) @map("show_company_contributions")
-  showClosingDateOnPayslip Boolean @default(true) @map("show_closing_date_on_payslip")
-  deductAbsenceFromBasic   Boolean @default(true) @map("deduct_absence_from_basic")
-  showActualAbsenceDays    Boolean @default(false) @map("show_actual_absence_days")
+  showCompanyContributions Boolean @default(true) @map("show_company_contributions") // إظهار مساهمات الشركة
+  showClosingDateOnPayslip Boolean @default(true) @map("show_closing_date_on_payslip") // إظهار تاريخ الإغلاق
+  deductAbsenceFromBasic   Boolean @default(true) @map("deduct_absence_from_basic") // اقتطاع الغياب من الأساسي
+  showActualAbsenceDays    Boolean @default(false) @map("show_actual_absence_days") // إظهار حساب أيام الغياب الفعلي
 
   // ========== أرصدة الرواتب السلبية ==========
-  enableNegativeBalanceCarryover Boolean @default(false) @map("enable_negative_balance_carryover")
-  settleNegativeAsTransaction    Boolean @default(false) @map("settle_negative_as_transaction")
+  enableNegativeBalanceCarryover Boolean @default(false) @map("enable_negative_balance_carryover") // ترحيل الرصيد السلبي
+  settleNegativeAsTransaction    Boolean @default(false) @map("settle_negative_as_transaction") // تسوية كحركة خارجية
 
   // ========== إعدادات إضافية ==========
-  roundSalaryToNearest       Int @default(0) @map("round_salary_to_nearest")
+  roundSalaryToNearest       Int @default(0) @map("round_salary_to_nearest") // تقريب الراتب (0 = بدون تقريب)
   defaultWorkingDaysPerMonth Int @default(30) @map("default_working_days_per_month")
-  leaveDailyRateDivisor      Int @default(30) @map("leave_daily_rate_divisor")
-
-  // ========== حقول الإنتاج المضافة ==========
-  overtimeMultiplier             Float    @default(1.5) @map("overtime_multiplier")
-  gracePeriodMinutes             Int      @default(15) @map("grace_period_minutes")
-  weekendOvertimeMultiplier      Float    @default(2.0) @map("weekend_overtime_multiplier")
-  holidayOvertimeMultiplier      Float    @default(2.0) @map("holiday_overtime_multiplier")
-  nightShiftAllowancePercent     Float    @default(0) @map("night_shift_allowance_percent")
-  maxDeductionPercent            Float    @default(50) @map("max_deduction_percent")
-  minNetSalary                   Float    @default(0) @map("min_net_salary")
-  autoLockDay                    Int      @default(0) @map("auto_lock_day")
-  defaultCurrency                String   @default("SAR") @map("default_currency")
-  enableMultiCurrency            Boolean  @default(false) @map("enable_multi_currency")
-  enableBonusTracking            Boolean  @default(true) @map("enable_bonus_tracking")
-  bonusCalculationMethod         String   @default("FIXED") @map("bonus_calculation_method")
-  enableCommission               Boolean  @default(false) @map("enable_commission")
-  commissionCalculationBase      String   @default("SALES") @map("commission_calculation_base")
-  enableAllowanceCategories      Boolean  @default(true) @map("enable_allowance_categories")
-  maxAllowancePercent            Float    @default(100) @map("max_allowance_percent")
-  enableTaxCalculation           Boolean  @default(false) @map("enable_tax_calculation")
-  taxCalculationMethod           String   @default("EXEMPT") @map("tax_calculation_method")
-  enableSalaryAdvance            Boolean  @default(true) @map("enable_salary_advance")
-  maxAdvancePercent              Float    @default(50) @map("max_advance_percent")
-  enableLoanDeduction            Boolean  @default(true) @map("enable_loan_deduction")
-  maxLoanDeductionPercent        Float    @default(30) @map("max_loan_deduction_percent")
-  enableApprovalWorkflow         Boolean  @default(false) @map("enable_approval_workflow")
-  approvalLevels                 Int      @default(1) @map("approval_levels")
-  enableBankTransfer             Boolean  @default(true) @map("enable_bank_transfer")
-  defaultBankCode                String   @default("") @map("default_bank_code")
-  enableRetroactivePay           Boolean  @default(true) @map("enable_retroactive_pay")
-  retroactiveMonthsLimit         Int      @default(3) @map("retroactive_months_limit")
-  enableEosCalculation           Boolean  @default(true) @map("enable_eos_calculation")
-  eosCalculationMethod           String   @default("SAUDI_LABOR_LAW") @map("eos_calculation_method")
-  enableGosiCalculation          Boolean  @default(true) @map("enable_gosi_calculation")
-  gosiEmployeePercent            Float    @default(9.75) @map("gosi_employee_percent")
-  gosiEmployerPercent            Float    @default(11.75) @map("gosi_employer_percent")
-  enableVacationEncashment       Boolean  @default(true) @map("enable_vacation_encashment")
-  vacationEncashmentMethod       String   @default("ON_TERMINATION") @map("vacation_encashment_method")
-  enableAttendancePenalty        Boolean  @default(true) @map("enable_attendance_penalty")
-  lateDeductionMethod            String   @default("PER_MINUTE") @map("late_deduction_method")
-  lateThresholdMinutes           Int      @default(120) @map("late_threshold_minutes")
-  absenceDeductionMethod         String   @default("DAILY_RATE") @map("absence_deduction_method")
-  absenceProgressiveRate         Float    @default(1.0) @map("absence_progressive_rate")
-  enableEarlyDeparturePenalty    Boolean  @default(false) @map("enable_early_departure_penalty")
-  earlyDepartureDeductionMethod  String   @default("PER_MINUTE") @map("early_departure_deduction_method")
-  earlyDepartureThresholdMinutes Int      @default(120) @map("early_departure_threshold_minutes")
-  enableCumulativeLateDeduction  Boolean  @default(false) @map("enable_cumulative_late_deduction")
-  lateCountForDayDeduction       Int      @default(3) @map("late_count_for_day_deduction")
-  gosiMaxSalary                  Float    @default(45000) @map("gosi_max_salary")
-  enableSanedCalculation         Boolean  @default(true) @map("enable_saned_calculation")
-  sanedEmployeePercent           Float    @default(0.75) @map("saned_employee_percent")
-  sanedEmployerPercent           Float    @default(0.75) @map("saned_employer_percent")
-  hazardRatePercent              Float    @default(2.0) @map("hazard_rate_percent")
-  enablePayslipEmail             Boolean  @default(true) @map("enable_payslip_email")
-  payslipLanguage                String   @default("AR") @map("payslip_language")
-  enableOvertimeCap              Boolean  @default(false) @map("enable_overtime_cap")
-  maxOvertimeHoursPerMonth       Int      @default(50) @map("max_overtime_hours_per_month")
-  enableAutoPayrollGeneration    Boolean  @default(false) @map("enable_auto_payroll_generation")
-  autoPayrollGenerationDay       Int      @default(25) @map("auto_payroll_generation_day")
-  enablePayrollAuditTrail        Boolean  @default(true) @map("enable_payroll_audit_trail")
-  enableSalaryRounding           Boolean  @default(false) @map("enable_salary_rounding")
-  salaryRoundingMethod           String   @default("NEAREST") @map("salary_rounding_method")
-  enableDepartmentBudget         Boolean  @default(false) @map("enable_department_budget")
-  enableCostCenterTracking       Boolean  @default(false) @map("enable_cost_center_tracking")
-  defaultPayrollExportFormat     String   @default("EXCEL") @map("default_payroll_export_format")
-  enableSickLeaveDeduction       Boolean? @default(true) @map("enable_sick_leave_deduction")
-  sickLeavePartialPayPercent     Float?   @default(75) @map("sick_leave_partial_pay_percent")
-  sickLeaveFullPayDays           Int?     @default(30) @map("sick_leave_full_pay_days")
-  sickLeavePartialPayDays        Int?     @default(60) @map("sick_leave_partial_pay_days")
-  sickLeaveUnpaidDays            Int?     @default(30) @map("sick_leave_unpaid_days")
-  calculationMethod              String?  @default("STANDARD") @map("calculation_method")
-  payslipTemplate                String?  @default("DEFAULT") @map("payslip_template")
-  showSalaryBreakdown            Boolean? @default(true) @map("show_salary_breakdown")
-  showYtdTotals                  Boolean? @default(true) @map("show_ytd_totals")
-  autoCalculateEos               Boolean? @default(true) @map("auto_calculate_eos")
-  eosFirstYearsRate              Float?   @default(0.5) @map("eos_first_years_rate")
-  eosLaterYearsRate              Float?   @default(1.0) @map("eos_later_years_rate")
-  eosThresholdYears              Int?     @default(5) @map("eos_threshold_years")
-  eosContractualRate             Float?   @default(1.0) @map("eos_contractual_rate")
-  dailyWorkingHours              Float?   @default(8) @map("daily_working_hours")
-  weeklyWorkingDays              Int?     @default(5) @map("weekly_working_days")
-  overtimeRate                   Float?   @default(1.5) @map("overtime_rate")
-  weekendOvertimeRate            Float?   @default(2.0) @map("weekend_overtime_rate")
-  holidayOvertimeRate            Float?   @default(2.0) @map("holiday_overtime_rate")
-  lateDeductionRate              Float?   @default(1.0) @map("late_deduction_rate")
-  absenceDeductionRate           Float?   @default(1.0) @map("absence_deduction_rate")
-  includeHousingInGosi           Boolean? @default(true) @map("include_housing_in_gosi")
-  includeTransportInGosi         Boolean? @default(false) @map("include_transport_in_gosi")
-  defaultLeaveDays               Int?     @default(21) @map("default_leave_days")
-  leaveCarryOverDays             Int?     @default(5) @map("leave_carry_over_days")
-  probationLeaveEnabled          Boolean? @default(false) @map("probation_leave_enabled")
-  autoApproveLeave               Boolean? @default(false) @map("auto_approve_leave")
-  enableOvertimeApproval         Boolean? @default(true) @map("enable_overtime_approval")
-  workingDaysPerWeek             Int?     @default(5) @map("working_days_per_week")
+  leaveDailyRateDivisor      Int @default(30) @map("leave_daily_rate_divisor") // مقسم الراتب اليومي للإجازات
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -458,15 +323,6 @@ model User {
   // سجل الموافقات (Audit)
   approvalLogs ApprovalLog[]
 
-  // relations to production models
-  costCenterAllocations CostCenterAllocation[]
-  goals                 Goal[]
-  goalCheckIns          GoalCheckIn[]
-  keyResultCheckIns     KeyResultCheckIn[]
-  kpiAssignments        KPIAssignment[]
-  performanceReviews    PerformanceReview[]    @relation("EmployeeReviews")
-  managedReviews        PerformanceReview[]    @relation("ManagerReviews")
-
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -516,82 +372,6 @@ model User {
 
   // التحليلات التنبؤية (AI Predictive Analytics)
   absencePredictions AbsencePrediction[]
-
-  // Tasks & Sprints relations
-  tasksCreated           Task[]            @relation("tasks_created_by_idTousers")
-  tasksAssigned          Task[]            @relation("tasks_assignee_idTousers")
-  tasksApproved          Task[]            @relation("tasks_approver_idTousers")
-  tasksReviewed          Task[]            @relation("tasks_reviewer_idTousers")
-  taskAssignments        TaskAssignment[]
-  taskWatchers           TaskWatcher[]
-  taskComments           TaskComment[]
-  taskTimeLogs           TaskTimeLog[]
-  taskActivityLogs       TaskActivityLog[]
-  taskApprovals          TaskApproval[]
-  taskEvidencesSubmitted TaskEvidence[]    @relation("task_evidences_submitted_by_idTousers")
-  taskEvidencesVerified  TaskEvidence[]    @relation("task_evidences_verified_by_idTousers")
-  sprintsCreated         Sprint[]          @relation("SprintCreator")
-
-  // Planning & Projects relations
-  programsCreated        Program[]          @relation("ProgramCreator")
-  programsManaged        Program[]          @relation("ProgramManager")
-  programsOwned          Program[]          @relation("ProgramOwner")
-  projectsCreated        Project[]          @relation("ProjectCreator")
-  projectsManaged        Project[]          @relation("ProjectManager")
-  projectsOwned          Project[]          @relation("ProjectOwner")
-  projectsSponsored      Project[]          @relation("ProjectSponsor")
-  projectMembers         ProjectMember[]    @relation("ProjectMembers")
-  projectMilestonesOwned ProjectMilestone[] @relation("MilestoneOwner")
-  projectRisksCreated    ProjectRisk[]      @relation("RiskCreator")
-  projectRisksOwned      ProjectRisk[]      @relation("RiskOwner")
-  projectBudgetsApproved ProjectBudget[]    @relation("BudgetApprover")
-  projectBudgetsCreated  ProjectBudget[]    @relation("BudgetCreator")
-  projectActivities      ProjectActivity[]  @relation("ProjectActivityUser")
-
-  // Other relations
-  shifts                      Shift[]                      @relation("UserShifts")
-  shiftSwapManaged            ShiftSwapRequest[]           @relation("ShiftSwapManager")
-  shiftSwapRequested          ShiftSwapRequest[]           @relation("ShiftSwapRequester")
-  shiftSwapTargeted           ShiftSwapRequest[]           @relation("ShiftSwapTarget")
-  shiftBids                   ShiftBid[]                   @relation("ShiftBidUser")
-  policyViolationPredictions  PolicyViolationPrediction[]  @relation("PolicyPredictionUser")
-  profileUpdateRequests       ProfileUpdateRequest[]       @relation("ProfileUpdateRequests")
-  profileUpdateReviewed       ProfileUpdateRequest[]       @relation("ProfileUpdateReviewer")
-  emergencyContacts           EmergencyContact[]           @relation("EmergencyContacts")
-  trainingRequests            TrainingRequest[]            @relation("TrainingRequests")
-  surveyResponses             SurveyResponse[]             @relation("SurveyResponses")
-  articleFeedbacks            ArticleFeedback[]            @relation("ArticleFeedback")
-  offlineSyncQueues           OfflineSyncQueue[]           @relation("OfflineSyncQueue")
-  userNotificationPreferences UserNotificationPreferences? @relation("NotificationPreferences")
-  locationProofs              LocationProof[]              @relation("LocationProofs")
-  teamCalendarEvents          TeamCalendarEvent[]          @relation("TeamCalendarEvents")
-  taskAutomations             TaskAutomation[]
-  taskAttachments             TaskAttachment[]
-  employeeDebtLedgers         EmployeeDebtLedger[]         @relation("EmployeeDebts")
-
-  // Holidays & Smart Policies (Restored)
-  holidayAssignments            HolidayAssignment[]
-  smartPolicyExceptions         SmartPolicyException[]
-  smartPolicyOccurrenceTrackers SmartPolicyOccurrenceTracker[]
-  smartPolicyRetroApplications  SmartPolicyRetroApplication[]
-
-  // Recognition & Succession Planning
-  recognitionsSent     Recognition[]         @relation("RecognitionSender")
-  recognitionsReceived Recognition[]         @relation("RecognitionReceiver")
-  recognitionReactions RecognitionReaction[]
-  successionCandidates SuccessionCandidate[]
-
-  // Social Feed (المنشورات والتواصل الاجتماعي)
-  postsAuthored    Post[]            @relation("PostAuthor")
-  postReactions    PostReaction[]    @relation("PostReactions")
-  postComments     PostComment[]     @relation("PostComments")
-  postViews        PostView[]        @relation("PostViews")
-  postImpressions  PostImpression[]  @relation("PostImpressions")
-  postAcknowledges PostAcknowledge[] @relation("PostAcknowledges")
-
-  // Calendar Events (أحداث التقويم)
-  eventsCreated    Event[]           @relation("EventCreator")
-  eventAttendances EventAttendee[]   @relation("EventAttendee")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -874,9 +654,8 @@ model Branch {
   policies     Policy[] // سياسات على مستوى الفرع
   custodyItems CustodyItem[] // العهد في هذا الفرع
 
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  shiftSchedules ShiftSchedule[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, name])
   @@map("branches")
@@ -898,11 +677,8 @@ model Department {
   users    User[]
   policies Policy[] // سياسات على مستوى القسم
 
-  createdAt              DateTime                @default(now()) @map("created_at")
-  updatedAt              DateTime                @updatedAt @map("updated_at")
-  departmentSaudizations DepartmentSaudization[]
-  shiftSchedules         ShiftSchedule[]
-  costCenters            CostCenter[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, name])
   @@map("departments")
@@ -938,12 +714,6 @@ enum AttendanceStatus {
   ABSENT // غائب
   ON_LEAVE // إجازة
   WORK_FROM_HOME // عمل من المنزل
-  OFF_DAY // يوم راحة
-  HOLIDAY // إجازة رسمية
-  EXCUSED // غياب بعذر
-  WFM // عمل من المنزل (Advanced)
-  MOCKED // موقع وهمي
-  LATE_AND_EARLY
 }
 
 enum CheckType {
@@ -1062,9 +832,6 @@ enum LeaveCategory {
   CASUAL // إجازات عارضة (زواج، وفاة)
   SICK // إجازات مرضية
   UNPAID // بدون راتب
-  SICK_PAID
-  SICK_PARTIAL
-  OTHER
 }
 
 // إعدادات أنواع الإجازات - Dynamic Leave Type Configuration
@@ -1507,32 +1274,7 @@ model Holiday {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Restored fields
-  isPaid             Boolean                @default(true) @map("is_paid")
-  applicationType    HolidayApplicationType @default(ALL) @map("application_type")
-  countAsWorkDay     Boolean                @default(false) @map("count_as_work_day")
-  overtimeMultiplier Decimal                @default(2.0) @map("overtime_multiplier") @db.Decimal(3, 2)
-  notes              String?
-  holidayAssignments HolidayAssignment[]
-
   @@map("holidays")
-}
-
-model HolidayAssignment {
-  id         String   @id @default(uuid())
-  holidayId  String   @map("holiday_id")
-  companyId  String   @map("company_id")
-  employeeId String   @map("employee_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  holiday Holiday @relation(fields: [holidayId], references: [id], onDelete: Cascade)
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([holidayId])
-  @@index([companyId])
-  @@index([employeeId])
-  @@map("holiday_assignments")
 }
 
 // ==================== إعدادات النظام ====================
@@ -2028,6 +1770,151 @@ model Contract {
   @@map("contracts")
 }
 
+model CostCenter {
+  id          String   @id @default(uuid())
+  companyId   String?  @map("company_id")
+  company     Company? @relation(fields: [companyId], references: [id])
+  code        String   @unique
+  name        String
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, code])
+  @@map("cost_centers")
+}
+
+// ==================== موديولات الرواتب: المكونات والهياكل ====================
+
+enum SalaryComponentType {
+  EARNING // استحقاق (بدلات، راتب أساسي)
+  DEDUCTION // استقطاع (تأمينات، غرامات)
+}
+
+enum SalaryComponentNature {
+  FIXED // مبلغ ثابت
+  VARIABLE // مبلغ متغير (يدخل يدوياً كل شهر)
+  FORMULA // محسوب بناءً على معادلة
+}
+
+model SalaryComponent {
+  id        String                @id @default(uuid())
+  companyId String?               @map("company_id")
+  company   Company?              @relation(fields: [companyId], references: [id])
+  code      String // مثال: BASIC, HRA, TRANSPORT
+  nameAr    String                @map("name_ar")
+  nameEn    String?               @map("name_en")
+  type      SalaryComponentType
+  nature    SalaryComponentNature @default(FIXED)
+
+  description  String?
+  gosiEligible Boolean @default(false) @map("gosi_eligible")
+  otEligible   Boolean @default(false) @map("ot_eligible")
+  eosEligible  Boolean @default(false) @map("eos_eligible") // يدخل في حساب مستحقات نهاية الخدمة
+  isProrated   Boolean @default(true) @map("is_prorated") // هل يتأثر بالغياب والتعيين المتأخر (Pro-rated)
+  taxable      Boolean @default(false) // خاضع للضريبة
+
+  // لربط المكون باللي يعتمد عليه (مثلاً السكن 25% من الأساسي)
+  formula String? // المعادلة (سيتم استخدامها لاحقاً في Rules Engine)
+
+  // Enterprise: Versioning & Effective Dating
+  version       Int       @default(1)
+  effectiveDate DateTime  @default(now()) @map("effective_date")
+  endDate       DateTime? @map("end_date")
+  isActive      Boolean   @default(true) @map("is_active")
+
+  // Enterprise: Rounding & Display
+  roundingMode String @default("ROUND") @map("rounding_mode") // ROUND, FLOOR, CEIL
+  decimals     Int    @default(2)
+  priority     Int    @default(100) // ترتيب الظهور في الـ Payslip
+
+  structureLines SalaryStructureLine[]
+  PayslipLine    PayslipLine[]
+  policyRules    PolicyRule[]          @relation("PolicyOutputComponent")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  @@unique([companyId, type, code, version])
+  @@index([companyId, isActive])
+  @@index([effectiveDate, endDate])
+  @@map("salary_components")
+}
+
+enum PayrollStatus {
+  DRAFT
+  INPUTS_COLLECTED
+  CALCULATED
+  HR_REVIEWED
+  FINANCE_APPROVED
+  LOCKED
+  PAID
+  CANCELLED
+  ARCHIVED
+}
+
+model SalaryStructure {
+  id          String   @id @default(uuid())
+  companyId   String?  @map("company_id")
+  company     Company? @relation(fields: [companyId], references: [id])
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+
+  // Enterprise: Versioning
+  version       Int       @default(1)
+  effectiveDate DateTime  @default(now()) @map("effective_date")
+  endDate       DateTime? @map("end_date")
+
+  // المكونات التابعة لهذا الهيكل
+  lines       SalaryStructureLine[]
+  assignments EmployeeSalaryAssignment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, name, version])
+  @@index([companyId, isActive])
+  @@index([effectiveDate, endDate])
+  @@map("salary_structures")
+}
+
+model SalaryStructureLine {
+  id          String          @id @default(uuid())
+  structureId String          @map("structure_id")
+  structure   SalaryStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  componentId String          @map("component_id")
+  component   SalaryComponent @relation(fields: [componentId], references: [id])
+
+  amount     Decimal  @default(0) @db.Decimal(10, 2)
+  percentage Decimal? @db.Decimal(5, 2) // إذا كان مبلغ البدلة نسبة من الأساسي
+
+  priority Int @default(0) // ترتيب الحساب
+
+  @@map("salary_structure_lines")
+}
+
+model EmployeeSalaryAssignment {
+  id         String @id @default(uuid())
+  employeeId String @map("employee_id")
+  employee   User   @relation("EmployeeSalaryAssignments", fields: [employeeId], references: [id])
+
+  structureId String          @map("structure_id")
+  structure   SalaryStructure @relation(fields: [structureId], references: [id])
+
+  baseSalary    Decimal   @map("base_salary") @db.Decimal(10, 2)
+  effectiveDate DateTime  @map("effective_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("employee_salary_assignments")
+}
+
 // قشرة قسيمة الراتب (سيتم إضافتها بالكامل في Step 2 لكن نحتاج الموديلات للعلاقات)
 
 // 🔥 مصدر سطر قسيمة الراتب
@@ -2041,150 +1928,26 @@ enum PayslipLineSource {
 }
 
 model PayslipLine {
-  id             String            @id @default(uuid())
-  payslipId      String            @map("payslip_id")
-  componentId    String            @map("component_id")
-  amount         Decimal           @db.Decimal(10, 2)
-  createdAt      DateTime          @default(now()) @map("created_at")
-  descriptionAr  String?           @map("description_ar")
-  rate           Decimal?          @db.Decimal(10, 4)
-  sign           String            @default("EARNING")
-  sourceRef      String?           @map("source_ref")
-  sourceType     PayslipLineSource @default(STRUCTURE) @map("source_type")
-  units          Decimal?          @db.Decimal(10, 2)
-  cost_center_id String?
-  component      SalaryComponent   @relation(fields: [componentId], references: [id])
-  cost_centers   CostCenter?       @relation(fields: [cost_center_id], references: [id])
-  payslip        Payslip           @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  id          String          @id @default(uuid())
+  payslipId   String          @map("payslip_id")
+  payslip     Payslip         @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  componentId String          @map("component_id")
+  component   SalaryComponent @relation(fields: [componentId], references: [id])
+
+  // 🔥 Extended fields for Policy Engine integration
+  sign          String            @default("EARNING") // EARNING | DEDUCTION
+  amount        Decimal           @db.Decimal(10, 2)
+  sourceType    PayslipLineSource @default(STRUCTURE) @map("source_type")
+  sourceRef     String?           @map("source_ref") // policyId:ruleId or "MERGED"
+  descriptionAr String?           @map("description_ar") // وصف السطر
+  units         Decimal?          @db.Decimal(10, 2) // ساعات OT، دقائق تأخير
+  rate          Decimal?          @db.Decimal(10, 4) // معدل الحساب
+
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([payslipId, sourceType])
   @@index([payslipId, componentId])
-  @@index([cost_center_id])
   @@map("payslip_lines")
-}
-
-model CostCenter {
-  id                                                                                   String                 @id @default(uuid())
-  code                                                                                 String
-  description                                                                          String?
-  createdAt                                                                            DateTime               @default(now()) @map("created_at")
-  updatedAt                                                                            DateTime               @updatedAt @map("updated_at")
-  companyId                                                                            String?                @map("company_id")
-  effective_from                                                                       DateTime               @default(now())
-  effective_to                                                                         DateTime?
-  is_allow_overbudget                                                                  Boolean                @default(false)
-  level                                                                                Int                    @default(1)
-  manager_id                                                                           String?
-  name_ar                                                                              String
-  name_en                                                                              String?
-  parent_id                                                                            String?
-  path                                                                                 String?
-  status                                                                               String                 @default("ACTIVE")
-  type                                                                                 String                 @default("OPERATING")
-  version                                                                              Int                    @default(1)
-  department_id                                                                        String?
-  max_headcount                                                                        Int?
-  budget_alert_threshold                                                               Decimal?               @default(80) @db.Decimal(5, 2)
-  name                                                                                 String?                @db.VarChar(255)
-  cost_center_allocations_cost_center_allocations_cost_center_idTocost_centers         CostCenterAllocation[] @relation("cost_center_allocations_cost_center_idTocost_centers")
-  cost_center_allocations_cost_center_allocations_primary_cost_center_idTocost_centers CostCenterAllocation[] @relation("cost_center_allocations_primary_cost_center_idTocost_centers")
-  company                                                                              Company?               @relation(fields: [companyId], references: [id])
-  departments                                                                          Department?            @relation(fields: [department_id], references: [id])
-  cost_centers                                                                         CostCenter?            @relation("cost_centersTocost_centers", fields: [parent_id], references: [id])
-  other_cost_centers                                                                   CostCenter[]           @relation("cost_centersTocost_centers")
-  payslip_lines                                                                        PayslipLine[]
-  users                                                                                User[]
-
-  @@unique([companyId, code, version])
-  @@index([companyId, status])
-  @@index([effective_from, effective_to])
-  @@index([parent_id])
-  @@map("cost_centers")
-}
-
-model SalaryComponent {
-  id             String                @id @default(uuid())
-  code           String
-  nameAr         String                @map("name_ar")
-  nameEn         String?               @map("name_en")
-  type           SalaryComponentType
-  nature         SalaryComponentNature @default(FIXED)
-  description    String?
-  gosiEligible   Boolean               @default(false) @map("gosi_eligible")
-  otEligible     Boolean               @default(false) @map("ot_eligible")
-  formula        String?
-  createdAt      DateTime              @default(now()) @map("created_at")
-  updatedAt      DateTime              @updatedAt @map("updated_at")
-  companyId      String?               @map("company_id")
-  decimals       Int                   @default(2)
-  effectiveDate  DateTime              @default(now()) @map("effective_date")
-  endDate        DateTime?             @map("end_date")
-  isActive       Boolean               @default(true) @map("is_active")
-  priority       Int                   @default(100)
-  roundingMode   String                @default("ROUND") @map("rounding_mode")
-  taxable        Boolean               @default(false)
-  version        Int                   @default(1)
-  eosEligible    Boolean               @default(false) @map("eos_eligible")
-  isProrated     Boolean               @default(true) @map("is_prorated")
-  PayslipLine    PayslipLine[]
-  policyRules    PolicyRule[]          @relation("PolicyOutputComponent")
-  company        Company?              @relation(fields: [companyId], references: [id])
-  structureLines SalaryStructureLine[]
-
-  @@unique([companyId, type, code, version])
-  @@index([companyId, isActive])
-  @@index([effectiveDate, endDate])
-  @@map("salary_components")
-}
-
-model SalaryStructure {
-  id            String                     @id @default(uuid())
-  name          String
-  description   String?
-  isActive      Boolean                    @default(true) @map("is_active")
-  createdAt     DateTime                   @default(now()) @map("created_at")
-  updatedAt     DateTime                   @updatedAt @map("updated_at")
-  companyId     String?                    @map("company_id")
-  effectiveDate DateTime                   @default(now()) @map("effective_date")
-  endDate       DateTime?                  @map("end_date")
-  version       Int                        @default(1)
-  assignments   EmployeeSalaryAssignment[]
-  lines         SalaryStructureLine[]
-  company       Company?                   @relation(fields: [companyId], references: [id])
-
-  @@unique([companyId, name, version])
-  @@index([companyId, isActive])
-  @@index([effectiveDate, endDate])
-  @@map("salary_structures")
-}
-
-model SalaryStructureLine {
-  id          String          @id @default(uuid())
-  structureId String          @map("structure_id")
-  componentId String          @map("component_id")
-  amount      Decimal         @default(0) @db.Decimal(10, 2)
-  percentage  Decimal?        @db.Decimal(5, 2)
-  priority    Int             @default(0)
-  component   SalaryComponent @relation(fields: [componentId], references: [id])
-  structure   SalaryStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
-
-  @@map("salary_structure_lines")
-}
-
-model EmployeeSalaryAssignment {
-  id            String          @id @default(uuid())
-  employeeId    String          @map("employee_id")
-  structureId   String          @map("structure_id")
-  baseSalary    Decimal         @map("base_salary") @db.Decimal(10, 2)
-  effectiveDate DateTime        @map("effective_date") @db.Date
-  endDate       DateTime?       @map("end_date") @db.Date
-  isActive      Boolean         @default(true) @map("is_active")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  employee      User            @relation("EmployeeSalaryAssignments", fields: [employeeId], references: [id])
-  structure     SalaryStructure @relation(fields: [structureId], references: [id])
-
-  @@map("employee_salary_assignments")
 }
 
 model PayrollPeriod {
@@ -2208,9 +1971,8 @@ model PayrollPeriod {
   disciplinaryCases  DisciplinaryCase[]
   payrollAdjustments PayrollAdjustment[]
 
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
-  employeeDebtLedgers EmployeeDebtLedger[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([companyId, month, year])
   @@index([companyId, status])
@@ -2532,9 +2294,6 @@ model SmartPolicy {
   // الإجراءات المحللة
   actions Json @default("[]")
 
-  // === Issue #21: AND/OR Logic Support ===
-  conditionLogic String @default("ALL") @map("condition_logic")
-
   // النطاق: لمن تُطبق السياسة
   scopeType String  @default("ALL") @map("scope_type") // ALL, EMPLOYEE, DEPARTMENT, BRANCH, JOB_TITLE
   scopeId   String? @map("scope_id") // معرف الهدف (إن وُجد)
@@ -2545,8 +2304,7 @@ model SmartPolicy {
   isActive Boolean           @default(false) @map("is_active")
 
   // الأولوية (الأعلى تُنفذ أولاً)
-  priority       Int @default(0)
-  executionOrder Int @default(0) @map("execution_order")
+  priority Int @default(0)
 
   // تاريخ الصلاحية
   effectiveFrom DateTime? @map("effective_from")
@@ -2574,15 +2332,6 @@ model SmartPolicy {
 
   // سجل التنفيذات
   executions SmartPolicyExecution[]
-
-  // Restored Relations
-  analytics          SmartPolicyAnalytics[]
-  approvals          SmartPolicyApproval[]
-  exceptions         SmartPolicyException[]
-  occurrenceTrackers SmartPolicyOccurrenceTracker[]
-  retroApplications  SmartPolicyRetroApplication[]
-  versions           SmartPolicyVersion[]
-  simulationRuns     PolicySimulationRun[]
 
   @@index([companyId, status, isActive])
   @@index([companyId, triggerEvent])
@@ -2627,156 +2376,6 @@ model SmartPolicyExecution {
   @@index([employeeId, executedAt])
   @@index([triggerEvent])
   @@map("smart_policy_executions")
-}
-
-model SmartPolicyAnalytics {
-  id               String      @id @default(uuid())
-  policyId         String      @map("policy_id")
-  totalTriggered   Int         @default(0) @map("total_triggered")
-  conditionsMet    Int         @default(0) @map("conditions_met")
-  totalAdditions   Decimal     @default(0) @map("total_additions") @db.Decimal(12, 2)
-  totalDeductions  Decimal     @default(0) @map("total_deductions") @db.Decimal(12, 2)
-  lastCalculated   DateTime    @default(now()) @map("last_calculated")
-  totalEmployees   Int         @default(0) @map("total_employees")
-  avgExecutionTime Int?        @map("avg_execution_time")
-  smartPolicy      SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-
-  @@map("smart_policy_analytics")
-}
-
-model SmartPolicyApproval {
-  id             String                @id @default(uuid())
-  policyId       String                @map("policy_id")
-  requestedBy    String?               @map("requested_by")
-  requestedAt    DateTime              @default(now()) @map("requested_at")
-  status         SmartPolicyStatus     @default(PENDING)
-  approvedBy     String?               @map("approved_by")
-  actionAt       DateTime?             @map("action_at")
-  action         PolicyApprovalAction?
-  comments       String?
-  proposedChange Json?                 @map("proposed_change")
-  smartPolicy    SmartPolicy           @relation(fields: [policyId], references: [id], onDelete: Cascade)
-
-  @@map("smart_policy_approvals")
-}
-
-model SmartPolicyException {
-  id              String      @id @default(uuid())
-  policyId        String      @map("policy_id")
-  employeeId      String      @map("employee_id")
-  companyId       String      @map("company_id")
-  exceptionReason String?     @map("exception_reason")
-  startDate       DateTime?   @map("start_date")
-  endDate         DateTime?   @map("end_date")
-  createdBy       String      @map("created_by")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  smartPolicy     SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user            User        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([policyId, employeeId])
-  @@map("smart_policy_exceptions")
-}
-
-model SmartPolicyOccurrenceTracker {
-  id               String                @id @default(uuid())
-  policyId         String                @map("policy_id")
-  employeeId       String                @map("employee_id")
-  occurrenceCount  Int                   @default(0) @map("occurrence_count")
-  lastOccurrence   DateTime?             @map("last_occurrence")
-  resetPeriod      OccurrenceResetPeriod @default(NEVER) @map("reset_period")
-  nextResetDate    DateTime?             @map("next_reset_date")
-  totalImpactValue Decimal               @default(0) @map("total_impact_value") @db.Decimal(12, 2)
-  companyId        String                @map("company_id")
-  smartPolicy      SmartPolicy           @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  company          Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user             User                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@unique([policyId, employeeId])
-  @@map("smart_policy_occurrence_trackers")
-}
-
-model SmartPolicyRetroApplication {
-  id             String                 @id @default(uuid())
-  policyId       String                 @map("policy_id")
-  employeeId     String                 @map("employee_id")
-  period         String                 @map("period")
-  status         RetroApplicationStatus @default(PENDING)
-  originalAmount Decimal                @map("original_amount") @db.Decimal(12, 2)
-  newAmount      Decimal                @map("new_amount") @db.Decimal(12, 2)
-  difference     Decimal                @db.Decimal(12, 2)
-  appliedBy      String?                @map("applied_by")
-  appliedAt      DateTime?              @map("applied_at")
-  companyId      String                 @map("company_id")
-  smartPolicy    SmartPolicy            @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  company        Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user           User                   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([policyId, period])
-  @@map("smart_policy_retro_applications")
-}
-
-model SmartPolicyTemplate {
-  id               String              @id
-  name             String?             @map("name")
-  nameEn           String?             @map("name_en")
-  triggerEvent     SmartPolicyTrigger? @map("trigger_event")
-  category         String
-  description      String?             @map("description") @db.Text
-  originalText     String?             @map("original_text") @db.Text
-  parsedRule       Json?               @map("parsed_rule")
-  recommendedFor   String?             @map("recommended_for")
-  legalCompliance  Json?               @map("legal_compliance")
-  laborLawArticles Json?               @map("labor_law_articles")
-  isPublic         Boolean             @default(true) @map("is_public")
-  rating           Decimal?            @default(0) @db.Decimal(3, 1)
-  ratingCount      Int                 @default(0) @map("rating_count")
-  usageCount       Int                 @default(0) @map("usage_count")
-  isActive         Boolean             @default(true) @map("is_active")
-  isSystemTemplate Boolean             @default(false) @map("is_system_template")
-  companyId        String?             @map("company_id")
-  company          Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt        DateTime            @default(now()) @map("created_at")
-
-  @@map("smart_policy_templates")
-}
-
-model SmartPolicyVersion {
-  id            String      @id @default(uuid())
-  policyId      String      @map("policy_id")
-  versionNumber Int         @map("version_number")
-  ruleSnapshot  Json        @map("rule_snapshot")
-  createdBy     String      @map("created_by")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  changeLog     String?     @map("change_log")
-  smartPolicy   SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-
-  @@unique([policyId, versionNumber])
-  @@map("smart_policy_versions")
-}
-
-model PolicySimulationRun {
-  id                     String      @id @default(uuid())
-  policyId               String      @map("policy_id")
-  simulatedBy            String      @map("simulated_by")
-  simulatedByName        String      @map("simulated_by_name")
-  simulationPeriod       String      @map("simulation_period")
-  totalEmployeesAffected Int         @map("total_employees_affected")
-  totalAdditions         Decimal     @default(0) @map("total_additions") @db.Decimal(12, 2)
-  totalDeductions        Decimal     @default(0) @map("total_deductions") @db.Decimal(12, 2)
-  results                Json        @default("[]")
-  executionTimeMs        Int?        @map("execution_time_ms")
-  warningsCount          Int         @default(0) @map("warnings_count")
-  warnings               Json?       @default("[]")
-  createdAt              DateTime    @default(now()) @map("created_at")
-  startDate              DateTime?   @default(now()) @map("start_date") @db.Timestamp(6)
-  endDate                DateTime?   @default(now()) @map("end_date") @db.Timestamp(6)
-  companyId              String?     @map("company_id")
-  smartPolicy            SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  company                Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([policyId, createdAt])
-  @@map("policy_simulation_runs")
 }
 
 // ==================== Government Compliance Tracking ====================
@@ -3826,16 +3425,11 @@ enum TaskPriority {
 
 // حالة المهمة العامة
 enum TaskStatus {
-  BACKLOG
   TODO
   IN_PROGRESS
   IN_REVIEW
-  BLOCKED
-  COMPLETED
+  DONE
   CANCELLED
-  PENDING_REVIEW
-  APPROVED
-  REJECTED
 }
 
 // حالة المهمة
@@ -4044,27 +3638,9 @@ model AbsencePattern {
   @@map("absence_patterns")
 }
 
-// ==================== إعدادات التوطين (Saudization Config) ====================
+saudizationTargets      SaudizationTarget[]
 
-model SaudizationConfig {
-  id        String  @id @default(uuid())
-  companyId String  @unique @map("company_id")
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  // إعدادات نطاقات
-  activityType String? @map("activity_type") // نوع النشاط التجاري لتحديد نسب التوطين
-  nitaqatSize  String? @map("nitaqat_size") // حجم المنشأة في نظام نطاقات
-
-  // العلاقات
-  saudizationRecords     SaudizationRecord[]
-  saudizationTargets     SaudizationTarget[]
-  departmentSaudizations DepartmentSaudization[]
-  nitaqatAlerts          NitaqatAlert[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("saudization_configs")
+@@map("saudization_configs")
 }
 
 model SaudizationRecord {
@@ -5112,358 +4688,654 @@ model ProjectActivity {
   @@map("project_activities")
 }
 
-// ==================== مهام ومشاريع (Tasks & Projects) ====================
-
-model Task {
-  id                String              @id @default(uuid())
-  companyId         String              @map("company_id")
-  company           Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  title             String
-  description       String?             @db.Text
-  status            TaskStatus          @default(TODO)
-  priority          TaskPriority        @default(MEDIUM)
-  categoryId        String?             @map("category_id")
-  category          TaskCategory?       @relation(fields: [categoryId], references: [id])
-  templateId        String?             @map("template_id")
-  template          TaskTemplate?       @relation(fields: [templateId], references: [id])
-  dueDate           DateTime?           @map("due_date")
-  startDate         DateTime?           @map("start_date")
-  completedAt       DateTime?           @map("completed_at")
-  createdById       String              @map("created_by_id")
-  createdBy         User                @relation("tasks_created_by_idTousers", fields: [createdById], references: [id])
-  assigneeId        String?             @map("assignee_id")
-  assignee          User?               @relation("tasks_assignee_idTousers", fields: [assigneeId], references: [id])
-  recurrenceType    TaskRecurrenceType? @map("recurrence_type")
-  recurrenceEnd     DateTime?           @map("recurrence_end")
-  parentTaskId      String?             @map("parent_task_id")
-  parentTask        Task?               @relation("TaskToTask", fields: [parentTaskId], references: [id])
-  subTasks          Task[]              @relation("TaskToTask")
-  progress          Int                 @default(0)
-  tags              String[]            @default([])
-  customFields      Json?               @map("custom_fields")
-  order             Int                 @default(0)
-  createdAt         DateTime            @default(now()) @map("created_at")
-  updatedAt         DateTime            @updatedAt @map("updated_at")
-  approvedAt        DateTime?           @map("approved_at")
-  approverId        String?             @map("approver_id")
-  approver          User?               @relation("tasks_approver_idTousers", fields: [approverId], references: [id])
-  reviewerId        String?             @map("reviewer_id")
-  reviewer          User?               @relation("tasks_reviewer_idTousers", fields: [reviewerId], references: [id])
-  reviewedAt        DateTime?           @map("reviewed_at")
-  reviewRequestedAt DateTime?           @map("review_requested_at")
-  isEscalated       Boolean             @default(false) @map("is_escalated")
-  escalatedAt       DateTime?           @map("escalated_at")
-  rejectedAt        DateTime?           @map("rejected_at")
-  rejectionReason   String?             @map("rejection_reason")
-  slaHours          Int?                @map("sla_hours")
-
-  // Relations
-  activityLogs TaskActivityLog[]
-  approvals    TaskApproval[]
-  assignments  TaskAssignment[]
-  attachments  TaskAttachment[]
-  checklists   TaskChecklist[]
-  comments     TaskComment[]
-  evidences    TaskEvidence[]
-  timeLogs     TaskTimeLog[]
-  watchers     TaskWatcher[]
-  sprintId     String?           @map("sprint_id")
-  sprint       Sprint?           @relation(fields: [sprintId], references: [id])
-  projectId    String?           @map("project_id")
-  project      Project?          @relation("ProjectTasks", fields: [projectId], references: [id])
-
-  // Dependencies
-  blockedTasks  TaskDependency[] @relation("BlockedTask")
-  blockingTasks TaskDependency[] @relation("BlockingTask")
-
-  @@index([companyId, assigneeId])
-  @@index([companyId, categoryId])
-  @@index([companyId, createdById])
-  @@index([companyId, dueDate])
-  @@index([companyId, status])
-  @@map("tasks")
+enum WorkDayCalculationBase {
+  CALENDAR_DAYS
+  ACTUAL_WORKING_DAYS
+  FIXED_30_DAYS
 }
 
-model TaskCategory {
-  id          String           @id @default(uuid())
-  companyId   String           @map("company_id")
-  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name        String
-  nameEn      String?          @map("name_en")
-  color       String           @default("#3B82F6")
-  icon        String?
-  order       Int              @default(0)
-  isActive    Boolean          @default(true) @map("is_active")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
-  tasks       Task[]
-  automations TaskAutomation[]
-  templates   TaskTemplate[]
-
-  @@unique([companyId, name])
-  @@index([companyId, isActive])
-  @@map("task_categories")
+enum HireTerminationMethod {
+  EXCLUDE_WEEKENDS
+  INCLUDE_ALL_DAYS
+  PRORATE_BY_CALENDAR
 }
 
-model TaskTemplate {
-  id                String        @id @default(uuid())
-  companyId         String        @map("company_id")
-  company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name              String
-  nameEn            String?       @map("name_en")
-  description       String?       @db.Text
-  categoryId        String?       @map("category_id")
-  category          TaskCategory? @relation(fields: [categoryId], references: [id])
-  defaultPriority   TaskPriority  @default(MEDIUM) @map("default_priority")
-  defaultDueDays    Int?          @map("default_due_days")
-  checklistTemplate Json?         @map("checklist_template")
-  workflowType      String?       @map("workflow_type")
-  isActive          Boolean       @default(true) @map("is_active")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  tasks             Task[]
-
-  @@unique([companyId, name])
-  @@index([companyId, isActive])
-  @@map("task_templates")
+enum UnpaidLeaveMethod {
+  BASED_ON_SHIFTS
+  BASED_ON_CALENDAR
+  BASED_ON_WORKING_DAYS
 }
 
-model Sprint {
-  id              String       @id @default(uuid())
-  companyId       String       @map("company_id")
-  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name            String
-  goal            String?      @db.Text
-  description     String?      @db.Text
-  status          SprintStatus @default(PLANNING)
-  startDate       DateTime?    @map("start_date")
-  endDate         DateTime?    @map("end_date")
-  startedAt       DateTime?    @map("started_at")
-  completedAt     DateTime?    @map("completed_at")
-  plannedPoints   Int          @default(0) @map("planned_points")
-  completedPoints Int          @default(0) @map("completed_points")
-  velocity        Float?
-  createdById     String       @map("created_by_id")
-  createdBy       User         @relation("SprintCreator", fields: [createdById], references: [id])
-  tasks           Task[]
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-
-  @@index([companyId, startDate])
-  @@index([companyId, status])
-  @@map("sprints")
+enum OvertimeCalculationMethod {
+  BASED_ON_SHIFTS
+  BASED_ON_BASIC_ONLY
+  BASED_ON_TOTAL
+  BASED_ON_ELIGIBLE_COMPONENTS
 }
 
-model TaskAssignment {
-  id           String   @id @default(uuid())
-  taskId       String   @map("task_id")
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId       String   @map("user_id")
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignedAt   DateTime @default(now()) @map("assigned_at")
-  assignedById String?  @map("assigned_by_id")
-
-  @@unique([taskId, userId])
-  @@map("task_assignments")
+enum LeaveAllowanceMethod {
+  BASIC_SALARY
+  BASIC_PLUS_HOUSING
+  TOTAL_SALARY
 }
 
-model TaskWatcher {
-  id            String   @id @default(uuid())
-  taskId        String   @map("task_id")
-  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId        String   @map("user_id")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  watchingSince DateTime @default(now()) @map("watching_since")
-
-  @@unique([taskId, userId])
-  @@map("task_watchers")
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  HR
 }
 
-model TaskComment {
-  id        String        @id @default(uuid())
-  taskId    String        @map("task_id")
-  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  authorId  String        @map("author_id")
-  author    User          @relation(fields: [authorId], references: [id])
-  content   String        @db.Text
-  mentions  String[]      @default([])
-  isEdited  Boolean       @default(false) @map("is_edited")
-  editedAt  DateTime?     @map("edited_at")
-  parentId  String?       @map("parent_id")
-  parent    TaskComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   TaskComment[] @relation("CommentReplies")
-  createdAt DateTime      @default(now()) @map("created_at")
-  updatedAt DateTime      @updatedAt @map("updated_at")
-
-  @@index([authorId])
-  @@index([parentId])
-  @@index([taskId])
-  @@map("task_comments")
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
 
-model TaskActivityLog {
-  id          String   @id @default(uuid())
-  taskId      String   @map("task_id")
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id])
-  action      String // STATUS_CHANGE, ASSIGNEE_CHANGE, etc.
-  oldValue    String?  @map("old_value")
-  newValue    String?  @map("new_value")
-  description String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@index([taskId])
-  @@index([userId])
-  @@map("task_activity_logs")
+enum ContractType {
+  PERMANENT
+  FIXED_TERM
+  PART_TIME
+  SEASONAL
+  PROBATION
 }
 
-model TaskEvidence {
-  id                  String             @id @default(uuid())
-  taskId              String             @map("task_id")
-  task                Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  submittedById       String             @map("submitted_by_id")
-  submittedBy         User               @relation("task_evidences_submitted_by_idTousers", fields: [submittedById], references: [id])
-  description         String?            @db.Text
-  fileUrl             String?            @map("file_url")
-  fileName            String?            @map("file_name")
-  fileType            String?            @map("file_type")
-  fileSize            Int?               @map("file_size")
-  latitude            Float?
-  longitude           Float?
-  locationName        String?            @map("location_name")
-  status              TaskEvidenceStatus @default(PENDING)
-  verifiedById        String?            @map("verified_by_id")
-  verifiedBy          User?              @relation("task_evidences_verified_by_idTousers", fields: [verifiedById], references: [id])
-  verifiedAt          DateTime?          @map("verified_at")
-  verificationComment String?            @map("verification_comment") @db.Text
-  createdAt           DateTime           @default(now()) @map("created_at")
-
-  @@index([submittedById])
-  @@index([taskId])
-  @@map("task_evidences")
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+  SUSPENDED
+  DRAFT
+  PENDING_EMPLOYEE
+  PENDING_EMPLOYER
+  PENDING_QIWA
+  REJECTED
 }
 
-model TaskTimeLog {
-  id          String    @id @default(uuid())
-  taskId      String    @map("task_id")
-  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId      String    @map("user_id")
-  user        User      @relation(fields: [userId], references: [id])
-  startTime   DateTime  @map("start_time")
-  endTime     DateTime? @map("end_time")
-  duration    Int? // in seconds
-  description String?   @db.Text
-  isBillable  Boolean   @default(false) @map("is_billable")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  @@index([taskId])
-  @@index([userId])
-  @@map("task_time_logs")
+enum QiwaAuthStatus {
+  NOT_SUBMITTED
+  PENDING
+  AUTHENTICATED
+  REJECTED
+  EXPIRED
 }
 
-model TaskDependency {
-  id             String         @id @default(uuid())
-  blockedTaskId  String         @map("blocked_task_id")
-  blockedTask    Task           @relation("BlockedTask", fields: [blockedTaskId], references: [id], onDelete: Cascade)
-  blockingTaskId String         @map("blocking_task_id")
-  blockingTask   Task           @relation("BlockingTask", fields: [blockingTaskId], references: [id], onDelete: Cascade)
-  type           DependencyType @default(BLOCKS)
-  createdAt      DateTime       @default(now()) @map("created_at")
-
-  @@unique([blockedTaskId, blockingTaskId])
-  @@map("task_dependencies")
+enum DeviceStatus {
+  ACTIVE
+  PENDING
+  BLOCKED
+  INACTIVE
 }
 
-model TaskChecklist {
-  id        String              @id @default(uuid())
-  taskId    String              @map("task_id")
-  task      Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  title     String
-  order     Int                 @default(0)
-  items     TaskChecklistItem[]
-  createdAt DateTime            @default(now()) @map("created_at")
-  updatedAt DateTime            @updatedAt @map("updated_at")
-
-  @@index([taskId])
-  @@map("task_checklists")
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+  UNKNOWN
 }
 
-model TaskChecklistItem {
-  id            String        @id @default(uuid())
-  checklistId   String        @map("checklist_id")
-  checklist     TaskChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
-  content       String        @db.Text
-  isCompleted   Boolean       @default(false) @map("is_completed")
-  order         Int           @default(0)
-  completedAt   DateTime?     @map("completed_at")
-  completedById String?       @map("completed_by_id")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-
-  @@index([checklistId])
-  @@map("task_checklist_items")
+enum UpdateRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
-model TaskAutomation {
-  id            String            @id @default(uuid())
-  companyId     String            @map("company_id")
-  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdById   String            @map("created_by_id")
-  createdBy     User              @relation(fields: [createdById], references: [id])
-  name          String
-  description   String?           @db.Text
-  isActive      Boolean           @default(true) @map("is_active")
-  trigger       AutomationTrigger
-  triggerConfig Json?             @map("trigger_config")
-  action        AutomationAction
-  actionConfig  Json?             @map("action_config")
-  categoryId    String?           @map("category_id")
-  category      TaskCategory?     @relation(fields: [categoryId], references: [id])
-  priority      TaskPriority?
-  lastRunAt     DateTime?         @map("last_run_at")
-  run_count     Int               @default(0) @map("run_count")
-  createdAt     DateTime          @default(now()) @map("created_at")
-  updatedAt     DateTime          @updatedAt @map("updated_at")
-
-  @@index([companyId])
-  @@index([isActive])
-  @@map("task_automations")
+enum UpdateRequestType {
+  FACE_UPDATE
+  DEVICE_UPDATE
+  BOTH
+  DEVICE_CHANGE
+  PROFILE_UPDATE
 }
 
-model TaskAttachment {
-  id           String   @id @default(uuid())
-  taskId       String   @map("task_id")
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploadedById String   @map("uploaded_by_id")
-  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
-  fileName     String   @map("file_name")
-  fileSize     Int      @map("file_size")
-  mimeType     String   @map("mime_type")
-  storagePath  String   @map("storage_path")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  @@index([taskId])
-  @@map("task_attachments")
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  EARLY_LEAVE
+  ABSENT
+  ON_LEAVE
+  WORK_FROM_HOME
+  LATE_AND_EARLY
+  HOLIDAY
 }
 
-model TaskApproval {
-  id        String             @id @default(uuid())
-  taskId    String             @map("task_id")
-  task      Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId    String             @map("user_id")
-  user      User               @relation(fields: [userId], references: [id])
-  action    TaskApprovalAction
-  comment   String?            @db.Text
-  createdAt DateTime           @default(now()) @map("created_at")
-
-  @@index([taskId])
-  @@index([userId])
-  @@map("task_approvals")
+enum CheckType {
+  CHECK_IN
+  CHECK_OUT
 }
 
-// ==================== Enums (Restored) ====================
+enum LeaveCategory {
+  BALANCED
+  CASUAL
+  SICK
+  UNPAID
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  PERSONAL
+  EMERGENCY
+  NEW_BABY
+  MARRIAGE
+  BEREAVEMENT
+  HAJJ
+  EXAM
+  WORK_MISSION
+  UNPAID
+  EARLY_LEAVE
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  MODIFIED
+  MGR_APPROVED
+  MGR_REJECTED
+  DELAYED
+}
+
+enum ApprovalStep {
+  MANAGER
+  HR
+  COMPLETED
+  FINANCE
+  CEO
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  DELAYED
+}
+
+enum LetterType {
+  SALARY_DEFINITION
+  SERVICE_CONFIRMATION
+  SALARY_ADJUSTMENT
+  PROMOTION
+  TRANSFER_ASSIGNMENT
+  RESIGNATION
+  TERMINATION
+  CLEARANCE
+  EXPERIENCE
+  SALARY_DEFINITION_DIRECTED
+  NOC
+  DELEGATION
+}
+
+enum LetterStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  MGR_APPROVED
+  MGR_REJECTED
+  DELAYED
+}
+
+enum NotificationType {
+  LATE_CHECK_IN
+  EARLY_CHECK_OUT
+  EARLY_CHECK_IN
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  SUSPICIOUS_ACTIVITY
+  GENERAL
+  LETTER_APPROVED
+  LETTER_REJECTED
+  DISC_CASE_SUBMITTED
+  DISC_HR_REJECTED
+  DISC_INFORMAL_SENT
+  DISC_EMP_REJECTED_INFORMAL
+  DISC_HEARING_SCHEDULED
+  DISC_DECISION_ISSUED
+  DISC_EMP_OBJECTED
+  DISC_FINALIZED
+  EMP_EXIT_GEOFENCE
+  EMP_RETURN_GEOFENCE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  SETTINGS_CHANGE
+  EXPORT
+  IMPORT
+}
+
+enum HolidayApplicationType {
+  ALL
+  BRANCH
+  DEPARTMENT
+  SPECIFIC_EMPLOYEES
+  EXCLUDE_EMPLOYEES
+}
+
+enum PermissionScope {
+  SELF
+  TEAM
+  BRANCH
+  DEPARTMENT
+  ALL
+  CUSTOM
+}
+
+enum PermissionAuditAction {
+  ADDED
+  REMOVED
+  MODIFIED
+}
+
+enum RaiseType {
+  SALARY_INCREASE
+  ANNUAL_LEAVE_BONUS
+  BUSINESS_TRIP
+  BONUS
+  ALLOWANCE
+  OTHER
+}
+
+enum RaiseStatus {
+  PENDING
+  MGR_APPROVED
+  MGR_REJECTED
+  APPROVED
+  REJECTED
+  DELAYED
+  CANCELLED
+}
+
+enum AdvanceType {
+  BANK_TRANSFER
+  CASH
+}
+
+enum SalaryComponentType {
+  EARNING
+  DEDUCTION
+}
+
+enum SalaryComponentNature {
+  FIXED
+  VARIABLE
+  FORMULA
+}
+
+enum PayrollFrequency {
+  WEEKLY
+  BI_WEEKLY
+  MONTHLY
+  OTHER
+}
+
+enum PayrollStatus {
+  DRAFT
+  INPUTS_COLLECTED
+  CALCULATED
+  HR_REVIEWED
+  FINANCE_APPROVED
+  LOCKED
+  PAID
+  CANCELLED
+  ARCHIVED
+}
+
+enum PayslipLineSource {
+  STRUCTURE
+  POLICY
+  MANUAL
+  ADJUSTMENT
+  STATUTORY
+  SMART
+  SYSTEM
+}
+
+enum RetroPayStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum PolicyType {
+  OVERTIME
+  LEAVE
+  DEDUCTION
+  ALLOWANCE
+  ATTENDANCE
+  GENERAL
+}
+
+enum PolicyScope {
+  COMPANY
+  BRANCH
+  DEPARTMENT
+  JOB_TITLE
+  EMPLOYEE
+}
+
+enum OutputSign {
+  EARNING
+  DEDUCTION
+}
+
+enum SmartPolicyTrigger {
+  ATTENDANCE
+  LEAVE
+  CUSTODY
+  PAYROLL
+  ANNIVERSARY
+  CONTRACT
+  DISCIPLINARY
+  PERFORMANCE
+  CUSTOM
+}
+
+enum SmartPolicyStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum SmartPolicyActionType {
+  ADD_TO_PAYROLL
+  DEDUCT_FROM_PAYROLL
+  SEND_NOTIFICATION
+  ALERT_HR
+  CREATE_RECORD
+}
+
+enum PolicyApprovalAction {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum OccurrenceResetPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  NEVER
+}
+
+enum RetroApplicationStatus {
+  PENDING
+  CALCULATING
+  REVIEWED
+  APPROVED
+  APPLIED
+  CANCELLED
+}
+
+enum MudadStatus {
+  PENDING
+  PREPARED
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  RESUBMITTED
+  RESUBMIT_REQUIRED
+}
+
+enum WpsStatus {
+  GENERATED
+  DOWNLOADED
+  SUBMITTED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum AuditModule {
+  AUTH
+  USER
+  PAYROLL
+  PAYSLIP
+  BANK_ACCOUNT
+  SALARY
+  LEAVE
+  ATTENDANCE
+  ADVANCE
+  GOSI
+  EOS
+  PERMISSION
+  POLICY
+  RETRO_PAY
+  LETTER
+  SETTINGS
+  MUDAD
+  WPS
+  CONTRACT
+  DISCIPLINARY
+}
+
+enum DisciplinaryStage {
+  MANAGER_REQUEST
+  HR_INITIAL_REVIEW
+  EMPLOYEE_INFORMAL_RESPONSE
+  OFFICIAL_INVESTIGATION
+  DECISION
+  OBJECTION
+  FINAL
+}
+
+enum DisciplinaryStatus {
+  SUBMITTED_TO_HR
+  HR_REJECTED
+  HR_INFORMAL_SENT
+  AWAITING_EMPLOYEE_INFORMAL
+  EMPLOYEE_REJECTED_INFORMAL
+  OFFICIAL_INVESTIGATION_OPENED
+  HEARING_SCHEDULED
+  INVESTIGATION_IN_PROGRESS
+  AWAITING_HR_DECISION
+  DECISION_ISSUED
+  AWAITING_EMPLOYEE_ACK
+  EMPLOYEE_OBJECTED
+  HR_REVIEWING_OBJECTION
+  FINALIZED_APPROVED
+  FINALIZED_CANCELLED
+  FINALIZED_CONTINUE_INVESTIGATION
+}
+
+enum DecisionType {
+  NO_VIOLATION
+  NOTICE
+  WARNING
+  FIRST_WARNING
+  SECOND_WARNING
+  FINAL_WARNING_TERMINATION
+  FINAL_TERMINATION_ART80
+  PROMOTION_DELAY
+  SALARY_DEDUCTION
+  SUSPENSION_WITH_PAY
+  SUSPENSION_WITHOUT_PAY
+}
+
+enum PayrollAdjustmentStatus {
+  PENDING
+  POSTED
+  REVERSED
+  CANCELLED
+}
+
+enum AdjustmentUnit {
+  DAYS
+  HOURS
+  AMOUNT
+}
+
+enum CaseEventType {
+  CASE_CREATED
+  HR_INITIAL_REVIEW
+  INFORMAL_ACTION_SENT
+  EMPLOYEE_INFORMAL_RESPONSE
+  OFFICIAL_INVESTIGATION_OPENED
+  HEARING_SCHEDULED
+  MINUTES_UPLOADED
+  DECISION_ISSUED
+  EMPLOYEE_ACKNOWLEDGED
+  EMPLOYEE_OBJECTED
+  OBJECTION_REVIEWED
+  FINALIZED
+  CANCELLED
+}
+
+enum DeductionBasePolicy {
+  BASIC_ONLY
+  BASIC_FIXED
+  GROSS
+}
+
+enum SubmissionEntityType {
+  MUDAD
+  WPS
+  QIWA
+}
+
+enum ApprovalRequestType {
+  LEAVE
+  ADVANCE
+  RAISE
+  PAYROLL
+  WPS
+}
+
+enum CustodyItemStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_MAINTENANCE
+  LOST
+  DAMAGED
+  DISPOSED
+  RESERVED
+}
+
+enum CustodyCondition {
+  NEW
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum CustodyAssignmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELIVERED
+  RETURNED
+  TRANSFERRED
+}
+
+enum CustodyReturnStatus {
+  PENDING
+  INSPECTING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum CustodyTransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum CustodyMaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANNOT_REPAIR
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  EMERGENCY
+}
+
+enum DocumentType {
+  ID_CARD
+  IQAMA
+  PASSPORT
+  CONTRACT
+  CERTIFICATE
+  MEDICAL
+  BANK_LETTER
+  DRIVING_LICENSE
+  QUALIFICATION
+  OTHER
+}
+
+enum ProficiencyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum OnboardingType {
+  JOINING
+  OFFBOARDING
+  RETURN
+}
+
+enum AssigneeType {
+  HR
+  IT
+  MANAGER
+  FINANCE
+  EMPLOYEE
+}
+
+enum OnboardingProcessStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum OnboardingTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  COMPLETED
+  CANCELLED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum TaskPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
 
 enum TaskRecurrenceType {
   DAILY
@@ -5537,25 +5409,19 @@ enum PerformanceReviewCycleStatus {
   DRAFT
   PLANNING
   ACTIVE
-  SELF_REVIEW
-  MANAGER_REVIEW
   CALIBRATION
   COMPLETED
-  CANCELLED
+  ARCHIVED
 }
 
 enum PerformanceReviewStatus {
   NOT_STARTED
-  PENDING
   SELF_REVIEW
-  SELF_REVIEW_PENDING
-  SELF_REVIEW_COMPLETED
   MANAGER_REVIEW
-  MANAGER_REVIEW_PENDING
-  MANAGER_REVIEW_COMPLETED
+  FEEDBACK_COLLECTION
   CALIBRATION
+  ACKNOWLEDGED
   COMPLETED
-  CANCELLED
 }
 
 enum GoalType {
@@ -5570,14 +5436,13 @@ enum GoalStatus {
   DRAFT
   PENDING_APPROVAL
   APPROVED
-  ACTIVE
   IN_PROGRESS
-  ON_TRACK
   AT_RISK
+  BEHIND
+  ON_TRACK
   EXCEEDED
   COMPLETED
   CANCELLED
-  ON_HOLD
 }
 
 enum GoalDataSource {
@@ -5616,12 +5481,6 @@ enum RecognitionType {
   AWARD
   ACHIEVEMENT
   SPOT_BONUS
-  PEER_TO_PEER
-  MANAGER_TO_EMPLOYEE
-  ANNIVERSARY
-  BIRTHDAY
-  PROJECT_COMPLETION
-  TOP_PERFORMER
 }
 
 enum DevelopmentGoalStatus {
@@ -6063,9 +5922,6 @@ enum DebtStatus {
   SETTLED // تم تسويته بالكامل
   WRITTEN_OFF // تم شطبه
   SUSPENDED // معلق مؤقتاً
-  PENDING
-  PAID
-  CANCELLED
 }
 
 enum DebtSourceType {
@@ -6075,9 +5931,6 @@ enum DebtSourceType {
   PENALTY // غرامة
   OVERPAYMENT_CORRECTION // تصحيح دفع زائد
   OTHER // أخرى
-  ADVANCE
-  CUSTODY
-  PAYROLL_OVERPAYMENT
 }
 
 enum DebtTransactionType {
@@ -6087,918 +5940,4 @@ enum DebtTransactionType {
   ADJUSTMENT // تعديل
   WRITE_OFF // شطب
   REVERSAL // عكس عملية سابقة
-  CREATION
-  PAYMENT
-  CANCELLATION
-}
-
-// ==================== نظام اكتشاف إيقاف التطبيق/الهاتف ====================
-
-enum OfflineEventType {
-  PHONE_OFF // الهاتف مغلق
-  APP_CLOSED // التطبيق مغلق
-  NO_SIGNAL // فقدان الإشارة
-  APP_UNINSTALLED // التطبيق محذوف (مفترض بعد timeout طويل)
-}
-
-model EmployeeOfflineEvent {
-  id        String @id @default(uuid())
-  userId    String @map("user_id")
-  companyId String @map("company_id")
-
-  // نوع الحدث
-  eventType OfflineEventType @map("event_type")
-
-  // وقت البداية والنهاية
-  startedAt DateTime  @map("started_at")
-  endedAt   DateTime? @map("ended_at")
-
-  // مدة الانقطاع (بالدقائق)
-  durationMinutes Int? @map("duration_minutes")
-
-  // آخر موقع معروف قبل الانقطاع
-  lastLatitude  Decimal? @map("last_latitude") @db.Decimal(10, 8)
-  lastLongitude Decimal? @map("last_longitude") @db.Decimal(11, 8)
-
-  // هل تم الإشعار؟
-  notified   Boolean   @default(false)
-  notifiedAt DateTime? @map("notified_at")
-
-  // هل الموظف عاد للاتصال؟
-  isResolved Boolean @default(false) @map("is_resolved")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([companyId, startedAt])
-  @@index([userId, isResolved])
-  @@index([companyId, isResolved, notified])
-  @@map("employee_offline_events")
-}
-
-enum HolidayApplicationType {
-  ALL
-  SAUDI_ONLY
-  NON_SAUDI_ONLY
-  SPECIFIC_BRANCH
-  SPECIFIC_DEPT
-  SPECIFIC_JOB_TITLE
-  BRANCH
-  DEPARTMENT
-  SPECIFIC_EMPLOYEES
-  EXCLUDE_EMPLOYEES
-}
-
-enum OccurrenceResetPeriod {
-  MONTHLY
-  QUARTERLY
-  SEMI_ANNUAL
-  ANNUAL
-  NEVER
-  YEARLY
-  DAILY
-  WEEKLY
-}
-
-enum RetroApplicationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  APPLIED
-  CANCELLED
-  CALCULATING
-  REVIEWED
-}
-
-enum PolicyApprovalAction {
-  APPROVE
-  REJECT
-  REQUEST_CHANGES
-  SUBMITTED
-  APPROVED
-  REJECTED
-  CHANGES_REQUESTED
-}
-
-enum SalaryComponentType {
-  EARNING
-  DEDUCTION
-}
-
-enum SalaryComponentNature {
-  FIXED
-  VARIABLE
-  FORMULA
-}
-
-enum PayrollFrequency {
-  MONTHLY
-  WEEKLY
-  BIWEEKLY
-  DAILY
-}
-
-enum PayrollStatus {
-  DRAFT
-  INPUTS_COLLECTED
-  CALCULATED
-  HR_REVIEWED
-  FINANCE_APPROVED
-  LOCKED
-  PAID
-  CANCELLED
-  ARCHIVED
-}
-
-// ==================== Missing Production Models ====================
-
-model CostCenterAllocation {
-  id                  String    @id @default(uuid())
-  companyId           String?   @map("company_id")
-  userId              String    @map("user_id")
-  costCenterId        String    @map("cost_center_id")
-  primaryCostCenterId String?   @map("primary_cost_center_id")
-  percentage          Decimal   @db.Decimal(5, 2)
-  effectiveFrom       DateTime  @default(now()) @map("effective_from")
-  effectiveTo         DateTime? @map("effective_to")
-  allocationType      String    @default("POSITION") @map("allocation_type")
-  reason              String?
-  isActive            Boolean   @default(true) @map("is_active")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  company           Company?    @relation(fields: [companyId], references: [id])
-  costCenter        CostCenter  @relation("cost_center_allocations_cost_center_idTocost_centers", fields: [costCenterId], references: [id])
-  primaryCostCenter CostCenter? @relation("cost_center_allocations_primary_cost_center_idTocost_centers", fields: [primaryCostCenterId], references: [id])
-  user              User        @relation(fields: [userId], references: [id])
-
-  @@unique([userId, costCenterId, effectiveFrom])
-  @@index([costCenterId])
-  @@index([effectiveFrom, effectiveTo])
-  @@index([userId, isActive])
-  @@map("cost_center_allocations")
-}
-
-model Goal {
-  id                   String          @id @default(uuid())
-  companyId            String          @map("company_id")
-  ownerId              String          @map("owner_id")
-  managerId            String?         @map("manager_id")
-  type                 GoalType        @default(INDIVIDUAL)
-  status               GoalStatus      @default(DRAFT)
-  title                String
-  titleEn              String?         @map("title_en")
-  description          String?
-  startDate            DateTime?       @map("start_date") @db.Date
-  dueDate              DateTime?       @map("due_date") @db.Date
-  completedAt          DateTime?       @map("completed_at")
-  targetValue          Decimal?        @map("target_value") @db.Decimal(10, 2)
-  currentValue         Decimal?        @map("current_value") @db.Decimal(10, 2)
-  unit                 String?
-  progress             Int             @default(0)
-  weight               Int             @default(100)
-  category             String?
-  isStretch            Boolean         @default(false) @map("is_stretch")
-  parentGoalId         String?         @map("parent_goal_id")
-  alignedCompanyGoalId String?         @map("aligned_company_goal_id")
-  approvedBy           String?         @map("approved_by")
-  approvedAt           DateTime?       @map("approved_at")
-  rejectionReason      String?         @map("rejection_reason")
-  aiGenerated          Boolean         @default(false) @map("ai_generated")
-  aiPrompt             String?         @map("ai_prompt")
-  createdAt            DateTime        @default(now()) @map("created_at")
-  updatedAt            DateTime        @updatedAt @map("updated_at")
-  autoCalculated       Boolean         @default(false) @map("auto_calculated")
-  dataSource           GoalDataSource? @map("data_source")
-  dataSourceConfig     Json?           @map("data_source_config")
-  lastSyncAt           DateTime?       @map("last_sync_at")
-  employeeId           String?         @map("employee_id") @db.VarChar(255)
-
-  goalCheckIns GoalCheckIn[]
-  goalRatings  GoalRating[]
-  company      Company       @relation(fields: [companyId], references: [id])
-  owner        User          @relation(fields: [ownerId], references: [id])
-  parentGoal   Goal?         @relation("GoalToGoal", fields: [parentGoalId], references: [id])
-  subGoals     Goal[]        @relation("GoalToGoal")
-  keyResults   KeyResult[]
-
-  @@index([companyId, ownerId])
-  @@index([companyId, status])
-  @@index([dataSource])
-  @@index([type])
-  @@map("goals")
-}
-
-model KeyResult {
-  id                String             @id @default(uuid())
-  goalId            String             @map("goal_id")
-  title             String
-  description       String?
-  targetValue       Decimal            @map("target_value") @db.Decimal(10, 2)
-  currentValue      Decimal            @default(0) @map("current_value") @db.Decimal(10, 2)
-  unit              String             @default("%")
-  progress          Int                @default(0)
-  dueDate           DateTime?          @map("due_date") @db.Date
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  keyResultCheckIns KeyResultCheckIn[]
-  goal              Goal               @relation(fields: [goalId], references: [id], onDelete: Cascade)
-
-  @@index([goalId])
-  @@map("key_results")
-}
-
-model KeyResultCheckIn {
-  id            String    @id @default(uuid())
-  keyResultId   String    @map("key_result_id")
-  userId        String    @map("user_id")
-  previousValue Decimal   @map("previous_value") @db.Decimal(10, 2)
-  newValue      Decimal   @map("new_value") @db.Decimal(10, 2)
-  notes         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-  keyResults    KeyResult @relation(fields: [keyResultId], references: [id], onDelete: Cascade)
-  user          User      @relation(fields: [userId], references: [id])
-
-  @@index([keyResultId])
-  @@map("key_result_check_ins")
-}
-
-model GoalCheckIn {
-  id            String   @id @default(uuid())
-  goalId        String   @map("goal_id")
-  userId        String   @map("user_id")
-  previousValue Decimal  @map("previous_value") @db.Decimal(10, 2)
-  newValue      Decimal  @map("new_value") @db.Decimal(10, 2)
-  statusUpdate  String?  @map("status_update")
-  blockers      String?
-  nextSteps     String?  @map("next_steps")
-  confidence    Int?
-  createdAt     DateTime @default(now()) @map("created_at")
-  goals         Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  user          User     @relation(fields: [userId], references: [id])
-
-  @@index([goalId])
-  @@map("goal_check_ins")
-}
-
-model GoalRating {
-  id                String            @id @default(uuid())
-  reviewId          String            @map("review_id")
-  goalId            String            @map("goal_id")
-  selfRating        Decimal?          @map("self_rating") @db.Decimal(3, 2)
-  selfComments      String?           @map("self_comments")
-  managerRating     Decimal?          @map("manager_rating") @db.Decimal(3, 2)
-  managerComments   String?           @map("manager_comments")
-  finalRating       Decimal?          @map("final_rating") @db.Decimal(3, 2)
-  weight            Int               @default(100)
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-  goals             Goal              @relation(fields: [goalId], references: [id])
-  performanceReview PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-
-  @@unique([reviewId, goalId])
-  @@map("goal_ratings")
-}
-
-model KPIDefinition {
-  id          String          @id @default(uuid())
-  companyId   String          @map("company_id")
-  jobFamilyId String?         @map("job_family_id")
-  code        String
-  name        String
-  nameAr      String?         @map("name_ar")
-  description String?
-  unit        String
-  formula     Json?
-  thresholds  Json
-  sourceType  KPISourceType   @default(MANUAL) @map("source_type")
-  frequency   KPIFrequency    @default(MONTHLY)
-  isActive    Boolean         @default(true) @map("is_active")
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  assignments KPIAssignment[]
-  company     Company         @relation(fields: [companyId], references: [id])
-
-  @@unique([companyId, code])
-  @@index([companyId])
-  @@index([jobFamilyId])
-  @@map("kpi_definitions")
-}
-
-model KPIAssignment {
-  id              String                 @id @default(uuid())
-  cycleId         String                 @map("cycle_id")
-  employeeId      String                 @map("employee_id")
-  kpiDefinitionId String                 @map("kpi_definition_id")
-  target          Decimal                @db.Decimal(15, 2)
-  weight          Int                    @default(100)
-  createdAt       DateTime               @default(now()) @map("created_at")
-  updatedAt       DateTime               @updatedAt @map("updated_at")
-  actualValue     Decimal?               @map("actual_value") @db.Decimal(10, 2)
-  notes           String?
-  score           Decimal?               @db.Decimal(5, 2)
-  cycle           PerformanceReviewCycle @relation(fields: [cycleId], references: [id])
-  user            User                   @relation(fields: [employeeId], references: [id])
-  kpiDefinition   KPIDefinition          @relation(fields: [kpiDefinitionId], references: [id])
-  kpiEntries      KPIEntry[]
-
-  @@unique([cycleId, employeeId, kpiDefinitionId])
-  @@index([cycleId, employeeId])
-  @@index([employeeId])
-  @@map("kpi_assignments")
-}
-
-model KPIEntry {
-  id            String        @id @default(uuid())
-  assignmentId  String        @map("assignment_id")
-  periodStart   DateTime      @map("period_start")
-  periodEnd     DateTime      @map("period_end")
-  value         Decimal       @db.Decimal(15, 2)
-  source        String?
-  createdBy     String        @map("created_by")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  notes         String?
-  kpiAssignment KPIAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-
-  @@index([assignmentId])
-  @@map("kpi_entries")
-}
-
-model PerformanceReviewCycle {
-  id                      String                       @id @default(uuid())
-  companyId               String                       @map("company_id")
-  name                    String
-  nameEn                  String?                      @map("name_en")
-  type                    PerformanceReviewCycleType   @default(ANNUAL)
-  status                  PerformanceReviewCycleStatus @default(DRAFT)
-  periodStart             DateTime                     @map("period_start") @db.Date
-  periodEnd               DateTime                     @map("period_end") @db.Date
-  selfReviewStart         DateTime?                    @map("self_review_start")
-  selfReviewEnd           DateTime?                    @map("self_review_end")
-  managerReviewStart      DateTime?                    @map("manager_review_start")
-  managerReviewEnd        DateTime?                    @map("manager_review_end")
-  feedbackStart           DateTime?                    @map("feedback_start")
-  feedbackEnd             DateTime?                    @map("feedback_end")
-  calibrationStart        DateTime?                    @map("calibration_start")
-  calibrationEnd          DateTime?                    @map("calibration_end")
-  includeSelfReview       Boolean                      @default(true) @map("include_self_review")
-  include360Feedback      Boolean                      @default(false) @map("include_360_feedback")
-  includeGoalRating       Boolean                      @default(true) @map("include_goal_rating")
-  includeCompetencyRating Boolean                      @default(true) @map("include_competency_rating")
-  goalWeight              Int                          @default(40) @map("goal_weight")
-  competencyWeight        Int                          @default(40) @map("competency_weight")
-  valueWeight             Int                          @default(20) @map("value_weight")
-  competencyFrameworkId   String?                      @map("competency_framework_id")
-  createdAt               DateTime                     @default(now()) @map("created_at")
-  updatedAt               DateTime                     @updatedAt @map("updated_at")
-
-  kpiAssignments     KPIAssignment[]
-  company            Company             @relation(fields: [companyId], references: [id])
-  performanceReviews PerformanceReview[]
-
-  @@index([companyId, status])
-  @@map("performance_review_cycles")
-}
-
-model PerformanceReview {
-  id                     String                  @id @default(uuid())
-  companyId              String                  @map("company_id")
-  cycleId                String                  @map("cycle_id")
-  employeeId             String                  @map("employee_id")
-  managerId              String                  @map("manager_id")
-  status                 PerformanceReviewStatus @default(PENDING)
-  selfRating             Decimal?                @map("self_rating") @db.Decimal(3, 2)
-  selfComments           String?                 @map("self_comments")
-  selfAchievements       Json?                   @map("self_achievements")
-  selfChallenges         Json?                   @map("self_challenges")
-  selfSubmittedAt        DateTime?               @map("self_submitted_at")
-  managerRating          Decimal?                @map("manager_rating") @db.Decimal(3, 2)
-  managerComments        String?                 @map("manager_comments")
-  managerStrengths       Json?                   @map("manager_strengths")
-  managerImprovements    Json?                   @map("manager_improvements")
-  managerSubmittedAt     DateTime?               @map("manager_submitted_at")
-  finalRating            Decimal?                @map("final_rating") @db.Decimal(3, 2)
-  finalComments          String?                 @map("final_comments")
-  calibrationNotes       String?                 @map("calibration_notes")
-  calibratedBy           String?                 @map("calibrated_by")
-  calibratedAt           DateTime?               @map("calibrated_at")
-  performanceScore       Int?                    @map("performance_score")
-  potentialScore         Int?                    @map("potential_score")
-  nineBoxPosition        String?                 @map("nine_box_position")
-  employeeAcknowledged   Boolean                 @default(false) @map("employee_acknowledged")
-  employeeAcknowledgedAt DateTime?               @map("employee_acknowledged_at")
-  employeeDisagreed      Boolean                 @default(false) @map("employee_disagreed")
-  employeeDisagreeReason String?                 @map("employee_disagree_reason")
-  aiSummary              String?                 @map("ai_summary")
-  aiBiasFlags            Json?                   @map("ai_bias_flags")
-  aiRecommendations      Json?                   @map("ai_recommendations")
-  createdAt              DateTime                @default(now()) @map("created_at")
-  updatedAt              DateTime                @updatedAt @map("updated_at")
-
-  cycle       PerformanceReviewCycle @relation(fields: [cycleId], references: [id])
-  employee    User                   @relation("EmployeeReviews", fields: [employeeId], references: [id])
-  manager     User                   @relation("ManagerReviews", fields: [managerId], references: [id])
-  goalRatings GoalRating[]
-
-  @@unique([cycleId, employeeId])
-  @@index([companyId, status])
-  @@index([employeeId])
-  @@index([managerId])
-  @@map("performance_reviews")
-}
-
-// ==================== Missing Production Models (Batch 2) ====================
-
-model Recognition {
-  id         String                @id @default(uuid())
-  companyId  String                @map("company_id")
-  senderId   String                @map("sender_id")
-  receiverId String                @map("receiver_id")
-  type       RecognitionType       @default(PEER_TO_PEER)
-  message    String
-  points     Int                   @default(0)
-  createdAt  DateTime              @default(now()) @map("created_at")
-  updatedAt  DateTime              @updatedAt @map("updated_at")
-  company    Company               @relation(fields: [companyId], references: [id])
-  sender     User                  @relation("RecognitionSender", fields: [senderId], references: [id])
-  receiver   User                  @relation("RecognitionReceiver", fields: [receiverId], references: [id])
-  reactions  RecognitionReaction[]
-
-  @@index([companyId, createdAt])
-  @@index([receiverId])
-  @@map("recognitions")
-}
-
-model RecognitionReaction {
-  id            String      @id @default(uuid())
-  recognitionId String      @map("recognition_id")
-  userId        String      @map("user_id")
-  emoji         String
-  createdAt     DateTime    @default(now()) @map("created_at")
-  recognition   Recognition @relation(fields: [recognitionId], references: [id], onDelete: Cascade)
-  user          User        @relation(fields: [userId], references: [id])
-
-  @@unique([recognitionId, userId, emoji])
-  @@map("recognition_reactions")
-}
-
-model SuccessionPlan {
-  id         String                @id @default(uuid())
-  companyId  String                @map("company_id")
-  positionId String                @map("position_id")
-  targetYear Int                   @map("target_year")
-  createdAt  DateTime              @default(now()) @map("created_at")
-  updatedAt  DateTime              @updatedAt @map("updated_at")
-  company    Company               @relation(fields: [companyId], references: [id])
-  candidates SuccessionCandidate[]
-
-  @@unique([positionId, targetYear])
-  @@map("succession_plans")
-}
-
-model SuccessionCandidate {
-  id                 String         @id @default(uuid())
-  planId             String         @map("plan_id")
-  employeeId         String         @map("employee_id")
-  readinessLevel     String         @map("readiness_level")
-  riskOfLeaving      String?        @map("risk_of_leaving")
-  developmentActions Json?          @map("development_actions")
-  notes              String?
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
-  plan               SuccessionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  employee           User           @relation(fields: [employeeId], references: [id])
-
-  @@unique([planId, employeeId])
-  @@map("succession_candidates")
-}
-
-// ==================== Social Feed (المنشورات والتواصل الاجتماعي) ====================
-
-// نوع المنشور
-enum PostType {
-  POST // منشور عادي
-  ANNOUNCEMENT // إعلان رسمي
-  PROMOTED // منشور مروج
-}
-
-// حالة المنشور
-enum PostStatus {
-  DRAFT // مسودة
-  PENDING_APPROVAL // في انتظار الموافقة
-  PUBLISHED // منشور
-  ARCHIVED // مؤرشف
-  REJECTED // مرفوض
-}
-
-// نوع الظهور/الرؤية
-enum VisibilityType {
-  PUBLIC // عام - للجميع في الشركة
-  DEPARTMENT // للقسم فقط
-  TEAM // للفريق فقط
-  TARGETED // مستهدف بقواعد محددة
-  MANAGERS_ONLY // للمدراء فقط
-  HR_ONLY // للموارد البشرية فقط
-  PRIVATE // خاص
-}
-
-// نوع الاستهداف (ABAC Targeting)
-enum TargetType {
-  BRANCH // فرع
-  DEPARTMENT // قسم
-  TEAM // فريق
-  USER // مستخدم محدد
-  ROLE // دور وظيفي
-  JOB_TITLE // مسمى وظيفي
-  GRADE // درجة وظيفية
-  CONTRACT_TYPE // نوع العقد
-  SHIFT // وردية
-  LOCATION // موقع
-  TAG // وسم
-}
-
-// نوع الإشارة (@mention)
-enum MentionType {
-  USER // إشارة لمستخدم
-  TEAM // إشارة لفريق
-  DEPARTMENT // إشارة لقسم
-}
-
-model Post {
-  id        String  @id @default(uuid())
-  companyId String  @map("company_id")
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  authorId  String  @map("author_id")
-  author    User    @relation("PostAuthor", fields: [authorId], references: [id])
-
-  // نوع المنشور
-  type PostType @default(POST)
-
-  // المحتوى (ثنائي اللغة)
-  title     String? // عنوان المنشور (اختياري)
-  titleEn   String? @map("title_en")
-  content   String  @db.Text // محتوى المنشور
-  contentEn String? @map("content_en") @db.Text
-
-  // إعدادات الظهور
-  visibilityType VisibilityType @default(PUBLIC) @map("visibility_type")
-  isPinned       Boolean        @default(false) @map("is_pinned")
-  pinnedUntil    DateTime?      @map("pinned_until")
-
-  // التوقيت
-  publishedAt DateTime? @map("published_at") // تاريخ النشر الفعلي
-  scheduledAt DateTime? @map("scheduled_at") // تاريخ النشر المجدول
-  expiresAt   DateTime? @map("expires_at") // تاريخ انتهاء الصلاحية
-
-  // إعدادات التفاعل
-  requireAcknowledge   Boolean @default(false) @map("require_acknowledge") // يتطلب تأكيد القراءة
-  hideAfterAcknowledge Boolean @default(false) @map("hide_after_acknowledge") // إخفاء بعد التأكيد
-  allowComments        Boolean @default(true) @map("allow_comments") // السماح بالتعليقات
-
-  // حالة المنشور
-  status PostStatus @default(DRAFT)
-
-  // إحصائيات الوصول
-  reachCount      Int @default(0) @map("reach_count") // عدد المستخدمين الذين شاهدوا
-  impressionCount Int @default(0) @map("impression_count") // عدد مرات الظهور
-  clickCount      Int @default(0) @map("click_count") // عدد النقرات
-
-  // إعدادات الترويج
-  priority       Int       @default(0) // أولوية الظهور (أعلى = أهم)
-  maxImpressions Int?      @map("max_impressions") // الحد الأقصى للظهور
-  promotedUntil  DateTime? @map("promoted_until") // تاريخ انتهاء الترويج
-
-  // العلاقات - الاستهداف والتفاعلات
-  targets   PostTarget[]
-  reactions PostReaction[]
-  comments  PostComment[]
-  mentions  PostMention[]
-
-  // العلاقات - التتبع والتحليلات
-  views        PostView[]
-  impressions  PostImpression[]
-  acknowledges PostAcknowledge[]
-  attachments  PostAttachment[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([companyId, status, publishedAt])
-  @@index([authorId])
-  @@index([companyId, isPinned])
-  @@map("posts")
-}
-
-// نموذج استهداف المنشور (ABAC Targeting)
-model PostTarget {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  targetType  TargetType @map("target_type")
-  targetValue String     @map("target_value") // قيمة الاستهداف (معرف الفرع، القسم، المستخدم، إلخ)
-
-  // قواعد الشمول/الاستثناء
-  isExclusion Boolean @default(false) @map("is_exclusion") // استثناء بدلاً من شمول
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([postId])
-  @@index([targetType, targetValue])
-  @@map("post_targets")
-}
-
-// نموذج التفاعلات على المنشور (Like, Love, Celebrate)
-model PostReaction {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
-  user   User   @relation("PostReactions", fields: [userId], references: [id])
-
-  emoji String // رمز التفاعل (like, love, celebrate, support, insightful, etc.)
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@unique([postId, userId, emoji]) // مستخدم واحد يمكنه إضافة كل نوع تفاعل مرة واحدة
-  @@index([postId])
-  @@index([userId])
-  @@map("post_reactions")
-}
-
-// نموذج التعليقات على المنشور
-model PostComment {
-  id       String @id @default(uuid())
-  postId   String @map("post_id")
-  post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  authorId String @map("author_id")
-  author   User   @relation("PostComments", fields: [authorId], references: [id])
-
-  content  String   @db.Text // محتوى التعليق
-  mentions String[] @default([]) // قائمة معرفات المستخدمين المذكورين
-
-  // التعديل
-  isEdited Boolean   @default(false) @map("is_edited")
-  editedAt DateTime? @map("edited_at")
-
-  // الردود المتسلسلة (Threading)
-  parentId String?       @map("parent_id")
-  parent   PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  PostComment[] @relation("CommentReplies")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([postId])
-  @@index([authorId])
-  @@index([parentId])
-  @@map("post_comments")
-}
-
-// نموذج الإشارات (@mentions) في المنشور
-model PostMention {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  mentionType MentionType @map("mention_type")
-  mentionId   String      @map("mention_id") // معرف المستخدم، الفريق، أو القسم
-
-  // موقع الإشارة في المحتوى (لتمييزها بصرياً)
-  startIndex Int? @map("start_index")
-  endIndex   Int? @map("end_index")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([postId])
-  @@index([mentionType, mentionId])
-  @@map("post_mentions")
-}
-
-// نموذج مشاهدات المنشور (Unique Views Tracking)
-model PostView {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
-  user   User   @relation("PostViews", fields: [userId], references: [id])
-
-  // معلومات المشاهدة
-  viewedAt   DateTime @default(now()) @map("viewed_at") // وقت المشاهدة
-  duration   Int?     // مدة المشاهدة بالثواني (اختياري)
-  deviceType String?  @map("device_type") // WEB, MOBILE, TABLET
-  ipAddress  String?  @map("ip_address") // عنوان IP للتحليلات
-
-  // unique constraint - كل مستخدم يُحسب مرة واحدة فقط
-  @@unique([postId, userId])
-  @@index([postId])
-  @@index([userId])
-  @@index([viewedAt])
-  @@map("post_views")
-}
-
-// نموذج ظهورات المنشور (Impressions Tracking - للإحصائيات)
-model PostImpression {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String? @map("user_id") // قد يكون null للمستخدمين غير المسجلين
-  user   User?   @relation("PostImpressions", fields: [userId], references: [id])
-
-  // معلومات الظهور
-  impressedAt DateTime @default(now()) @map("impressed_at") // وقت الظهور
-  source      String?  // مصدر الظهور: FEED, SEARCH, NOTIFICATION, DIRECT_LINK
-  position    Int?     // موقع المنشور في الـ Feed عند الظهور
-  deviceType  String?  @map("device_type") // WEB, MOBILE, TABLET
-  sessionId   String?  @map("session_id") // معرف الجلسة للتتبع
-
-  @@index([postId])
-  @@index([userId])
-  @@index([impressedAt])
-  @@index([source])
-  @@map("post_impressions")
-}
-
-// نموذج تأكيد قراءة المنشور الرسمي (Acknowledgement Tracking)
-model PostAcknowledge {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
-  user   User   @relation("PostAcknowledges", fields: [userId], references: [id])
-
-  // معلومات التأكيد
-  acknowledgedAt DateTime @default(now()) @map("acknowledged_at") // وقت التأكيد
-  deviceType     String?  @map("device_type") // WEB, MOBILE, TABLET
-  ipAddress      String?  @map("ip_address") // عنوان IP للتوثيق
-
-  // ملاحظة اختيارية (في حال طلب تعليق من المستخدم)
-  note String? @db.Text
-
-  // unique constraint - كل مستخدم يؤكد مرة واحدة فقط
-  @@unique([postId, userId])
-  @@index([postId])
-  @@index([userId])
-  @@index([acknowledgedAt])
-  @@map("post_acknowledges")
-}
-
-// نموذج مرفقات المنشور (File Attachments)
-model PostAttachment {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  // معلومات الملف
-  fileName     String  @map("file_name") // اسم الملف الأصلي
-  fileUrl      String  @map("file_url") // رابط الملف المخزن
-  fileType     String  @map("file_type") // نوع الملف: IMAGE, VIDEO, DOCUMENT, AUDIO, OTHER
-  mimeType     String  @map("mime_type") // نوع MIME للملف
-  fileSize     Int     @map("file_size") // حجم الملف بالبايت
-  thumbnailUrl String? @map("thumbnail_url") // رابط الصورة المصغرة (للصور والفيديو)
-
-  // بيانات إضافية
-  altText     String? @map("alt_text") // نص بديل للصورة (accessibility)
-  description String? // وصف المرفق
-  sortOrder   Int     @default(0) @map("sort_order") // ترتيب العرض
-
-  // إحصائيات
-  downloadCount Int @default(0) @map("download_count") // عدد مرات التحميل
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([postId])
-  @@index([fileType])
-  @@map("post_attachments")
-}
-
-// ==================== أحداث التقويم (Calendar Events) ====================
-
-// نوع الحدث
-enum EventType {
-  MEETING // اجتماع
-  INTERVIEW // مقابلة
-  PAYROLL // رواتب
-  HOLIDAY // عطلة
-  DEADLINE // موعد نهائي
-  ANNOUNCEMENT // إعلان
-  OTHER // أخرى
-}
-
-// حالة الحدث
-enum EventStatus {
-  SCHEDULED // مجدول
-  CANCELLED // ملغي
-  DONE // تم
-}
-
-// حالة RSVP للحضور
-enum RSVPStatus {
-  INVITED // مدعو
-  GOING // سيحضر
-  MAYBE // ربما
-  DECLINED // رفض
-}
-
-// نموذج الحدث (Calendar Event)
-model Event {
-  id        String  @id @default(uuid())
-  companyId String  @map("company_id")
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  creatorId String  @map("creator_id")
-  creator   User    @relation("EventCreator", fields: [creatorId], references: [id])
-
-  // معلومات الحدث (ثنائي اللغة)
-  title         String
-  titleEn       String?  @map("title_en")
-  description   String?  @db.Text
-  descriptionEn String?  @map("description_en") @db.Text
-
-  // التوقيت
-  startAt  DateTime @map("start_at")
-  endAt    DateTime @map("end_at")
-  isAllDay Boolean  @default(false) @map("is_all_day")
-  timezone String   @default("Asia/Riyadh")
-
-  // الموقع والرابط
-  location    String?
-  meetingLink String? @map("meeting_link")
-
-  // النوع والظهور
-  eventType      EventType      @default(MEETING) @map("event_type")
-  visibilityType VisibilityType @default(PUBLIC) @map("visibility_type")
-
-  // الحالة
-  status EventStatus @default(SCHEDULED)
-
-  // إعدادات التكرار (اختياري)
-  isRecurring    Boolean @default(false) @map("is_recurring")
-  recurrenceRule String? @map("recurrence_rule") // قاعدة التكرار (RRULE format)
-
-  // معلومات إضافية
-  color String? // لون الحدث في التقويم
-  icon  String? // أيقونة الحدث
-
-  // العلاقات
-  attendees EventAttendee[]
-  targets   EventTarget[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([companyId, startAt])
-  @@index([companyId, status])
-  @@index([creatorId])
-  @@map("events")
-}
-
-// نموذج حضور الحدث (Event Attendees with RSVP)
-model EventAttendee {
-  id      String @id @default(uuid())
-  eventId String @map("event_id")
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId  String @map("user_id")
-  user    User   @relation("EventAttendee", fields: [userId], references: [id])
-
-  // حالة RSVP
-  rsvpStatus  RSVPStatus @default(INVITED) @map("rsvp_status")
-  respondedAt DateTime?  @map("responded_at") // تاريخ الرد
-
-  // ملاحظات الحضور
-  note String? @db.Text
-
-  // إشعار التذكير
-  reminderSent   Boolean   @default(false) @map("reminder_sent")
-  reminderSentAt DateTime? @map("reminder_sent_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // كل مستخدم يُدعى مرة واحدة فقط لكل حدث
-  @@unique([eventId, userId])
-  @@index([eventId])
-  @@index([userId])
-  @@index([rsvpStatus])
-  @@map("event_attendees")
-}
-
-// نموذج استهداف الحدث (Event Targeting - similar to PostTarget)
-model EventTarget {
-  id      String @id @default(uuid())
-  eventId String @map("event_id")
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  // نوع وقيمة الاستهداف
-  targetType  TargetType @map("target_type")
-  targetValue String     @map("target_value") // قيمة الاستهداف (معرف الفرع، القسم، المستخدم، إلخ)
-
-  // قواعد الشمول/الاستثناء
-  isExclusion Boolean @default(false) @map("is_exclusion") // استثناء بدلاً من شمول
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([eventId])
-  @@index([targetType, targetValue])
-  @@map("event_targets")
 }

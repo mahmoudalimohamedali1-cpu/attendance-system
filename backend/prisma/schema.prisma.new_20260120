@@ -27,6 +27,7 @@ model Company {
   branches             Branch[]
   jobTitles            JobTitle[]
   costCenters          CostCenter[]
+  costCenterBudgets    CostCenterBudget[]
   salaryComponents     SalaryComponent[]
   salaryStructures     SalaryStructure[]
   policies             Policy[]
@@ -127,12 +128,6 @@ model Company {
   // Recognition & Succession Planning
   recognitions    Recognition[]
   successionPlans SuccessionPlan[]
-
-  // Social Feed (المنشورات والتواصل الاجتماعي)
-  posts Post[]
-
-  // Calendar Events (أحداث التقويم)
-  events Event[]
 
   @@map("companies")
 }
@@ -580,18 +575,6 @@ model User {
   recognitionsReceived Recognition[]         @relation("RecognitionReceiver")
   recognitionReactions RecognitionReaction[]
   successionCandidates SuccessionCandidate[]
-
-  // Social Feed (المنشورات والتواصل الاجتماعي)
-  postsAuthored    Post[]            @relation("PostAuthor")
-  postReactions    PostReaction[]    @relation("PostReactions")
-  postComments     PostComment[]     @relation("PostComments")
-  postViews        PostView[]        @relation("PostViews")
-  postImpressions  PostImpression[]  @relation("PostImpressions")
-  postAcknowledges PostAcknowledge[] @relation("PostAcknowledges")
-
-  // Calendar Events (أحداث التقويم)
-  eventsCreated    Event[]           @relation("EventCreator")
-  eventAttendances EventAttendee[]   @relation("EventAttendee")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -2064,41 +2047,43 @@ model PayslipLine {
 }
 
 model CostCenter {
-  id                                                                                   String                 @id @default(uuid())
-  code                                                                                 String
-  description                                                                          String?
-  createdAt                                                                            DateTime               @default(now()) @map("created_at")
-  updatedAt                                                                            DateTime               @updatedAt @map("updated_at")
-  companyId                                                                            String?                @map("company_id")
-  effective_from                                                                       DateTime               @default(now())
-  effective_to                                                                         DateTime?
-  is_allow_overbudget                                                                  Boolean                @default(false)
-  level                                                                                Int                    @default(1)
-  manager_id                                                                           String?
-  name_ar                                                                              String
-  name_en                                                                              String?
-  parent_id                                                                            String?
-  path                                                                                 String?
-  status                                                                               String                 @default("ACTIVE")
-  type                                                                                 String                 @default("OPERATING")
-  version                                                                              Int                    @default(1)
-  department_id                                                                        String?
-  max_headcount                                                                        Int?
-  budget_alert_threshold                                                               Decimal?               @default(80) @db.Decimal(5, 2)
-  name                                                                                 String?                @db.VarChar(255)
-  cost_center_allocations_cost_center_allocations_cost_center_idTocost_centers         CostCenterAllocation[] @relation("cost_center_allocations_cost_center_idTocost_centers")
-  cost_center_allocations_cost_center_allocations_primary_cost_center_idTocost_centers CostCenterAllocation[] @relation("cost_center_allocations_primary_cost_center_idTocost_centers")
-  company                                                                              Company?               @relation(fields: [companyId], references: [id])
-  departments                                                                          Department?            @relation(fields: [department_id], references: [id])
-  cost_centers                                                                         CostCenter?            @relation("cost_centersTocost_centers", fields: [parent_id], references: [id])
-  other_cost_centers                                                                   CostCenter[]           @relation("cost_centersTocost_centers")
-  payslip_lines                                                                        PayslipLine[]
-  users                                                                                User[]
-
+  id                    String                 @id @default(uuid())
+  code                  String
+  description           String?
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  companyId             String?                @map("company_id")
+  effectiveFrom         DateTime               @default(now()) @map("effective_from")
+  effectiveTo           DateTime?              @map("effective_to")
+  isAllowOverbudget     Boolean                @default(false) @map("is_allow_overbudget")
+  level                 Int                    @default(1)
+  managerId             String?                @map("manager_id")
+  nameAr                String                 @map("name_ar")
+  nameEn                String?                @map("name_en")
+  parentId              String?                @map("parent_id")
+  path                  String?
+  status                String                 @default("ACTIVE")
+  type                  String                 @default("OPERATING")
+  version               Int                    @default(1)
+  departmentId          String?                @map("department_id")
+  maxHeadcount          Int?                   @map("max_headcount")
+  budgetAlertThreshold  Decimal?               @default(80) @map("budget_alert_threshold") @db.Decimal(5, 2)
+  name                  String?                @db.VarChar(255)
+  
+  allocations           CostCenterAllocation[] @relation("cost_center_allocations_cost_center_idTocost_centers")
+  primaryAllocations    CostCenterAllocation[] @relation("cost_center_allocations_primary_cost_center_idTocost_centers")
+  company               Company?               @relation(fields: [companyId], references: [id])
+  department            Department?            @relation(fields: [departmentId], references: [id])
+  parent                CostCenter?            @relation("CostCenterHierarchy", fields: [parentId], references: [id])
+  children              CostCenter[]           @relation("CostCenterHierarchy")
+  payslipLines          PayslipLine[]
+  users                 User[]
+  budgets               CostCenterBudget[]
+  
   @@unique([companyId, code, version])
   @@index([companyId, status])
-  @@index([effective_from, effective_to])
-  @@index([parent_id])
+  @@index([effectiveFrom, effectiveTo])
+  @@index([parentId])
   @@map("cost_centers")
 }
 
@@ -6573,432 +6558,24 @@ model SuccessionCandidate {
   @@map("succession_candidates")
 }
 
-// ==================== Social Feed (المنشورات والتواصل الاجتماعي) ====================
-
-// نوع المنشور
-enum PostType {
-  POST // منشور عادي
-  ANNOUNCEMENT // إعلان رسمي
-  PROMOTED // منشور مروج
-}
-
-// حالة المنشور
-enum PostStatus {
-  DRAFT // مسودة
-  PENDING_APPROVAL // في انتظار الموافقة
-  PUBLISHED // منشور
-  ARCHIVED // مؤرشف
-  REJECTED // مرفوض
-}
-
-// نوع الظهور/الرؤية
-enum VisibilityType {
-  PUBLIC // عام - للجميع في الشركة
-  DEPARTMENT // للقسم فقط
-  TEAM // للفريق فقط
-  TARGETED // مستهدف بقواعد محددة
-  MANAGERS_ONLY // للمدراء فقط
-  HR_ONLY // للموارد البشرية فقط
-  PRIVATE // خاص
-}
-
-// نوع الاستهداف (ABAC Targeting)
-enum TargetType {
-  BRANCH // فرع
-  DEPARTMENT // قسم
-  TEAM // فريق
-  USER // مستخدم محدد
-  ROLE // دور وظيفي
-  JOB_TITLE // مسمى وظيفي
-  GRADE // درجة وظيفية
-  CONTRACT_TYPE // نوع العقد
-  SHIFT // وردية
-  LOCATION // موقع
-  TAG // وسم
-}
-
-// نوع الإشارة (@mention)
-enum MentionType {
-  USER // إشارة لمستخدم
-  TEAM // إشارة لفريق
-  DEPARTMENT // إشارة لقسم
-}
-
-model Post {
-  id        String  @id @default(uuid())
-  companyId String  @map("company_id")
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  authorId  String  @map("author_id")
-  author    User    @relation("PostAuthor", fields: [authorId], references: [id])
-
-  // نوع المنشور
-  type PostType @default(POST)
-
-  // المحتوى (ثنائي اللغة)
-  title     String? // عنوان المنشور (اختياري)
-  titleEn   String? @map("title_en")
-  content   String  @db.Text // محتوى المنشور
-  contentEn String? @map("content_en") @db.Text
-
-  // إعدادات الظهور
-  visibilityType VisibilityType @default(PUBLIC) @map("visibility_type")
-  isPinned       Boolean        @default(false) @map("is_pinned")
-  pinnedUntil    DateTime?      @map("pinned_until")
-
-  // التوقيت
-  publishedAt DateTime? @map("published_at") // تاريخ النشر الفعلي
-  scheduledAt DateTime? @map("scheduled_at") // تاريخ النشر المجدول
-  expiresAt   DateTime? @map("expires_at") // تاريخ انتهاء الصلاحية
-
-  // إعدادات التفاعل
-  requireAcknowledge   Boolean @default(false) @map("require_acknowledge") // يتطلب تأكيد القراءة
-  hideAfterAcknowledge Boolean @default(false) @map("hide_after_acknowledge") // إخفاء بعد التأكيد
-  allowComments        Boolean @default(true) @map("allow_comments") // السماح بالتعليقات
-
-  // حالة المنشور
-  status PostStatus @default(DRAFT)
-
-  // إحصائيات الوصول
-  reachCount      Int @default(0) @map("reach_count") // عدد المستخدمين الذين شاهدوا
-  impressionCount Int @default(0) @map("impression_count") // عدد مرات الظهور
-  clickCount      Int @default(0) @map("click_count") // عدد النقرات
-
-  // إعدادات الترويج
-  priority       Int       @default(0) // أولوية الظهور (أعلى = أهم)
-  maxImpressions Int?      @map("max_impressions") // الحد الأقصى للظهور
-  promotedUntil  DateTime? @map("promoted_until") // تاريخ انتهاء الترويج
-
-  // العلاقات - الاستهداف والتفاعلات
-  targets   PostTarget[]
-  reactions PostReaction[]
-  comments  PostComment[]
-  mentions  PostMention[]
-
-  // العلاقات - التتبع والتحليلات
-  views        PostView[]
-  impressions  PostImpression[]
-  acknowledges PostAcknowledge[]
-  attachments  PostAttachment[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([companyId, status, publishedAt])
-  @@index([authorId])
-  @@index([companyId, isPinned])
-  @@map("posts")
-}
-
-// نموذج استهداف المنشور (ABAC Targeting)
-model PostTarget {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  targetType  TargetType @map("target_type")
-  targetValue String     @map("target_value") // قيمة الاستهداف (معرف الفرع، القسم، المستخدم، إلخ)
-
-  // قواعد الشمول/الاستثناء
-  isExclusion Boolean @default(false) @map("is_exclusion") // استثناء بدلاً من شمول
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([postId])
-  @@index([targetType, targetValue])
-  @@map("post_targets")
-}
-
-// نموذج التفاعلات على المنشور (Like, Love, Celebrate)
-model PostReaction {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
-  user   User   @relation("PostReactions", fields: [userId], references: [id])
-
-  emoji String // رمز التفاعل (like, love, celebrate, support, insightful, etc.)
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@unique([postId, userId, emoji]) // مستخدم واحد يمكنه إضافة كل نوع تفاعل مرة واحدة
-  @@index([postId])
-  @@index([userId])
-  @@map("post_reactions")
-}
-
-// نموذج التعليقات على المنشور
-model PostComment {
-  id       String @id @default(uuid())
-  postId   String @map("post_id")
-  post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  authorId String @map("author_id")
-  author   User   @relation("PostComments", fields: [authorId], references: [id])
-
-  content  String   @db.Text // محتوى التعليق
-  mentions String[] @default([]) // قائمة معرفات المستخدمين المذكورين
-
-  // التعديل
-  isEdited Boolean   @default(false) @map("is_edited")
-  editedAt DateTime? @map("edited_at")
-
-  // الردود المتسلسلة (Threading)
-  parentId String?       @map("parent_id")
-  parent   PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  PostComment[] @relation("CommentReplies")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([postId])
-  @@index([authorId])
-  @@index([parentId])
-  @@map("post_comments")
-}
-
-// نموذج الإشارات (@mentions) في المنشور
-model PostMention {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  mentionType MentionType @map("mention_type")
-  mentionId   String      @map("mention_id") // معرف المستخدم، الفريق، أو القسم
-
-  // موقع الإشارة في المحتوى (لتمييزها بصرياً)
-  startIndex Int? @map("start_index")
-  endIndex   Int? @map("end_index")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([postId])
-  @@index([mentionType, mentionId])
-  @@map("post_mentions")
-}
-
-// نموذج مشاهدات المنشور (Unique Views Tracking)
-model PostView {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
-  user   User   @relation("PostViews", fields: [userId], references: [id])
-
-  // معلومات المشاهدة
-  viewedAt   DateTime @default(now()) @map("viewed_at") // وقت المشاهدة
-  duration   Int?     // مدة المشاهدة بالثواني (اختياري)
-  deviceType String?  @map("device_type") // WEB, MOBILE, TABLET
-  ipAddress  String?  @map("ip_address") // عنوان IP للتحليلات
-
-  // unique constraint - كل مستخدم يُحسب مرة واحدة فقط
-  @@unique([postId, userId])
-  @@index([postId])
-  @@index([userId])
-  @@index([viewedAt])
-  @@map("post_views")
-}
-
-// نموذج ظهورات المنشور (Impressions Tracking - للإحصائيات)
-model PostImpression {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String? @map("user_id") // قد يكون null للمستخدمين غير المسجلين
-  user   User?   @relation("PostImpressions", fields: [userId], references: [id])
-
-  // معلومات الظهور
-  impressedAt DateTime @default(now()) @map("impressed_at") // وقت الظهور
-  source      String?  // مصدر الظهور: FEED, SEARCH, NOTIFICATION, DIRECT_LINK
-  position    Int?     // موقع المنشور في الـ Feed عند الظهور
-  deviceType  String?  @map("device_type") // WEB, MOBILE, TABLET
-  sessionId   String?  @map("session_id") // معرف الجلسة للتتبع
-
-  @@index([postId])
-  @@index([userId])
-  @@index([impressedAt])
-  @@index([source])
-  @@map("post_impressions")
-}
-
-// نموذج تأكيد قراءة المنشور الرسمي (Acknowledgement Tracking)
-model PostAcknowledge {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId String @map("user_id")
-  user   User   @relation("PostAcknowledges", fields: [userId], references: [id])
-
-  // معلومات التأكيد
-  acknowledgedAt DateTime @default(now()) @map("acknowledged_at") // وقت التأكيد
-  deviceType     String?  @map("device_type") // WEB, MOBILE, TABLET
-  ipAddress      String?  @map("ip_address") // عنوان IP للتوثيق
-
-  // ملاحظة اختيارية (في حال طلب تعليق من المستخدم)
-  note String? @db.Text
-
-  // unique constraint - كل مستخدم يؤكد مرة واحدة فقط
-  @@unique([postId, userId])
-  @@index([postId])
-  @@index([userId])
-  @@index([acknowledgedAt])
-  @@map("post_acknowledges")
-}
-
-// نموذج مرفقات المنشور (File Attachments)
-model PostAttachment {
-  id     String @id @default(uuid())
-  postId String @map("post_id")
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  // معلومات الملف
-  fileName     String  @map("file_name") // اسم الملف الأصلي
-  fileUrl      String  @map("file_url") // رابط الملف المخزن
-  fileType     String  @map("file_type") // نوع الملف: IMAGE, VIDEO, DOCUMENT, AUDIO, OTHER
-  mimeType     String  @map("mime_type") // نوع MIME للملف
-  fileSize     Int     @map("file_size") // حجم الملف بالبايت
-  thumbnailUrl String? @map("thumbnail_url") // رابط الصورة المصغرة (للصور والفيديو)
-
-  // بيانات إضافية
-  altText     String? @map("alt_text") // نص بديل للصورة (accessibility)
-  description String? // وصف المرفق
-  sortOrder   Int     @default(0) @map("sort_order") // ترتيب العرض
-
-  // إحصائيات
-  downloadCount Int @default(0) @map("download_count") // عدد مرات التحميل
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([postId])
-  @@index([fileType])
-  @@map("post_attachments")
-}
-
-// ==================== أحداث التقويم (Calendar Events) ====================
-
-// نوع الحدث
-enum EventType {
-  MEETING // اجتماع
-  INTERVIEW // مقابلة
-  PAYROLL // رواتب
-  HOLIDAY // عطلة
-  DEADLINE // موعد نهائي
-  ANNOUNCEMENT // إعلان
-  OTHER // أخرى
-}
-
-// حالة الحدث
-enum EventStatus {
-  SCHEDULED // مجدول
-  CANCELLED // ملغي
-  DONE // تم
-}
-
-// حالة RSVP للحضور
-enum RSVPStatus {
-  INVITED // مدعو
-  GOING // سيحضر
-  MAYBE // ربما
-  DECLINED // رفض
-}
-
-// نموذج الحدث (Calendar Event)
-model Event {
-  id        String  @id @default(uuid())
-  companyId String  @map("company_id")
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  creatorId String  @map("creator_id")
-  creator   User    @relation("EventCreator", fields: [creatorId], references: [id])
-
-  // معلومات الحدث (ثنائي اللغة)
-  title         String
-  titleEn       String?  @map("title_en")
-  description   String?  @db.Text
-  descriptionEn String?  @map("description_en") @db.Text
-
-  // التوقيت
-  startAt  DateTime @map("start_at")
-  endAt    DateTime @map("end_at")
-  isAllDay Boolean  @default(false) @map("is_all_day")
-  timezone String   @default("Asia/Riyadh")
-
-  // الموقع والرابط
-  location    String?
-  meetingLink String? @map("meeting_link")
-
-  // النوع والظهور
-  eventType      EventType      @default(MEETING) @map("event_type")
-  visibilityType VisibilityType @default(PUBLIC) @map("visibility_type")
-
-  // الحالة
-  status EventStatus @default(SCHEDULED)
-
-  // إعدادات التكرار (اختياري)
-  isRecurring    Boolean @default(false) @map("is_recurring")
-  recurrenceRule String? @map("recurrence_rule") // قاعدة التكرار (RRULE format)
-
-  // معلومات إضافية
-  color String? // لون الحدث في التقويم
-  icon  String? // أيقونة الحدث
-
-  // العلاقات
-  attendees EventAttendee[]
-  targets   EventTarget[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([companyId, startAt])
-  @@index([companyId, status])
-  @@index([creatorId])
-  @@map("events")
-}
-
-// نموذج حضور الحدث (Event Attendees with RSVP)
-model EventAttendee {
-  id      String @id @default(uuid())
-  eventId String @map("event_id")
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId  String @map("user_id")
-  user    User   @relation("EventAttendee", fields: [userId], references: [id])
-
-  // حالة RSVP
-  rsvpStatus  RSVPStatus @default(INVITED) @map("rsvp_status")
-  respondedAt DateTime?  @map("responded_at") // تاريخ الرد
-
-  // ملاحظات الحضور
-  note String? @db.Text
-
-  // إشعار التذكير
-  reminderSent   Boolean   @default(false) @map("reminder_sent")
-  reminderSentAt DateTime? @map("reminder_sent_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // كل مستخدم يُدعى مرة واحدة فقط لكل حدث
-  @@unique([eventId, userId])
-  @@index([eventId])
-  @@index([userId])
-  @@index([rsvpStatus])
-  @@map("event_attendees")
-}
-
-// نموذج استهداف الحدث (Event Targeting - similar to PostTarget)
-model EventTarget {
-  id      String @id @default(uuid())
-  eventId String @map("event_id")
-  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  // نوع وقيمة الاستهداف
-  targetType  TargetType @map("target_type")
-  targetValue String     @map("target_value") // قيمة الاستهداف (معرف الفرع، القسم، المستخدم، إلخ)
-
-  // قواعد الشمول/الاستثناء
-  isExclusion Boolean @default(false) @map("is_exclusion") // استثناء بدلاً من شمول
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([eventId])
-  @@index([targetType, targetValue])
-  @@map("event_targets")
+model CostCenterBudget {
+  id             String      @id @default(uuid())
+  companyId      String?     @map("company_id")
+  costCenterId   String      @map("cost_center_id")
+  year           Int
+  month          Int?
+  quarter        Int?
+  budgetAmount   Decimal     @map("budget_amount") @db.Decimal(18, 2)
+  actualAmount   Decimal     @default(0) @map("actual_amount") @db.Decimal(18, 2)
+  notes          String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  
+  company        Company?    @relation(fields: [companyId], references: [id])
+  costCenter     CostCenter  @relation(fields: [costCenterId], references: [id], onDelete: Cascade)
+
+  @@unique([costCenterId, year, month, quarter])
+  @@index([costCenterId, year])
+  @@index([companyId])
+  @@map("cost_center_budgets")
 }

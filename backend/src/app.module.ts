@@ -79,7 +79,10 @@ import { SaudizationModule } from './modules/saudization/saudization.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { ProgramsModule } from './modules/programs/programs.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { SocialFeedModule } from './modules/social-feed/social-feed.module';
+import { CalendarEventsModule } from './modules/calendar-events/calendar-events.module';
 import { EmployeeDebtModule } from './modules/employee-debt/employee-debt.module';
+// import { EmployeeDebtModule } from './modules/employee-debt/employee-debt.module'; // DISABLED: Prisma schema desync
 import { SecurityModule } from './common/security/security.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 
@@ -170,7 +173,10 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     ProjectsModule,           // 📊 إدارة المشاريع والمحفظة
     ProgramsModule,           // 📊 إدارة البرامج
     IntegrationsModule,       // 🔗 التكاملات الخارجية (Slack, Teams, GitHub, etc.)
+    SocialFeedModule,         // 📢 جدار الشركة الاجتماعي (إعلانات، أخبار، ترويج)
+    CalendarEventsModule,     // 📅 أحداث التقويم (عطل، فعاليات، تواريخ مهمة)
     EmployeeDebtModule,       // 💰 دفتر ديون الموظفين
+    // EmployeeDebtModule,       // 💰 دفتر ديون الموظفين - DISABLED: Prisma schema desync
     SecurityModule,           // 🔒 أمان المعادلات
   ],
   controllers: [AppController],
