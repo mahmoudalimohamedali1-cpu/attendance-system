@@ -88,7 +88,48 @@ export const RecurringTasksView: React.FC = () => {
         description: '',
         recurrenceType: 'DAILY',
         priority: 'MEDIUM',
+        targetType: 'EMPLOYEE' as 'EMPLOYEE' | 'DEPARTMENT' | 'BRANCH' | 'ALL',
+        assigneeId: '',
+        departmentId: '',
+        branchId: '',
     });
+
+    // Fetch employees
+    const { data: employeesData } = useQuery({
+        queryKey: ['employees-list'],
+        queryFn: async () => {
+            const res = await fetch('/api/v1/users?role=EMPLOYEE&status=ACTIVE&limit=500', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
+            });
+            return res.json();
+        },
+    });
+
+    // Fetch departments
+    const { data: departmentsData } = useQuery({
+        queryKey: ['departments-list'],
+        queryFn: async () => {
+            const res = await fetch('/api/v1/departments', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
+            });
+            return res.json();
+        },
+    });
+
+    // Fetch branches
+    const { data: branchesData } = useQuery({
+        queryKey: ['branches-list'],
+        queryFn: async () => {
+            const res = await fetch('/api/v1/branches', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
+            });
+            return res.json();
+        },
+    });
+
+    const employees = employeesData?.data || employeesData || [];
+    const departments = departmentsData?.data || departmentsData || [];
+    const branches = branchesData?.data || branchesData || [];
 
     const { data: recurringTasks, isLoading } = useQuery({
         queryKey: ['recurring-tasks'],
@@ -103,7 +144,16 @@ export const RecurringTasksView: React.FC = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['recurring-tasks'] });
             setDialogOpen(false);
-            setNewTask({ title: '', description: '', recurrenceType: 'DAILY', priority: 'MEDIUM' });
+            setNewTask({
+                title: '',
+                description: '',
+                recurrenceType: 'DAILY',
+                priority: 'MEDIUM',
+                targetType: 'EMPLOYEE',
+                assigneeId: '',
+                departmentId: '',
+                branchId: '',
+            });
         },
     });
 
@@ -123,6 +173,13 @@ export const RecurringTasksView: React.FC = () => {
         YEARLY: '#EF4444',
     };
 
+    const targetTypeLabels: Record<string, string> = {
+        EMPLOYEE: 'موظف محدد',
+        DEPARTMENT: 'كل موظفين القسم',
+        BRANCH: 'كل موظفين الفرع',
+        ALL: 'كل الموظفين',
+    };
+
     if (isLoading) {
         return (
             <Grid container spacing={2}>
@@ -136,6 +193,34 @@ export const RecurringTasksView: React.FC = () => {
     }
 
     const tasks = Array.isArray(recurringTasks) ? recurringTasks : (recurringTasks?.tasks || recurringTasks || []);
+
+    const handleCreate = () => {
+        const payload: any = {
+            title: newTask.title,
+            description: newTask.description,
+            recurrenceType: newTask.recurrenceType,
+            priority: newTask.priority,
+            targetType: newTask.targetType,
+        };
+
+        if (newTask.targetType === 'EMPLOYEE' && newTask.assigneeId) {
+            payload.assigneeId = newTask.assigneeId;
+        } else if (newTask.targetType === 'DEPARTMENT' && newTask.departmentId) {
+            payload.departmentId = newTask.departmentId;
+        } else if (newTask.targetType === 'BRANCH' && newTask.branchId) {
+            payload.branchId = newTask.branchId;
+        }
+
+        createMutation.mutate(payload);
+    };
+
+    const isCreateDisabled = () => {
+        if (!newTask.title) return true;
+        if (newTask.targetType === 'EMPLOYEE' && !newTask.assigneeId) return true;
+        if (newTask.targetType === 'DEPARTMENT' && !newTask.departmentId) return true;
+        if (newTask.targetType === 'BRANCH' && !newTask.branchId) return true;
+        return createMutation.isPending;
+    };
 
     return (
         <Box>
@@ -166,6 +251,14 @@ export const RecurringTasksView: React.FC = () => {
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                                     {task.description || 'بدون وصف'}
                                 </Typography>
+                                {task.assignee && (
+                                    <Chip
+                                        size="small"
+                                        avatar={<Avatar sx={{ width: 20, height: 20 }}>{task.assignee.firstName?.[0]}</Avatar>}
+                                        label={`${task.assignee.firstName} ${task.assignee.lastName}`}
+                                        sx={{ mb: 1 }}
+                                    />
+                                )}
                                 <Stack direction="row" spacing={1}>
                                     <IconButton size="small"><EditIcon fontSize="small" /></IconButton>
                                     <IconButton size="small" color="error"><DeleteIcon fontSize="small" /></IconButton>
@@ -215,14 +308,95 @@ export const RecurringTasksView: React.FC = () => {
                                 ))}
                             </Select>
                         </FormControl>
+
+                        <Divider sx={{ my: 1 }} />
+                        <Typography variant="subtitle2" color="text.secondary">تعيين المهمة لـ</Typography>
+
+                        <FormControl fullWidth>
+                            <InputLabel>نوع التعيين</InputLabel>
+                            <Select
+                                value={newTask.targetType}
+                                label="نوع التعيين"
+                                onChange={(e) => setNewTask({
+                                    ...newTask,
+                                    targetType: e.target.value as any,
+                                    assigneeId: '',
+                                    departmentId: '',
+                                    branchId: '',
+                                })}
+                            >
+                                {Object.entries(targetTypeLabels).map(([key, label]) => (
+                                    <MenuItem key={key} value={key}>{label}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        {newTask.targetType === 'EMPLOYEE' && (
+                            <FormControl fullWidth>
+                                <InputLabel>اختر الموظف</InputLabel>
+                                <Select
+                                    value={newTask.assigneeId}
+                                    label="اختر الموظف"
+                                    onChange={(e) => setNewTask({ ...newTask, assigneeId: e.target.value })}
+                                >
+                                    {(Array.isArray(employees) ? employees : []).map((emp: any) => (
+                                        <MenuItem key={emp.id} value={emp.id}>
+                                            {emp.firstName} {emp.lastName}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
+
+                        {newTask.targetType === 'DEPARTMENT' && (
+                            <FormControl fullWidth>
+                                <InputLabel>اختر القسم</InputLabel>
+                                <Select
+                                    value={newTask.departmentId}
+                                    label="اختر القسم"
+                                    onChange={(e) => setNewTask({ ...newTask, departmentId: e.target.value })}
+                                >
+                                    {(Array.isArray(departments) ? departments : []).map((dept: any) => (
+                                        <MenuItem key={dept.id} value={dept.id}>
+                                            {dept.name} ({dept._count?.users || 0} موظف)
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
+
+                        {newTask.targetType === 'BRANCH' && (
+                            <FormControl fullWidth>
+                                <InputLabel>اختر الفرع</InputLabel>
+                                <Select
+                                    value={newTask.branchId}
+                                    label="اختر الفرع"
+                                    onChange={(e) => setNewTask({ ...newTask, branchId: e.target.value })}
+                                >
+                                    {(Array.isArray(branches) ? branches : []).map((branch: any) => (
+                                        <MenuItem key={branch.id} value={branch.id}>
+                                            {branch.name} ({branch._count?.users || 0} موظف)
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
+
+                        {newTask.targetType === 'ALL' && (
+                            <Paper sx={{ p: 2, bgcolor: alpha(theme.palette.warning.main, 0.1), borderRadius: 2 }}>
+                                <Typography variant="body2" color="warning.main">
+                                    ⚠️ سيتم إنشاء المهمة لجميع الموظفين ({Array.isArray(employees) ? employees.length : 0} موظف)
+                                </Typography>
+                            </Paper>
+                        )}
                     </Stack>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDialogOpen(false)}>إلغاء</Button>
                     <Button
                         variant="contained"
-                        onClick={() => createMutation.mutate(newTask)}
-                        disabled={!newTask.title || createMutation.isPending}
+                        onClick={handleCreate}
+                        disabled={isCreateDisabled()}
                     >
                         إنشاء
                     </Button>

@@ -2801,38 +2801,109 @@ export class TasksService {
 
     /**
      * Create a recurring task
+     * Supports targetType: EMPLOYEE (single), DEPARTMENT, BRANCH, or ALL
      */
     async createRecurringTask(
         userId: string,
         companyId: string,
-        dto: CreateTaskDto & { recurrenceType: string; recurrenceEnd?: string },
+        dto: CreateTaskDto & {
+            recurrenceType: string;
+            recurrenceEnd?: string;
+            targetType?: 'EMPLOYEE' | 'DEPARTMENT' | 'BRANCH' | 'ALL';
+            departmentId?: string;
+            branchId?: string;
+        },
     ) {
-        const task = await this.prisma.task.create({
-            data: {
-                companyId,
-                createdById: userId,
-                title: dto.title,
-                description: dto.description,
-                priority: dto.priority || 'MEDIUM',
-                status: dto.status || 'TODO',
-                categoryId: dto.categoryId,
-                dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-                startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-                assigneeId: dto.assigneeId,
-                tags: dto.tags || [],
-                recurrenceType: dto.recurrenceType as any,
-                recurrenceEnd: dto.recurrenceEnd ? new Date(dto.recurrenceEnd) : undefined,
-            },
-            include: {
-                category: true,
-                createdBy: { select: { id: true, firstName: true, lastName: true, avatar: true } },
-                assignee: { select: { id: true, firstName: true, lastName: true, avatar: true } },
-            },
-        });
+        const targetType = dto.targetType || 'EMPLOYEE';
 
-        await this.logActivity(task.id, userId, 'CREATED', null, null, 'تم إنشاء مهمة متكررة');
+        // Get the list of assignees based on targetType
+        let assigneeIds: string[] = [];
 
-        return task;
+        if (targetType === 'EMPLOYEE' && dto.assigneeId) {
+            assigneeIds = [dto.assigneeId];
+        } else if (targetType === 'DEPARTMENT' && dto.departmentId) {
+            const users = await this.prisma.user.findMany({
+                where: { companyId, departmentId: dto.departmentId, status: 'ACTIVE' },
+                select: { id: true },
+            });
+            assigneeIds = users.map(u => u.id);
+        } else if (targetType === 'BRANCH' && dto.branchId) {
+            const users = await this.prisma.user.findMany({
+                where: { companyId, branchId: dto.branchId, status: 'ACTIVE' },
+                select: { id: true },
+            });
+            assigneeIds = users.map(u => u.id);
+        } else if (targetType === 'ALL') {
+            const users = await this.prisma.user.findMany({
+                where: { companyId, status: 'ACTIVE', role: 'EMPLOYEE' },
+                select: { id: true },
+            });
+            assigneeIds = users.map(u => u.id);
+        }
+
+        // If no assignees found, create task without assignee
+        if (assigneeIds.length === 0) {
+            const task = await this.prisma.task.create({
+                data: {
+                    companyId,
+                    createdById: userId,
+                    title: dto.title,
+                    description: dto.description,
+                    priority: dto.priority || 'MEDIUM',
+                    status: dto.status || 'TODO',
+                    categoryId: dto.categoryId,
+                    dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+                    startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+                    tags: dto.tags || [],
+                    recurrenceType: dto.recurrenceType as any,
+                    recurrenceEnd: dto.recurrenceEnd ? new Date(dto.recurrenceEnd) : undefined,
+                },
+                include: {
+                    category: true,
+                    createdBy: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+                    assignee: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+                },
+            });
+
+            await this.logActivity(task.id, userId, 'CREATED', null, null, 'تم إنشاء مهمة متكررة');
+            return { tasks: [task], count: 1 };
+        }
+
+        // Create tasks for all assignees
+        const createdTasks = [];
+        for (const assigneeId of assigneeIds) {
+            const task = await this.prisma.task.create({
+                data: {
+                    companyId,
+                    createdById: userId,
+                    title: dto.title,
+                    description: dto.description,
+                    priority: dto.priority || 'MEDIUM',
+                    status: dto.status || 'TODO',
+                    categoryId: dto.categoryId,
+                    dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+                    startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+                    assigneeId,
+                    tags: dto.tags || [],
+                    recurrenceType: dto.recurrenceType as any,
+                    recurrenceEnd: dto.recurrenceEnd ? new Date(dto.recurrenceEnd) : undefined,
+                },
+                include: {
+                    category: true,
+                    createdBy: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+                    assignee: { select: { id: true, firstName: true, lastName: true, avatar: true } },
+                },
+            });
+
+            await this.logActivity(task.id, userId, 'CREATED', null, null, 'تم إنشاء مهمة متكررة');
+            createdTasks.push(task);
+        }
+
+        return {
+            tasks: createdTasks,
+            count: createdTasks.length,
+            message: `تم إنشاء ${createdTasks.length} مهمة متكررة`,
+        };
     }
 
     /**
