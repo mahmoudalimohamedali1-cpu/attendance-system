@@ -303,12 +303,12 @@ export class TasksService {
                     },
                     orderBy: { startTime: 'desc' },
                 },
-                blockedBy: {
+                blockedTasks: {
                     include: {
                         blockingTask: { select: { id: true, title: true, status: true } },
                     },
                 },
-                blocks: {
+                blockingTasks: {
                     include: {
                         blockedTask: { select: { id: true, title: true, status: true } },
                     },
@@ -1700,10 +1700,10 @@ export class TasksService {
                 category: {
                     select: { id: true, name: true, color: true },
                 },
-                blockedBy: {
+                blockedTasks: {
                     select: { blockingTaskId: true, type: true },
                 },
-                blocks: {
+                blockingTasks: {
                     select: { blockedTaskId: true, type: true },
                 },
             },
@@ -1721,8 +1721,8 @@ export class TasksService {
             priority: task.priority,
             assignee: task.assignee,
             category: task.category,
-            dependencies: task.blockedBy.map(d => d.blockingTaskId),
-            type: task.blockedBy.length > 0 ? 'task' : 'milestone',
+            dependencies: (task.blockedTasks || []).map(d => d.blockingTaskId),
+            type: (task.blockedTasks?.length || 0) > 0 ? 'task' : 'milestone',
         }));
     }
 
@@ -2949,7 +2949,7 @@ export class TasksService {
                 assignee: { select: { id: true, firstName: true, lastName: true, avatar: true } },
                 category: { select: { id: true, name: true, color: true } },
                 project: { select: { id: true, name: true, code: true } },
-                blockedBy: {
+                blockedTasks: {
                     select: {
                         blockingTaskId: true,
                         type: true,
@@ -2971,7 +2971,7 @@ export class TasksService {
             assignee: task.assignee,
             category: task.category,
             project: task.project,
-            dependencies: task.blockedBy.map((d) => d.blockingTaskId).join(','),
+            dependencies: (task.blockedTasks || []).map((d) => d.blockingTaskId).join(','),
         }));
     }
 
@@ -7058,7 +7058,7 @@ export class TasksService {
             },
             include: {
                 assignee: { select: { id: true, firstName: true, lastName: true } },
-                blockedBy: true,
+                blockedTasks: true,
                 blockingTasks: true,
                 category: true,
             },
@@ -7086,7 +7086,7 @@ export class TasksService {
             score += Math.min((task.blockingTasks?.length || 0) * 10, 20);
 
             // Being blocked penalty (-10 points)
-            if ((task.blockedBy?.length || 0) > 0) score -= 10;
+            if ((task.blockedTasks?.length || 0) > 0) score -= 10;
 
             // Story points complexity (max 10 points)
             if (task.storyPoints) score += Math.min(task.storyPoints, 10);
@@ -7119,8 +7119,8 @@ export class TasksService {
                 ...(categoryId && { categoryId }),
             },
             include: {
-                blockedBy: true,
-                blocks: true,
+                blockedTasks: true,
+                blockingTasks: true,
                 assignee: { select: { id: true, firstName: true, lastName: true, avatar: true } },
             },
         });
@@ -7137,7 +7137,7 @@ export class TasksService {
 
         const edges: { source: string; target: string; type: string }[] = [];
         for (const task of tasks) {
-            for (const dep of task.blockedBy) {
+            for (const dep of (task.blockedTasks || [])) {
                 edges.push({
                     source: dep.blockingTaskId,
                     target: task.id,
