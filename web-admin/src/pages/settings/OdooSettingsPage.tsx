@@ -143,6 +143,64 @@ const OdooSettingsPage: React.FC = () => {
         }
     };
 
+    // Leaves
+    const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+    const [leaves, setLeaves] = useState<any[]>([]);
+
+    const loadLeaveTypes = async () => {
+        try {
+            const data = await integrationsApi.getOdooLeaveTypes();
+            setLeaveTypes(data);
+        } catch (error) {
+            console.error('Failed to load leave types:', error);
+        }
+    };
+
+    const loadLeaves = async () => {
+        try {
+            const data = await integrationsApi.getOdooLeaves();
+            setLeaves(data);
+        } catch (error) {
+            console.error('Failed to load leaves:', error);
+        }
+    };
+
+    // Payroll
+    const [payrollData, setPayrollData] = useState<any>(null);
+    const [payrollPeriod, setPayrollPeriod] = useState({
+        start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0],
+    });
+
+    const handleExportPayroll = async () => {
+        try {
+            setSyncing(true);
+            const data = await integrationsApi.exportOdooPayroll({
+                periodStart: payrollPeriod.start,
+                periodEnd: payrollPeriod.end,
+            });
+            setPayrollData(data);
+            alert(`تم تصدير بيانات ${data.totalEmployees} موظف`);
+        } catch (error) {
+            console.error('Payroll export failed:', error);
+        } finally {
+            setSyncing(false);
+        }
+    };
+
+    const handlePushPayroll = async () => {
+        if (!payrollData?.data) return;
+        try {
+            setSyncing(true);
+            const result = await integrationsApi.pushOdooPayroll({ data: payrollData.data });
+            alert(`تم إرسال ${result.success} سجل إلى Odoo`);
+        } catch (error) {
+            console.error('Push payroll failed:', error);
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -316,10 +374,65 @@ const OdooSettingsPage: React.FC = () => {
                     {activeTab === 2 && (
                         <Card>
                             <CardContent>
-                                <Typography variant="h6" mb={2}>الإجازات من Odoo</Typography>
-                                <Alert severity="info">
-                                    يتم جلب الإجازات من Odoo ومزامنتها مع نظام الحضور.
-                                </Alert>
+                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                                    <Typography variant="h6">الإجازات من Odoo</Typography>
+                                    <Box>
+                                        <Button startIcon={<Refresh />} onClick={loadLeaveTypes} sx={{ mr: 1 }}>
+                                            أنواع الإجازات
+                                        </Button>
+                                        <Button variant="contained" startIcon={<CloudDownload />} onClick={loadLeaves} disabled={syncing}>
+                                            جلب الإجازات
+                                        </Button>
+                                    </Box>
+                                </Box>
+
+                                {leaveTypes.length > 0 && (
+                                    <Box mb={3}>
+                                        <Typography variant="subtitle1" mb={1}>أنواع الإجازات المتاحة:</Typography>
+                                        <Box display="flex" gap={1} flexWrap="wrap">
+                                            {leaveTypes.map((lt: any) => (
+                                                <Chip key={lt.id} label={lt.name} variant="outlined" />
+                                            ))}
+                                        </Box>
+                                    </Box>
+                                )}
+
+                                {leaves.length > 0 ? (
+                                    <TableContainer component={Paper}>
+                                        <Table size="small">
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>الموظف</TableCell>
+                                                    <TableCell>نوع الإجازة</TableCell>
+                                                    <TableCell>من</TableCell>
+                                                    <TableCell>إلى</TableCell>
+                                                    <TableCell>الأيام</TableCell>
+                                                    <TableCell>الحالة</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {leaves.map((leave: any) => (
+                                                    <TableRow key={leave.id}>
+                                                        <TableCell>{leave.employeeName}</TableCell>
+                                                        <TableCell>{leave.leaveTypeName}</TableCell>
+                                                        <TableCell>{leave.dateFrom?.split(' ')[0]}</TableCell>
+                                                        <TableCell>{leave.dateTo?.split(' ')[0]}</TableCell>
+                                                        <TableCell>{leave.numberOfDays}</TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={leave.state === 'validate' ? 'معتمد' : leave.state === 'confirm' ? 'بانتظار' : leave.state}
+                                                                color={leave.state === 'validate' ? 'success' : 'default'}
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                ) : (
+                                    <Alert severity="info">اضغط "جلب الإجازات" لعرض الإجازات من Odoo</Alert>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -328,10 +441,79 @@ const OdooSettingsPage: React.FC = () => {
                     {activeTab === 3 && (
                         <Card>
                             <CardContent>
-                                <Typography variant="h6" mb={2}>تصدير الرواتب</Typography>
-                                <Alert severity="info">
-                                    تصدير بيانات الحضور والانصراف والتأخير إلى نظام الرواتب في Odoo.
-                                </Alert>
+                                <Typography variant="h6" mb={2}>تصدير بيانات الرواتب</Typography>
+
+                                <Grid container spacing={2} mb={3}>
+                                    <Grid item xs={12} md={4}>
+                                        <TextField
+                                            fullWidth
+                                            type="date"
+                                            label="من تاريخ"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={payrollPeriod.start}
+                                            onChange={e => setPayrollPeriod({ ...payrollPeriod, start: e.target.value })}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} md={4}>
+                                        <TextField
+                                            fullWidth
+                                            type="date"
+                                            label="إلى تاريخ"
+                                            InputLabelProps={{ shrink: true }}
+                                            value={payrollPeriod.end}
+                                            onChange={e => setPayrollPeriod({ ...payrollPeriod, end: e.target.value })}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} md={4}>
+                                        <Box display="flex" gap={1} height="100%" alignItems="center">
+                                            <Button variant="contained" startIcon={<CloudDownload />} onClick={handleExportPayroll} disabled={syncing}>
+                                                {syncing ? 'جاري التصدير...' : 'تصدير الحضور'}
+                                            </Button>
+                                            {payrollData && (
+                                                <Button variant="outlined" startIcon={<CloudUpload />} onClick={handlePushPayroll} disabled={syncing}>
+                                                    إرسال لـ Odoo
+                                                </Button>
+                                            )}
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+
+                                {payrollData && (
+                                    <Box>
+                                        <Alert severity="success" sx={{ mb: 2 }}>
+                                            الفترة: {payrollData.periodStart} إلى {payrollData.periodEnd} |
+                                            الموظفين: {payrollData.totalEmployees}
+                                        </Alert>
+                                        <TableContainer component={Paper}>
+                                            <Table size="small">
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell>الموظف</TableCell>
+                                                        <TableCell>أيام العمل</TableCell>
+                                                        <TableCell>ساعات العمل</TableCell>
+                                                        <TableCell>الإضافي</TableCell>
+                                                        <TableCell>التأخير (د)</TableCell>
+                                                        <TableCell>الخروج المبكر</TableCell>
+                                                        <TableCell>الغياب</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {payrollData.data?.map((row: any) => (
+                                                        <TableRow key={row.userId}>
+                                                            <TableCell>{row.employeeName}</TableCell>
+                                                            <TableCell>{row.workedDays}</TableCell>
+                                                            <TableCell>{row.workedHours}</TableCell>
+                                                            <TableCell>{row.overtimeHours}</TableCell>
+                                                            <TableCell>{row.lateMinutes}</TableCell>
+                                                            <TableCell>{row.earlyLeaveMinutes}</TableCell>
+                                                            <TableCell>{row.absentDays}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                    </Box>
+                                )}
                             </CardContent>
                         </Card>
                     )}
