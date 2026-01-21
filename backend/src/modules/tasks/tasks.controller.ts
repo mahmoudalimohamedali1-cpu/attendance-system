@@ -1176,23 +1176,6 @@ export class TasksController {
         );
     }
 
-    // ==================== RECURRING TASKS ====================
-
-    @Post('recurring')
-    @ApiOperation({ summary: 'إنشاء مهمة متكررة' })
-    createRecurringTask(
-        @Request() req: any,
-        @Body() body: CreateTaskDto & { recurrenceType: string; recurrenceEnd?: string },
-    ) {
-        return this.tasksService.createRecurringTask(req.user.id, req.user.companyId, body);
-    }
-
-    @Get('recurring')
-    @ApiOperation({ summary: 'المهام المتكررة' })
-    getRecurringTasks(@Request() req: any) {
-        return this.tasksService.getRecurringTasks(req.user.companyId);
-    }
-
     // ==================== GANTT ENHANCEMENTS ====================
 
     @Patch(':id/dates')

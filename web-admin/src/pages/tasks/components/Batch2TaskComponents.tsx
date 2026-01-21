@@ -135,7 +135,7 @@ export const RecurringTasksView: React.FC = () => {
         );
     }
 
-    const tasks = recurringTasks?.tasks || [];
+    const tasks = Array.isArray(recurringTasks) ? recurringTasks : (recurringTasks?.tasks || recurringTasks || []);
 
     return (
         <Box>
