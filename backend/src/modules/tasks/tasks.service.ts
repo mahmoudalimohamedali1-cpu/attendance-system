@@ -7059,7 +7059,7 @@ export class TasksService {
             include: {
                 assignee: { select: { id: true, firstName: true, lastName: true } },
                 blockedBy: true,
-                blocks: true,
+                blockingTasks: true,
                 category: true,
             },
         });
@@ -7083,10 +7083,10 @@ export class TasksService {
             score += priorityScores[task.priority] || 10;
 
             // Blocking others (max 20 points)
-            score += Math.min(task.blocks.length * 10, 20);
+            score += Math.min((task.blockingTasks?.length || 0) * 10, 20);
 
             // Being blocked penalty (-10 points)
-            if (task.blockedBy.length > 0) score -= 10;
+            if ((task.blockedBy?.length || 0) > 0) score -= 10;
 
             // Story points complexity (max 10 points)
             if (task.storyPoints) score += Math.min(task.storyPoints, 10);
@@ -7164,7 +7164,7 @@ export class TasksService {
         const employees = await this.prisma.user.findMany({
             where: { companyId, status: 'ACTIVE', role: { in: ['EMPLOYEE', 'MANAGER', 'HR'] } },
             include: {
-                assignedTasks: {
+                tasksAssigned: {
                     where: { status: { notIn: ['COMPLETED', 'CANCELLED'] } },
                 },
             },
@@ -7175,7 +7175,7 @@ export class TasksService {
             let score = 100;
 
             // Workload penalty (fewer tasks = higher score)
-            score -= ((emp as any).assignedTasks?.length || 0) * 10;
+            score -= ((emp as any).tasksAssigned?.length || 0) * 10;
 
             // Skill match bonus
             if (task.category && (emp as any).skills) {
@@ -7208,7 +7208,7 @@ export class TasksService {
                 id: bestMatch.employee.id,
                 name: `${bestMatch.employee.firstName} ${bestMatch.employee.lastName}`,
             },
-            reason: `تم التعيين بناءً على عبء العمل (${(bestMatch.employee as any).assignedTasks?.length || 0} مهام حالية)`,
+            reason: `تم التعيين بناءً على عبء العمل (${(bestMatch.employee as any).tasksAssigned?.length || 0} مهام حالية)`,
         };
     }
 
@@ -7219,7 +7219,7 @@ export class TasksService {
         const employees = await this.prisma.user.findMany({
             where: { companyId, status: 'ACTIVE' },
             include: {
-                assignedTasks: {
+                tasksAssigned: {
                     where: { status: { notIn: ['COMPLETED', 'CANCELLED'] } },
                     select: { id: true, priority: true, dueDate: true, storyPoints: true, estimatedHours: true },
                 },
@@ -7227,7 +7227,7 @@ export class TasksService {
         });
 
         const analysis = employees.map(emp => {
-            const tasks = emp.assignedTasks;
+            const tasks = (emp as any).tasksAssigned || [];
             const totalPoints = tasks.reduce((sum, t) => sum + (t.storyPoints || 0), 0);
             const totalHours = tasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
             const overdueTasks = tasks.filter(t => t.dueDate && t.dueDate < new Date()).length;
