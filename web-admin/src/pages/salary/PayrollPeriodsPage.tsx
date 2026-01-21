@@ -20,12 +20,18 @@ import {
     Grid,
     Alert,
     MenuItem,
+    Tabs,
+    Tab,
+    Divider,
 } from '@mui/material';
 import {
     Add as AddIcon,
     PlayArrow,
     Visibility,
     EventNote,
+    Lock,
+    LockOpen,
+    Receipt,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
 import { useNavigate } from 'react-router-dom';
@@ -41,11 +47,23 @@ interface PayrollPeriod {
     _count?: { payslips: number };
 }
 
+interface PayrollRun {
+    id: string;
+    runDate: string;
+    status: string;
+    lockedAt: string | null;
+    isAdjustment: boolean;
+    period: { month: number; year: number };
+    _count?: { payslips: number };
+}
+
 export const PayrollPeriodsPage = () => {
     const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
+    const [runs, setRuns] = useState<PayrollRun[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [open, setOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState(0);
     const [formData, setFormData] = useState({
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
@@ -58,10 +76,14 @@ export const PayrollPeriodsPage = () => {
     const fetchPeriods = async () => {
         try {
             setLoading(true);
-            const data = await api.get('/payroll-periods') as PayrollPeriod[];
-            setPeriods(data);
+            const [periodsData, runsData] = await Promise.all([
+                api.get('/payroll-periods') as Promise<PayrollPeriod[]>,
+                api.get('/payroll-runs') as Promise<PayrollRun[]>,
+            ]);
+            setPeriods(periodsData);
+            setRuns(runsData);
         } catch (err: any) {
-            setError(err.message || 'Failed to fetch periods');
+            setError(err.message || 'Failed to fetch data');
         } finally {
             setLoading(false);
         }
@@ -132,13 +154,35 @@ export const PayrollPeriodsPage = () => {
         }
     };
 
+    const getRunStatusLabel = (status: string) => {
+        switch (status) {
+            case 'DRAFT': return 'مسودة';
+            case 'CALCULATED': return 'تم الحساب';
+            case 'APPROVED': return 'معتمد';
+            case 'LOCKED': return 'مقفل 🔒';
+            case 'PAID': return 'تم الصرف ✅';
+            default: return status;
+        }
+    };
+
+    const getRunStatusColor = (status: string) => {
+        switch (status) {
+            case 'DRAFT': return 'default';
+            case 'CALCULATED': return 'info';
+            case 'APPROVED': return 'success';
+            case 'LOCKED': return 'success';
+            case 'PAID': return 'success';
+            default: return 'default';
+        }
+    };
+
     return (
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                 <Box>
-                    <Typography variant="h5" fontWeight="bold">فترات مسيرات الرواتب</Typography>
+                    <Typography variant="h5" fontWeight="bold">فترات ومسيرات الرواتب</Typography>
                     <Typography variant="body2" color="text.secondary">
-                        فتح وإدارة فترات شهرية لاحتساب وصرف الرواتب
+                        فتح وإدارة فترات شهرية ومسيرات لاحتساب وصرف الرواتب
                     </Typography>
                 </Box>
                 <Button
@@ -153,73 +197,156 @@ export const PayrollPeriodsPage = () => {
 
             {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
 
-            <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-                <TableContainer>
-                    <Table>
-                        <TableHead sx={{ bgcolor: 'grey.50' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 'bold' }}>الفترة</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>التكرار</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>من تاريخ</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>إلى تاريخ</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>عدد المسودات</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>الحالة</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }} align="center">الإجراءات</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {periods.map((period) => (
-                                <TableRow key={period.id} hover>
-                                    <TableCell>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <EventNote color="primary" sx={{ fontSize: 20 }} />
-                                            <Typography fontWeight="bold">{period.month} / {period.year}</Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2">{getFrequencyLabel(period.frequency)}</Typography>
-                                    </TableCell>
-                                    <TableCell>{new Date(period.startDate).toLocaleDateString('ar-SA')}</TableCell>
-                                    <TableCell>{new Date(period.endDate).toLocaleDateString('ar-SA')}</TableCell>
-                                    <TableCell>{period._count?.payslips || 0}</TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={getStatusLabel(period.status)}
-                                            size="small"
-                                            color={getStatusColor(period.status) as any}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <Button
-                                            size="small"
-                                            startIcon={<PlayArrow />}
-                                            onClick={() => navigate(`/salary/wizard?periodId=${period.id}`)}
-                                            disabled={period.status === 'PAID'}
-                                        >
-                                            تشغيل
-                                        </Button>
-                                        <IconButton
-                                            onClick={() => navigate(`/payslips?periodId=${period.id}`)}
-                                            size="small"
-                                            title="عرض القسائم"
-                                        >
-                                            <Visibility fontSize="small" />
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {periods.length === 0 && !loading && (
+            {/* Tabs for Periods vs Runs */}
+            <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
+                <Tab icon={<EventNote />} iconPosition="start" label="فترات الرواتب" />
+                <Tab icon={<Receipt />} iconPosition="start" label={`المسيرات (${runs.length})`} />
+            </Tabs>
+
+            {activeTab === 0 && (
+
+                <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+                    <TableContainer>
+                        <Table>
+                            <TableHead sx={{ bgcolor: 'grey.50' }}>
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                                        <EventNote sx={{ fontSize: 48, color: 'grey.300', mb: 1 }} />
-                                        <Typography color="text.secondary">لا يوجد فترات رواتب مفتوحة بعد</Typography>
-                                    </TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>الفترة</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>التكرار</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>من تاريخ</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>إلى تاريخ</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>عدد المسودات</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>الحالة</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">الإجراءات</TableCell>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Card>
+                            </TableHead>
+                            <TableBody>
+                                {periods.map((period) => (
+                                    <TableRow key={period.id} hover>
+                                        <TableCell>
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <EventNote color="primary" sx={{ fontSize: 20 }} />
+                                                <Typography fontWeight="bold">{period.month} / {period.year}</Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2">{getFrequencyLabel(period.frequency)}</Typography>
+                                        </TableCell>
+                                        <TableCell>{new Date(period.startDate).toLocaleDateString('ar-SA')}</TableCell>
+                                        <TableCell>{new Date(period.endDate).toLocaleDateString('ar-SA')}</TableCell>
+                                        <TableCell>{period._count?.payslips || 0}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={getStatusLabel(period.status)}
+                                                size="small"
+                                                color={getStatusColor(period.status) as any}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Button
+                                                size="small"
+                                                startIcon={<PlayArrow />}
+                                                onClick={() => navigate(`/salary/wizard?periodId=${period.id}`)}
+                                                disabled={period.status === 'PAID'}
+                                            >
+                                                تشغيل
+                                            </Button>
+                                            <IconButton
+                                                onClick={() => navigate(`/payslips?periodId=${period.id}`)}
+                                                size="small"
+                                                title="عرض القسائم"
+                                            >
+                                                <Visibility fontSize="small" />
+                                            </IconButton>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {periods.length === 0 && !loading && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                                            <EventNote sx={{ fontSize: 48, color: 'grey.300', mb: 1 }} />
+                                            <Typography color="text.secondary">لا يوجد فترات رواتب مفتوحة بعد</Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Card>
+            )}
+
+            {/* Payroll Runs Tab */}
+            {activeTab === 1 && (
+                <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+                    <TableContainer>
+                        <Table>
+                            <TableHead sx={{ bgcolor: 'grey.50' }}>
+                                <TableRow>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>الفترة</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>تاريخ التشغيل</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>النوع</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>عدد القسائم</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>الحالة</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }} align="center">الإجراءات</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {runs.map((run) => (
+                                    <TableRow key={run.id} hover>
+                                        <TableCell>
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <Receipt color="primary" sx={{ fontSize: 20 }} />
+                                                <Typography fontWeight="bold">
+                                                    {run.period?.month} / {run.period?.year}
+                                                </Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell>
+                                            {new Date(run.runDate).toLocaleDateString('ar-SA')}
+                                        </TableCell>
+                                        <TableCell>
+                                            {run.isAdjustment ? (
+                                                <Chip label="تعديل" size="small" color="secondary" />
+                                            ) : (
+                                                <Chip label="أساسي" size="small" variant="outlined" />
+                                            )}
+                                        </TableCell>
+                                        <TableCell>{run._count?.payslips || 0}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                icon={run.lockedAt ? <Lock /> : <LockOpen />}
+                                                label={getRunStatusLabel(run.status)}
+                                                size="small"
+                                                color={getRunStatusColor(run.status) as any}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                startIcon={<Visibility />}
+                                                onClick={() => navigate(`/salary/runs/${run.id}`)}
+                                            >
+                                                تفاصيل
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {runs.length === 0 && !loading && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                                            <Receipt sx={{ fontSize: 48, color: 'grey.300', mb: 1 }} />
+                                            <Typography color="text.secondary">لا يوجد مسيرات رواتب بعد</Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                اذهب للفترات واضغط "تشغيل" لإنشاء مسير جديد
+                                            </Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Card>
+            )}
 
             <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
                 <DialogTitle>فتح فترة رواتب جديدة</DialogTitle>
