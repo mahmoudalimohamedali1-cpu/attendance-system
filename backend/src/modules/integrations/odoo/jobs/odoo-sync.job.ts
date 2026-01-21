@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { OdooService } from './odoo.service';
-import { PrismaService } from '../../../common/prisma/prisma.service';
+import { OdooService } from '../odoo.service';
+import { PrismaService } from '../../../../common/prisma/prisma.service';
 
 @Injectable()
 export class OdooSyncJob {
