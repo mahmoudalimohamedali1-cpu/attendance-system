@@ -870,8 +870,8 @@ export class PayrollCalculationService {
                     status: 'APPROVED',
                     startDate: { lte: endDate },
                     endDate: { gte: startDate },
-                    leaveTypeId: sickLeaveType.id
-                } as any
+                    leaveTypeConfigId: sickLeaveType.id
+                }
             }) : [];
 
             if (sickLeaves.length > 0) {
@@ -892,8 +892,8 @@ export class PayrollCalculationService {
                         companyId,
                         status: 'APPROVED',
                         startDate: { gte: yearStart, lte: endDate },
-                        leaveTypeId: sickLeaveType!.id
-                    } as any
+                        leaveTypeConfigId: sickLeaveType!.id
+                    }
                 });
 
                 let totalSickDaysThisYear = 0;
