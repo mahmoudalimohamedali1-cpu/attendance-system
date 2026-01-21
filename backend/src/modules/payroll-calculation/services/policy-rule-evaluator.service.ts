@@ -172,6 +172,7 @@ export class PolicyRuleEvaluatorService {
 
     /**
      * Deduction rule evaluation (late, absence, etc.)
+     * 🔧 FIX: Now properly checks MongoDB-style conditions like {lateMinutes: {gte: 15, lt: 30}}
      */
     private evaluateDeductionRule(rule: any, context: PolicyEvaluationContext): PolicyRuleResult {
         const att = context.attendance;
@@ -190,10 +191,31 @@ export class PolicyRuleEvaluatorService {
             units = att.lateMinutes;
             if (units <= 0) return { success: false, amount: 0, description: 'No late minutes' };
 
+            // 🔧 FIX: Parse MongoDB-style conditions: {lateMinutes: {gte: 15, lt: 30}}
+            const lateCondition = conditions.lateMinutes;
+            if (lateCondition && typeof lateCondition === 'object') {
+                const gte = lateCondition.gte ?? lateCondition.$gte ?? 0;
+                const gt = lateCondition.gt ?? lateCondition.$gt ?? -Infinity;
+                const lt = lateCondition.lt ?? lateCondition.$lt ?? Infinity;
+                const lte = lateCondition.lte ?? lateCondition.$lte ?? Infinity;
+
+                // Check if late minutes is within the specified range
+                const matchesGte = units >= gte;
+                const matchesGt = units > gt;
+                const matchesLt = units < lt;
+                const matchesLte = units <= lte;
+
+                if (!matchesGte || !matchesGt || !matchesLt || !matchesLte) {
+                    this.logger.debug(`Skipping late rule: ${units} minutes doesn't match condition (gte:${gte}, lt:${lt})`);
+                    return { success: false, amount: 0, description: `Late minutes ${units} doesn't match condition` };
+                }
+            }
+
             if (rule.valueType === 'FIXED') {
                 amount = parseFloat(rule.value);
             } else if (rule.valueType === 'PERCENTAGE') {
-                amount = (units / 60) * hourlyRate * (parseFloat(rule.value) / 100);
+                // Percentage of daily rate for the deduction
+                amount = dailyRate * (parseFloat(rule.value) / 100);
             } else {
                 amount = (units / 60) * hourlyRate; // Default: deduct per hour
             }
@@ -203,8 +225,29 @@ export class PolicyRuleEvaluatorService {
             units = att.absentDays;
             if (units <= 0) return { success: false, amount: 0, description: 'No absent days' };
 
+            // 🔧 FIX: Parse MongoDB-style conditions for absence too
+            const absenceCondition = conditions.absentDays;
+            if (absenceCondition && typeof absenceCondition === 'object') {
+                const gte = absenceCondition.gte ?? absenceCondition.$gte ?? 0;
+                const gt = absenceCondition.gt ?? absenceCondition.$gt ?? -Infinity;
+                const lt = absenceCondition.lt ?? absenceCondition.$lt ?? Infinity;
+                const lte = absenceCondition.lte ?? absenceCondition.$lte ?? Infinity;
+
+                const matchesGte = units >= gte;
+                const matchesGt = units > gt;
+                const matchesLt = units < lt;
+                const matchesLte = units <= lte;
+
+                if (!matchesGte || !matchesGt || !matchesLt || !matchesLte) {
+                    this.logger.debug(`Skipping absence rule: ${units} days doesn't match condition`);
+                    return { success: false, amount: 0, description: `Absent days ${units} doesn't match condition` };
+                }
+            }
+
             if (rule.valueType === 'FIXED') {
                 amount = parseFloat(rule.value) * units;
+            } else if (rule.valueType === 'PERCENTAGE') {
+                amount = dailyRate * units * (parseFloat(rule.value) / 100);
             } else {
                 amount = dailyRate * units;
             }
