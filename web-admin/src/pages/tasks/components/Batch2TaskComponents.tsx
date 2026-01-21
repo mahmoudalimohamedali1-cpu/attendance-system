@@ -87,7 +87,7 @@ export const RecurringTasksView: React.FC = () => {
         title: '',
         description: '',
         recurrenceType: 'DAILY',
-        priority: 'NORMAL',
+        priority: 'MEDIUM',
     });
 
     const { data: recurringTasks, isLoading } = useQuery({
@@ -103,7 +103,7 @@ export const RecurringTasksView: React.FC = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['recurring-tasks'] });
             setDialogOpen(false);
-            setNewTask({ title: '', description: '', recurrenceType: 'DAILY', priority: 'NORMAL' });
+            setNewTask({ title: '', description: '', recurrenceType: 'DAILY', priority: 'MEDIUM' });
         },
     });
 
@@ -358,7 +358,7 @@ export const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                                 onChange={(e) => setUpdates({ ...updates, priority: e.target.value })}
                             >
                                 <MenuItem value="LOW">منخفضة</MenuItem>
-                                <MenuItem value="NORMAL">عادية</MenuItem>
+                                <MenuItem value="MEDIUM">عادية</MenuItem>
                                 <MenuItem value="HIGH">عالية</MenuItem>
                                 <MenuItem value="URGENT">عاجلة</MenuItem>
                             </Select>

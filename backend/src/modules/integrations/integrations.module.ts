@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { OdooModule } from './odoo/odoo.module';
 import { SlackService } from './slack/slack.service';
 import { TeamsService } from './teams/teams.service';
 import { GitHubService } from './github/github.service';
@@ -9,9 +10,9 @@ import { TrelloService } from './trello/trello.service';
 import { IntegrationsController } from './integrations.controller';
 
 @Module({
-    imports: [PrismaModule, WebhooksModule],
+    imports: [PrismaModule, WebhooksModule, OdooModule],
     controllers: [IntegrationsController],
     providers: [SlackService, TeamsService, GitHubService, JiraService, TrelloService],
-    exports: [WebhooksModule, SlackService, TeamsService, GitHubService, JiraService, TrelloService],
+    exports: [WebhooksModule, OdooModule, SlackService, TeamsService, GitHubService, JiraService, TrelloService],
 })
 export class IntegrationsModule { }

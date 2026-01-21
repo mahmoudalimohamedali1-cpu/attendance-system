@@ -40,6 +40,7 @@ export class IntegrationsController {
             { type: 'gitlab', name: 'GitLab', icon: '🦊', description: 'ربط المهام بالـ Issues' },
             { type: 'jira', name: 'Jira', icon: '📊', description: 'استيراد وتصدير المهام' },
             { type: 'trello', name: 'Trello', icon: '📋', description: 'استيراد اللوحات والبطاقات' },
+            { type: 'ODOO', name: 'Odoo ERP', icon: '🟣', description: 'مزامنة الموظفين والحضور' },
         ];
 
         return {
