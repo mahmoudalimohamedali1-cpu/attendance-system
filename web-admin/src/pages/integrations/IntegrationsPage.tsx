@@ -364,7 +364,7 @@ function IntegrationsTab() {
                                         >
                                             فصل
                                         </Button>
-                                    ) : integration.type === 'odoo' ? (
+                                    ) : integration.type === 'odoo' || integration.type === 'ODOO' ? (
                                         <Button
                                             variant="contained" size="small" color="secondary"
                                             startIcon={<LinkIcon />}
