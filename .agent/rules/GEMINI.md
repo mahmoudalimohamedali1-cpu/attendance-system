@@ -235,7 +235,6 @@ When user's prompt is NOT in English:
 | `frontend-design` | Web UI patterns |
 | `mobile-design` | Mobile UI patterns |
 | `plan-writing` | {task-slug}.md format |
-| `threejs-mastery` | 2025 3D Web (R3F, WebGPU) |
 | `behavioral-modes` | Mode switching |
 
 ### Script Locations

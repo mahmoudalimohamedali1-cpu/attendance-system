@@ -7140,3 +7140,171 @@ model EventTarget {
   @@index([targetType, targetValue])
   @@map("event_targets")
 }
+
+// ==================== Odoo ERP Integration ====================
+
+// سجل مزامنة Odoo
+model OdooSyncLog {
+  id           String  @id @default(uuid())
+  companyId    String  @map("company_id")
+  operation    String // EMPLOYEE_SYNC, ATTENDANCE_PUSH, LEAVE_SYNC, PAYROLL_EXPORT
+  direction    String // INBOUND, OUTBOUND
+  status       String // SUCCESS, FAILED, PARTIAL
+  recordCount  Int     @default(0) @map("record_count")
+  successCount Int     @default(0) @map("success_count")
+  failedCount  Int     @default(0) @map("failed_count")
+  errors       Json?
+  duration     Int? // milliseconds
+  triggeredBy  String? @map("triggered_by") // USER, SCHEDULED, WEBHOOK
+  metadata     Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@index([operation])
+  @@index([status])
+  @@index([createdAt])
+  @@map("odoo_sync_logs")
+}
+
+// طابور إعادة المحاولة
+model OdooRetryQueue {
+  id          String    @id @default(uuid())
+  companyId   String    @map("company_id")
+  operation   String
+  payload     Json
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  lastError   String?   @map("last_error") @db.Text
+  nextRetryAt DateTime? @map("next_retry_at")
+  status      String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  priority    Int       @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@index([status])
+  @@index([nextRetryAt])
+  @@map("odoo_retry_queue")
+}
+
+// ربط الحقول بين النظامين
+model OdooFieldMapping {
+  id          String  @id @default(uuid())
+  companyId   String  @map("company_id")
+  entityType  String  @map("entity_type") // EMPLOYEE, ATTENDANCE, LEAVE, PAYROLL
+  localField  String  @map("local_field")
+  odooField   String  @map("odoo_field")
+  odooModel   String  @map("odoo_model") // hr.employee, hr.attendance, etc.
+  transformer String? // DATE_FORMAT, ENUM_MAP, CONCAT, SPLIT
+  config      Json? // Transformer configuration
+  isRequired  Boolean @default(false) @map("is_required")
+  isActive    Boolean @default(true) @map("is_active")
+  description String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, entityType, localField])
+  @@index([companyId])
+  @@index([entityType])
+  @@map("odoo_field_mappings")
+}
+
+// تكوين Odoo لكل شركة
+model OdooCompanyConfig {
+  id         String @id @default(uuid())
+  companyId  String @unique @map("company_id")
+  odooUrl    String @map("odoo_url")
+  database   String
+  username   String
+  apiKey     String @map("api_key")
+  odooUserId Int?   @map("odoo_user_id")
+
+  // Sync Settings
+  syncInterval   Int     @default(5) @map("sync_interval") // minutes
+  autoSync       Boolean @default(true) @map("auto_sync")
+  syncEmployees  Boolean @default(true) @map("sync_employees")
+  syncAttendance Boolean @default(true) @map("sync_attendance")
+  syncLeaves     Boolean @default(true) @map("sync_leaves")
+  syncPayroll    Boolean @default(false) @map("sync_payroll")
+
+  // Conflict Resolution
+  conflictStrategy String @default("LATEST_WINS") @map("conflict_strategy") // ODOO_WINS, LOCAL_WINS, LATEST_WINS, MANUAL
+
+  // Webhook Settings
+  webhookUrl    String? @map("webhook_url")
+  webhookSecret String? @map("webhook_secret")
+
+  isActive   Boolean   @default(true) @map("is_active")
+  lastSyncAt DateTime? @map("last_sync_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("odoo_company_configs")
+}
+
+// ربط الموظفين بين النظامين
+model OdooEmployeeMapping {
+  id             String    @id @default(uuid())
+  companyId      String    @map("company_id")
+  userId         String    @map("user_id")
+  odooEmployeeId Int       @map("odoo_employee_id")
+  odooData       Json?     @map("odoo_data") // Cached Odoo employee data
+  lastSyncedAt   DateTime? @map("last_synced_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, userId])
+  @@unique([companyId, odooEmployeeId])
+  @@index([companyId])
+  @@index([userId])
+  @@map("odoo_employee_mappings")
+}
+
+// Webhooks من/إلى Odoo
+model OdooWebhookEvent {
+  id          String    @id @default(uuid())
+  companyId   String    @map("company_id")
+  direction   String // INBOUND, OUTBOUND
+  eventType   String    @map("event_type") // attendance.created, employee.updated, etc.
+  payload     Json
+  status      String    @default("PENDING") // PENDING, DELIVERED, FAILED
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error") @db.Text
+  processedAt DateTime? @map("processed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("odoo_webhook_events")
+}
+
+// سجل التعارضات للمراجعة اليدوية
+model OdooConflict {
+  id           String    @id @default(uuid())
+  companyId    String    @map("company_id")
+  entityType   String    @map("entity_type") // EMPLOYEE, ATTENDANCE, LEAVE
+  entityId     String    @map("entity_id")
+  localData    Json      @map("local_data")
+  odooData     Json      @map("odoo_data")
+  conflictType String    @map("conflict_type") // DATA_MISMATCH, MISSING_LOCAL, MISSING_ODOO
+  resolution   String? // KEEP_LOCAL, KEEP_ODOO, MERGED, SKIPPED
+  resolvedBy   String?   @map("resolved_by")
+  resolvedAt   DateTime? @map("resolved_at")
+  notes        String?   @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@index([entityType])
+  @@index([resolution])
+  @@map("odoo_conflicts")
+}

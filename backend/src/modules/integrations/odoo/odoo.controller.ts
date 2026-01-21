@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, UseGuards, Request, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -7,13 +7,26 @@ import { OdooService } from './odoo.service';
 import { ConnectOdooDto, TestOdooConnectionDto } from './dto/connect-odoo.dto';
 import { SyncEmployeesDto, OdooEmployeeMappingDto } from './dto/odoo-employee.dto';
 import { SyncAttendanceDto } from './dto/sync-attendance.dto';
+import { OdooSyncLogService } from './logs/sync-log.service';
+import { OdooRetryQueueService } from './queue/retry-queue.service';
+import { OdooConflictResolverService } from './conflict/conflict-resolver.service';
+import { OdooWebhookService } from './webhooks/odoo-webhook.service';
+import { OdooFieldMappingService } from './mapping/field-mapping.service';
 
 @ApiTags('Odoo Integration')
 @Controller('integrations/odoo')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class OdooController {
-    constructor(private readonly odooService: OdooService) { }
+    constructor(
+        private readonly odooService: OdooService,
+        private readonly syncLogService: OdooSyncLogService,
+        private readonly retryQueueService: OdooRetryQueueService,
+        private readonly conflictResolver: OdooConflictResolverService,
+        private readonly webhookService: OdooWebhookService,
+        private readonly fieldMappingService: OdooFieldMappingService,
+    ) { }
+
 
     // ============= CONNECTION =============
 
@@ -148,5 +161,151 @@ export class OdooController {
     async pushPayroll(@Request() req: any, @Body() dto: { data: any[] }) {
         return this.odooService.pushPayrollToOdoo(req.user.companyId, dto.data);
     }
-}
 
+    // ============= SYNC LOGS =============
+
+    @Get('logs')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📜 سجل المزامنة' })
+    @ApiResponse({ status: 200, description: 'سجلات المزامنة' })
+    async getSyncLogs(
+        @Request() req: any,
+        @Query('operation') operation?: string,
+        @Query('status') status?: string,
+        @Query('limit') limit?: number,
+        @Query('offset') offset?: number,
+    ) {
+        return this.syncLogService.getLogs(req.user.companyId, {
+            operation,
+            status,
+            limit: limit ? Number(limit) : 50,
+            offset: offset ? Number(offset) : 0,
+        });
+    }
+
+    @Get('logs/stats')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📊 إحصائيات المزامنة' })
+    @ApiResponse({ status: 200, description: 'إحصائيات' })
+    async getSyncStats(@Request() req: any, @Query('days') days?: number) {
+        return this.syncLogService.getStats(req.user.companyId, days ? Number(days) : 7);
+    }
+
+    // ============= CONFLICTS =============
+
+    @Get('conflicts')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '⚠️ التعارضات غير المحلولة' })
+    @ApiResponse({ status: 200, description: 'قائمة التعارضات' })
+    async getConflicts(
+        @Request() req: any,
+        @Query('entityType') entityType?: string,
+        @Query('limit') limit?: number,
+    ) {
+        return this.conflictResolver.getUnresolved(req.user.companyId, {
+            entityType,
+            limit: limit ? Number(limit) : 50,
+        });
+    }
+
+    @Get('conflicts/stats')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📊 إحصائيات التعارضات' })
+    @ApiResponse({ status: 200, description: 'إحصائيات' })
+    async getConflictStats(@Request() req: any) {
+        return this.conflictResolver.getStats(req.user.companyId);
+    }
+
+    @Post('conflicts/:id/resolve')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '✅ حل تعارض' })
+    @ApiResponse({ status: 200, description: 'تم الحل' })
+    async resolveConflict(
+        @Request() req: any,
+        @Body() dto: { conflictId: string; resolution: string; notes?: string },
+    ) {
+        await this.conflictResolver.resolveManually(
+            dto.conflictId,
+            dto.resolution as any,
+            req.user.id,
+            dto.notes,
+        );
+        return { success: true, message: 'تم حل التعارض' };
+    }
+
+    // ============= WEBHOOKS =============
+
+    @Get('webhooks')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '🔔 أحداث الويب هوك' })
+    @ApiResponse({ status: 200, description: 'قائمة الأحداث' })
+    async getWebhookEvents(
+        @Request() req: any,
+        @Query('direction') direction?: string,
+        @Query('status') status?: string,
+        @Query('limit') limit?: number,
+    ) {
+        return this.webhookService.getEvents(req.user.companyId, {
+            direction,
+            status,
+            limit: limit ? Number(limit) : 50,
+        });
+    }
+
+    @Post('webhooks/incoming')
+    @ApiOperation({ summary: '📥 استقبال ويب هوك من Odoo' })
+    async receiveWebhook(
+        @Request() req: any,
+        @Body() body: { companyId: string; eventType: string; payload: any },
+    ) {
+        const signature = req.headers['x-webhook-signature'] || '';
+        return this.webhookService.processIncoming(
+            body.companyId,
+            body.eventType,
+            body.payload,
+            signature,
+        );
+    }
+
+    @Post('webhooks/retry')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '🔄 إعادة إرسال الويب هوك الفاشلة' })
+    async retryWebhooks(@Request() req: any) {
+        const retried = await this.webhookService.retryFailed(req.user.companyId);
+        return { success: true, retried };
+    }
+
+    // ============= FIELD MAPPINGS =============
+
+    @Get('mappings')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '🔗 ربط الحقول' })
+    @ApiResponse({ status: 200, description: 'قائمة الربط' })
+    async getFieldMappings(@Request() req: any) {
+        return this.fieldMappingService.getAllMappings(req.user.companyId);
+    }
+
+    @Post('mappings/initialize')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '🔧 تهيئة الربط الافتراضي' })
+    async initializeMappings(@Request() req: any) {
+        const created = await this.fieldMappingService.initializeDefaults(req.user.companyId);
+        return { success: true, created };
+    }
+
+    @Post('mappings')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '➕ إضافة ربط جديد' })
+    async createMapping(@Request() req: any, @Body() dto: any) {
+        return this.fieldMappingService.createMapping(req.user.companyId, dto);
+    }
+
+    // ============= RETRY QUEUE =============
+
+    @Get('queue/stats')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '📊 إحصائيات الطابور' })
+    async getQueueStats(@Request() req: any) {
+        return this.retryQueueService.getStats(req.user.companyId);
+    }
+}

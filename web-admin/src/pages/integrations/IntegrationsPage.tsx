@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box, Typography, Paper, Grid, Card, CardContent, IconButton, Button, Chip, Switch,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormGroup, FormControlLabel,
@@ -251,6 +252,7 @@ function WebhooksTab() {
 
 function IntegrationsTab() {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const [connectDialog, setConnectDialog] = useState<string | null>(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
@@ -303,6 +305,7 @@ function IntegrationsTab() {
 
     // Default integrations list
     const defaultIntegrations: AvailableIntegration[] = [
+        { type: 'odoo', name: 'Odoo ERP', icon: '🟣', description: 'مزامنة الموظفين والحضور والإجازات والرواتب', isConnected: false },
         { type: 'slack', name: 'Slack', icon: '💬', description: 'إشعارات فورية وأوامر المهام', isConnected: false },
         { type: 'teams', name: 'Microsoft Teams', icon: '🟦', description: 'بطاقات تكيفية وإشعارات', isConnected: false },
         { type: 'github', name: 'GitHub', icon: '🐙', description: 'ربط المهام بالـ Issues', isConnected: false },
@@ -312,7 +315,7 @@ function IntegrationsTab() {
     ];
 
     const integrationIcons: Record<string, string> = {
-        slack: '💬', teams: '🟦', github: '🐙', gitlab: '🦊', jira: '📊', trello: '📋', google: '🔗', zapier: '⚡',
+        odoo: '🟣', slack: '💬', teams: '🟦', github: '🐙', gitlab: '🦊', jira: '📊', trello: '📋', google: '🔗', zapier: '⚡',
     };
 
     // Use API data or default list
@@ -360,6 +363,14 @@ function IntegrationsTab() {
                                             onClick={() => disconnectMutation.mutate(integration.type)}
                                         >
                                             فصل
+                                        </Button>
+                                    ) : integration.type === 'odoo' ? (
+                                        <Button
+                                            variant="contained" size="small" color="secondary"
+                                            startIcon={<LinkIcon />}
+                                            onClick={() => navigate('/settings/odoo')}
+                                        >
+                                            إعدادات Odoo
                                         </Button>
                                     ) : (
                                         <Button

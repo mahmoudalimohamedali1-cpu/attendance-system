@@ -400,6 +400,18 @@ export class TasksService {
             );
         }
 
+        // Notify OLD assignee that task was removed from them
+        if (dto.assigneeId !== undefined && dto.assigneeId !== existing.assigneeId && existing.assigneeId && existing.assigneeId !== userId) {
+            await this.notificationsService.create({
+                companyId,
+                userId: existing.assigneeId,
+                type: NotificationType.GENERAL,
+                title: 'تم سحب مهمة منك',
+                body: `تم نقل المهمة "${task.title}" إلى موظف آخر`,
+                data: { taskId: id },
+            });
+        }
+
         // Notify new assignee
         if (dto.assigneeId && dto.assigneeId !== existing.assigneeId && dto.assigneeId !== userId) {
             await this.notificationsService.create({
@@ -410,6 +422,26 @@ export class TasksService {
                 body: `تم تكليفك بمهمة: ${task.title}`,
                 data: { taskId: id },
             });
+        }
+
+        // Notify watchers about task update
+        if (changes.length > 0) {
+            const watchers = await this.prisma.taskWatcher.findMany({
+                where: { taskId: id },
+                select: { userId: true },
+            });
+            for (const watcher of watchers) {
+                if (watcher.userId !== userId) {
+                    await this.notificationsService.create({
+                        companyId,
+                        userId: watcher.userId,
+                        type: NotificationType.GENERAL,
+                        title: 'تحديث على مهمة تتابعها',
+                        body: `تم تحديث المهمة: ${task.title}`,
+                        data: { taskId: id },
+                    });
+                }
+            }
         }
 
         return task;
@@ -1292,6 +1324,17 @@ export class TasksService {
                 'TASK_UPDATED' as any,
                 'تمت الموافقة على مهمتك',
                 `تمت الموافقة على المهمة: ${task.title}`,
+                { taskId },
+            );
+        }
+
+        // Notify approver if reviewer approved (so approver knows to give final approval)
+        if (isReviewer && task.approverId && task.approverId !== userId && newStatus === 'APPROVED') {
+            await this.notificationsService.sendNotification(
+                task.approverId,
+                'TASK_UPDATED' as any,
+                'مهمة بانتظار اعتمادك النهائي',
+                `المهمة "${task.title}" تمت مراجعتها وبانتظار اعتمادك`,
                 { taskId },
             );
         }
@@ -2896,6 +2939,19 @@ export class TasksService {
             });
 
             await this.logActivity(task.id, userId, 'CREATED', null, null, 'تم إنشاء مهمة متكررة');
+
+            // Notify assignee about new recurring task
+            if (assigneeId && assigneeId !== userId) {
+                await this.notificationsService.create({
+                    companyId,
+                    userId: assigneeId,
+                    type: NotificationType.GENERAL,
+                    title: 'مهمة متكررة جديدة مسندة إليك',
+                    body: `تم تكليفك بمهمة متكررة: ${dto.title}`,
+                    data: { taskId: task.id, recurrenceType: dto.recurrenceType },
+                });
+            }
+
             createdTasks.push(task);
         }
 

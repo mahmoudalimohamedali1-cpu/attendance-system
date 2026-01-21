@@ -202,5 +202,110 @@ export const integrationsApi = {
 
     pushOdooPayroll: (data: { data: any[] }) =>
         api.post<{ success: number; failed: number; errors: any[] }>('/integrations/odoo/payroll/push', data),
-};
 
+    // ============ ENTERPRISE FEATURES ============
+
+    // Sync Logs
+    getOdooSyncLogs: (params?: { operation?: string; status?: string; limit?: number; offset?: number }) =>
+        api.get<{
+            logs: {
+                id: string;
+                operation: string;
+                direction: string;
+                status: string;
+                recordCount: number;
+                successCount: number;
+                failedCount: number;
+                errors?: any;
+                duration?: number;
+                triggeredBy?: string;
+                createdAt: string;
+            }[];
+            total: number;
+        }>('/integrations/odoo/logs', { params }),
+
+    getOdooSyncStats: (days?: number) =>
+        api.get<{
+            totalSyncs: number;
+            successful: number;
+            failed: number;
+            partial: number;
+            totalRecords: number;
+            totalSuccess: number;
+            totalFailed: number;
+            avgDuration: number;
+            byOperation: Record<string, number>;
+            byDay: Record<string, number>;
+        }>('/integrations/odoo/logs/stats', { params: { days } }),
+
+    // Conflicts
+    getOdooConflicts: (params?: { entityType?: string; limit?: number }) =>
+        api.get<{
+            id: string;
+            entityType: string;
+            entityId: string;
+            localData: any;
+            odooData: any;
+            conflictType: string;
+            createdAt: string;
+        }[]>('/integrations/odoo/conflicts', { params }),
+
+    getOdooConflictStats: () =>
+        api.get<{
+            unresolved: number;
+            resolved: number;
+            total: number;
+            byType: Record<string, number>;
+        }>('/integrations/odoo/conflicts/stats'),
+
+    resolveOdooConflict: (data: { conflictId: string; resolution: string; notes?: string }) =>
+        api.post<{ success: boolean; message: string }>('/integrations/odoo/conflicts/resolve', data),
+
+    // Webhooks
+    getOdooWebhookEvents: (params?: { direction?: string; status?: string; limit?: number }) =>
+        api.get<{
+            id: string;
+            direction: string;
+            eventType: string;
+            status: string;
+            attempts: number;
+            createdAt: string;
+        }[]>('/integrations/odoo/webhooks', { params }),
+
+    retryOdooWebhooks: () =>
+        api.post<{ success: boolean; retried: number }>('/integrations/odoo/webhooks/retry'),
+
+    // Field Mappings
+    getOdooFieldMappings: () =>
+        api.get<{
+            id: string;
+            entityType: string;
+            localField: string;
+            odooField: string;
+            odooModel: string;
+            transformer?: string;
+            isActive: boolean;
+            description?: string;
+        }[]>('/integrations/odoo/mappings'),
+
+    initializeOdooMappings: () =>
+        api.post<{ success: boolean; created: number }>('/integrations/odoo/mappings/initialize'),
+
+    createOdooMapping: (data: {
+        entityType: string;
+        localField: string;
+        odooField: string;
+        odooModel: string;
+        transformer?: string;
+    }) => api.post<any>('/integrations/odoo/mappings', data),
+
+    // Retry Queue
+    getOdooQueueStats: () =>
+        api.get<{
+            pending: number;
+            processing: number;
+            completed: number;
+            failed: number;
+            total: number;
+        }>('/integrations/odoo/queue/stats'),
+};

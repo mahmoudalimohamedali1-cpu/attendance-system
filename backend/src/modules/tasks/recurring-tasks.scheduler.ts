@@ -2,7 +2,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { TaskStatus, TaskPriority } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
+import { TaskStatus, TaskPriority, NotificationType } from '@prisma/client';
 
 // TaskRecurrenceType constants (Task.recurrenceType is String not enum)
 const TaskRecurrenceType = {
@@ -18,7 +19,10 @@ const TaskRecurrenceType = {
 export class RecurringTasksScheduler {
     private readonly logger = new Logger(RecurringTasksScheduler.name);
 
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private notificationsService: NotificationsService,
+    ) { }
 
     /**
      * Runs every day at 1:00 AM to create recurring tasks
@@ -61,6 +65,62 @@ export class RecurringTasksScheduler {
         }
 
         this.logger.log(`Created ${createdCount} recurring task instances`);
+    }
+
+    /**
+     * Runs every day at 8:00 AM to send due date reminders
+     */
+    @Cron(CronExpression.EVERY_DAY_AT_8AM)
+    async sendDueDateReminders() {
+        this.logger.log('Sending due date reminders...');
+
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(23, 59, 59, 999);
+
+        const todayStart = new Date(today);
+        todayStart.setHours(0, 0, 0, 0);
+
+        // Get tasks due today or tomorrow
+        const tasksDue = await this.prisma.task.findMany({
+            where: {
+                status: { in: ['TODO', 'IN_PROGRESS', 'BACKLOG'] },
+                dueDate: {
+                    gte: todayStart,
+                    lte: tomorrow,
+                },
+                assigneeId: { not: null },
+            },
+            select: {
+                id: true,
+                title: true,
+                dueDate: true,
+                companyId: true,
+                assigneeId: true,
+            },
+        });
+
+        let notifiedCount = 0;
+
+        for (const task of tasksDue) {
+            if (task.assigneeId) {
+                const dueDate = new Date(task.dueDate!);
+                const isToday = dueDate.toDateString() === today.toDateString();
+
+                await this.notificationsService.create({
+                    companyId: task.companyId,
+                    userId: task.assigneeId,
+                    type: NotificationType.GENERAL,
+                    title: isToday ? '⚠️ مهمة مستحقة اليوم!' : '📅 مهمة مستحقة غداً',
+                    body: `المهمة "${task.title}" ${isToday ? 'مستحقة اليوم' : 'مستحقة غداً'}`,
+                    data: { taskId: task.id },
+                });
+                notifiedCount++;
+            }
+        }
+
+        this.logger.log(`Sent ${notifiedCount} due date reminders`);
     }
 
     /**
@@ -114,6 +174,18 @@ export class RecurringTasksScheduler {
                 order: 0,
             },
         });
+
+        // Notify assignee about new auto-created task
+        if (parentTask.assigneeId) {
+            await this.notificationsService.create({
+                companyId: parentTask.companyId,
+                userId: parentTask.assigneeId,
+                type: NotificationType.GENERAL,
+                title: '🔄 مهمة متكررة جديدة',
+                body: `تم إنشاء نسخة جديدة من المهمة المتكررة: ${parentTask.title}`,
+                data: { taskId: newTask.id, parentTaskId: parentTask.id },
+            });
+        }
 
         // Copy checklists if they exist
         if (parentTask.checklists?.length > 0) {
@@ -188,4 +260,13 @@ export class RecurringTasksScheduler {
         this.logger.log('Manually triggering recurring tasks processing...');
         return this.processRecurringTasks();
     }
+
+    /**
+     * Manual trigger for due date reminders - for testing
+     */
+    async triggerRemindersManually() {
+        this.logger.log('Manually triggering due date reminders...');
+        return this.sendDueDateReminders();
+    }
 }
+
