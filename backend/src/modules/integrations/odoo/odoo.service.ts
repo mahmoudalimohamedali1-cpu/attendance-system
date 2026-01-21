@@ -772,54 +772,67 @@ export class OdooService {
     }
 
     /**
-     * Parse XML-RPC response
+     * Parse XML-RPC response - improved recursive parser
      */
     private parseXmlRpcResponse(xml: string): any {
-        // Simple parser for XML-RPC responses
-        const valueMatch = xml.match(/<value[^>]*>([\s\S]*?)<\/value>/);
-        if (!valueMatch) return null;
+        // Extract the first value from methodResponse/params/param/value
+        let content = xml;
 
-        const content = valueMatch[1];
-
-        // Integer
-        const intMatch = content.match(/<i(?:nt|4)>(\d+)<\/i(?:nt|4)>/);
-        if (intMatch) return parseInt(intMatch[1], 10);
-
-        // Double
-        const doubleMatch = content.match(/<double>([^<]+)<\/double>/);
-        if (doubleMatch) return parseFloat(doubleMatch[1]);
-
-        // Boolean
-        const boolMatch = content.match(/<boolean>([01])<\/boolean>/);
-        if (boolMatch) return boolMatch[1] === '1';
-
-        // String
-        const strMatch = content.match(/<string>([^<]*)<\/string>/);
-        if (strMatch) return strMatch[1];
-
-        // Array
-        if (content.includes('<array>')) {
-            const dataMatch = content.match(/<data>([\s\S]*?)<\/data>/);
-            if (dataMatch) {
-                const values: any[] = [];
-                const valueRegex = /<value>([\s\S]*?)<\/value>/g;
-                let match;
-                while ((match = valueRegex.exec(dataMatch[1])) !== null) {
-                    values.push(this.parseXmlRpcResponse(`<value>${match[1]}</value>`));
-                }
-                return values;
+        // If this is a full response, extract the value
+        const paramMatch = xml.match(/<param>\s*<value>([\s\S]*?)<\/value>\s*<\/param>/);
+        if (paramMatch) {
+            content = paramMatch[1];
+        } else {
+            const valueMatch = xml.match(/<value[^>]*>([\s\S]*?)<\/value>/);
+            if (valueMatch) {
+                content = valueMatch[1];
             }
         }
 
-        // Struct
-        if (content.includes('<struct>')) {
-            const obj: any = {};
-            const memberRegex = /<member><name>([^<]+)<\/name><value>([\s\S]*?)<\/value><\/member>/g;
-            let match;
-            while ((match = memberRegex.exec(content)) !== null) {
-                obj[match[1]] = this.parseXmlRpcResponse(`<value>${match[2]}</value>`);
+        return this.parseXmlValue(content.trim());
+    }
+
+    /**
+     * Parse a single XML-RPC value
+     */
+    private parseXmlValue(content: string): any {
+        if (!content) return null;
+
+        // Integer
+        const intMatch = content.match(/^<i(?:nt|4)>(-?\d+)<\/i(?:nt|4)>$/);
+        if (intMatch) return parseInt(intMatch[1], 10);
+
+        // Double
+        const doubleMatch = content.match(/^<double>([^<]+)<\/double>$/);
+        if (doubleMatch) return parseFloat(doubleMatch[1]);
+
+        // Boolean
+        const boolMatch = content.match(/^<boolean>([01])<\/boolean>$/);
+        if (boolMatch) return boolMatch[1] === '1';
+
+        // String
+        const strMatch = content.match(/^<string>([^<]*)<\/string>$/);
+        if (strMatch) return strMatch[1];
+
+        // Empty string or direct string content
+        if (content.match(/^<string\s*\/>$/)) return '';
+
+        // Array - need to parse recursively
+        if (content.startsWith('<array>')) {
+            const dataMatch = content.match(/<array>\s*<data>([\s\S]*)<\/data>\s*<\/array>/);
+            if (dataMatch) {
+                return this.parseArrayData(dataMatch[1]);
             }
-            return obj;
+            return [];
+        }
+
+        // Struct - need to parse recursively
+        if (content.startsWith('<struct>')) {
+            const structContent = content.match(/<struct>([\s\S]*)<\/struct>/);
+            if (structContent) {
+                return this.parseStructMembers(structContent[1]);
+            }
+            return {};
         }
 
         // Fault
@@ -828,7 +841,66 @@ export class OdooService {
             throw new Error(faultMatch ? faultMatch[1] : 'XML-RPC Fault');
         }
 
+        // Plain text or unknown
         return content.trim();
+    }
+
+    /**
+     * Parse array data - handles nested values properly
+     */
+    private parseArrayData(dataContent: string): any[] {
+        const values: any[] = [];
+        let depth = 0;
+        let currentValue = '';
+        let inValue = false;
+        let i = 0;
+
+        while (i < dataContent.length) {
+            if (dataContent.substring(i, i + 7) === '<value>') {
+                if (depth === 0) {
+                    inValue = true;
+                    currentValue = '';
+                } else {
+                    currentValue += '<value>';
+                }
+                depth++;
+                i += 7;
+            } else if (dataContent.substring(i, i + 8) === '</value>') {
+                depth--;
+                if (depth === 0 && inValue) {
+                    values.push(this.parseXmlValue(currentValue.trim()));
+                    inValue = false;
+                } else {
+                    currentValue += '</value>';
+                }
+                i += 8;
+            } else {
+                if (inValue) {
+                    currentValue += dataContent[i];
+                }
+                i++;
+            }
+        }
+
+        return values;
+    }
+
+    /**
+     * Parse struct members - handles nested values properly
+     */
+    private parseStructMembers(structContent: string): Record<string, any> {
+        const obj: Record<string, any> = {};
+        const memberRegex = /<member>\s*<name>([^<]+)<\/name>\s*<value>([\s\S]*?)<\/value>\s*<\/member>/g;
+        let match;
+
+        // For simple structs, use regex
+        while ((match = memberRegex.exec(structContent)) !== null) {
+            const name = match[1];
+            const valueContent = match[2].trim();
+            obj[name] = this.parseXmlValue(valueContent);
+        }
+
+        return obj;
     }
 
     /**
