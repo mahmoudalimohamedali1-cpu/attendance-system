@@ -88,6 +88,22 @@ export class OdooController {
         return this.odooService.mapEmployee(req.user.companyId, dto.userId, dto.odooEmployeeId);
     }
 
+    @Delete('employees/map/:userId')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '🔗 فك ربط موظف' })
+    @ApiResponse({ status: 200, description: 'تم فك الربط' })
+    async unmapEmployee(@Request() req: any, @Param('userId') userId: string) {
+        return this.odooService.unmapEmployee(req.user.companyId, userId);
+    }
+
+    @Get('employees/mappings')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📋 قائمة ربط الموظفين' })
+    @ApiResponse({ status: 200, description: 'قائمة الربط' })
+    async getEmployeeMappings(@Request() req: any) {
+        return this.odooService.getEmployeeMappings(req.user.companyId);
+    }
+
     // ============= ATTENDANCE =============
 
     @Post('attendance/sync')

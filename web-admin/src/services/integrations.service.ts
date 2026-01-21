@@ -149,6 +149,20 @@ export const integrationsApi = {
     mapOdooEmployee: (data: { userId: string; odooEmployeeId: number }) =>
         api.post<{ success: boolean }>('/integrations/odoo/employees/map', data),
 
+    unmapOdooEmployee: (userId: string) =>
+        api.delete<{ success: boolean }>(`/integrations/odoo/employees/map/${userId}`),
+
+    getEmployeeMappings: () =>
+        api.get<{
+            userId: string;
+            userName: string;
+            email: string;
+            jobTitle?: string;
+            isMapped: boolean;
+            odooEmployeeId?: number;
+            odooEmployeeName?: string;
+        }[]>('/integrations/odoo/employees/mappings'),
+
     // Attendance
     syncOdooAttendance: (data?: { startDate?: string; endDate?: string; userIds?: string[] }) =>
         api.post<{

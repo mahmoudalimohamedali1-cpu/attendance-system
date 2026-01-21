@@ -201,6 +201,45 @@ const OdooSettingsPage: React.FC = () => {
         }
     };
 
+    // Employee Mapping
+    const [mappings, setMappings] = useState<any[]>([]);
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
+    const [selectedOdooId, setSelectedOdooId] = useState<number | null>(null);
+
+    const loadMappings = async () => {
+        try {
+            const data = await integrationsApi.getEmployeeMappings();
+            setMappings(data);
+            // Also load Odoo employees for dropdown
+            if (employees.length === 0) {
+                await loadEmployees();
+            }
+        } catch (error) {
+            console.error('Failed to load mappings:', error);
+        }
+    };
+
+    const handleMapEmployee = async (userId: string, odooEmployeeId: number) => {
+        try {
+            await integrationsApi.mapOdooEmployee({ userId, odooEmployeeId });
+            await loadMappings();
+            alert('تم ربط الموظف بنجاح!');
+        } catch (error) {
+            console.error('Mapping failed:', error);
+        }
+    };
+
+    const handleUnmapEmployee = async (userId: string) => {
+        if (!confirm('هل تريد فك ربط هذا الموظف؟')) return;
+        try {
+            await integrationsApi.unmapOdooEmployee(userId);
+            await loadMappings();
+            alert('تم فك الربط!');
+        } catch (error) {
+            console.error('Unmapping failed:', error);
+        }
+    };
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -298,6 +337,7 @@ const OdooSettingsPage: React.FC = () => {
                 <>
                     <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
                         <Tab icon={<Person />} label="الموظفين" />
+                        <Tab icon={<LinkIcon />} label="ربط الموظفين" />
                         <Tab icon={<AccessTime />} label="الحضور" />
                         <Tab icon={<BeachAccess />} label="الإجازات" />
                         <Tab icon={<AttachMoney />} label="الرواتب" />
@@ -355,8 +395,89 @@ const OdooSettingsPage: React.FC = () => {
                         </Card>
                     )}
 
-                    {/* Attendance Tab */}
+                    {/* Employee Mapping Tab */}
                     {activeTab === 1 && (
+                        <Card>
+                            <CardContent>
+                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                                    <Typography variant="h6">ربط الموظفين مع Odoo</Typography>
+                                    <Button variant="contained" startIcon={<Refresh />} onClick={loadMappings}>
+                                        تحديث القائمة
+                                    </Button>
+                                </Box>
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                    اربط موظفيك المحليين بموظفين Odoo لتفعيل مزامنة الحضور والإجازات والرواتب
+                                </Alert>
+                                {mappings.length > 0 ? (
+                                    <TableContainer component={Paper}>
+                                        <Table size="small">
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>الموظف المحلي</TableCell>
+                                                    <TableCell>البريد</TableCell>
+                                                    <TableCell>الوظيفة</TableCell>
+                                                    <TableCell>حالة الربط</TableCell>
+                                                    <TableCell>موظف Odoo</TableCell>
+                                                    <TableCell>الإجراء</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {mappings.map(m => (
+                                                    <TableRow key={m.userId}>
+                                                        <TableCell>{m.userName}</TableCell>
+                                                        <TableCell>{m.email}</TableCell>
+                                                        <TableCell>{m.jobTitle || '-'}</TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                label={m.isMapped ? 'مربوط' : 'غير مربوط'}
+                                                                color={m.isMapped ? 'success' : 'default'}
+                                                                size="small"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {m.isMapped ? (
+                                                                <Typography variant="body2">{m.odooEmployeeName || `ID: ${m.odooEmployeeId}`}</Typography>
+                                                            ) : (
+                                                                <TextField
+                                                                    select
+                                                                    size="small"
+                                                                    sx={{ minWidth: 150 }}
+                                                                    SelectProps={{ native: true }}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.value) {
+                                                                            handleMapEmployee(m.userId, Number(e.target.value));
+                                                                        }
+                                                                    }}
+                                                                    defaultValue=""
+                                                                >
+                                                                    <option value="">اختر موظف Odoo</option>
+                                                                    {employees.map(emp => (
+                                                                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                                                    ))}
+                                                                </TextField>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {m.isMapped && (
+                                                                <Button size="small" color="error" onClick={() => handleUnmapEmployee(m.userId)}>
+                                                                    فك الربط
+                                                                </Button>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                ) : (
+                                    <Alert severity="warning">اضغط "تحديث القائمة" لعرض الموظفين</Alert>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Attendance Tab */}
+                    {activeTab === 2 && (
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" mb={2}>مزامنة الحضور إلى Odoo</Typography>
@@ -371,7 +492,7 @@ const OdooSettingsPage: React.FC = () => {
                     )}
 
                     {/* Leaves Tab */}
-                    {activeTab === 2 && (
+                    {activeTab === 3 && (
                         <Card>
                             <CardContent>
                                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -438,7 +559,7 @@ const OdooSettingsPage: React.FC = () => {
                     )}
 
                     {/* Payroll Tab */}
-                    {activeTab === 3 && (
+                    {activeTab === 4 && (
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" mb={2}>تصدير بيانات الرواتب</Typography>
@@ -519,7 +640,7 @@ const OdooSettingsPage: React.FC = () => {
                     )}
 
                     {/* Settings Tab */}
-                    {activeTab === 4 && (
+                    {activeTab === 5 && (
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" mb={2}>إعدادات التكامل</Typography>

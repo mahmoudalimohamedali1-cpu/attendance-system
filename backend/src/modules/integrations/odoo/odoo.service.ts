@@ -322,6 +322,52 @@ export class OdooService {
         return { success: true };
     }
 
+    /**
+     * Unmap local user from Odoo employee
+     */
+    async unmapEmployee(companyId: string, userId: string): Promise<{ success: boolean }> {
+        await this.prisma.$executeRaw`
+      DELETE FROM odoo_employee_mappings WHERE user_id = ${userId} AND company_id = ${companyId}
+    `;
+        return { success: true };
+    }
+
+    /**
+     * Get all employee mappings with local user info
+     */
+    async getEmployeeMappings(companyId: string): Promise<any[]> {
+        // Get all local users
+        const users = await this.prisma.user.findMany({
+            where: { companyId, role: { in: ['EMPLOYEE', 'MANAGER'] as any } },
+            select: { id: true, firstName: true, lastName: true, email: true, jobTitle: true },
+        });
+
+        // Get mappings
+        const mappings = await this.prisma.$queryRaw<any[]>`
+            SELECT user_id, odoo_employee_id FROM odoo_employee_mappings WHERE company_id = ${companyId}
+        `;
+        const mappingMap = new Map(mappings.map(m => [m.user_id, m.odoo_employee_id]));
+
+        // Fetch Odoo employees for mapping display
+        let odooEmployees: any[] = [];
+        try {
+            odooEmployees = await this.fetchEmployees(companyId);
+        } catch (e) {
+            // If Odoo not connected, just return local users without Odoo info
+        }
+        const odooMap = new Map(odooEmployees.map(e => [e.id, e]));
+
+        return users.map(user => ({
+            userId: user.id,
+            userName: `${user.firstName} ${user.lastName}`,
+            email: user.email,
+            jobTitle: user.jobTitle,
+            isMapped: mappingMap.has(user.id),
+            odooEmployeeId: mappingMap.get(user.id) || null,
+            odooEmployeeName: mappingMap.has(user.id) ? odooMap.get(mappingMap.get(user.id))?.name || null : null,
+        }));
+    }
+
     // ============= ATTENDANCE =============
 
     /**
