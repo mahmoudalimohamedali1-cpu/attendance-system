@@ -9,7 +9,7 @@ import {
 import {
     Add as AddIcon, Delete as DeleteIcon, PlayArrow as TestIcon, Refresh as RefreshIcon,
     Link as LinkIcon, LinkOff as DisconnectIcon, ContentCopy as CopyIcon, CheckCircle, Error,
-    Settings as WebhookIcon, CloudSync as SyncIcon, Download as ImportIcon,
+    Settings as WebhookIcon, CloudSync as SyncIcon, Download as ImportIcon, SettingsOutlined,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { integrationsApi, Webhook, WebhookEvent, Integration, AvailableIntegration } from '../../services/integrations.service';
@@ -356,7 +356,18 @@ function IntegrationsTab() {
                                     {integration.description}
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
-                                    {integration.isConnected ? (
+                                    {/* Odoo - always show settings button */}
+                                    {(integration.type === 'odoo' || integration.type === 'ODOO') && (
+                                        <Button
+                                            variant="contained" size="small" color="secondary"
+                                            startIcon={<SettingsOutlined />}
+                                            onClick={() => navigate('/settings/odoo')}
+                                        >
+                                            إعدادات
+                                        </Button>
+                                    )}
+                                    {/* Connected - show disconnect */}
+                                    {integration.isConnected && (
                                         <Button
                                             variant="outlined" color="error" size="small"
                                             startIcon={<DisconnectIcon />}
@@ -364,15 +375,9 @@ function IntegrationsTab() {
                                         >
                                             فصل
                                         </Button>
-                                    ) : integration.type === 'odoo' || integration.type === 'ODOO' ? (
-                                        <Button
-                                            variant="contained" size="small" color="secondary"
-                                            startIcon={<LinkIcon />}
-                                            onClick={() => navigate('/settings/odoo')}
-                                        >
-                                            إعدادات Odoo
-                                        </Button>
-                                    ) : (
+                                    )}
+                                    {/* Not connected and not Odoo - show connect */}
+                                    {!integration.isConnected && integration.type !== 'odoo' && integration.type !== 'ODOO' && (
                                         <Button
                                             variant="contained" size="small"
                                             startIcon={<LinkIcon />}
