@@ -2848,7 +2848,7 @@ export class TasksService {
             include: {
                 category: true,
                 assignee: { select: { id: true, firstName: true, lastName: true, avatar: true } },
-                _count: { select: { childTasks: true } },
+                _count: { select: { subTasks: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
