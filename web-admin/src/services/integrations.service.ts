@@ -101,4 +101,106 @@ export const integrationsApi = {
     // GitHub
     linkGitHubIssue: (data: { taskId: string; issueUrl: string }) =>
         api.post('/integrations/github/link-issue', data),
+
+    // ============ ODOO ERP ============
+
+    // Connection
+    getOdooStatus: () => api.get<{
+        isConnected: boolean;
+        lastSyncAt?: string;
+        config?: { odooUrl: string; database: string; syncInterval: number };
+    }>('/integrations/odoo/status'),
+
+    testOdooConnection: (data: { odooUrl: string; database: string; username: string; apiKey: string }) =>
+        api.post<{ success: boolean; message: string; uid?: number }>('/integrations/odoo/test', data),
+
+    connectOdoo: (data: {
+        odooUrl: string;
+        database: string;
+        username: string;
+        apiKey: string;
+        syncInterval?: number;
+        autoSync?: boolean;
+    }) => api.post<{ success: boolean; message: string }>('/integrations/odoo/connect', data),
+
+    disconnectOdoo: () => api.delete<{ success: boolean; message: string }>('/integrations/odoo/disconnect'),
+
+    // Employees
+    getOdooEmployees: (params?: { activeOnly?: boolean; departmentId?: number }) =>
+        api.get<{
+            id: number;
+            name: string;
+            workEmail?: string;
+            mobilePhone?: string;
+            departmentName?: string;
+            jobTitle?: string;
+            active: boolean;
+        }[]>('/integrations/odoo/employees', { params }),
+
+    syncOdooEmployees: (data: { activeOnly?: boolean; createNewUsers?: boolean }) =>
+        api.post<{
+            total: number;
+            imported: number;
+            updated: number;
+            skipped: number;
+            errors: { odooId: number; error: string }[];
+        }>('/integrations/odoo/employees/sync', data),
+
+    mapOdooEmployee: (data: { userId: string; odooEmployeeId: number }) =>
+        api.post<{ success: boolean }>('/integrations/odoo/employees/map', data),
+
+    // Attendance
+    syncOdooAttendance: (data?: { startDate?: string; endDate?: string; userIds?: string[] }) =>
+        api.post<{
+            total: number;
+            pushed: number;
+            failed: number;
+            errors: { attendanceId: string; error: string }[];
+        }>('/integrations/odoo/attendance/sync', data),
+
+    // Leaves
+    getOdooLeaveTypes: () =>
+        api.get<{ id: number; name: string; code?: string }[]>('/integrations/odoo/leaves/types'),
+
+    getOdooLeaves: (params?: { startDate?: string; endDate?: string; state?: string }) =>
+        api.get<{
+            id: number;
+            employeeId: number;
+            employeeName: string;
+            leaveTypeName: string;
+            dateFrom: string;
+            dateTo: string;
+            numberOfDays: number;
+            state: string;
+        }[]>('/integrations/odoo/leaves', { params }),
+
+    pushOdooLeave: (data: {
+        odooEmployeeId: number;
+        leaveTypeId: number;
+        dateFrom: string;
+        dateTo: string;
+        notes?: string;
+    }) => api.post<{ success: boolean; odooId?: number }>('/integrations/odoo/leaves/push', data),
+
+    // Payroll
+    exportOdooPayroll: (data: { periodStart: string; periodEnd: string; userIds?: string[] }) =>
+        api.post<{
+            periodStart: string;
+            periodEnd: string;
+            totalEmployees: number;
+            data: {
+                odooEmployeeId: number;
+                employeeName: string;
+                workedDays: number;
+                workedHours: number;
+                overtimeHours: number;
+                lateMinutes: number;
+                absentDays: number;
+            }[];
+            errors: { userId: string; error: string }[];
+        }>('/integrations/odoo/payroll/export', data),
+
+    pushOdooPayroll: (data: { data: any[] }) =>
+        api.post<{ success: number; failed: number; errors: any[] }>('/integrations/odoo/payroll/push', data),
 };
+

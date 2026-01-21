@@ -90,6 +90,7 @@ const SaudizationPage = lazy(() => import('./pages/saudization/SaudizationPage')
 const ProjectsPage = lazy(() => import('./pages/projects/ProjectsPage'));
 const IntegrationsPage = lazy(() => import('./pages/integrations/IntegrationsPage'));
 const TeamCollaborationPage = lazy(() => import('./pages/team-collaboration/TeamCollaborationPage'));
+const OdooSettingsPage = lazy(() => import('./pages/settings/OdooSettingsPage'));
 // Enterprise Payroll Pages
 const PayrollAnalyticsPage = lazy(() => import('./pages/enterprise-payroll/PayrollAnalyticsPage'));
 const EmployeeSelfServicePage = lazy(() => import('./pages/enterprise-payroll/EmployeeSelfServicePage'));
@@ -553,6 +554,11 @@ function App() {
           <Route path="integrations" element={
             <Suspense fallback={<PageLoader />}>
               <IntegrationsPage />
+            </Suspense>
+          } />
+          <Route path="settings/odoo" element={
+            <Suspense fallback={<PageLoader />}>
+              <OdooSettingsPage />
             </Suspense>
           } />
           {/* Enterprise Payroll Routes */}
