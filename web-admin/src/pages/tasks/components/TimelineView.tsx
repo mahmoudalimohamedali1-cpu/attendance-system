@@ -104,7 +104,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ categoryId, onTaskCl
         queryKey: ['ganttData', categoryId],
         queryFn: async () => {
             const response = await tasksApi.getGanttData(categoryId);
-            return response.data as TimelineTask[];
+            // api.get() already returns the data directly
+            return response as TimelineTask[];
         },
     });
 
