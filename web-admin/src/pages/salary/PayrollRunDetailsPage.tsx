@@ -42,6 +42,7 @@ import {
     AttachMoney,
     Search,
     Receipt,
+    Edit as AdjustmentIcon,
 } from '@mui/icons-material';
 import { api, API_URL } from '@/services/api.service';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -62,6 +63,10 @@ export const PayrollRunDetailsPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedPayslip, setSelectedPayslip] = useState<any | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    // Adjustment Run Dialog
+    const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
+    const [adjustmentReason, setAdjustmentReason] = useState('');
+    const [adjustmentLoading, setAdjustmentLoading] = useState(false);
 
     // Calculate summary from payslips - must be before any conditional returns
     const summary = useMemo(() => {
@@ -126,6 +131,28 @@ export const PayrollRunDetailsPage = () => {
             setError(err.message || 'Failed to send emails');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Handle Create Adjustment Run
+    const handleCreateAdjustmentRun = async () => {
+        if (adjustmentReason.trim().length < 5) {
+            setError('سبب التعديل مطلوب (5 أحرف على الأقل)');
+            return;
+        }
+        try {
+            setAdjustmentLoading(true);
+            const result = await api.post(`/payroll-runs/${id}/adjustment`, {
+                reason: adjustmentReason.trim()
+            }) as { id: string; message: string };
+            setAdjustmentDialogOpen(false);
+            setAdjustmentReason('');
+            // Navigate to the new adjustment run
+            navigate(`/salary/runs/${result.id}`);
+        } catch (err: any) {
+            setError(err.response?.data?.message || err.message || 'فشل في إنشاء التعديل');
+        } finally {
+            setAdjustmentLoading(false);
         }
     };
 
@@ -220,6 +247,17 @@ export const PayrollRunDetailsPage = () => {
                     >
                         تصدير SARIE
                     </Button>
+                    {/* Adjustment Run Button - Only for Locked Runs */}
+                    {isLocked && (
+                        <Button
+                            variant="contained"
+                            color="secondary"
+                            startIcon={<AdjustmentIcon />}
+                            onClick={() => setAdjustmentDialogOpen(true)}
+                        >
+                            إنشاء تعديل
+                        </Button>
+                    )}
                     <Button
                         variant="contained"
                         color="success"
@@ -572,6 +610,53 @@ export const PayrollRunDetailsPage = () => {
                             تحميل PDF
                         </Button>
                     )}
+                </DialogActions>
+            </Dialog>
+
+            {/* Adjustment Run Dialog */}
+            <Dialog
+                open={adjustmentDialogOpen}
+                onClose={() => !adjustmentLoading && setAdjustmentDialogOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AdjustmentIcon color="secondary" />
+                    إنشاء تعديل على المسير المقفل
+                </DialogTitle>
+                <DialogContent>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        سيتم إنشاء مسير تعديل جديد يمكنك من خلاله إضافة تسويات مالية على الموظفين.
+                    </Alert>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        label="سبب التعديل"
+                        placeholder="مثال: تصحيح بدل مواصلات شهر يناير"
+                        value={adjustmentReason}
+                        onChange={(e) => setAdjustmentReason(e.target.value)}
+                        multiline
+                        rows={2}
+                        helperText="أدخل سبب التعديل (5 أحرف على الأقل)"
+                        disabled={adjustmentLoading}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setAdjustmentDialogOpen(false)}
+                        disabled={adjustmentLoading}
+                    >
+                        إلغاء
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        onClick={handleCreateAdjustmentRun}
+                        disabled={adjustmentLoading || adjustmentReason.trim().length < 5}
+                        startIcon={adjustmentLoading ? <CircularProgress size={20} /> : <AdjustmentIcon />}
+                    >
+                        {adjustmentLoading ? 'جاري الإنشاء...' : 'إنشاء التعديل'}
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

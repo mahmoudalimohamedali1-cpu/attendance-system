@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { Response } from 'express';
 import { PayrollRunsService } from './payroll-runs.service';
 import { PayrollValidationService, ValidationOptions } from './payroll-validation.service';
+import { AdjustmentRunService } from './adjustment-run.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -21,6 +22,7 @@ export class PayrollRunsController {
     constructor(
         private readonly service: PayrollRunsService,
         private readonly validationService: PayrollValidationService,
+        private readonly adjustmentService: AdjustmentRunService,
         private readonly pdfService: PdfService,
         private readonly excelService: ExcelService,
         private readonly emailService: EmailService,
@@ -181,5 +183,21 @@ export class PayrollRunsController {
         }
 
         return { message: `تم إرسال ${results.sent} قسيمة، فشل ${results.failed}`, ...results };
+    }
+
+    // ==========================================
+    // ADJUSTMENT RUN ENDPOINTS
+    // ==========================================
+
+    @Post(':id/adjustment')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'إنشاء تعديل على مسير مقفل' })
+    createAdjustmentRun(
+        @Param('id') originalRunId: string,
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('id') userId: string,
+        @Body() body: { reason: string },
+    ) {
+        return this.adjustmentService.createAdjustmentRun(originalRunId, companyId, body.reason, userId);
     }
 }
