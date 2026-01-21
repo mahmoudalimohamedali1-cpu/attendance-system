@@ -240,6 +240,24 @@ const OdooSettingsPage: React.FC = () => {
         }
     };
 
+    const handleAutoMap = async () => {
+        try {
+            setSyncing(true);
+            const result = await integrationsApi.autoMapOdooEmployees();
+            await loadMappings();
+            if (result.mapped > 0) {
+                alert(`✅ تم ربط ${result.mapped} موظف تلقائياً!\n\nتم تخطي: ${result.skipped}`);
+            } else {
+                alert(`⚠️ لم يتم إيجاد تطابق بالإيميل.\n\nتأكد أن إيميلات الموظفين متطابقة في النظامين.`);
+            }
+        } catch (error) {
+            console.error('Auto-map failed:', error);
+            alert('فشل الربط التلقائي');
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     if (loading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -401,13 +419,19 @@ const OdooSettingsPage: React.FC = () => {
                             <CardContent>
                                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                                     <Typography variant="h6">ربط الموظفين مع Odoo</Typography>
-                                    <Button variant="contained" startIcon={<Refresh />} onClick={loadMappings}>
-                                        تحديث القائمة
-                                    </Button>
+                                    <Box display="flex" gap={1}>
+                                        <Button variant="outlined" startIcon={<Sync />} onClick={handleAutoMap} disabled={syncing}>
+                                            {syncing ? 'جاري الربط...' : 'ربط تلقائي بالإيميل'}
+                                        </Button>
+                                        <Button variant="contained" startIcon={<Refresh />} onClick={loadMappings}>
+                                            تحديث القائمة
+                                        </Button>
+                                    </Box>
                                 </Box>
                                 <Alert severity="info" sx={{ mb: 2 }}>
-                                    اربط موظفيك المحليين بموظفين Odoo لتفعيل مزامنة الحضور والإجازات والرواتب
+                                    الربط التلقائي يقارن الإيميلات ويربط الموظفين المتطابقين تلقائياً. أو يمكنك الربط يدوياً.
                                 </Alert>
+
                                 {mappings.length > 0 ? (
                                     <TableContainer component={Paper}>
                                         <Table size="small">

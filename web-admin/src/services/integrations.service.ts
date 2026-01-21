@@ -163,6 +163,13 @@ export const integrationsApi = {
             odooEmployeeName?: string;
         }[]>('/integrations/odoo/employees/mappings'),
 
+    autoMapOdooEmployees: () =>
+        api.post<{
+            mapped: number;
+            skipped: number;
+            details: { localUser: string; localEmail: string; odooEmployee: string; odooId: number }[];
+        }>('/integrations/odoo/employees/auto-map'),
+
     // Attendance
     syncOdooAttendance: (data?: { startDate?: string; endDate?: string; userIds?: string[] }) =>
         api.post<{

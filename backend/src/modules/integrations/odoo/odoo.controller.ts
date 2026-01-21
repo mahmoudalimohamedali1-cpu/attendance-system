@@ -104,6 +104,14 @@ export class OdooController {
         return this.odooService.getEmployeeMappings(req.user.companyId);
     }
 
+    @Post('employees/auto-map')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '🔄 ربط تلقائي بالإيميل' })
+    @ApiResponse({ status: 200, description: 'نتيجة الربط التلقائي' })
+    async autoMapEmployees(@Request() req: any) {
+        return this.odooService.autoMapEmployeesByEmail(req.user.companyId);
+    }
+
     // ============= ATTENDANCE =============
 
     @Post('attendance/sync')

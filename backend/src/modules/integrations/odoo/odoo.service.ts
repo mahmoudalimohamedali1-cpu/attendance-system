@@ -368,6 +368,64 @@ export class OdooService {
         }));
     }
 
+    /**
+     * Auto-map employees by email match
+     */
+    async autoMapEmployeesByEmail(companyId: string): Promise<{ mapped: number; skipped: number; details: any[] }> {
+        // Get all local users with emails
+        const localUsers = await this.prisma.user.findMany({
+            where: { companyId, role: { in: ['EMPLOYEE', 'MANAGER'] as any }, email: { not: null } },
+            select: { id: true, email: true, firstName: true, lastName: true },
+        });
+
+        // Get Odoo employees
+        const odooEmployees = await this.fetchEmployees(companyId);
+
+        // Create email lookup map (lowercase for case-insensitive matching)
+        const odooEmailMap = new Map<string, any>();
+        for (const emp of odooEmployees) {
+            if (emp.workEmail) {
+                odooEmailMap.set(emp.workEmail.toLowerCase(), emp);
+            }
+        }
+
+        // Get existing mappings
+        const existingMappings = await this.prisma.$queryRaw<any[]>`
+            SELECT user_id FROM odoo_employee_mappings WHERE company_id = ${companyId}
+        `;
+        const alreadyMapped = new Set(existingMappings.map(m => m.user_id));
+
+        let mapped = 0;
+        let skipped = 0;
+        const details: any[] = [];
+
+        for (const user of localUsers) {
+            // Skip if already mapped
+            if (alreadyMapped.has(user.id)) {
+                skipped++;
+                continue;
+            }
+
+            // Find matching Odoo employee by email
+            const odooEmployee = odooEmailMap.get(user.email.toLowerCase());
+            if (odooEmployee) {
+                await this.mapEmployee(companyId, user.id, odooEmployee.id);
+                mapped++;
+                details.push({
+                    localUser: `${user.firstName} ${user.lastName}`,
+                    localEmail: user.email,
+                    odooEmployee: odooEmployee.name,
+                    odooId: odooEmployee.id,
+                });
+            } else {
+                skipped++;
+            }
+        }
+
+        this.logger.log(`Auto-mapped ${mapped} employees for company ${companyId}`);
+        return { mapped, skipped, details };
+    }
+
     // ============= ATTENDANCE =============
 
     /**
