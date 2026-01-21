@@ -29,7 +29,8 @@ export class PolicyRuleEvaluatorService {
         // Evaluate each policy type that has relevant context data
         const typeEvaluators: Array<{ type: PolicyType; hasData: () => boolean }> = [
             { type: PolicyType.OVERTIME, hasData: () => (context.attendance?.otHours || 0) > 0 },
-            { type: PolicyType.DEDUCTION, hasData: () => (context.attendance?.lateMinutes || 0) > 0 || (context.attendance?.absentDays || 0) > 0 },
+            // 🔧 DISABLED: Using PayrollSettings for deductions instead of Smart Policies
+            // { type: PolicyType.DEDUCTION, hasData: () => (context.attendance?.lateMinutes || 0) > 0 || (context.attendance?.absentDays || 0) > 0 },
             { type: PolicyType.LEAVE, hasData: () => (context.leaves?.paidDays || 0) > 0 || (context.leaves?.unpaidDays || 0) > 0 },
             { type: PolicyType.ALLOWANCE, hasData: () => true }, // Always evaluate allowances
             { type: PolicyType.ATTENDANCE, hasData: () => !!context.attendance },
