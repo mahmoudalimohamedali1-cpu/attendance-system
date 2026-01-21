@@ -1,7 +1,8 @@
-import { Controller, Get, Patch, Post, Body, UseGuards, Logger, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards, Logger, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { PayrollSettingsService, UpdatePayrollSettingsDto } from './payroll-settings.service';
+import { PayrollSettingsService } from './payroll-settings.service';
+import { Request } from 'express';
 
 @Controller('payroll-settings')
 @UseGuards(JwtAuthGuard)
@@ -20,13 +21,14 @@ export class PayrollSettingsController {
 
     /**
      * تحديث إعدادات الرواتب
-     * نستخدم ValidationPipe مع whitelist: false لأن الـ DTO مفيهوش decorators
+     * نستخدم Request مباشرة لتجنب الـ ValidationPipe stripping
      */
     @Patch()
     async updateSettings(
         @CurrentUser('companyId') companyId: string,
-        @Body(new ValidationPipe({ whitelist: false, transform: true })) data: UpdatePayrollSettingsDto,
+        @Req() req: Request,
     ) {
+        const data = req.body;
         this.logger.log(`📨 Received update request for company ${companyId}`);
         this.logger.log(`📦 Body keys: ${Object.keys(data).join(', ')}`);
         this.logger.log(`📦 Body: ${JSON.stringify(data).substring(0, 500)}`);
