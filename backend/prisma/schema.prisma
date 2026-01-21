@@ -571,7 +571,6 @@ model User {
 
   // Holidays & Smart Policies (Restored)
   holidayAssignments            HolidayAssignment[]
-  smartPolicyExceptions         SmartPolicyException[]
   smartPolicyOccurrenceTrackers SmartPolicyOccurrenceTracker[]
   smartPolicyRetroApplications  SmartPolicyRetroApplication[]
 
@@ -2783,20 +2782,34 @@ model SmartPolicyApproval {
 }
 
 model SmartPolicyException {
-  id              String      @id @default(uuid())
-  policyId        String      @map("policy_id")
-  employeeId      String      @map("employee_id")
-  companyId       String      @map("company_id")
-  exceptionReason String?     @map("exception_reason")
-  startDate       DateTime?   @map("start_date")
-  endDate         DateTime?   @map("end_date")
-  createdBy       String      @map("created_by")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  smartPolicy     SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
-  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user            User        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id        String @id @default(uuid())
+  policyId  String @map("policy_id")
+  companyId String @map("company_id")
 
-  @@index([policyId, employeeId])
+  // Target Information (Enhanced - supports Employee, Department, Branch, Job Title)
+  targetType String  @default("EMPLOYEE") @map("target_type")
+  targetId   String  @map("target_id")
+  targetName String? @map("target_name")
+
+  // Exception Details
+  reason        String?   @map("reason")
+  exceptionFrom DateTime? @map("exception_from")
+  exceptionTo   DateTime? @map("exception_to")
+  isActive      Boolean   @default(true) @map("is_active")
+
+  // Audit
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  smartPolicy SmartPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, targetType, targetId])
+  @@index([policyId])
+  @@index([targetId])
+  @@index([isActive])
   @@map("smart_policy_exceptions")
 }
 

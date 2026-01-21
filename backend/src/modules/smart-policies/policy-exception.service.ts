@@ -97,7 +97,7 @@ export class PolicyExceptionService {
                 exceptionFrom: dto.exceptionFrom,
                 exceptionTo: dto.exceptionTo,
                 createdBy,
-            } as any,
+            },
         });
 
         this.logger.log(`Exception created: ${exception.id} for policy ${dto.policyId}`);
@@ -162,7 +162,7 @@ export class PolicyExceptionService {
                 ...(options?.isActive !== undefined && { isActive: options.isActive }),
             },
             include: {
-                policy: {
+                smartPolicy: {
                     select: { id: true, name: true, originalText: true },
                 },
             },
@@ -207,7 +207,7 @@ export class PolicyExceptionService {
         for (const exception of activeExceptions) {
             let isMatch = false;
 
-            switch (exception.exceptionType) {
+            switch (exception.targetType) {
                 case 'EMPLOYEE':
                     isMatch = exception.targetId === employeeId;
                     break;
@@ -246,7 +246,7 @@ export class PolicyExceptionService {
             where: {
                 policyId,
                 isActive: true,
-                exceptionType: 'EMPLOYEE',
+                targetType: 'EMPLOYEE',
             },
             select: { targetId: true },
         });
@@ -377,7 +377,7 @@ export class PolicyExceptionService {
 
         for (const ex of exceptions) {
             if (ex.isActive) {
-                const exType = ex.exceptionType as keyof typeof stats.byType;
+                const exType = ex.targetType as keyof typeof stats.byType;
                 stats.byType[exType] = (stats.byType[exType] || 0) + 1;
 
                 if (ex.exceptionTo) {

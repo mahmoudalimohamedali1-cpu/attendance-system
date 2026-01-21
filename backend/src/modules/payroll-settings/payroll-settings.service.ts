@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 export class UpdatePayrollSettingsDto {
@@ -173,6 +173,8 @@ export class UpdatePayrollSettingsDto {
 
 @Injectable()
 export class PayrollSettingsService {
+    private readonly logger = new Logger(PayrollSettingsService.name);
+
     constructor(private prisma: PrismaService) { }
 
     /**
@@ -200,9 +202,24 @@ export class PayrollSettingsService {
      * تحديث إعدادات الرواتب
      */
     async updateSettings(companyId: string, data: UpdatePayrollSettingsDto) {
+        // ✅ تنظيف البيانات - إزالة الحقول غير المسموح بها
+        const { id, companyId: _, createdAt, updatedAt, ...cleanData } = data as any;
+
+        this.logger.log(`📝 Updating payroll settings for company ${companyId}`);
+        this.logger.debug(`Received fields: ${Object.keys(data).join(', ')}`);
+        this.logger.debug(`Clean fields for update: ${Object.keys(cleanData).join(', ')}`);
+
+        // Log specific deduction-related fields for debugging
+        if ('lateDeductionMethod' in cleanData) {
+            this.logger.log(`🔧 lateDeductionMethod: ${cleanData.lateDeductionMethod}`);
+        }
+        if ('absenceDeductionMethod' in cleanData) {
+            this.logger.log(`🔧 absenceDeductionMethod: ${cleanData.absenceDeductionMethod}`);
+        }
+
         // التحقق من صحة payrollClosingDay
-        if (data.payrollClosingDay !== undefined) {
-            if (data.payrollClosingDay < 0 || data.payrollClosingDay > 28) {
+        if (cleanData.payrollClosingDay !== undefined) {
+            if (cleanData.payrollClosingDay < 0 || cleanData.payrollClosingDay > 28) {
                 throw new Error('يجب أن يكون تاريخ إغلاق الرواتب بين 0 و 28');
             }
         }
@@ -215,20 +232,27 @@ export class PayrollSettingsService {
         });
 
         if (!existing) {
+            this.logger.log('⚠️ No existing settings found, creating new record');
             // إنشاء مع البيانات المحدثة
             return payrollSettings.create({
                 data: {
                     companyId,
-                    ...data,
+                    ...cleanData,
                 },
             });
         }
 
+        this.logger.log(`✅ Updating existing settings (ID: ${existing.id})`);
+
         // تحديث الإعدادات الموجودة
-        return payrollSettings.update({
+        const result = await payrollSettings.update({
             where: { companyId },
-            data,
+            data: cleanData,
         });
+
+        this.logger.log(`✅ Settings updated successfully. lateDeductionMethod: ${result.lateDeductionMethod}`);
+
+        return result;
     }
 
     /**
