@@ -64,7 +64,43 @@ export class PolicyRuleEvaluatorService {
             }
         }
 
-        return lines;
+        // 🔧 FIX: Consolidate duplicate lines by componentCode (merge amounts)
+        // This prevents showing 3 separate "خصم تأخير" lines
+        const consolidatedLines = this.consolidateLines(lines);
+
+        return consolidatedLines;
+    }
+
+    /**
+     * Consolidate duplicate lines by componentCode
+     * Merges amounts for deductions (LATE_DED, ABSENCE_DED) and earnings (OVERTIME)
+     */
+    private consolidateLines(lines: PolicyPayrollLine[]): PolicyPayrollLine[] {
+        const consolidated = new Map<string, PolicyPayrollLine>();
+
+        for (const line of lines) {
+            const key = line.componentCode;
+
+            if (consolidated.has(key)) {
+                // Merge with existing line
+                const existing = consolidated.get(key)!;
+                existing.amount += line.amount;
+                existing.units = (existing.units || 0) + (line.units || 0);
+                // Update description to show combined
+                if (line.componentCode === 'LATE_DED' || line.componentCode === 'LATE') {
+                    existing.descriptionAr = `خصم تأخير - ${existing.units} دقيقة (مجمّع)`;
+                } else if (line.componentCode === 'ABSENCE_DED' || line.componentCode === 'ABSENCE') {
+                    existing.descriptionAr = `خصم غياب - ${existing.units} يوم (مجمّع)`;
+                } else if (line.componentCode === 'OVERTIME' || line.componentCode === 'OT') {
+                    existing.descriptionAr = `وقت إضافي - ${existing.units} ساعة (مجمّع)`;
+                }
+            } else {
+                // Add new line (clone to avoid mutation)
+                consolidated.set(key, { ...line });
+            }
+        }
+
+        return Array.from(consolidated.values());
     }
 
     /**
@@ -247,11 +283,29 @@ export class PolicyRuleEvaluatorService {
     ): PolicyPayrollLine {
         const component = rule.outputComponent;
 
+        // 🔧 FIX: Determine sign based on policy type if outputSign is not explicitly set
+        let sign = rule.outputSign;
+        if (!sign) {
+            // Infer sign from policy type or component code
+            const policyType = policy.type?.toUpperCase() || '';
+            const componentCode = (component?.code || '').toUpperCase();
+
+            if (policyType === 'DEDUCTION' ||
+                componentCode.includes('DED') ||
+                componentCode.includes('DEDUCTION') ||
+                componentCode.includes('LATE') ||
+                componentCode.includes('ABSENCE')) {
+                sign = 'DEDUCTION';
+            } else {
+                sign = 'EARNING';
+            }
+        }
+
         return {
             componentId: rule.outputComponentId || '',
             componentCode: component?.code || 'UNKNOWN',
             componentName: component?.nameAr || component?.code || 'Unknown',
-            sign: rule.outputSign || 'EARNING',
+            sign,
             amount: result.amount,
             descriptionAr: result.description,
             units: result.units,
