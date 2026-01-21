@@ -5278,6 +5278,8 @@ model Task {
   rejectedAt        DateTime?           @map("rejected_at")
   rejectionReason   String?             @map("rejection_reason")
   slaHours          Int?                @map("sla_hours")
+  storyPoints       Int?                @map("story_points")
+  estimatedHours    Decimal?            @map("estimated_hours") @db.Decimal(10, 2)
 
   // Relations
   activityLogs TaskActivityLog[]
