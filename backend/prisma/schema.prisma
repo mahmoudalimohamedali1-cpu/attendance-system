@@ -5649,6 +5649,12 @@ enum AutomationAction {
   CREATE_SUBTASK
   ADD_COMMENT
   MOVE_TO_CATEGORY
+  ADD_TAG
+  REMOVE_TAG
+  SET_DUE_DATE
+  ESCALATE
+  ARCHIVE
+  DUPLICATE
 }
 
 enum PerformanceReviewCycleType {
