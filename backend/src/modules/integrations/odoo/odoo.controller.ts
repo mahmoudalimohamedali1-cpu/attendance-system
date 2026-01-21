@@ -84,4 +84,69 @@ export class OdooController {
     async syncAttendance(@Request() req: any, @Body() dto: SyncAttendanceDto) {
         return this.odooService.syncAttendance(req.user.companyId, dto);
     }
+
+    // ============= LEAVES =============
+
+    @Get('leaves/types')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📋 أنواع الإجازات من Odoo' })
+    @ApiResponse({ status: 200, description: 'قائمة أنواع الإجازات' })
+    async fetchLeaveTypes(@Request() req: any) {
+        return this.odooService.fetchLeaveTypes(req.user.companyId);
+    }
+
+    @Get('leaves')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📋 جلب الإجازات من Odoo' })
+    @ApiResponse({ status: 200, description: 'قائمة الإجازات' })
+    async fetchLeaves(
+        @Request() req: any,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+        @Query('state') state?: string,
+    ) {
+        return this.odooService.fetchLeaves(req.user.companyId, { startDate, endDate, state });
+    }
+
+    @Post('leaves/push')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📤 إرسال إجازة إلى Odoo' })
+    @ApiResponse({ status: 200, description: 'تم الإرسال' })
+    async pushLeave(@Request() req: any, @Body() dto: {
+        odooEmployeeId: number;
+        leaveTypeId: number;
+        dateFrom: string;
+        dateTo: string;
+        notes?: string;
+    }) {
+        return this.odooService.pushLeave(req.user.companyId, dto);
+    }
+
+    // ============= PAYROLL =============
+
+    @Post('payroll/export')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '💰 تصدير بيانات الرواتب' })
+    @ApiResponse({ status: 200, description: 'بيانات الرواتب' })
+    async exportPayroll(@Request() req: any, @Body() dto: {
+        periodStart: string;
+        periodEnd: string;
+        userIds?: string[];
+    }) {
+        return this.odooService.generatePayrollExport(
+            req.user.companyId,
+            new Date(dto.periodStart),
+            new Date(dto.periodEnd),
+            dto.userIds,
+        );
+    }
+
+    @Post('payroll/push')
+    @Roles('ADMIN', 'HR_MANAGER')
+    @ApiOperation({ summary: '📤 إرسال بيانات الرواتب لـ Odoo' })
+    @ApiResponse({ status: 200, description: 'تم الإرسال' })
+    async pushPayroll(@Request() req: any, @Body() dto: { data: any[] }) {
+        return this.odooService.pushPayrollToOdoo(req.user.companyId, dto.data);
+    }
 }
+

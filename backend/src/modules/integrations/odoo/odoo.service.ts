@@ -412,6 +412,235 @@ export class OdooService {
         return result;
     }
 
+    // ============= LEAVES =============
+
+    /**
+     * Fetch leave types from Odoo
+     */
+    async fetchLeaveTypes(companyId: string): Promise<any[]> {
+        const config = await this.getConfig(companyId);
+        if (!config) {
+            throw new NotFoundException('Odoo غير متصل');
+        }
+
+        const result = await this.callOdoo(config, 'hr.leave.type', 'search_read', [
+            [],
+            ['id', 'name', 'code', 'request_unit', 'validity_start', 'validity_stop'],
+        ]);
+
+        if (!result.success || !Array.isArray(result.data)) {
+            throw new BadRequestException(result.error || 'فشل جلب أنواع الإجازات من Odoo');
+        }
+
+        return result.data.map((lt: any) => ({
+            id: lt.id,
+            name: lt.name,
+            code: lt.code,
+            requestUnit: lt.request_unit,
+            validityStart: lt.validity_start,
+            validityStop: lt.validity_stop,
+        }));
+    }
+
+    /**
+     * Push leave request to Odoo
+     */
+    async pushLeave(companyId: string, data: {
+        odooEmployeeId: number;
+        leaveTypeId: number;
+        dateFrom: string;
+        dateTo: string;
+        notes?: string;
+    }): Promise<{ success: boolean; odooId?: number }> {
+        const config = await this.getConfig(companyId);
+        if (!config) {
+            throw new NotFoundException('Odoo غير متصل');
+        }
+
+        const result = await this.callOdoo(config, 'hr.leave', 'create', [{
+            employee_id: data.odooEmployeeId,
+            holiday_status_id: data.leaveTypeId,
+            date_from: data.dateFrom,
+            date_to: data.dateTo,
+            name: data.notes || 'طلب إجازة من نظام الحضور',
+            request_date_from: data.dateFrom,
+            request_date_to: data.dateTo,
+        }]);
+
+        if (!result.success) {
+            throw new BadRequestException(result.error || 'فشل إرسال الإجازة لـ Odoo');
+        }
+
+        return { success: true, odooId: result.data };
+    }
+
+    /**
+     * Fetch leaves from Odoo
+     */
+    async fetchLeaves(companyId: string, options?: {
+        startDate?: string;
+        endDate?: string;
+        state?: string;
+    }): Promise<any[]> {
+        const config = await this.getConfig(companyId);
+        if (!config) {
+            throw new NotFoundException('Odoo غير متصل');
+        }
+
+        const domain: any[] = [];
+        if (options?.startDate) {
+            domain.push(['date_from', '>=', options.startDate]);
+        }
+        if (options?.endDate) {
+            domain.push(['date_to', '<=', options.endDate]);
+        }
+        if (options?.state) {
+            domain.push(['state', '=', options.state]);
+        }
+
+        const result = await this.callOdoo(config, 'hr.leave', 'search_read', [
+            domain,
+            ['id', 'employee_id', 'holiday_status_id', 'date_from', 'date_to', 'number_of_days', 'state', 'name'],
+        ]);
+
+        if (!result.success || !Array.isArray(result.data)) {
+            throw new BadRequestException(result.error || 'فشل جلب الإجازات من Odoo');
+        }
+
+        return result.data.map((leave: any) => ({
+            id: leave.id,
+            employeeId: leave.employee_id?.[0],
+            employeeName: leave.employee_id?.[1],
+            leaveTypeId: leave.holiday_status_id?.[0],
+            leaveTypeName: leave.holiday_status_id?.[1],
+            dateFrom: leave.date_from,
+            dateTo: leave.date_to,
+            numberOfDays: leave.number_of_days,
+            state: leave.state,
+            notes: leave.name,
+        }));
+    }
+
+    // ============= PAYROLL =============
+
+    /**
+     * Generate payroll data for Odoo export
+     */
+    async generatePayrollExport(companyId: string, periodStart: Date, periodEnd: Date, userIds?: string[]): Promise<any> {
+        // Get employee mappings
+        const mappings = await this.prisma.$queryRaw<any[]>`
+            SELECT user_id, odoo_employee_id FROM odoo_employee_mappings WHERE company_id = ${companyId}
+        `;
+
+        if (mappings.length === 0) {
+            return { totalEmployees: 0, data: [], errors: [{ userId: '', error: 'لا يوجد موظفين مربوطين بـ Odoo' }] };
+        }
+
+        const userToOdoo = new Map(mappings.map(m => [m.user_id, m.odoo_employee_id]));
+        const targetUserIds = userIds || Array.from(userToOdoo.keys());
+
+        const results: any[] = [];
+        const errors: any[] = [];
+
+        for (const userId of targetUserIds) {
+            const odooEmployeeId = userToOdoo.get(userId);
+            if (!odooEmployeeId) {
+                errors.push({ userId, error: 'الموظف غير مربوط بـ Odoo' });
+                continue;
+            }
+
+            try {
+                // Get user info
+                const user = await this.prisma.user.findUnique({
+                    where: { id: userId },
+                    select: { id: true, firstName: true, lastName: true },
+                });
+
+                if (!user) continue;
+
+                // Get attendance summary
+                const attendances = await this.prisma.attendance.findMany({
+                    where: {
+                        userId,
+                        date: { gte: periodStart, lte: periodEnd },
+                    },
+                    select: {
+                        workingMinutes: true,
+                        overtimeMinutes: true,
+                        lateMinutes: true,
+                        earlyLeaveMinutes: true,
+                        status: true,
+                    },
+                });
+
+                const workedDays = attendances.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
+                const absentDays = attendances.filter(a => a.status === 'ABSENT').length;
+                const workedMinutes = attendances.reduce((sum, a) => sum + (a.workingMinutes || 0), 0);
+                const overtimeMinutes = attendances.reduce((sum, a) => sum + (a.overtimeMinutes || 0), 0);
+                const lateMinutes = attendances.reduce((sum, a) => sum + (a.lateMinutes || 0), 0);
+                const earlyLeaveMinutes = attendances.reduce((sum, a) => sum + (a.earlyLeaveMinutes || 0), 0);
+
+                results.push({
+                    odooEmployeeId,
+                    userId,
+                    employeeName: `${user.firstName} ${user.lastName}`,
+                    workedDays,
+                    workedHours: Math.round(workedMinutes / 60 * 100) / 100,
+                    overtimeHours: Math.round(overtimeMinutes / 60 * 100) / 100,
+                    lateMinutes,
+                    earlyLeaveMinutes,
+                    absentDays,
+                });
+            } catch (error) {
+                errors.push({ userId, error: error.message });
+            }
+        }
+
+        return {
+            periodStart: periodStart.toISOString().split('T')[0],
+            periodEnd: periodEnd.toISOString().split('T')[0],
+            totalEmployees: results.length,
+            exported: results.length,
+            failed: errors.length,
+            data: results,
+            errors,
+        };
+    }
+
+    /**
+     * Push payroll data to Odoo work entries
+     */
+    async pushPayrollToOdoo(companyId: string, data: any[]): Promise<{ success: number; failed: number; errors: any[] }> {
+        const config = await this.getConfig(companyId);
+        if (!config) {
+            throw new NotFoundException('Odoo غير متصل');
+        }
+
+        let success = 0;
+        let failed = 0;
+        const errors: any[] = [];
+
+        for (const entry of data) {
+            try {
+                // Create work entry in Odoo
+                await this.callOdoo(config, 'hr.work.entry', 'create', [{
+                    employee_id: entry.odooEmployeeId,
+                    work_entry_type_id: 1, // Default work entry type
+                    name: `حضور ${entry.employeeName}`,
+                    date_start: entry.periodStart,
+                    date_stop: entry.periodEnd,
+                    duration: entry.workedHours,
+                }]);
+                success++;
+            } catch (error) {
+                failed++;
+                errors.push({ odooEmployeeId: entry.odooEmployeeId, error: error.message });
+            }
+        }
+
+        return { success, failed, errors };
+    }
+
     // ============= API HELPERS =============
 
     /**
