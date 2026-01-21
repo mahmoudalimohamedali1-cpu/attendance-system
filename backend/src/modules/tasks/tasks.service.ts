@@ -2267,33 +2267,46 @@ export class TasksService {
             priority?: string;
         },
     ) {
-        // TODO: TaskAutomation model not yet in schema - returning stub
-        return {
-            id: 'stub-' + Date.now(),
-            companyId,
-            createdById: userId,
-            name: data.name,
-            description: data.description || null,
-            trigger: data.trigger,
-            triggerConfig: data.triggerConfig || null,
-            action: data.action,
-            actionConfig: data.actionConfig || null,
-            categoryId: data.categoryId || null,
-            priority: data.priority || null,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            createdBy: null,
-            category: null,
-        };
+        return this.prisma.taskAutomation.create({
+            data: {
+                companyId,
+                createdById: userId,
+                name: data.name,
+                description: data.description,
+                trigger: data.trigger as any,
+                triggerConfig: data.triggerConfig,
+                action: data.action as any,
+                actionConfig: data.actionConfig,
+                categoryId: data.categoryId,
+                priority: data.priority as any,
+            },
+            include: {
+                createdBy: {
+                    select: { id: true, firstName: true, lastName: true },
+                },
+                category: {
+                    select: { id: true, name: true, color: true },
+                },
+            },
+        });
     }
 
     /**
      * Get all automation rules for a company
      */
     async getAutomations(companyId: string) {
-        // TODO: TaskAutomation model not yet in schema - returning empty array
-        return [];
+        return this.prisma.taskAutomation.findMany({
+            where: { companyId },
+            include: {
+                createdBy: {
+                    select: { id: true, firstName: true, lastName: true },
+                },
+                category: {
+                    select: { id: true, name: true, color: true },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
     }
 
     /**
@@ -2314,24 +2327,67 @@ export class TasksService {
             isActive: boolean;
         }>,
     ) {
-        // TODO: TaskAutomation model not yet in schema - returning stub
-        throw new NotFoundException('ميزة الأتمتة غير متاحة حالياً');
+        const automation = await this.prisma.taskAutomation.findFirst({
+            where: { id: automationId, companyId },
+        });
+
+        if (!automation) throw new NotFoundException('القاعدة غير موجودة');
+
+        return this.prisma.taskAutomation.update({
+            where: { id: automationId },
+            data: {
+                name: data.name,
+                description: data.description,
+                trigger: data.trigger as any,
+                triggerConfig: data.triggerConfig,
+                action: data.action as any,
+                actionConfig: data.actionConfig,
+                categoryId: data.categoryId,
+                priority: data.priority as any,
+                isActive: data.isActive,
+            },
+            include: {
+                createdBy: {
+                    select: { id: true, firstName: true, lastName: true },
+                },
+                category: {
+                    select: { id: true, name: true, color: true },
+                },
+            },
+        });
     }
 
     /**
      * Delete an automation rule
      */
     async deleteAutomation(automationId: string, companyId: string) {
-        // TODO: TaskAutomation model not yet in schema
-        throw new NotFoundException('ميزة الأتمتة غير متاحة حالياً');
+        const automation = await this.prisma.taskAutomation.findFirst({
+            where: { id: automationId, companyId },
+        });
+
+        if (!automation) throw new NotFoundException('القاعدة غير موجودة');
+
+        await this.prisma.taskAutomation.delete({
+            where: { id: automationId },
+        });
+
+        return { success: true };
     }
 
     /**
      * Toggle automation active state
      */
     async toggleAutomation(automationId: string, companyId: string) {
-        // TODO: TaskAutomation model not yet in schema
-        throw new NotFoundException('ميزة الأتمتة غير متاحة حالياً');
+        const automation = await this.prisma.taskAutomation.findFirst({
+            where: { id: automationId, companyId },
+        });
+
+        if (!automation) throw new NotFoundException('القاعدة غير موجودة');
+
+        return this.prisma.taskAutomation.update({
+            where: { id: automationId },
+            data: { isActive: !automation.isActive },
+        });
     }
 
     /**
@@ -2343,8 +2399,60 @@ export class TasksService {
         trigger: string,
         context: any = {},
     ) {
-        // TODO: TaskAutomation model not yet in schema - skipping automation processing
-        return [];
+        // Find matching automations
+        const automations = await this.prisma.taskAutomation.findMany({
+            where: {
+                companyId,
+                trigger: trigger as any,
+                isActive: true,
+            },
+        });
+
+        const task = await this.prisma.task.findUnique({
+            where: { id: taskId },
+            include: { assignee: true, reviewer: true, approver: true },
+        });
+
+        if (!task) return [];
+
+        const results = [];
+
+        for (const automation of automations) {
+            // Check category filter
+            if (automation.categoryId && task.categoryId !== automation.categoryId) continue;
+
+            // Check priority filter
+            if (automation.priority && task.priority !== automation.priority) continue;
+
+            // Check trigger config
+            const triggerConfig = automation.triggerConfig as any;
+            if (triggerConfig) {
+                if (trigger === 'STATUS_CHANGED') {
+                    if (triggerConfig.fromStatus && context.fromStatus !== triggerConfig.fromStatus) continue;
+                    if (triggerConfig.toStatus && context.toStatus !== triggerConfig.toStatus) continue;
+                }
+            }
+
+            // Execute action
+            try {
+                await this.executeAutomationAction(automation, task, context);
+
+                // Update run count
+                await this.prisma.taskAutomation.update({
+                    where: { id: automation.id },
+                    data: {
+                        lastRunAt: new Date(),
+                        run_count: { increment: 1 },
+                    },
+                });
+
+                results.push({ automationId: automation.id, success: true });
+            } catch (error: any) {
+                results.push({ automationId: automation.id, success: false, error: error.message });
+            }
+        }
+
+        return results;
     }
 
     /**
