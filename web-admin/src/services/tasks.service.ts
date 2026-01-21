@@ -283,6 +283,15 @@ export const tasksApi = {
         api.patch(`/tasks/automations/${id}/toggle`),
     getAutomationLogs: (id: string, limit?: number) =>
         api.get(`/tasks/automations/${id}/logs`, { params: limit ? { limit } : {} }),
+
+    // Recurring Tasks
+    createRecurringTask: (data: {
+        title: string;
+        description?: string;
+        priority?: string;
+        recurrenceType: string;
+    }) => api.post('/tasks/recurring', data),
+    getRecurringTasks: () => api.get('/tasks/recurring'),
 };
 
 // ============ CATEGORIES API ============
