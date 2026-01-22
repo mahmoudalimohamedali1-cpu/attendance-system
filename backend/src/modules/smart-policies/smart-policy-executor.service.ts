@@ -1030,7 +1030,8 @@ export class SmartPolicyExecutorService {
     private async getOrCreateSmartComponent(sign: 'EARNING' | 'DEDUCTION', companyId: string): Promise<string> {
         const code = sign === 'EARNING' ? 'SMART_BONUS' : 'SMART_DEDUCTION';
         const nameAr = sign === 'EARNING' ? 'مكافأة السياسات الذكية' : 'خصم السياسات الذكية';
-        const type = sign === 'EARNING' ? 'BONUS' : 'DEDUCTION';
+        // 🔧 FIX: Use correct SalaryComponentType enum values (EARNING/DEDUCTION, not BONUS)
+        const type = sign; // sign is already 'EARNING' or 'DEDUCTION'
 
         // Try to find existing component
         let component = await this.prisma.salaryComponent.findFirst({

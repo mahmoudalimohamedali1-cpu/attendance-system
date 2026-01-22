@@ -1236,7 +1236,7 @@ export class PayrollCalculationService {
         // ✅ Using Decimal comparison and conversion
         if (isPositive(overtimeAmount) && !hasOTFromPolicy) {
             policyLines.push({
-                componentId: 'SYS-OT',
+                componentId: null, // System-calculated, no specific component needed
                 componentCode: 'OVERTIME',
                 componentName: 'ساعات إضافية',
                 sign: 'EARNING',
@@ -1254,7 +1254,7 @@ export class PayrollCalculationService {
 
         if (isPositive(lateDeduction) && !hasLateFromPolicy) {
             policyLines.push({
-                componentId: 'SYS-LATE',
+                componentId: null, // System-calculated, no specific component needed
                 componentCode: 'LATE_DED',
                 componentName: 'خصم تأخير',
                 sign: 'DEDUCTION',
@@ -1272,7 +1272,7 @@ export class PayrollCalculationService {
 
         if (isPositive(absenceDeduction) && !hasAbsenceFromPolicy) {
             policyLines.push({
-                componentId: 'SYS-ABSENCE',
+                componentId: null, // System-calculated, no specific component needed
                 componentCode: 'ABSENCE_DED',
                 componentName: 'خصم غياب',
                 sign: 'DEDUCTION',
@@ -1292,7 +1292,7 @@ export class PayrollCalculationService {
         if (isPositive(sickLeaveDeduction)) {
             const details = sickLeaveDeductionDetails!;
             policyLines.push({
-                componentId: 'SYS-SICK-LEAVE',
+                componentId: null, // System-calculated, no specific component needed
                 componentCode: 'SICK_LEAVE_DED',
                 componentName: 'خصم الإجازة المرضية',
                 sign: 'DEDUCTION',
