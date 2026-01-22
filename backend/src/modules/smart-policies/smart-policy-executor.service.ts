@@ -132,9 +132,9 @@ export class SmartPolicyExecutorService {
                                 success: true,
                                 amount: penaltyResult.calculatedAmount,
                                 policyLine: {
-                                    componentId: "SMART-TIER-" + policy.id.substring(0, 8),
+                                    componentId: policy.targetComponentId || await this.getOrCreateSmartComponent(sign, context.employee?.companyId || policy.companyId),
                                     componentName: policy.name || "عقوبة متدرجة",
-                                    componentCode: "SMART_TIERED",
+                                    componentCode: policy.targetComponent?.code || "SMART_TIERED",
                                     amount: penaltyResult.calculatedAmount,
                                     sign,
                                     descriptionAr: penaltyResult.explanation,
@@ -175,7 +175,7 @@ export class SmartPolicyExecutorService {
                         isSuccess: true,
                         payrollPeriod: null,
                     },
-                    include: { policy: true },
+                    include: { policy: true }, // targetComponent included after prisma generate
                 });
 
                 this.logger.log(`Found ${pendingAdjustments.length} pending adjustments for employee ${employeeId}`);
@@ -191,9 +191,9 @@ export class SmartPolicyExecutorService {
                         success: true,
                         amount,
                         policyLine: {
-                            componentId: "SMART-" + adj.policyId.substring(0, 8),
+                            componentId: (adj.policy as any)?.targetComponentId || await this.getOrCreateSmartComponent(sign, context.employee?.companyId),
                             componentName: adj.policy?.name || "Smart Policy Adjustment",
-                            componentCode: "SMART",
+                            componentCode: (adj.policy as any)?.targetComponent?.code || "SMART",
                             amount,
                             sign,
                             descriptionAr: `سياسة ذكية: ${adj.policy?.name || ""} (${adj.triggerEvent}.${adj.triggerSubEvent || "*"})`,
@@ -516,15 +516,15 @@ export class SmartPolicyExecutorService {
         }
 
         const policyLine: PolicyPayrollLine = {
-            componentId: "SMART-" + policy.id.substring(0, 8),
+            componentId: policy.targetComponentId || await this.getOrCreateSmartComponent(sign, context.employee?.companyId || policy.companyId),
             componentName: componentName,
-            componentCode: "SMART",
+            componentCode: policy.targetComponent?.code || "SMART",
             amount: Math.abs(totalAmount),
             sign: sign,
             descriptionAr: "سياسة ذكية: " + (policy.name || parsed.explanation || ""),
             source: {
                 policyId: policy.id,
-                policyCode: "SMART",
+                policyCode: policy.targetComponent?.code || "SMART",
                 ruleId: "SMART-EXEC",
                 ruleCode: "SMART",
             },
@@ -1021,6 +1021,42 @@ export class SmartPolicyExecutorService {
     invalidatePolicyCache(companyId: string): void {
         this.policyCache.delete(companyId);
         this.logger.log(`[CACHE] Invalidated cache for company ${companyId}`);
+    }
+
+    /**
+     * 🔧 Get or create default Smart Policy salary component
+     * Auto-creates SMART_BONUS or SMART_DEDUCTION if not exists
+     */
+    private async getOrCreateSmartComponent(sign: 'EARNING' | 'DEDUCTION', companyId: string): Promise<string> {
+        const code = sign === 'EARNING' ? 'SMART_BONUS' : 'SMART_DEDUCTION';
+        const nameAr = sign === 'EARNING' ? 'مكافأة السياسات الذكية' : 'خصم السياسات الذكية';
+        const type = sign === 'EARNING' ? 'BONUS' : 'DEDUCTION';
+
+        // Try to find existing component
+        let component = await this.prisma.salaryComponent.findFirst({
+            where: { code, companyId }
+        });
+
+        // Create if not exists
+        if (!component) {
+            this.logger.log(`🔧 Creating default Smart Policy component: ${code}`);
+            component = await this.prisma.salaryComponent.create({
+                data: {
+                    code,
+                    nameAr,
+                    nameEn: code.replace('_', ' '),
+                    type: type as any,
+                    nature: 'VARIABLE',
+                    companyId,
+                    isActive: true,
+                    gosiEligible: false,
+                    otEligible: false,
+                    taxable: false,
+                }
+            });
+        }
+
+        return component.id;
     }
 }
 

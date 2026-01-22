@@ -2260,6 +2260,7 @@ model SalaryComponent {
   policyRules    PolicyRule[]          @relation("PolicyOutputComponent")
   company        Company?              @relation(fields: [companyId], references: [id])
   structureLines SalaryStructureLine[]
+  smartPolicies  SmartPolicy[]
 
   @@unique([companyId, type, code, version])
   @@index([companyId, isActive])
@@ -2768,6 +2769,10 @@ model SmartPolicy {
   retroApplications  SmartPolicyRetroApplication[]
   versions           SmartPolicyVersion[]
   simulationRuns     PolicySimulationRun[]
+
+  // 🔗 مكون الراتب المستهدف (للإضافة أو الخصم)
+  targetComponentId String?          @map("target_component_id")
+  targetComponent   SalaryComponent? @relation(fields: [targetComponentId], references: [id])
 
   @@index([companyId, status, isActive])
   @@index([companyId, triggerEvent])
