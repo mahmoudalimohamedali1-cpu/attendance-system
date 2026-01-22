@@ -388,6 +388,25 @@ export class PayrollRunsService {
                     this.logger.log(`Created debt record for employee ${employee.id}: ${toFixed(negativeBalanceAmount)} SAR`);
                 }
 
+                // 🔧 FIX: Validate componentIds before creating payslip to prevent foreign key errors
+                const validComponentIds = new Set<string>();
+                const componentsInDb = await tx.salaryComponent.findMany({
+                    where: { companyId },
+                    select: { id: true }
+                });
+                for (const c of componentsInDb) {
+                    validComponentIds.add(c.id);
+                }
+
+                // Filter payslipLines to only include valid componentIds (or null)
+                const validatedPayslipLines = payslipLines.filter(line => {
+                    if (!line.componentId) return true; // null is allowed
+                    if (validComponentIds.has(line.componentId)) return true;
+                    // Log and skip invalid componentIds
+                    this.logger.warn(`🚫 Skipping payslip line with invalid componentId: ${line.componentId} (${line.descriptionAr})`);
+                    return false;
+                });
+
                 await tx.payslip.create({
                     data: {
                         employeeId: employee.id,
@@ -401,7 +420,7 @@ export class PayrollRunsService {
                         status: (hasNegativeBalance ? 'REQUIRES_REVIEW' : 'DRAFT') as any,
                         calculationTrace: calculation.calculationTrace as any,
                         lines: {
-                            create: payslipLines
+                            create: validatedPayslipLines
                         }
                     }
                 });
