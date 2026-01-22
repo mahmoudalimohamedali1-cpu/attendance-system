@@ -221,6 +221,9 @@ export class PayrollRunsService {
                             descriptionAr: pl.descriptionAr || undefined,
                             sourceRef: pl.source ? `${pl.source.policyId}:${pl.source.ruleId}` : undefined,
                             costCenterId: primaryCostCenterId, // ربط بمركز التكلفة
+                            // 🔧 إضافة الوحدات والمعدل للعرض التفصيلي
+                            units: pl.units ? new Decimal(pl.units) : null,
+                            rate: pl.rate ? new Decimal(pl.rate) : null,
                         });
                     }
                 }

@@ -1295,6 +1295,8 @@ export class PayrollCalculationService {
                 componentName: 'ساعات إضافية',
                 sign: 'EARNING',
                 amount: toNumber(round(overtimeAmount)),
+                units: toNumber(overtimeHours), // 🔧 عدد الساعات
+                rate: toNumber(otHourlyRate), // 🔧 معدل الساعة
                 descriptionAr: `${toFixed(overtimeHours)} ساعة إضافية`,
                 source: {
                     policyId: 'SYSTEM',
@@ -1313,6 +1315,8 @@ export class PayrollCalculationService {
                 componentName: 'خصم تأخير',
                 sign: 'DEDUCTION',
                 amount: toNumber(round(lateDeduction)),
+                units: lateMinutes, // 🔧 عدد الدقائق
+                rate: lateMinutes > 0 ? toNumber(div(lateDeduction, toDecimal(lateMinutes))) : 0, // 🔧 سعر الدقيقة
                 descriptionAr: `خصم تأخير ${lateMinutes} دقيقة`,
                 source: {
                     policyId: 'SYSTEM',
@@ -1331,6 +1335,8 @@ export class PayrollCalculationService {
                 componentName: 'خصم غياب',
                 sign: 'DEDUCTION',
                 amount: toNumber(round(absenceDeduction)),
+                units: absentDays, // 🔧 عدد أيام الغياب
+                rate: absentDays > 0 ? toNumber(div(absenceDeduction, toDecimal(absentDays))) : 0, // 🔧 سعر اليوم
                 descriptionAr: `خصم غياب ${absentDays} يوم`,
                 source: {
                     policyId: 'SYSTEM',
@@ -1345,12 +1351,15 @@ export class PayrollCalculationService {
         // ✅ إضافة خصم الإجازة المرضية (حسب نظام العمل السعودي)
         if (isPositive(sickLeaveDeduction)) {
             const details = sickLeaveDeductionDetails!;
+            const sickDays = details.partialPayDays + details.unpaidDays;
             policyLines.push({
                 componentId: systemComponentIds.SICK_LEAVE_DED,
                 componentCode: 'SICK_LEAVE_DED',
                 componentName: 'خصم الإجازة المرضية',
                 sign: 'DEDUCTION',
                 amount: toNumber(round(sickLeaveDeduction)),
+                units: sickDays, // 🔧 عدد أيام المرضية
+                rate: sickDays > 0 ? toNumber(div(sickLeaveDeduction, toDecimal(sickDays))) : 0, // 🔧 متوسط الخصم لليوم
                 descriptionAr: `خصم مرضية: ${details.partialPayDays} يوم براتب جزئي + ${details.unpaidDays} يوم بدون راتب`,
                 source: {
                     policyId: 'SAUDI_LABOR_LAW',
@@ -1368,6 +1377,8 @@ export class PayrollCalculationService {
                 componentName: 'خصم انصراف مبكر',
                 sign: 'DEDUCTION',
                 amount: toNumber(round(earlyDepartureDeduction)),
+                units: earlyDepartureMinutes, // 🔧 عدد الدقائق
+                rate: earlyDepartureMinutes > 0 ? toNumber(div(earlyDepartureDeduction, toDecimal(earlyDepartureMinutes))) : 0, // 🔧 سعر الدقيقة
                 descriptionAr: `خصم انصراف مبكر ${earlyDepartureMinutes} دقيقة`,
                 source: {
                     policyId: 'SYSTEM',
