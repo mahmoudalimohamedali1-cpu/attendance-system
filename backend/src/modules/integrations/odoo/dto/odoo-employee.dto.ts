@@ -52,6 +52,9 @@ export class SyncEmployeesDto {
 
     @ApiPropertyOptional({ description: 'Create new users for unmapped employees', default: false })
     createNewUsers?: boolean = false;
+
+    @ApiPropertyOptional({ description: 'Who triggered the sync' })
+    triggeredBy?: 'USER' | 'SCHEDULED' | 'WEBHOOK';
 }
 
 // Employee Mapping

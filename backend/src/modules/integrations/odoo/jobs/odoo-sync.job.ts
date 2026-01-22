@@ -3,6 +3,8 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { OdooService } from '../odoo.service';
 import { PrismaService } from '../../../../common/prisma/prisma.service';
 
+import { OdooRetryQueueService } from '../queue/retry-queue.service';
+
 @Injectable()
 export class OdooSyncJob {
     private readonly logger = new Logger(OdooSyncJob.name);
@@ -11,6 +13,7 @@ export class OdooSyncJob {
     constructor(
         private readonly odooService: OdooService,
         private readonly prisma: PrismaService,
+        private readonly retryQueue: OdooRetryQueueService,
     ) { }
 
     /**
@@ -95,6 +98,43 @@ export class OdooSyncJob {
             }
         } catch (error) {
             this.logger.error('❌ Employee sync job failed:', error);
+        }
+    }
+
+    /**
+     * Process failed sync items from the retry queue
+     */
+    @Cron(CronExpression.EVERY_10_MINUTES)
+    async processRetryQueue() {
+        this.logger.log('🔄 Processing Odoo retry queue...');
+
+        try {
+            const items = await this.retryQueue.getNextItems(20);
+            if (items.length === 0) return;
+
+            for (const item of items) {
+                try {
+                    switch (item.operation) {
+                        case 'ATTENDANCE_PUSH':
+                            const result = await this.odooService.pushAttendance(item.companyId, item.payload);
+                            if (result.success) {
+                                await this.retryQueue.markCompleted(item.id);
+                            } else {
+                                await this.retryQueue.markFailed(item.id, 'Odoo rejected record during retry');
+                            }
+                            break;
+
+                        default:
+                            this.logger.warn(`Unknown retry operation: ${item.operation}`);
+                            await this.retryQueue.markFailed(item.id, 'Unsupported operation for retry');
+                    }
+                } catch (error) {
+                    await this.retryQueue.markFailed(item.id, error.message);
+                    this.logger.error(`❌ Retry failed for item ${item.id}: ${error.message}`);
+                }
+            }
+        } catch (error) {
+            this.logger.error('❌ Retry queue job failed:', error);
         }
     }
 }

@@ -43,6 +43,7 @@ const OdooSettingsPage: React.FC = () => {
         apiKey: '',
         syncInterval: 5,
         autoSync: true,
+        useStealthMode: false,
     });
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [connecting, setConnecting] = useState(false);
@@ -62,6 +63,7 @@ const OdooSettingsPage: React.FC = () => {
                     odooUrl: data.config?.odooUrl || '',
                     database: data.config?.database || '',
                     syncInterval: data.config?.syncInterval || 5,
+                    useStealthMode: (data.config as any)?.useStealthMode || false,
                 }));
             }
         } catch (error) {
@@ -79,6 +81,7 @@ const OdooSettingsPage: React.FC = () => {
                 database: form.database,
                 username: form.username,
                 apiKey: form.apiKey,
+                useStealthMode: form.useStealthMode,
             });
             setTestResult(data);
         } catch (error: any) {
@@ -723,6 +726,24 @@ const OdooSettingsPage: React.FC = () => {
                                     value={form.apiKey}
                                     onChange={e => setForm({ ...form, apiKey: e.target.value })}
                                 />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <Divider sx={{ my: 1 }} />
+                                <Tooltip title="تفعيل هذا الخيار في حال كان السيرفر يحجب بوابة الربط البرمجي التقليدية (XML-RPC). سيقوم النظام بمحاكاة جلسة ويب عادية للربط.">
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={form.useStealthMode}
+                                                onChange={e => setForm({ ...form, useStealthMode: e.target.checked })}
+                                                color="secondary"
+                                            />
+                                        }
+                                        label="وضع التخفي (Stealth Mode)"
+                                    />
+                                </Tooltip>
+                                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    استخدم هذا الحل إذا كان الرابط يعمل في المتصفح ولكن يفشل اختبار الاتصال البرمجي.
+                                </Typography>
                             </Grid>
                         </Grid>
 

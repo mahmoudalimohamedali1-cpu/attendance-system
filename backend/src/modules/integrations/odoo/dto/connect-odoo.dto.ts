@@ -33,6 +33,11 @@ export class ConnectOdooDto {
     @IsOptional()
     @IsBoolean()
     autoSync?: boolean = true;
+
+    @ApiPropertyOptional({ description: 'Use JSON-RPC Stealth Mode (for blocked APIs)', default: false })
+    @IsOptional()
+    @IsBoolean()
+    useStealthMode?: boolean = false;
 }
 
 export class TestOdooConnectionDto {
@@ -55,4 +60,9 @@ export class TestOdooConnectionDto {
     @IsString()
     @IsNotEmpty()
     apiKey: string;
+
+    @ApiPropertyOptional({ description: 'Use JSON-RPC Stealth Mode' })
+    @IsOptional()
+    @IsBoolean()
+    useStealthMode?: boolean = false;
 }

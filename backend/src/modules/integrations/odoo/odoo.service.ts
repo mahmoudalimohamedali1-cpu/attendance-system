@@ -3,6 +3,11 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ConnectOdooDto, TestOdooConnectionDto } from './dto/connect-odoo.dto';
 import { SyncEmployeesDto, EmployeeImportResultDto, OdooEmployeeDto } from './dto/odoo-employee.dto';
 import { SyncAttendanceDto, AttendanceSyncResultDto, PushAttendanceDto } from './dto/sync-attendance.dto';
+import { OdooSyncLogService } from './logs/sync-log.service';
+import { OdooRetryQueueService } from './queue/retry-queue.service';
+import { OdooConflictResolverService } from './conflict/conflict-resolver.service';
+import { OdooWebhookService } from './webhooks/odoo-webhook.service';
+import { OdooFieldMappingService } from './mapping/field-mapping.service';
 import * as https from 'https';
 import * as http from 'http';
 
@@ -11,6 +16,7 @@ interface OdooXmlRpcResponse {
     data?: any;
     error?: string;
     uid?: number;
+    sessionId?: string;
 }
 
 interface OdooConfig {
@@ -20,28 +26,40 @@ interface OdooConfig {
     username: string;
     apiKey: string;
     uid?: number;
+    sessionId?: string;
+    useStealthMode?: boolean;
 }
 
 @Injectable()
 export class OdooService {
     private readonly logger = new Logger(OdooService.name);
 
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly syncLogService: OdooSyncLogService,
+        private readonly retryQueueService: OdooRetryQueueService,
+        private readonly conflictResolver: OdooConflictResolverService,
+        private readonly webhookService: OdooWebhookService,
+        private readonly fieldMappingService: OdooFieldMappingService,
+    ) { }
 
     // ============= CONNECTION =============
 
     /**
      * Test connection to Odoo instance
      */
-    async testConnection(dto: TestOdooConnectionDto): Promise<{ success: boolean; message: string; uid?: number }> {
+    async testConnection(dto: TestOdooConnectionDto): Promise<{ success: boolean; message: string; uid?: number; sessionId?: string }> {
         try {
-            const result = await this.authenticate(dto.odooUrl, dto.database, dto.username, dto.apiKey);
+            const result = dto.useStealthMode
+                ? await this.authenticateJsonRpc(dto.odooUrl, dto.database, dto.username, dto.apiKey)
+                : await this.authenticate(dto.odooUrl, dto.database, dto.username, dto.apiKey);
 
-            if (result.success && result.uid) {
+            if (result.success) {
                 return {
                     success: true,
-                    message: 'تم الاتصال بـ Odoo بنجاح',
+                    message: `تم الاتصال بـ Odoo بنجاح ${dto.useStealthMode ? '(وضع التخفي)' : ''}`,
                     uid: result.uid,
+                    sessionId: result.sessionId,
                 };
             }
 
@@ -68,6 +86,7 @@ export class OdooService {
             database: dto.database,
             username: dto.username,
             apiKey: dto.apiKey,
+            useStealthMode: dto.useStealthMode,
         });
 
         if (!testResult.success) {
@@ -93,10 +112,12 @@ export class OdooService {
                     odooUrl: dto.odooUrl,
                     database: dto.database,
                     username: dto.username,
-                    apiKey: dto.apiKey, // Should be encrypted in production
+                    apiKey: dto.apiKey,
                     syncInterval: dto.syncInterval || 5,
                     autoSync: dto.autoSync ?? true,
                     uid: testResult.uid,
+                    sessionId: testResult.sessionId,
+                    useStealthMode: dto.useStealthMode,
                 },
             },
             update: {
@@ -111,11 +132,13 @@ export class OdooService {
                     syncInterval: dto.syncInterval || 5,
                     autoSync: dto.autoSync ?? true,
                     uid: testResult.uid,
+                    sessionId: testResult.sessionId,
+                    useStealthMode: dto.useStealthMode,
                 },
             },
         });
 
-        this.logger.log(`Odoo connected for company ${companyId}`);
+        this.logger.log(`Odoo connected for company ${companyId} (Stealth: ${dto.useStealthMode})`);
         return { success: true, message: 'تم ربط Odoo بنجاح' };
     }
 
@@ -137,11 +160,16 @@ export class OdooService {
      * Get Odoo configuration for a company
      */
     async getConfig(companyId: string): Promise<OdooConfig | null> {
-        const integration = await this.prisma.integration.findFirst({
-            where: { companyId, type: 'ODOO', isActive: true },
+        const integration = await this.prisma.integration.findUnique({
+            where: {
+                companyId_type: {
+                    companyId,
+                    type: 'ODOO',
+                },
+            },
         });
 
-        if (!integration || !integration.config) {
+        if (!integration || !integration.isActive) {
             return null;
         }
 
@@ -153,6 +181,8 @@ export class OdooService {
             username: config.username,
             apiKey: config.apiKey,
             uid: config.uid,
+            sessionId: config.sessionId,
+            useStealthMode: config.useStealthMode,
         };
     }
 
@@ -233,6 +263,19 @@ export class OdooService {
      * Sync employees from Odoo to local system
      */
     async syncEmployees(companyId: string, dto?: SyncEmployeesDto): Promise<EmployeeImportResultDto> {
+        const config = await this.getConfig(companyId);
+        if (!config) {
+            throw new NotFoundException('Odoo غير متصل');
+        }
+
+        const logId = await this.syncLogService.startLog({
+            companyId,
+            operation: 'EMPLOYEE_SYNC',
+            direction: 'INBOUND',
+            triggeredBy: dto?.triggeredBy === 'USER' ? 'USER' : 'SCHEDULED',
+        });
+        const startTime = Date.now();
+
         const employees = await this.fetchEmployees(companyId, dto);
         const result: EmployeeImportResultDto = {
             total: employees.length,
@@ -242,55 +285,84 @@ export class OdooService {
             errors: [],
         };
 
+        // Get mappings for transformation
+        const fieldMappings = await this.fieldMappingService.getMappings(companyId, 'EMPLOYEE');
+        const mappingFields = fieldMappings.map(m => m.localField);
+
         for (const emp of employees) {
             try {
-                // Check if mapping exists
-                const existingMapping = await this.prisma.$queryRaw<any[]>`
-          SELECT user_id FROM odoo_employee_mappings 
-          WHERE odoo_employee_id = ${emp.id} AND company_id = ${companyId}
-        `;
+                // Transform Odoo employee data to local format using mapping service
+                const mappedData = await this.fieldMappingService.transformToLocal(companyId, 'EMPLOYEE', emp);
 
-                if (existingMapping.length > 0) {
-                    // Update existing user - parse name into firstName/lastName
-                    const nameParts = emp.name.split(' ');
-                    const firstName = nameParts[0] || emp.name;
-                    const lastName = nameParts.slice(1).join(' ') || firstName;
+                // Find by Odoo ID using raw query for type safety across client versions
+                const mappings = await this.prisma.$queryRaw<any[]>`
+                    SELECT user_id as "userId" FROM odoo_employee_mappings 
+                    WHERE odoo_employee_id = ${emp.id} AND company_id = ${companyId}
+                    LIMIT 1
+                `;
+                const mappingByOdooId = mappings.length > 0 ? mappings[0] : null;
 
-                    await this.prisma.user.update({
-                        where: { id: existingMapping[0].user_id },
-                        data: {
-                            firstName,
-                            lastName,
-                            phone: emp.mobilePhone || emp.workPhone || undefined,
-                            jobTitle: emp.jobTitle,
-                        },
+                if (mappingByOdooId) {
+                    // Update existing user - check for conflicts
+                    const user = await this.prisma.user.findUnique({
+                        where: { id: mappingByOdooId.userId },
                     });
-                    result.updated++;;
+
+                    if (user) {
+                        const conflicts = this.conflictResolver.detectConflicts(user, mappedData, mappingFields);
+
+                        if (conflicts.length > 0) {
+                            const resolution = await this.conflictResolver.resolveAuto(
+                                {
+                                    companyId,
+                                    entityType: 'EMPLOYEE',
+                                    entityId: user.id,
+                                    localData: user,
+                                    odooData: mappedData,
+                                    conflictType: 'DATA_MISMATCH',
+                                },
+                                (config as any).conflictStrategy || 'ODOO_WINS',
+                            );
+
+                            if (resolution.action === 'KEEP_ODOO' || resolution.action === 'MERGED') {
+                                await this.prisma.user.update({
+                                    where: { id: user.id },
+                                    data: resolution.resolvedData,
+                                });
+                                result.updated++;
+                            } else {
+                                result.skipped++;
+                            }
+                        } else {
+                            // No changes needed or no conflicts
+                            result.skipped++;
+                        }
+                    }
                 } else if (dto?.createNewUsers && emp.workEmail) {
-                    // Create new user - parse name into firstName/lastName
+                    // Create new user using mapped data
                     const nameParts = emp.name.split(' ');
-                    const firstName = nameParts[0] || emp.name;
-                    const lastName = nameParts.slice(1).join(' ') || firstName;
+                    const firstName = mappedData.firstName || nameParts[0] || emp.name;
+                    const lastName = mappedData.lastName || nameParts.slice(1).join(' ') || firstName;
 
                     const newUser = await this.prisma.user.create({
                         data: {
                             email: emp.workEmail,
-                            password: '', // Will need to be set by user
+                            password: '', // Should be set by user or emailed
                             firstName,
                             lastName,
-                            phone: emp.mobilePhone || emp.workPhone || undefined,
-                            jobTitle: emp.jobTitle,
+                            phone: mappedData.phone || emp.mobilePhone || emp.workPhone || undefined,
+                            jobTitle: mappedData.jobTitle || emp.jobTitle,
                             companyId,
                             role: 'EMPLOYEE',
                             status: 'ACTIVE',
                         },
                     });
 
-                    // Create mapping
+                    // Create mapping using raw query
                     await this.prisma.$executeRaw`
-            INSERT INTO odoo_employee_mappings (id, user_id, odoo_employee_id, company_id, last_sync_at)
-            VALUES (gen_random_uuid(), ${newUser.id}, ${emp.id}, ${companyId}, NOW())
-          `;
+                        INSERT INTO odoo_employee_mappings (id, user_id, odoo_employee_id, company_id, last_synced_at, created_at, updated_at)
+                        VALUES (gen_random_uuid(), ${newUser.id}, ${emp.id}, ${companyId}, NOW(), NOW(), NOW())
+                    `;
                     result.imported++;
                 } else {
                     result.skipped++;
@@ -300,7 +372,15 @@ export class OdooService {
             }
         }
 
-        // Update last sync time
+        // Complete the log
+        await this.syncLogService.completeLog(logId, {
+            recordCount: result.total,
+            successCount: result.imported + result.updated,
+            failedCount: result.errors.length,
+            errors: result.errors,
+        }, startTime);
+
+        // Update last sync time on integration
         await this.prisma.integration.updateMany({
             where: { companyId, type: 'ODOO' },
             data: { lastSyncAt: new Date() },
@@ -459,6 +539,14 @@ export class OdooService {
             throw new NotFoundException('Odoo غير متصل');
         }
 
+        const logId = await this.syncLogService.startLog({
+            companyId,
+            operation: 'ATTENDANCE_PUSH',
+            direction: 'OUTBOUND',
+            triggeredBy: 'SCHEDULED',
+        });
+        const startTime = Date.now();
+
         // Get attendance records that haven't been synced
         const startDate = dto?.startDate ? new Date(dto.startDate) : new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24 hours
         const endDate = dto?.endDate ? new Date(dto.endDate) : new Date();
@@ -502,15 +590,41 @@ export class OdooService {
                     checkOut: att.checkOutTime?.toISOString(),
                 });
 
-                // Log sync success (no odooSynced field yet, using metadata in future)
+                // Log sync success
                 this.logger.debug(`Synced attendance ${att.id} to Odoo`);
-
                 result.pushed++;
             } catch (error) {
                 result.failed++;
                 result.errors.push({ attendanceId: att.id, error: error.message });
+
+                // Enqueue for retry
+                await this.retryQueueService.enqueue({
+                    companyId,
+                    operation: 'ATTENDANCE_PUSH',
+                    payload: {
+                        attendanceId: att.id,
+                        odooEmployeeId,
+                        checkIn: att.checkInTime.toISOString(),
+                        checkOut: att.checkOutTime?.toISOString(),
+                    },
+                    priority: 1,
+                });
             }
         }
+
+        // Complete the log
+        await this.syncLogService.completeLog(logId, {
+            recordCount: result.total,
+            successCount: result.pushed,
+            failedCount: result.failed,
+            errors: result.errors,
+        }, startTime);
+
+        // Update last sync time
+        await this.prisma.integration.updateMany({
+            where: { companyId, type: 'ODOO' },
+            data: { lastSyncAt: new Date() },
+        });
 
         this.logger.log(`Pushed ${result.pushed} attendance records to Odoo for company ${companyId}`);
         return result;
@@ -768,9 +882,40 @@ export class OdooService {
     }
 
     /**
+     * Authenticate with Odoo (JSON-RPC Stealth Mode)
+     */
+    private async authenticateJsonRpc(odooUrl: string, database: string, username: string, password: string): Promise<OdooXmlRpcResponse> {
+        try {
+            const response = await this.jsonRpcRequest(odooUrl, '/web/session/authenticate', {
+                db: database,
+                login: username,
+                password: password,
+                base_location: odooUrl,
+            });
+
+            if (response.result && response.result.uid) {
+                return {
+                    success: true,
+                    uid: response.result.uid,
+                    data: response.result,
+                    sessionId: response.sessionId,
+                };
+            }
+
+            return { success: false, error: 'فشل المصادقة عبر وضع التخفي. تأكد من صحة بيانات الدخول واسم قاعدة البيانات.' };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Call Odoo model method
      */
     private async callOdoo(config: OdooConfig, model: string, method: string, args: any[]): Promise<OdooXmlRpcResponse> {
+        if (config.useStealthMode) {
+            return this.callOdooJsonRpc(config, model, method, args);
+        }
+
         try {
             // Re-authenticate if no uid
             let uid = config.uid;
@@ -797,6 +942,57 @@ export class OdooService {
             return { success: true, data };
         } catch (error) {
             this.logger.error(`Odoo API call failed: ${model}.${method}`, error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Call Odoo model method (JSON-RPC Stealth Mode)
+     */
+    private async callOdooJsonRpc(config: OdooConfig, model: string, method: string, args: any[]): Promise<OdooXmlRpcResponse> {
+        try {
+            let sessionId = config.sessionId;
+
+            // Simple wrapper to refresh session if needed
+            const performCall = async (sId: string) => {
+                return this.jsonRpcRequest(config.odooUrl, '/web/dataset/call_kw', {
+                    model,
+                    method,
+                    args,
+                    kwargs: {},
+                }, sId);
+            };
+
+            let response = await performCall(sessionId || '');
+
+            // If session expired (check for specific Odoo error or 404/redirect)
+            if (response.error && response.error.data && response.error.data.name === 'odoo.http.SessionExpiredException') {
+                const authResult = await this.authenticateJsonRpc(config.odooUrl, config.database, config.username, config.apiKey);
+                if (authResult.success && authResult.sessionId) {
+                    sessionId = authResult.sessionId;
+                    // Update session in DB
+                    await this.prisma.integration.update({
+                        where: { id: config.id },
+                        data: {
+                            config: {
+                                ...config,
+                                sessionId,
+                            } as any,
+                        },
+                    });
+                    response = await performCall(sessionId);
+                } else {
+                    return { success: false, error: 'انتهت الجلسة وفشلت محاولة التجديد التلقائي' };
+                }
+            }
+
+            if (response.error) {
+                return { success: false, error: response.error.message || 'خطأ في استدعاء JSON-RPC' };
+            }
+
+            return { success: true, data: response.result };
+        } catch (error) {
+            this.logger.error(`Odoo JSON-RPC call failed: ${model}.${method}`, error);
             return { success: false, error: error.message };
         }
     }
@@ -1019,11 +1215,12 @@ export class OdooService {
             const options = {
                 hostname: url.hostname,
                 port: url.port || (isHttps ? 443 : 80),
-                path: url.pathname,
+                path: url.pathname + url.search,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/xml',
                     'Content-Length': Buffer.byteLength(body),
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 },
                 timeout: 30000,
             };
@@ -1038,6 +1235,78 @@ export class OdooService {
             req.on('timeout', () => {
                 req.destroy();
                 reject(new Error('Request timeout'));
+            });
+
+            req.write(body);
+            req.end();
+        });
+    }
+
+    /**
+     * Make JSON-RPC request for Stealth Mode
+     */
+    private jsonRpcRequest(baseUrl: string, path: string, params: any, sessionId?: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const url = new URL(path, baseUrl);
+            const isHttps = url.protocol === 'https:';
+            const lib = isHttps ? https : http;
+
+            const body = JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'call',
+                params: params,
+                id: Math.floor(Math.random() * 1000000),
+            });
+
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'Content-Length': String(Buffer.byteLength(body)),
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            };
+
+            if (sessionId) {
+                headers['Cookie'] = `session_id=${sessionId}`;
+            }
+
+            const options = {
+                hostname: url.hostname,
+                port: url.port || (isHttps ? 443 : 80),
+                path: url.pathname,
+                method: 'POST',
+                headers: headers,
+                timeout: 30000,
+            };
+
+            const req = lib.request(options, (res) => {
+                let data = '';
+                let newSessionId = sessionId;
+
+                // Extract session_id from Set-Cookie header if present
+                const setCookie = res.headers['set-cookie'];
+                if (setCookie) {
+                    const sessionCookie = setCookie.find(c => c.includes('session_id='));
+                    if (sessionCookie) {
+                        const match = sessionCookie.match(/session_id=([^;]+)/);
+                        if (match) newSessionId = match[1];
+                    }
+                }
+
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                    try {
+                        const json = JSON.parse(data);
+                        json.sessionId = newSessionId;
+                        resolve(json);
+                    } catch (e) {
+                        reject(new Error(`Failed to parse JSON-RPC response: ${data.substring(0, 100)}...`));
+                    }
+                });
+            });
+
+            req.on('error', reject);
+            req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('JSON-RPC request timeout'));
             });
 
             req.write(body);

@@ -111,7 +111,7 @@ export const integrationsApi = {
         config?: { odooUrl: string; database: string; syncInterval: number };
     }>('/integrations/odoo/status'),
 
-    testOdooConnection: (data: { odooUrl: string; database: string; username: string; apiKey: string }) =>
+    testOdooConnection: (data: { odooUrl: string; database: string; username: string; apiKey: string; useStealthMode?: boolean }) =>
         api.post<{ success: boolean; message: string; uid?: number }>('/integrations/odoo/test', data),
 
     connectOdoo: (data: {
@@ -121,6 +121,7 @@ export const integrationsApi = {
         apiKey: string;
         syncInterval?: number;
         autoSync?: boolean;
+        useStealthMode?: boolean;
     }) => api.post<{ success: boolean; message: string }>('/integrations/odoo/connect', data),
 
     disconnectOdoo: () => api.delete<{ success: boolean; message: string }>('/integrations/odoo/disconnect'),
