@@ -138,6 +138,42 @@ export class PayrollCalculationService {
     }
 
     /**
+     * حساب تاريخ الدفع القادم بناءً على الإعدادات
+     * @param year السنة
+     * @param month الشهر (1-12)
+     * @param paymentDayType نوع يوم الدفع (LAST_WORKING_DAY أو FIXED_DAY)
+     * @param paymentDay يوم الدفع (1-31) إذا كان نوع الدفع FIXED_DAY
+     * @param workingDays أيام العمل في الأسبوع (مثال: '0,1,2,3,4' = أحد-خميس)
+     */
+    getNextPaymentDate(
+        year: number,
+        month: number,
+        paymentDayType: string = 'LAST_WORKING_DAY',
+        paymentDay: number = 28,
+        workingDays: string = '0,1,2,3,4'
+    ): Date {
+        const workingDaysArray = workingDays.split(',').map(d => parseInt(d.trim()));
+
+        if (paymentDayType === 'FIXED_DAY') {
+            // يوم محدد من الشهر
+            const lastDayOfMonth = new Date(year, month, 0).getDate();
+            const actualDay = Math.min(paymentDay, lastDayOfMonth);
+            return new Date(year, month - 1, actualDay);
+        } else {
+            // آخر يوم عمل من الشهر
+            const lastDayOfMonth = new Date(year, month, 0).getDate();
+            for (let day = lastDayOfMonth; day >= 1; day--) {
+                const date = new Date(year, month - 1, day);
+                if (workingDaysArray.includes(date.getDay())) {
+                    return date;
+                }
+            }
+            // إذا لم يجد يوم عمل، يرجع آخر يوم في الشهر
+            return new Date(year, month, 0);
+        }
+    }
+
+    /**
      * حساب معامل التناسب (Pro-rata) للموظفين الجدد أو المغادرين
      * ✅ Updated to use Decimal for precision
      */

@@ -48,6 +48,7 @@ import {
     HealthAndSafety as GosiIcon,
     FlightTakeoff as VacationIcon,
     Warning as PenaltyIcon,
+    Event as EventIcon,
     Email as EmailIcon,
     Language as LanguageIcon,
     TimerOff as OvertimeCapIcon,
@@ -367,6 +368,60 @@ export default function PayrollSettingsPage() {
                         />
                     </Grid>
                 </Grid>
+            </SettingsSection>
+
+            {/* جدول دفع الرواتب */}
+            <SettingsSection
+                icon={<EventIcon />}
+                title="جدول دفع الرواتب"
+                description="تحديد متى يتم دفع الرواتب للموظفين"
+            >
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            select
+                            label="نوع يوم الدفع"
+                            fullWidth
+                            value={settings.paymentDayType || 'LAST_WORKING_DAY'}
+                            onChange={(e) => handleChange('paymentDayType', e.target.value)}
+                            helperText={settings.paymentDayType === 'FIXED_DAY' ? 'سيتم الدفع في يوم محدد من كل شهر' : 'سيتم الدفع في آخر يوم عمل من كل شهر'}
+                        >
+                            <MenuItem value="LAST_WORKING_DAY">
+                                <Box>
+                                    <Typography variant="body2">آخر يوم عمل من كل شهر</Typography>
+                                    <Typography variant="caption" color="text.secondary">يتم الدفع تلقائياً في آخر يوم عمل</Typography>
+                                </Box>
+                            </MenuItem>
+                            <MenuItem value="FIXED_DAY">
+                                <Box>
+                                    <Typography variant="body2">يوم محدد من كل شهر</Typography>
+                                    <Typography variant="caption" color="text.secondary">اختر يوم ثابت للدفع</Typography>
+                                </Box>
+                            </MenuItem>
+                        </TextField>
+                    </Grid>
+                    {settings.paymentDayType === 'FIXED_DAY' && (
+                        <Grid item xs={12} md={6}>
+                            <TextField
+                                label="يوم الدفع"
+                                type="number"
+                                fullWidth
+                                value={settings.paymentDay || 28}
+                                onChange={(e) => handleChange('paymentDay', parseInt(e.target.value) || 28)}
+                                inputProps={{ min: 1, max: 31 }}
+                                helperText="اختر يوم من 1 إلى 31 - ملاحظة: إذا كان الشهر أقصر سيتم الدفع في آخر يوم"
+                            />
+                        </Grid>
+                    )}
+                </Grid>
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                    <Typography variant="body2" color="info.contrastText">
+                        💡 <strong>ملاحظة:</strong> هذا الإعداد يُستخدم لتحديد تاريخ استحقاق الراتب في التقارير والتنبيهات.
+                        {settings.paymentDayType === 'FIXED_DAY'
+                            ? ` الرواتب ستُستحق في يوم ${settings.paymentDay || 28} من كل شهر.`
+                            : ' الرواتب ستُستحق في آخر يوم عمل من كل شهر.'}
+                    </Typography>
+                </Box>
             </SettingsSection>
 
             {/* 2. حساب التوظيف وإنهاء الخدمات */}
