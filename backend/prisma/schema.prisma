@@ -488,7 +488,6 @@ model User {
   createdDisciplinaryCases DisciplinaryCase[]           @relation("ManagerCreatedCases")
   disciplinaryCases        DisciplinaryCase[]           @relation("EmployeeDisciplinaryCases")
   disciplinaryRecords      EmployeeDisciplinaryRecord[]
-  payrollAdjustments       PayrollAdjustment[]
 
   // العهد (Custody Relations)
   custodyAssignments        CustodyAssignment[]  @relation("EmployeeCustody")
@@ -603,6 +602,7 @@ model User {
   employeeAdjustments PayrollAdjustment[] @relation("EmployeeAdjustments")
   createdAdjustments  PayrollAdjustment[] @relation("AdjustmentCreator")
   approvedAdjustments PayrollAdjustment[] @relation("AdjustmentApprover")
+  payrollAdjustments  PayrollAdjustment[]
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -2433,12 +2433,12 @@ model PayrollAdjustment {
   company            Company           @relation(fields: [companyId], references: [id])
   createdBy          User              @relation("AdjustmentCreator", fields: [createdById], references: [id])
   approvedBy         User?             @relation("AdjustmentApprover", fields: [approvedById], references: [id])
+  payrollPeriod      PayrollPeriod?    @relation(fields: [payrollPeriodId], references: [id])
+  payrollPeriodId    String?           @map("payroll_period_id")
+  disciplinaryCase   DisciplinaryCase? @relation(fields: [disciplinaryCaseId], references: [id])
+  disciplinaryCaseId String?           @map("disciplinary_case_id")
   user               User?             @relation(fields: [userId], references: [id])
   userId             String?
-  payrollPeriod      PayrollPeriod?    @relation(fields: [payrollPeriodId], references: [id])
-  payrollPeriodId    String?
-  disciplinaryCase   DisciplinaryCase? @relation(fields: [disciplinaryCaseId], references: [id])
-  disciplinaryCaseId String?
 
   @@index([payrollRunId])
   @@index([employeeId])
