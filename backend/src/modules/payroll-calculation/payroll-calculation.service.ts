@@ -377,6 +377,7 @@ export class PayrollCalculationService {
         let weekendOvertimeMinutes = 0; // ساعات العمل الإضافية في عطلة نهاية الأسبوع
         let lateCount = 0; // عدد مرات التأخير (للخصم التراكمي)
         let totalEarlyDepartureMinutes = 0; // دقائق الانصراف المبكر
+        let lateDaysOverThreshold = 0; // عدد الأيام التي تجاوز فيها التأخير الحد (للخصم اليومي)
 
         for (const att of attendances) {
             const dayOfWeek = new Date(att.date).getDay(); // 0 = Sunday, 6 = Saturday
@@ -405,6 +406,11 @@ export class PayrollCalculationService {
             totalLateMinutes += attLateMinutes;
             if (attLateMinutes > 0) {
                 lateCount++; // عد مرات التأخير
+                // عد الأيام اللي فيها تأخير أكبر من 120 دقيقة (القيمة الافتراضية)
+                // سيتم تعديل الحد لاحقاً حسب الإعدادات في الحساب الفعلي
+                if (attLateMinutes >= 120) {
+                    lateDaysOverThreshold++;
+                }
             }
 
             // حساب الانصراف المبكر
@@ -431,6 +437,7 @@ export class PayrollCalculationService {
             weekendOvertimeHours: weekendOvertimeMinutes / 60,
             recordsCount: attendances.length,
             lateCount, // عدد مرات التأخير (للخصم التراكمي)
+            lateDaysOverThreshold, // عدد الأيام اللي فيها تأخير أكبر من الحد (للخصم اليومي)
             earlyDepartureMinutes: totalEarlyDepartureMinutes, // دقائق الانصراف المبكر
             // 🌙 Ramadan-aware work hours
             isRamadanActive,
@@ -692,12 +699,14 @@ export class PayrollCalculationService {
                     lateDeduction = mul(lateHours, hourlyRateLate);
                     break;
                 case 'DAILY_RATE':
-                    // خصم يوم كامل إذا تجاوز التأخير الحد المحدد في الإعدادات
-                    const thresholdMinutes = settings.lateThresholdMinutes || 120;
-                    if (effectiveLateMinutes >= thresholdMinutes) {
-                        lateDeduction = dailyRateAbsence;
+                    // خصم يوم كامل لكل يوم تجاوز فيه التأخير الحد المحدد
+                    // نستخدم عدد الأيام المحسوب مسبقاً في attendanceData
+                    const lateDaysCount = (attendanceData as any).lateDaysOverThreshold || 0;
+                    if (lateDaysCount > 0) {
+                        // خصم يوم كامل × عدد الأيام اللي تجاوزت الحد
+                        lateDeduction = mul(lateDaysCount, dailyRateAbsence);
                     } else {
-                        // أقل من الحد = خصم بالدقيقة
+                        // لو مفيش أيام تجاوزت الحد، نخصم بالدقيقة
                         lateDeduction = mul(div(effectiveLateMinutes, 60), hourlyRateLate);
                     }
                     break;
