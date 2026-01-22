@@ -59,6 +59,9 @@ import { PolicyMarketplaceService } from "./features/policy-marketplace.service"
 // === Marketplace Seed ===
 import { MarketplaceSeedService } from "./marketplace/marketplace-seed.service";
 import { PolicyGeneratorService } from "./marketplace/policy-generator.service";
+// === AI-Free Rule Engine (Phase V2) ===
+import { PolicyTemplateRegistryService } from "./templates/policy-template.registry";
+import { PELParserService } from "./engines/pel-parser.service";
 import { PrismaModule } from "../../common/prisma/prisma.module";
 import { AiModule } from "../ai/ai.module";
 import { ScheduleModule } from "@nestjs/schedule";
@@ -133,6 +136,9 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
         // === Marketplace Seed ===
         PolicyGeneratorService,
         MarketplaceSeedService,
+        // === AI-Free Rule Engine (Phase V2) ===
+        PolicyTemplateRegistryService,
+        PELParserService,
         // === Global Providers ===
         {
             provide: APP_FILTER,
@@ -197,6 +203,9 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
         IntegrationHubService,
         AdvancedReportingService,
         PolicyMarketplaceService,
+        // === AI-Free Rule Engine (Phase V2) ===
+        PolicyTemplateRegistryService,
+        PELParserService,
     ],
 })
 export class SmartPoliciesModule { }

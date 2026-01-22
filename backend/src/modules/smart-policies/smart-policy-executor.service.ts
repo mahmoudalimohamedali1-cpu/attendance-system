@@ -20,6 +20,9 @@ import {
     roundTo,
     chunk,
 } from "./helpers/smart-policy.helpers";
+// === AI-Free Rule Engine (Phase V2) ===
+import { PolicyTemplateRegistryService } from "./templates/policy-template.registry";
+import { PELParserService } from "./engines/pel-parser.service";
 
 export interface SmartPolicyExecutionResult {
     success: boolean;
@@ -56,6 +59,9 @@ export class SmartPolicyExecutorService {
         private policyException: PolicyExceptionService,
         private tieredPenalty: TieredPenaltyService,
         private safeParser: SafeExpressionParserService,
+        // === AI-Free Rule Engine (Phase V2) ===
+        private templateRegistry: PolicyTemplateRegistryService,
+        private pelParser: PELParserService,
     ) { }
 
     async executeSmartPolicies(
@@ -395,7 +401,7 @@ export class SmartPolicyExecutorService {
         policy: any,
         context: EnrichedPolicyContext
     ): Promise<SmartPolicyExecutionResult> {
-        const parsed = policy.parsedRule;
+        let parsed = policy.parsedRule;
         if (!parsed || !parsed.understood) {
             return { success: false, amount: 0, error: "Policy not understood" };
         }
@@ -421,25 +427,76 @@ export class SmartPolicyExecutorService {
             this.logger.log(`Dynamic query passed: ${queryResult}`);
         }
 
-        // 🔥 AI Agent Fallback: لو مفيش dynamicQuery ولا conditions، استخدم الـ AI Agent
+        // 🔥 AI-Free Fallback (Phase V2): لو مفيش dynamicQuery ولا conditions، استخدم Templates أو PEL
         if (!parsed.dynamicQuery && (!parsed.conditions || parsed.conditions.length === 0)) {
-            // استخدام الـ AI Agent للتحقق من السياسة ديناميكياً
-            this.logger.log(`Using AI Agent for policy: ${policy.name}`);
-            try {
-                const agentResult = await this.aiAgent.executeSmartPolicy(
-                    policy.originalText || policy.description || parsed.explanation,
-                    context.employee.id,
-                    context.period.startDate,
-                    context.period.endDate
-                );
+            this.logger.log(`Using AI-Free fallback for policy: ${policy.name}`);
 
-                if (!agentResult.success || !agentResult.result) {
-                    this.logger.debug(`AI Agent: condition not met for policy ${policy.name}`);
-                    return { success: false, amount: 0 };
+            // 1️⃣ Try PEL parsing if originalText looks like PEL expression
+            const originalText = policy.originalText || policy.description || '';
+            if (originalText.toLowerCase().includes('when') || originalText.includes('عندما') || originalText.includes('إذا')) {
+                try {
+                    const pelResult = this.pelParser.parse(originalText);
+                    if (pelResult.success && pelResult.parsedRule) {
+                        this.logger.log(`PEL parsed successfully for policy: ${policy.name}`);
+                        parsed = { ...parsed, ...pelResult.parsedRule };
+                    }
+                } catch (pelError) {
+                    this.logger.debug(`PEL parsing failed, trying templates: ${(pelError as Error).message}`);
                 }
-                this.logger.log(`AI Agent passed: ${JSON.stringify(agentResult.result)}`);
-            } catch (error) {
-                this.logger.warn(`AI Agent failed, continuing with default: ${error.message}`);
+            }
+
+            // 2️⃣ Try template matching if policy has a templateId
+            if ((!parsed.conditions || parsed.conditions.length === 0) && (policy as any).templateId) {
+                try {
+                    const templateRule = this.templateRegistry.generateParsedRule((policy as any).templateId);
+                    if (templateRule.understood) {
+                        this.logger.log(`Template matched for policy: ${policy.name} (${(policy as any).templateId})`);
+                        parsed = { ...parsed, ...templateRule };
+                    }
+                } catch (templateError) {
+                    this.logger.debug(`Template matching failed: ${(templateError as Error).message}`);
+                }
+            }
+
+            // 3️⃣ Fallback: Use default template based on trigger event
+            if (!parsed.conditions || parsed.conditions.length === 0) {
+                const categoryMap: Record<string, string> = {
+                    'ATTENDANCE': 'ATTENDANCE',
+                    'PAYROLL': 'BONUSES',
+                    'LEAVE': 'ATTENDANCE',
+                    'PERFORMANCE': 'BONUSES',
+                };
+                const category = categoryMap[policy.triggerEvent] || 'BONUSES';
+                try {
+                    const defaultRule = this.templateRegistry.getDefaultTemplate(category as any);
+                    if (defaultRule.understood) {
+                        this.logger.log(`Using default ${category} template for policy: ${policy.name}`);
+                        parsed = { ...parsed, ...defaultRule };
+                    }
+                } catch (defaultError) {
+                    this.logger.warn(`Default template failed, policy will be skipped: ${(defaultError as Error).message}`);
+                    return { success: false, amount: 0, error: 'No valid rule configuration' };
+                }
+            }
+
+            // 4️⃣ Optional: Still try AI as last resort (graceful degradation)
+            if ((!parsed.conditions || parsed.conditions.length === 0) && this.aiAgent) {
+                try {
+                    const agentResult = await this.aiAgent.executeSmartPolicy(
+                        originalText,
+                        context.employee.id,
+                        context.period.startDate,
+                        context.period.endDate
+                    );
+
+                    if (!agentResult.success || !agentResult.result) {
+                        this.logger.debug(`AI Agent: condition not met for policy ${policy.name}`);
+                        return { success: false, amount: 0 };
+                    }
+                    this.logger.log(`AI Agent passed (fallback): ${JSON.stringify(agentResult.result)}`);
+                } catch (aiError) {
+                    this.logger.debug(`AI Agent unavailable, using template defaults: ${(aiError as Error).message}`);
+                }
             }
         }
 
