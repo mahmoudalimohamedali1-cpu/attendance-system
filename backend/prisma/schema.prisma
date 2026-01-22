@@ -2171,25 +2171,25 @@ enum PayslipLineSource {
 }
 
 model PayslipLine {
-  id             String            @id @default(uuid())
-  payslipId      String            @map("payslip_id")
-  componentId    String            @map("component_id")
-  amount         Decimal           @db.Decimal(10, 2)
-  createdAt      DateTime          @default(now()) @map("created_at")
-  descriptionAr  String?           @map("description_ar")
-  rate           Decimal?          @db.Decimal(10, 4)
-  sign           String            @default("EARNING")
-  sourceRef      String?           @map("source_ref")
-  sourceType     PayslipLineSource @default(STRUCTURE) @map("source_type")
-  units          Decimal?          @db.Decimal(10, 2)
-  cost_center_id String?
-  component      SalaryComponent   @relation(fields: [componentId], references: [id])
-  cost_centers   CostCenter?       @relation(fields: [cost_center_id], references: [id])
-  payslip        Payslip           @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  id            String            @id @default(uuid())
+  payslipId     String            @map("payslip_id")
+  componentId   String            @map("component_id")
+  amount        Decimal           @db.Decimal(10, 2)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  descriptionAr String?           @map("description_ar")
+  rate          Decimal?          @db.Decimal(10, 4)
+  sign          String            @default("EARNING")
+  sourceRef     String?           @map("source_ref")
+  sourceType    PayslipLineSource @default(STRUCTURE) @map("source_type")
+  units         Decimal?          @db.Decimal(10, 2)
+  costCenterId  String?           @map("cost_center_id")
+  component     SalaryComponent   @relation(fields: [componentId], references: [id])
+  costCenter    CostCenter?       @relation(fields: [costCenterId], references: [id])
+  payslip       Payslip           @relation(fields: [payslipId], references: [id], onDelete: Cascade)
 
   @@index([payslipId, sourceType])
   @@index([payslipId, componentId])
-  @@index([cost_center_id])
+  @@index([costCenterId])
   @@map("payslip_lines")
 }
 
