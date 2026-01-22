@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import { EmployeeDebtService } from '../employee-debt/employee-debt.service';
 import { GosiValidationService } from '../gosi/gosi-validation.service';
 import { PayrollValidationService } from './payroll-validation.service';
+import { PayrollAdjustmentsService } from '../payroll-adjustments/payroll-adjustments.service';
 import { DebtSourceType } from '@prisma/client';
 
 // ✅ Decimal imports for financial calculations
@@ -41,6 +42,7 @@ export class PayrollRunsService {
         private employeeDebtService: EmployeeDebtService,
         private gosiValidationService: GosiValidationService,
         private payrollValidationService: PayrollValidationService,
+        private adjustmentsService: PayrollAdjustmentsService,
     ) { }
 
     async create(dto: CreatePayrollRunDto, companyId: string, userId: string) {
@@ -258,6 +260,50 @@ export class PayrollRunsService {
                             costCenterId: primaryCostCenterId,
                         });
                     }
+                }
+
+                // ✅ تطبيق التسويات المعتمدة من قاعدة البيانات (PayrollAdjustments)
+                const approvedAdjustments = await this.adjustmentsService.getApprovedAdjustmentsTotal(
+                    employee.id,
+                    run.id
+                );
+
+                if (approvedAdjustments.netAdjustment !== 0) {
+                    // إضافة الإضافات المعتمدة
+                    if (approvedAdjustments.totalAdditions > 0) {
+                        adjustmentBonus = add(adjustmentBonus, toDecimal(approvedAdjustments.totalAdditions));
+                        payslipLines.push({
+                            componentId: null,
+                            amount: round(toDecimal(approvedAdjustments.totalAdditions)),
+                            sourceType: 'ADJUSTMENT' as any,
+                            sign: 'EARNING',
+                            descriptionAr: `تسويات معتمدة (إلغاء خصم/إضافة يدوية)`,
+                            sourceRef: 'PAYROLL_ADJUSTMENTS',
+                            costCenterId: primaryCostCenterId,
+                        });
+                    }
+                    // إضافة الخصومات المعتمدة
+                    if (approvedAdjustments.totalDeductions > 0) {
+                        adjustmentDeduction = add(adjustmentDeduction, toDecimal(approvedAdjustments.totalDeductions));
+                        payslipLines.push({
+                            componentId: null,
+                            amount: round(toDecimal(approvedAdjustments.totalDeductions)),
+                            sourceType: 'ADJUSTMENT' as any,
+                            sign: 'DEDUCTION',
+                            descriptionAr: `تسويات معتمدة (خصم يدوي)`,
+                            sourceRef: 'PAYROLL_ADJUSTMENTS',
+                            costCenterId: primaryCostCenterId,
+                        });
+                    }
+
+                    calculation.calculationTrace.push({
+                        step: 'APPROVED_ADJUSTMENTS',
+                        description: 'تطبيق التسويات المعتمدة',
+                        formula: `Additions: ${approvedAdjustments.totalAdditions} | Deductions: ${approvedAdjustments.totalDeductions}`,
+                        result: approvedAdjustments.netAdjustment,
+                    });
+
+                    this.logger.log(`Applied adjustments for employee ${employee.id}: +${approvedAdjustments.totalAdditions} -${approvedAdjustments.totalDeductions}`);
                 }
 
                 // ✅ Using Decimal for final calculations

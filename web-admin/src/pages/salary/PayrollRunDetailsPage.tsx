@@ -25,6 +25,7 @@ import {
     TextField,
     InputAdornment,
     Paper,
+    MenuItem,
 } from '@mui/material';
 import {
     ArrowBack,
@@ -68,6 +69,24 @@ export const PayrollRunDetailsPage = () => {
     const [adjustmentReason, setAdjustmentReason] = useState('');
     const [adjustmentLoading, setAdjustmentLoading] = useState(false);
 
+    // === تسويات الموظفين ===
+    interface Adjustment {
+        id: string;
+        employeeId: string;
+        adjustmentType: string;
+        originalAmount: number;
+        adjustedAmount: number;
+        reason: string;
+        status: string;
+    }
+    const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+    const [employeeAdjustmentOpen, setEmployeeAdjustmentOpen] = useState(false);
+    const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+    const [adjFormType, setAdjFormType] = useState('WAIVE_DEDUCTION');
+    const [adjFormOriginalAmount, setAdjFormOriginalAmount] = useState('');
+    const [adjFormReason, setAdjFormReason] = useState('');
+    const [adjFormLoading, setAdjFormLoading] = useState(false);
+
     // Calculate summary from payslips - must be before any conditional returns
     const summary = useMemo(() => {
         if (!run?.payslips) return { employees: 0, grossTotal: 0, deductionsTotal: 0, netTotal: 0 };
@@ -103,6 +122,19 @@ export const PayrollRunDetailsPage = () => {
             }
         };
         fetchRun();
+    }, [id]);
+
+    // جلب التسويات
+    useEffect(() => {
+        const fetchAdjustments = async () => {
+            try {
+                const data = await api.get(`/payroll-adjustments/by-run/${id}`) as Adjustment[];
+                setAdjustments(data || []);
+            } catch (err) {
+                console.log('No adjustments or error:', err);
+            }
+        };
+        if (id) fetchAdjustments();
     }, [id]);
 
     const handleApprove = async () => {
@@ -413,9 +445,24 @@ export const PayrollRunDetailsPage = () => {
                                             {netSalary.toLocaleString()} ريال
                                         </TableCell>
                                         <TableCell align="center">
-                                            <IconButton size="small" onClick={() => setSelectedPayslip(payslip)}>
-                                                <Visibility fontSize="small" />
-                                            </IconButton>
+                                            <Box display="flex" gap={0.5} justifyContent="center">
+                                                <IconButton size="small" onClick={() => setSelectedPayslip(payslip)} title="عرض التفاصيل">
+                                                    <Visibility fontSize="small" />
+                                                </IconButton>
+                                                {!isLocked && (
+                                                    <IconButton
+                                                        size="small"
+                                                        color="secondary"
+                                                        onClick={() => {
+                                                            setSelectedEmployee(payslip.employee);
+                                                            setEmployeeAdjustmentOpen(true);
+                                                        }}
+                                                        title="إضافة تسوية"
+                                                    >
+                                                        <AdjustmentIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </Box>
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -424,6 +471,112 @@ export const PayrollRunDetailsPage = () => {
                     </Table>
                 </TableContainer>
             </Paper>
+
+            {/* === قسم التسويات === */}
+            {adjustments.length > 0 && (
+                <Paper sx={{ mt: 3, p: 2 }}>
+                    <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AdjustmentIcon color="secondary" /> تسويات الرواتب ({adjustments.length})
+                    </Typography>
+                    <TableContainer>
+                        <Table size="small">
+                            <TableHead sx={{ bgcolor: 'grey.50' }}>
+                                <TableRow>
+                                    <TableCell>الموظف</TableCell>
+                                    <TableCell>نوع التسوية</TableCell>
+                                    <TableCell>المبلغ الأصلي</TableCell>
+                                    <TableCell>المبلغ المُعدّل</TableCell>
+                                    <TableCell>السبب</TableCell>
+                                    <TableCell>الحالة</TableCell>
+                                    <TableCell align="center">الإجراءات</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {adjustments.map((adj) => {
+                                    const employee = run?.payslips.find(p => p.employee?.id === adj.employeeId)?.employee;
+                                    const getTypeLabel = (type: string) => {
+                                        switch (type) {
+                                            case 'WAIVE_DEDUCTION': return '❌ إلغاء خصم';
+                                            case 'MANUAL_ADDITION': return '➕ إضافة يدوية';
+                                            case 'MANUAL_DEDUCTION': return '➖ خصم يدوي';
+                                            case 'CONVERT_TO_LEAVE': return '🔄 تحويل لإجازة';
+                                            default: return type;
+                                        }
+                                    };
+                                    const getStatusChip = (status: string) => {
+                                        switch (status) {
+                                            case 'PENDING': return <Chip label="قيد المراجعة" color="warning" size="small" />;
+                                            case 'APPROVED': return <Chip label="مُعتمد ✅" color="success" size="small" />;
+                                            case 'REJECTED': return <Chip label="مرفوض ❌" color="error" size="small" />;
+                                            default: return <Chip label={status} size="small" />;
+                                        }
+                                    };
+                                    return (
+                                        <TableRow key={adj.id} hover>
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {employee ? `${employee.firstName} ${employee.lastName}` : adj.employeeId}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>{getTypeLabel(adj.adjustmentType)}</TableCell>
+                                            <TableCell>{adj.originalAmount.toLocaleString()} ريال</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold', color: adj.adjustedAmount > adj.originalAmount ? 'success.main' : 'error.main' }}>
+                                                {adj.adjustedAmount.toLocaleString()} ريال
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="caption" sx={{ maxWidth: 150, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {adj.reason}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>{getStatusChip(adj.status)}</TableCell>
+                                            <TableCell align="center">
+                                                {adj.status === 'PENDING' && !isLocked && (
+                                                    <Box display="flex" gap={0.5} justifyContent="center">
+                                                        <Button
+                                                            size="small"
+                                                            color="success"
+                                                            variant="contained"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await api.patch(`/payroll-adjustments/${adj.id}/approve`, {});
+                                                                    const data = await api.get(`/payroll-adjustments/by-run/${id}`) as Adjustment[];
+                                                                    setAdjustments(data || []);
+                                                                } catch (err: any) {
+                                                                    alert('❌ ' + (err.message || 'فشل في الاعتماد'));
+                                                                }
+                                                            }}
+                                                        >
+                                                            اعتماد
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            color="error"
+                                                            variant="outlined"
+                                                            onClick={async () => {
+                                                                const reason = prompt('سبب الرفض:');
+                                                                if (!reason) return;
+                                                                try {
+                                                                    await api.patch(`/payroll-adjustments/${adj.id}/reject`, { reason });
+                                                                    const data = await api.get(`/payroll-adjustments/by-run/${id}`) as Adjustment[];
+                                                                    setAdjustments(data || []);
+                                                                } catch (err: any) {
+                                                                    alert('❌ ' + (err.message || 'فشل في الرفض'));
+                                                                }
+                                                            }}
+                                                        >
+                                                            رفض
+                                                        </Button>
+                                                    </Box>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
+            )}
 
             <Dialog open={!!selectedPayslip} onClose={() => setSelectedPayslip(null)} maxWidth="md" fullWidth>
                 <DialogTitle>تفاصيل قسيمة الراتب</DialogTitle>
@@ -656,6 +809,101 @@ export const PayrollRunDetailsPage = () => {
                         startIcon={adjustmentLoading ? <CircularProgress size={20} /> : <AdjustmentIcon />}
                     >
                         {adjustmentLoading ? 'جاري الإنشاء...' : 'إنشاء التعديل'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Employee Adjustment Dialog - تسوية خصم موظف */}
+            <Dialog
+                open={employeeAdjustmentOpen}
+                onClose={() => !adjFormLoading && setEmployeeAdjustmentOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AdjustmentIcon color="secondary" />
+                    تسوية لـ {selectedEmployee?.firstName} {selectedEmployee?.lastName}
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            label="نوع التسوية"
+                            value={adjFormType}
+                            onChange={(e) => setAdjFormType(e.target.value)}
+                            disabled={adjFormLoading}
+                        >
+                            <MenuItem value="WAIVE_DEDUCTION">❌ إلغاء خصم</MenuItem>
+                            <MenuItem value="MANUAL_ADDITION">➕ إضافة يدوية (مكافأة)</MenuItem>
+                            <MenuItem value="MANUAL_DEDUCTION">➖ خصم يدوي</MenuItem>
+                            <MenuItem value="CONVERT_TO_LEAVE">🔄 تحويل خصم لإجازة</MenuItem>
+                        </TextField>
+                        <TextField
+                            fullWidth
+                            type="number"
+                            label="المبلغ (ر.س)"
+                            value={adjFormOriginalAmount}
+                            onChange={(e) => setAdjFormOriginalAmount(e.target.value)}
+                            disabled={adjFormLoading}
+                            helperText={adjFormType === 'WAIVE_DEDUCTION' ? 'المبلغ الأصلي للخصم المراد إلغاؤه' : 'قيمة الإضافة/الخصم'}
+                        />
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={2}
+                            label="السبب"
+                            value={adjFormReason}
+                            onChange={(e) => setAdjFormReason(e.target.value)}
+                            disabled={adjFormLoading}
+                            placeholder="مثال: إلغاء خصم تأخير بسبب عذر طبي"
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => {
+                            setEmployeeAdjustmentOpen(false);
+                            setAdjFormType('WAIVE_DEDUCTION');
+                            setAdjFormOriginalAmount('');
+                            setAdjFormReason('');
+                        }}
+                        disabled={adjFormLoading}
+                    >
+                        إلغاء
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        disabled={adjFormLoading || !adjFormReason.trim() || !adjFormOriginalAmount}
+                        onClick={async () => {
+                            try {
+                                setAdjFormLoading(true);
+                                await api.post('/payroll-adjustments', {
+                                    payrollRunId: id,
+                                    employeeId: selectedEmployee?.id,
+                                    adjustmentType: adjFormType,
+                                    originalAmount: parseFloat(adjFormOriginalAmount),
+                                    adjustedAmount: adjFormType === 'WAIVE_DEDUCTION' ? 0 : parseFloat(adjFormOriginalAmount),
+                                    reason: adjFormReason.trim(),
+                                });
+                                // Refresh adjustments
+                                const data = await api.get(`/payroll-adjustments/by-run/${id}`) as Adjustment[];
+                                setAdjustments(data || []);
+                                setEmployeeAdjustmentOpen(false);
+                                setAdjFormType('WAIVE_DEDUCTION');
+                                setAdjFormOriginalAmount('');
+                                setAdjFormReason('');
+                                alert('✅ تم إنشاء التسوية بنجاح');
+                            } catch (err: any) {
+                                alert('❌ ' + (err.response?.data?.message || err.message || 'فشل في إنشاء التسوية'));
+                            } finally {
+                                setAdjFormLoading(false);
+                            }
+                        }}
+                        startIcon={adjFormLoading ? <CircularProgress size={20} /> : <AdjustmentIcon />}
+                    >
+                        {adjFormLoading ? 'جاري الحفظ...' : 'حفظ التسوية'}
                     </Button>
                 </DialogActions>
             </Dialog>

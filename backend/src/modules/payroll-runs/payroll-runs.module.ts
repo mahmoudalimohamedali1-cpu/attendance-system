@@ -9,6 +9,7 @@ import { PayrollValidationService } from './payroll-validation.service';
 import { AuditModule } from '../audit/audit.module';
 import { EmployeeDebtModule } from '../employee-debt/employee-debt.module';
 import { GosiModule } from '../gosi/gosi.module';
+import { PayrollAdjustmentsModule } from '../payroll-adjustments/payroll-adjustments.module';
 
 @Module({
     imports: [
@@ -18,6 +19,7 @@ import { GosiModule } from '../gosi/gosi.module';
         AuditModule,
         EmployeeDebtModule,
         GosiModule,
+        PayrollAdjustmentsModule,
     ],
     controllers: [PayrollRunsController],
     providers: [PayrollRunsService, AdjustmentRunService, PayrollValidationService],
