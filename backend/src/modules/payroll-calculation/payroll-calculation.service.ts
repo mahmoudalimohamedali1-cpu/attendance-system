@@ -64,6 +64,51 @@ export class PayrollCalculationService {
         private aiPolicyEvaluator: AIPolicyEvaluatorService,
     ) { }
 
+    // 🔧 Cache for system component IDs to avoid repeated DB lookups
+    private systemComponentCache = new Map<string, string>();
+
+    /**
+     * 🔧 Get or create a system salary component by code
+     * Looks up existing component or creates one if not exists
+     */
+    private async getOrCreateSystemComponent(
+        code: string,
+        nameAr: string,
+        type: 'EARNING' | 'DEDUCTION',
+        companyId: string
+    ): Promise<string> {
+        const cacheKey = `${companyId}:${code}`;
+        if (this.systemComponentCache.has(cacheKey)) {
+            return this.systemComponentCache.get(cacheKey)!;
+        }
+
+        let component = await this.prisma.salaryComponent.findFirst({
+            where: { code, companyId }
+        });
+
+        if (!component) {
+            this.logger.log(`🔧 Creating system component: ${code}`);
+            component = await this.prisma.salaryComponent.create({
+                data: {
+                    code,
+                    nameAr,
+                    nameEn: code.replace(/_/g, ' '),
+                    type,
+                    nature: 'VARIABLE',
+                    companyId,
+                    isActive: true,
+                    gosiEligible: false,
+                    otEligible: false,
+                    taxable: false,
+                }
+            });
+        }
+
+        this.systemComponentCache.set(cacheKey, component.id);
+        return component.id;
+    }
+
+
     /**
      * تحويل أيام العمل من نص إلى مصفوفة أرقام
      * Parse workingDays string like "1,2,3,4,5" to number array [1,2,3,4,5]
@@ -520,6 +565,15 @@ export class PayrollCalculationService {
 
         // جلب الإعدادات أولاً لتحديد كيفية التعامل مع الموظفين الجدد
         const settings = await this.getCalculationSettings(employeeId, companyId);
+
+        // 🔧 Pre-load system component IDs to avoid null componentId issues
+        const systemComponentIds = {
+            OVERTIME: await this.getOrCreateSystemComponent('OVERTIME', 'ساعات إضافية', 'EARNING', companyId),
+            LATE_DED: await this.getOrCreateSystemComponent('LATE_DED', 'خصم تأخير', 'DEDUCTION', companyId),
+            ABSENCE_DED: await this.getOrCreateSystemComponent('ABSENCE_DED', 'خصم غياب', 'DEDUCTION', companyId),
+            SICK_LEAVE_DED: await this.getOrCreateSystemComponent('SICK_LEAVE_DED', 'خصم إجازة مرضية', 'DEDUCTION', companyId),
+            EARLY_DEP_DED: await this.getOrCreateSystemComponent('EARLY_DEP_DED', 'خصم انصراف مبكر', 'DEDUCTION', companyId),
+        };
 
         // ✅ التحقق من تاريخ التعيين - بناءً على إعدادات الشركة
         if (employee.hireDate && new Date(employee.hireDate) > startDate) {
@@ -1236,7 +1290,7 @@ export class PayrollCalculationService {
         // ✅ Using Decimal comparison and conversion
         if (isPositive(overtimeAmount) && !hasOTFromPolicy) {
             policyLines.push({
-                componentId: null, // System-calculated, no specific component needed
+                componentId: systemComponentIds.OVERTIME,
                 componentCode: 'OVERTIME',
                 componentName: 'ساعات إضافية',
                 sign: 'EARNING',
@@ -1254,7 +1308,7 @@ export class PayrollCalculationService {
 
         if (isPositive(lateDeduction) && !hasLateFromPolicy) {
             policyLines.push({
-                componentId: null, // System-calculated, no specific component needed
+                componentId: systemComponentIds.LATE_DED,
                 componentCode: 'LATE_DED',
                 componentName: 'خصم تأخير',
                 sign: 'DEDUCTION',
@@ -1272,7 +1326,7 @@ export class PayrollCalculationService {
 
         if (isPositive(absenceDeduction) && !hasAbsenceFromPolicy) {
             policyLines.push({
-                componentId: null, // System-calculated, no specific component needed
+                componentId: systemComponentIds.ABSENCE_DED,
                 componentCode: 'ABSENCE_DED',
                 componentName: 'خصم غياب',
                 sign: 'DEDUCTION',
@@ -1292,7 +1346,7 @@ export class PayrollCalculationService {
         if (isPositive(sickLeaveDeduction)) {
             const details = sickLeaveDeductionDetails!;
             policyLines.push({
-                componentId: null, // System-calculated, no specific component needed
+                componentId: systemComponentIds.SICK_LEAVE_DED,
                 componentCode: 'SICK_LEAVE_DED',
                 componentName: 'خصم الإجازة المرضية',
                 sign: 'DEDUCTION',
@@ -1309,7 +1363,7 @@ export class PayrollCalculationService {
         }
         if (isPositive(earlyDepartureDeduction)) {
             policyLines.push({
-                componentId: 'SYS-EARLY-DEP',
+                componentId: systemComponentIds.EARLY_DEP_DED,
                 componentCode: 'EARLY_DEP_DED',
                 componentName: 'خصم انصراف مبكر',
                 sign: 'DEDUCTION',
