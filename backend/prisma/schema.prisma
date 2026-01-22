@@ -308,6 +308,10 @@ model PayrollSettings {
   enableOvertimeApproval         Boolean? @default(true) @map("enable_overtime_approval")
   workingDaysPerWeek             Int?     @default(5) @map("working_days_per_week")
 
+  // ========== جدول دفع الرواتب ==========
+  paymentDayType String? @default("LAST_WORKING_DAY") @map("payment_day_type")
+  paymentDay     Int?    @default(28) @map("payment_day")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

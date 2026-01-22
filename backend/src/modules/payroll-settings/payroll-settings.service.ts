@@ -169,6 +169,12 @@ export class UpdatePayrollSettingsDto {
     enableCostCenterTracking?: boolean;
     // 50. صيغة تصدير الرواتب الافتراضية
     defaultPayrollExportFormat?: 'PDF' | 'EXCEL' | 'CSV' | 'WPS';
+
+    // === Payment Schedule (51-52) - جدول دفع الرواتب ===
+    // 51. نوع يوم الدفع (آخر يوم عمل أو يوم محدد)
+    paymentDayType?: 'LAST_WORKING_DAY' | 'FIXED_DAY';
+    // 52. يوم الدفع (إذا كان نوع الدفع يوم محدد)
+    paymentDay?: number;
 }
 
 @Injectable()

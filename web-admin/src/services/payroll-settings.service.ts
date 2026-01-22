@@ -172,6 +172,12 @@ export interface PayrollSettingsData {
     enableCostCenterTracking: boolean;
     // 50. صيغة تصدير الرواتب الافتراضية
     defaultPayrollExportFormat: 'PDF' | 'EXCEL' | 'CSV' | 'WPS';
+
+    // === جدول دفع الرواتب (51-52) ===
+    // 51. نوع يوم الدفع (آخر يوم عمل أو يوم محدد)
+    paymentDayType?: 'LAST_WORKING_DAY' | 'FIXED_DAY';
+    // 52. يوم الدفع (إذا كان نوع الدفع يوم محدد)
+    paymentDay?: number;
 }
 
 export const payrollSettingsService = {
