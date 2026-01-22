@@ -25,7 +25,6 @@ import {
     TextField,
     InputAdornment,
     Paper,
-    MenuItem,
 } from '@mui/material';
 import {
     ArrowBack,
@@ -158,6 +157,40 @@ export const PayrollRunDetailsPage = () => {
         }
     };
 
+    // 🔧 Export Excel with authentication
+    const handleExportExcel = async () => {
+        try {
+            const response = await api.get(`/payroll-runs/${id}/excel`, { responseType: 'blob' }) as Blob;
+            const url = window.URL.createObjectURL(response);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `payroll_run_${id}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            setError(err.message || 'Failed to export Excel');
+        }
+    };
+
+    // 🔧 Export PDF with authentication
+    const handleExportPdf = async (payslipId: string) => {
+        try {
+            const response = await api.get(`/payroll-runs/payslip/${payslipId}/pdf`, { responseType: 'blob' }) as Blob;
+            const url = window.URL.createObjectURL(response);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `payslip_${payslipId}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            setError(err.message || 'Failed to export PDF');
+        }
+    };
+
     const handleOpenAdjustment = (payslip: any) => {
         setAdjustmentEmployee(payslip.employee);
         const totalDeductions = parseFloat(payslip.totalDeductions || 0);
@@ -252,8 +285,7 @@ export const PayrollRunDetailsPage = () => {
                     <Button
                         variant="outlined"
                         startIcon={<Download />}
-                        href={`${API_URL}/payroll-runs/${id}/excel`}
-                        target="_blank"
+                        onClick={handleExportExcel}
                     >
                         Excel
                     </Button>
@@ -629,8 +661,7 @@ export const PayrollRunDetailsPage = () => {
                         <Button
                             variant="contained"
                             startIcon={<PictureAsPdf />}
-                            href={`${API_URL}/payroll-runs/payslip/${selectedPayslip.id}/pdf`}
-                            target="_blank"
+                            onClick={() => handleExportPdf(selectedPayslip.id)}
                         >
                             تحميل PDF
                         </Button>
