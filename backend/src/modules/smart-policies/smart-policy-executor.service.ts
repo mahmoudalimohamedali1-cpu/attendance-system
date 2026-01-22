@@ -103,7 +103,10 @@ export class SmartPolicyExecutorService {
                 }
 
                 // Handle ALL_EMPLOYEES or PAYROLL triggered policies
-                if (parsed.scope?.type === "ALL_EMPLOYEES" || parsed.scope?.type === "DEPARTMENT" || policy.triggerEvent === "PAYROLL") {
+                const shouldExecute = parsed.scope?.type === "ALL_EMPLOYEES" || parsed.scope?.type === "DEPARTMENT" || policy.triggerEvent === "PAYROLL";
+                this.logger.log(`[DEBUG] Policy "${policy.name}": triggerEvent=${policy.triggerEvent}, scope=${parsed.scope?.type}, shouldExecute=${shouldExecute}`);
+
+                if (shouldExecute) {
                     // === Priority 4: Respect execution order ===
                     // Policies are already sorted by executionOrder in query if needed
 
@@ -150,11 +153,14 @@ export class SmartPolicyExecutorService {
                     } else {
                         // Standard policy evaluation
                         result = await this.evaluateAdvancedPolicy(policy, enrichedContext);
+                        this.logger.log(`[DEBUG] Policy "${policy.name}" evaluation result: success=${result.success}, amount=${result.amount}, error=${result.error || 'none'}`);
                     }
 
                     if (result.success && result.amount !== 0) {
                         results.push(result);
                         this.logger.log(`Policy ${policy.name} applied: ${result.amount} SAR`);
+                    } else {
+                        this.logger.log(`[DEBUG] Policy "${policy.name}" NOT applied: success=${result.success}, amount=${result.amount}`);
                     }
                 }
             }
@@ -579,7 +585,7 @@ export class SmartPolicyExecutorService {
                         // 🔧 FIX: تحسين منطق الحقول المفقودة
                         // بدلاً من إفشال السياسة، نفحص إذا كان الشرط اختياري
                         const isOptionalCondition = condition.optional === true || condition.skipIfMissing === true;
-                        
+
                         if (isOptionalCondition) {
                             this.logger.log(`Skipping optional condition for missing field: ${field}`);
                             continue;
