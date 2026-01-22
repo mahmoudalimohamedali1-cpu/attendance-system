@@ -82,6 +82,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { SocialFeedModule } from './modules/social-feed/social-feed.module';
 import { CalendarEventsModule } from './modules/calendar-events/calendar-events.module';
 import { EmployeeDebtModule } from './modules/employee-debt/employee-debt.module';
+import { PayrollAdjustmentsModule } from './modules/payroll-adjustments/payroll-adjustments.module';
 // import { EmployeeDebtModule } from './modules/employee-debt/employee-debt.module'; // DISABLED: Prisma schema desync
 import { SecurityModule } from './common/security/security.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
@@ -178,6 +179,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     EmployeeDebtModule,       // 💰 دفتر ديون الموظفين
     // EmployeeDebtModule,       // 💰 دفتر ديون الموظفين - DISABLED: Prisma schema desync
     SecurityModule,           // 🔒 أمان المعادلات
+    PayrollAdjustmentsModule, // ⚙️ تسويات الرواتب
   ],
   controllers: [AppController],
   providers: [

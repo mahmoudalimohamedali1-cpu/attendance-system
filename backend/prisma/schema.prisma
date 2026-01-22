@@ -599,6 +599,11 @@ model User {
   // أيام العمل الخاصة بالموظف (اختياري - يتجاوز إعدادات القسم والفرع)
   workingDays String? @map("working_days") // e.g., "1,2,3" for Mon-Wed
 
+  // تسويات الرواتب
+  employeeAdjustments PayrollAdjustment[] @relation("EmployeeAdjustments")
+  createdAdjustments  PayrollAdjustment[] @relation("AdjustmentCreator")
+  approvedAdjustments PayrollAdjustment[] @relation("AdjustmentApprover")
+
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
   @@map("users")
@@ -2377,13 +2382,68 @@ model PayrollRun {
   wpsSubmissions   WpsSubmission[]
   ledger           PayrollLedger?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  payrollAdjustments PayrollAdjustment[]
 
   @@index([companyId, status])
   @@index([periodId])
   @@index([originalRunId])
   @@map("payroll_runs")
+}
+
+// ==================== تسويات الرواتب ====================
+model PayrollAdjustment {
+  id           String @id @default(uuid())
+  payrollRunId String @map("payroll_run_id")
+  employeeId   String @map("employee_id")
+  companyId    String @map("company_id")
+
+  // نوع التسوية
+  adjustmentType String @map("adjustment_type") // WAIVE_DEDUCTION, CONVERT_TO_LEAVE, MANUAL_ADDITION, MANUAL_DEDUCTION
+
+  // نوع الخصم الأصلي (لو كان إلغاء خصم)
+  originalDeductionType String? @map("original_deduction_type") // LATE_DEDUCTION, ABSENCE_DEDUCTION, EARLY_DEPARTURE
+
+  // المبالغ
+  originalAmount Float @default(0) @map("original_amount") // المبلغ الأصلي قبل التعديل
+  adjustedAmount Float @default(0) @map("adjusted_amount") // المبلغ بعد التعديل
+
+  // تحويل لإجازة
+  leaveDaysDeducted Float @default(0) @map("leave_days_deducted") // أيام الإجازة المخصومة بدل الخصم المالي
+
+  // التفاصيل
+  reason String // سبب التعديل (مطلوب)
+  notes  String? // ملاحظات إضافية
+
+  // سير العمل والاعتماد
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdById     String    @map("created_by_id")
+  approvedById    String?   @map("approved_by_id")
+  approvedAt      DateTime? @map("approved_at")
+  rejectedAt      DateTime? @map("rejected_at")
+  rejectionReason String?   @map("rejection_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  payrollRun         PayrollRun        @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee           User              @relation("EmployeeAdjustments", fields: [employeeId], references: [id])
+  company            Company           @relation(fields: [companyId], references: [id])
+  createdBy          User              @relation("AdjustmentCreator", fields: [createdById], references: [id])
+  approvedBy         User?             @relation("AdjustmentApprover", fields: [approvedById], references: [id])
+  user               User?             @relation(fields: [userId], references: [id])
+  userId             String?
+  payrollPeriod      PayrollPeriod?    @relation(fields: [payrollPeriodId], references: [id])
+  payrollPeriodId    String?
+  disciplinaryCase   DisciplinaryCase? @relation(fields: [disciplinaryCaseId], references: [id])
+  disciplinaryCaseId String?
+
+  @@index([payrollRunId])
+  @@index([employeeId])
+  @@index([companyId, status])
+  @@map("payroll_adjustments")
 }
 
 model Payslip {
@@ -3312,40 +3372,6 @@ model EmployeeDisciplinaryRecord {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("employee_disciplinary_records")
-}
-
-model PayrollAdjustment {
-  id        String  @id @default(uuid())
-  companyId String  @map("company_id")
-  company   Company @relation(fields: [companyId], references: [id])
-
-  employeeId String @map("employee_id")
-  employee   User   @relation(fields: [employeeId], references: [id])
-
-  caseId String           @map("case_id")
-  case   DisciplinaryCase @relation(fields: [caseId], references: [id])
-
-  payrollPeriodId String        @map("payroll_period_id")
-  payrollPeriod   PayrollPeriod @relation(fields: [payrollPeriodId], references: [id])
-
-  adjustmentType String                  @map("adjustment_type") // DEDUCTION, SUSPENSION_UNPAID
-  unit           AdjustmentUnit
-  value          Decimal                 @db.Decimal(10, 2)
-  amount         Decimal?                @db.Decimal(10, 2) // Optional computed amount
-  status         PayrollAdjustmentStatus @default(PENDING)
-  description    String?
-  effectiveDate  DateTime?               @map("effective_date") @db.Date
-
-  postedAt   DateTime? @map("posted_at")
-  reversedAt DateTime? @map("reversed_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-
-  @@unique([companyId, caseId]) // One adjustment per case
-  @@index([companyId, employeeId, payrollPeriodId, status])
-  @@index([employeeId, payrollPeriodId])
-  @@index([payrollPeriodId, status])
-  @@map("payroll_adjustments")
 }
 
 // ==================== Compliance: Status Change Audit Trail ====================
