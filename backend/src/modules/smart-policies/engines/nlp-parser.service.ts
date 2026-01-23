@@ -26,6 +26,11 @@ export class NLPParserService {
         'بدريه': 'attendance.currentPeriod.earlyArrivalMinutes',
         'مبكر': 'attendance.currentPeriod.earlyArrivalMinutes',
         'قبل دوامه': 'attendance.currentPeriod.earlyArrivalMinutes',
+        'لفت نظر': 'disciplinary.activeWarnings',
+        'إنذار': 'disciplinary.activeWarnings',
+        'انذار': 'disciplinary.activeWarnings',
+        'مخالفة': 'disciplinary.totalCases',
+        'مخالفه': 'disciplinary.totalCases',
         'خدمة': 'employee.tenure.years',
         'سنة': 'employee.tenure.years',
         'سنه': 'employee.tenure.years',
@@ -64,21 +69,31 @@ export class NLPParserService {
             clarificationNeeded: 'false' as any,
         };
 
-        // 1. تنظيف النص وتحويل الأرقام المكتوبة كلمات لأرقام
         const preparedText = this.prepareText(safeText);
-
-        // 2. استخراج الأرقام مع سياقها (مع تجاهل التواريخ)
         const numbers = this.extractNumbersWithContext(preparedText);
-        const conditionValueObj = numbers.find(n => n.context === 'condition');
+        let conditionValueObj = numbers.find(n => n.context === 'condition');
         const actionValueObj = numbers.find(n => n.context === 'action');
 
-        // 3. محاولة فهم الشرط
         let conditionField: string | null = null;
         if (conditionValueObj) {
             conditionField = this.detectFieldInSnippet(conditionValueObj.surrounding);
         }
         if (!conditionField) {
             conditionField = this.detectField(preparedText, ['salary', 'راتب']);
+        }
+
+        // تحسين: لو فيه كلمة "لفت نظر" أو "إنذار" بدون رقم، نعتبر الرقم 1
+        if (!conditionField) {
+            const disciplinaryTerms = ['لفت نظر', 'إنذار', 'انذار', 'مخالفة', 'مخالفه'];
+            for (const term of disciplinaryTerms) {
+                if (preparedText.includes(term)) {
+                    conditionField = this.FIELDS_MAP[term];
+                    if (!conditionValueObj) {
+                        conditionValueObj = { value: 1, context: 'condition', surrounding: term, position: -1 };
+                    }
+                    break;
+                }
+            }
         }
 
         const operator = this.detectOperator(preparedText);
@@ -91,14 +106,13 @@ export class NLPParserService {
             });
         }
 
-        // 4. محاولة فهم الإجراء
         const actionType = this.detectAction(preparedText);
 
         if (actionType && actionValueObj) {
             const isPerUnit = preparedText.includes('لكل') || preparedText.includes('عن كل');
             result.actions.push({
                 type: actionType as any,
-                valueType: 'FIXED', // PER_UNIT is not in the type definition, we use description to mark recursion
+                valueType: 'FIXED',
                 value: actionValueObj.value,
                 description: isPerUnit ? `يخصم لكل وحدة (تكرار)` : `مبلغ ثابت`,
             });
@@ -107,6 +121,8 @@ export class NLPParserService {
         // 5. تحديد الحدث (Trigger)
         if (preparedText.includes('حضور') || preparedText.includes('تأخير') || preparedText.includes('غياب') || preparedText.includes('غاب') || preparedText.includes('دوام') || preparedText.includes('يجى')) {
             result.trigger.event = 'ATTENDANCE';
+        } else if (preparedText.includes('لفت نظر') || preparedText.includes('إنذار') || preparedText.includes('انذار') || preparedText.includes('مخالفة')) {
+            result.trigger.event = 'DISCIPLINARY';
         }
 
         // 6. التحقق من النجاح
@@ -148,8 +164,8 @@ export class NLPParserService {
 
         // كلمات الإجراء (حافز، خصم، مكافأة) - الأولوية العليا
         const actionKeywords = ['حافز', 'مكافأ', 'مكافاه', 'بونص', 'خصم', 'جزاء', 'ينزل', 'يصرف', 'ضيف', 'يخصم'];
-        // كلمات الشرط (راتب، غياب، تأخير) - شروط
-        const conditionKeywords = ['راتبه', 'الاجمالي', 'اجمالي', 'اساسي', 'دقيق', 'يوم', 'ساع', 'سنة', 'دوام', 'بدرى', 'قبل', 'غياب', 'غاب', 'تأخير'];
+        // كلمات الشرط (راتب، غياب، تأخير، تأديب) - شروط
+        const conditionKeywords = ['راتبه', 'الاجمالي', 'اجمالي', 'اساسي', 'دقيق', 'يوم', 'ساع', 'سنة', 'دوام', 'بدرى', 'قبل', 'غياب', 'غاب', 'تأخير', 'لفت نظر', 'إنذار', 'انذار', 'مخالفة', 'مخالفه'];
 
         for (let i = 0; i < words.length; i++) {
             const numMatch = words[i].match(/\d+/);
