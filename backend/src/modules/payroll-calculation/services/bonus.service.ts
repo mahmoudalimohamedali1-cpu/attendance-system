@@ -219,15 +219,22 @@ export class BonusService {
   }
 
   /**
-   * توليد مكافآت جماعية
+   * توليد مكافآت جماعية وحفظها في قاعدة البيانات
    */
   async generateBulkBonuses(dto: any, companyId: string): Promise<any> {
+    // جلب الموظفين المحددين فقط أو جميع الموظفين
+    const whereClause: any = {
+      companyId,
+      status: 'ACTIVE',
+      role: { in: ['EMPLOYEE', 'MANAGER', 'HR'] },
+    };
+
+    if (dto.employeeIds && dto.employeeIds.length > 0) {
+      whereClause.id = { in: dto.employeeIds };
+    }
+
     const employees = await this.prisma.user.findMany({
-      where: {
-        companyId,
-        status: 'ACTIVE',
-        role: { in: ['EMPLOYEE', 'MANAGER', 'HR'] },
-      },
+      where: whereClause,
       include: {
         salaryAssignments: { where: { isActive: true }, take: 1 },
       },
@@ -235,6 +242,14 @@ export class BonusService {
 
     const results = [];
     let totalAmount = 0;
+    let savedCount = 0;
+
+    // جلب معلومات البرنامج
+    const program = await this.prisma.salaryComponent.findFirst({
+      where: { id: dto.programId, companyId },
+    });
+
+    const metadata = program?.description ? JSON.parse(program.description) : {};
 
     for (const employee of employees) {
       try {
@@ -245,6 +260,31 @@ export class BonusService {
           dto.periodYear,
           dto.periodMonth,
         );
+
+        // حفظ المكافأة في قاعدة البيانات (جدول retroPay)
+        if (result.calculatedAmount > 0) {
+          const effectiveDate = new Date(dto.periodYear, (dto.periodMonth || 1) - 1, 1);
+          const effectiveEndDate = new Date(dto.periodYear, dto.periodMonth || 12, 0);
+
+          await this.prisma.retroPay.create({
+            data: {
+              companyId,
+              employeeId: employee.id,
+              reason: `${program?.nameAr || 'مكافأة'} - ${metadata.bonusType || 'BONUS'}`,
+              effectiveFrom: effectiveDate,
+              effectiveTo: effectiveEndDate,
+              oldAmount: 0,
+              newAmount: result.calculatedAmount,
+              difference: result.calculatedAmount,
+              monthsCount: 1,
+              totalAmount: result.calculatedAmount,
+              status: metadata.requiresApproval === false ? 'APPROVED' : 'PENDING',
+              notes: `برنامج: ${program?.code || dto.programId} | طريقة الحساب: ${result.calculationMethod}`,
+            },
+          });
+          savedCount++;
+        }
+
         results.push(result);
         totalAmount += result.calculatedAmount;
       } catch (error) {
@@ -252,9 +292,12 @@ export class BonusService {
       }
     }
 
+    this.logger.log(`✅ Generated ${savedCount} bonuses for ${employees.length} employees, total: ${totalAmount} SAR`);
+
     return {
       employeesProcessed: employees.length,
       successCount: results.length,
+      generated: savedCount,
       totalAmount,
       results,
     };

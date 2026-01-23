@@ -1745,6 +1745,54 @@ export class PayrollCalculationService {
             }
         }
 
+        // --- Approved Bonuses Integration ---
+        // جلب المكافآت المعتمدة للموظف في هذه الفترة وإضافتها للرواتب
+        try {
+            const approvedBonuses = await this.prisma.retroPay.findMany({
+                where: {
+                    employeeId,
+                    companyId,
+                    status: 'APPROVED',
+                    // المكافآت التي تنطبق على هذه الفترة
+                    effectiveFrom: { lte: endDate },
+                    effectiveTo: { gte: startDate },
+                },
+            });
+
+            for (const bonus of approvedBonuses) {
+                const bonusAmount = bonus.totalAmount?.toNumber() || bonus.difference?.toNumber() || 0;
+                if (bonusAmount > 0) {
+                    // تحقق من أن هذه المكافأة لم تُضف مسبقاً
+                    const bonusCode = `BONUS_${bonus.id.slice(0, 8)}`;
+                    if (!existingComponentCodes.has(bonusCode)) {
+                        policyLines.push({
+                            componentId: bonus.id,
+                            componentCode: bonusCode,
+                            componentName: bonus.reason || 'مكافأة',
+                            sign: 'EARNING',
+                            amount: Math.round(bonusAmount * 100) / 100,
+                            descriptionAr: bonus.notes || bonus.reason || 'مكافأة معتمدة',
+                            source: {
+                                policyId: bonus.id,
+                                policyCode: 'BONUS',
+                                ruleId: bonusCode,
+                                ruleCode: 'BONUS',
+                            },
+                            gosiEligible: false,
+                        });
+                        existingComponentCodes.add(bonusCode);
+                        this.logger.log(`✅ Added bonus to payroll: ${bonus.reason || 'مكافأة'} - ${bonusAmount} SAR`);
+                    }
+                }
+            }
+
+            if (approvedBonuses.length > 0) {
+                this.logger.log(`💰 Found ${approvedBonuses.length} approved bonuses for employee ${employeeId}`);
+            }
+        } catch (err) {
+            this.logger.error(`Failed to load bonuses for ${employeeId}: ${err.message}`);
+        }
+
 
         // === Smart Policy Execution ===
         // 🔧 FIX: تتبع السياسات والمكونات المنفذة لمنع التكرار

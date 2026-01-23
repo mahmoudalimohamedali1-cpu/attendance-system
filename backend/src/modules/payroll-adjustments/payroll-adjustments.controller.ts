@@ -16,12 +16,51 @@ import {
     PayrollAdjustmentsService,
     CreateAdjustmentDto,
     ApproveAdjustmentDto,
+    InstantAdjustmentDto,
 } from './payroll-adjustments.service';
 
 @Controller('payroll-adjustments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PayrollAdjustmentsController {
     constructor(private readonly service: PayrollAdjustmentsService) { }
+
+    /**
+     * ⚡ إنشاء خصم/مكافأة فورية
+     * POST /payroll-adjustments/instant
+     */
+    @Post('instant')
+    @Roles('ADMIN', 'MANAGER', 'HR')
+    async createInstant(
+        @Body() dto: InstantAdjustmentDto,
+        @CurrentUser('id') userId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.createInstant(dto, userId, companyId);
+    }
+
+    /**
+     * 📋 جلب التسويات المعلقة
+     * GET /payroll-adjustments/pending
+     */
+    @Get('pending')
+    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
+    async findPending(
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.findPendingByCompany(companyId);
+    }
+
+    /**
+     * 📊 إحصائيات الفترة الحالية
+     * GET /payroll-adjustments/stats
+     */
+    @Get('stats')
+    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
+    async getStats(
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.getCurrentPeriodStats(companyId);
+    }
 
     /**
      * إنشاء تسوية جديدة
@@ -101,3 +140,4 @@ export class PayrollAdjustmentsController {
         return this.service.delete(id, companyId);
     }
 }
+

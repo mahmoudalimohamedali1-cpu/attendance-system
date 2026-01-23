@@ -242,4 +242,178 @@ export class PayrollAdjustmentsService {
         this.logger.log(`🗑️ Deleted adjustment ${adjustmentId}`);
         return { success: true };
     }
+
+    /**
+     * 🚀 إنشاء خصم/مكافأة فورية
+     * لا يحتاج payrollRunId - يجد أو ينشئ المسيّر تلقائياً
+     */
+    async createInstant(
+        dto: InstantAdjustmentDto,
+        createdById: string,
+        companyId: string,
+    ) {
+        this.logger.log(`⚡ Creating instant ${dto.type} for employee ${dto.employeeId}`);
+
+        // التحقق من وجود الموظف
+        const employee = await this.prisma.user.findFirst({
+            where: { id: dto.employeeId, companyId },
+            select: { id: true, firstName: true, lastName: true, employeeCode: true },
+        });
+
+        if (!employee) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // تحديد الفترة الحالية
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+
+        // البحث عن مسيّر الفترة الحالية أو إنشائه
+        let payrollRun = await this.prisma.payrollRun.findFirst({
+            where: {
+                companyId,
+                periodMonth: currentMonth,
+                periodYear: currentYear,
+                status: { in: ['DRAFT', 'PROCESSING', 'CALCULATED'] },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (!payrollRun) {
+            // إنشاء مسيّر جديد للفترة الحالية
+            this.logger.log(`📋 Creating new payroll run for ${currentYear}-${currentMonth}`);
+            payrollRun = await this.prisma.payrollRun.create({
+                data: {
+                    companyId,
+                    periodMonth: currentMonth,
+                    periodYear: currentYear,
+                    runDate: now,
+                    status: 'DRAFT',
+                    totalEmployees: 0,
+                    totalGrossSalary: 0,
+                    totalDeductions: 0,
+                    totalNetSalary: 0,
+                },
+            });
+        }
+
+        // إنشاء التسوية
+        const adjustmentType = dto.type === 'DEDUCTION' ? 'MANUAL_DEDUCTION' : 'MANUAL_ADDITION';
+
+        const adjustment = await this.prisma.payrollAdjustment.create({
+            data: {
+                payrollRunId: payrollRun.id,
+                employeeId: dto.employeeId,
+                companyId,
+                adjustmentType,
+                originalAmount: 0,
+                adjustedAmount: dto.amount,
+                reason: dto.reason,
+                notes: dto.notes || `خصم/مكافأة فورية بتاريخ ${now.toLocaleDateString('ar-SA')}`,
+                createdById,
+                status: dto.autoApprove ? 'APPROVED' : 'PENDING',
+                approvedById: dto.autoApprove ? createdById : null,
+                approvedAt: dto.autoApprove ? now : null,
+            },
+            include: {
+                employee: { select: { firstName: true, lastName: true, employeeCode: true } },
+                createdBy: { select: { firstName: true, lastName: true } },
+                payrollRun: { select: { periodMonth: true, periodYear: true } },
+            },
+        });
+
+        this.logger.log(`✅ Instant adjustment created: ${adjustment.id} (${adjustmentType}: ${dto.amount} SAR)`);
+
+        return {
+            success: true,
+            adjustment,
+            message: `تم إنشاء ${dto.type === 'DEDUCTION' ? 'الخصم' : 'المكافأة'} بنجاح وسيظهر في مسيّر ${currentMonth}/${currentYear}`,
+            payrollPeriod: `${currentMonth}/${currentYear}`,
+        };
+    }
+
+    /**
+     * 📋 جلب جميع التسويات المعلقة للشركة
+     */
+    async findPendingByCompany(companyId: string) {
+        return this.prisma.payrollAdjustment.findMany({
+            where: { companyId, status: 'PENDING' },
+            include: {
+                employee: { select: { firstName: true, lastName: true, employeeCode: true } },
+                createdBy: { select: { firstName: true, lastName: true } },
+                payrollRun: { select: { periodMonth: true, periodYear: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    /**
+     * 📊 إحصائيات التسويات للفترة الحالية
+     */
+    async getCurrentPeriodStats(companyId: string) {
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+
+        const payrollRun = await this.prisma.payrollRun.findFirst({
+            where: {
+                companyId,
+                periodMonth: currentMonth,
+                periodYear: currentYear,
+            },
+        });
+
+        if (!payrollRun) {
+            return {
+                period: `${currentMonth}/${currentYear}`,
+                pendingCount: 0,
+                approvedCount: 0,
+                totalAdditions: 0,
+                totalDeductions: 0,
+            };
+        }
+
+        const adjustments = await this.prisma.payrollAdjustment.findMany({
+            where: { payrollRunId: payrollRun.id },
+        });
+
+        let pendingCount = 0;
+        let approvedCount = 0;
+        let totalAdditions = 0;
+        let totalDeductions = 0;
+
+        for (const adj of adjustments) {
+            if (adj.status === 'PENDING') pendingCount++;
+            if (adj.status === 'APPROVED') {
+                approvedCount++;
+                if (adj.adjustmentType === 'MANUAL_ADDITION' || adj.adjustmentType === 'WAIVE_DEDUCTION') {
+                    totalAdditions += Number(adj.adjustedAmount);
+                } else if (adj.adjustmentType === 'MANUAL_DEDUCTION') {
+                    totalDeductions += Number(adj.adjustedAmount);
+                }
+            }
+        }
+
+        return {
+            period: `${currentMonth}/${currentYear}`,
+            pendingCount,
+            approvedCount,
+            totalAdditions,
+            totalDeductions,
+        };
+    }
 }
+
+/**
+ * DTO للخصم/المكافأة الفورية
+ */
+export interface InstantAdjustmentDto {
+    employeeId: string;
+    type: 'DEDUCTION' | 'ADDITION';
+    amount: number;
+    reason: string;
+    notes?: string;
+    autoApprove?: boolean; // إذا كان المدير نفسه يعتمد تلقائياً
+}
+
