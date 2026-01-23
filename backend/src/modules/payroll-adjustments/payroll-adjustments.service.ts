@@ -326,6 +326,7 @@ export class PayrollAdjustmentsService {
                     originalAmount: 0,
                     adjustedAmount: dto.amount,
                     leaveDaysDeducted: 0,
+                    value: dto.amount, // ⚡ مطلوب للـ database
                     reason: dto.reason,
                     notes: dto.notes || `خصم/مكافأة فورية بتاريخ ${now.toLocaleDateString('ar-SA')}`,
                     status: dto.autoApprove ? 'APPROVED' : 'PENDING',

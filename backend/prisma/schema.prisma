@@ -2424,7 +2424,9 @@ model PayrollAdjustment {
   notes  String? // ملاحظات إضافية
 
   // وحدة القياس (للتوافق مع الـ database)
-  unit AdjustmentUnit @default(AMOUNT)
+  unit   AdjustmentUnit @default(AMOUNT)
+  value  Decimal        @default(0) @db.Decimal(10, 2) // القيمة (مطلوبة)
+  amount Decimal?       @db.Decimal(10, 2) // المبلغ المحسوب
 
   // سير العمل والاعتماد
   status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
