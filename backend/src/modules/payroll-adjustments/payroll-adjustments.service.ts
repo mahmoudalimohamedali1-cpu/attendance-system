@@ -319,39 +319,46 @@ export class PayrollAdjustmentsService {
         // 3. إنشاء التسوية
         const adjustmentType = dto.type === 'DEDUCTION' ? 'MANUAL_DEDUCTION' : 'MANUAL_ADDITION';
 
-        const adjustment = await (this.prisma.payrollAdjustment as any).create({
-            data: {
-                payrollRunId: payrollRun.id,
-                employeeId: dto.employeeId,
-                companyId,
-                adjustmentType,
-                originalAmount: 0,
-                adjustedAmount: dto.amount,
-                reason: dto.reason,
-                notes: dto.notes || `خصم/مكافأة فورية بتاريخ ${now.toLocaleDateString('ar-SA')}`,
-                createdById,
-                status: dto.autoApprove ? 'APPROVED' : 'PENDING',
-                approvedById: dto.autoApprove ? createdById : null,
-                approvedAt: dto.autoApprove ? now : null,
-            },
-        });
+        try {
+            const adjustment = await this.prisma.payrollAdjustment.create({
+                data: {
+                    adjustmentType,
+                    originalAmount: 0,
+                    adjustedAmount: dto.amount,
+                    leaveDaysDeducted: 0,
+                    reason: dto.reason,
+                    notes: dto.notes || `خصم/مكافأة فورية بتاريخ ${now.toLocaleDateString('ar-SA')}`,
+                    status: dto.autoApprove ? 'APPROVED' : 'PENDING',
+                    approvedAt: dto.autoApprove ? now : null,
+                    // Relations using connect
+                    payrollRun: { connect: { id: payrollRun.id } },
+                    employee: { connect: { id: dto.employeeId } },
+                    company: { connect: { id: companyId } },
+                    createdBy: { connect: { id: createdById } },
+                    ...(dto.autoApprove && { approvedBy: { connect: { id: createdById } } }),
+                },
+            });
 
-        // جلب البيانات بشكل منفصل
-        const fullAdjustment = await (this.prisma.payrollAdjustment as any).findUnique({
-            where: { id: adjustment.id },
-            include: {
-                employee: { select: { firstName: true, lastName: true, employeeCode: true } },
-            },
-        });
+            this.logger.log(`✅ Instant adjustment created: ${adjustment.id} (${adjustmentType}: ${dto.amount} SAR)`);
 
-        this.logger.log(`✅ Instant adjustment created: ${adjustment.id} (${adjustmentType}: ${dto.amount} SAR)`);
+            // جلب البيانات مع العلاقات
+            const fullAdjustment = await this.prisma.payrollAdjustment.findUnique({
+                where: { id: adjustment.id },
+                include: {
+                    employee: { select: { firstName: true, lastName: true, employeeCode: true } },
+                },
+            });
 
-        return {
-            success: true,
-            adjustment: fullAdjustment,
-            message: `تم إنشاء ${dto.type === 'DEDUCTION' ? 'الخصم' : 'المكافأة'} بنجاح وسيظهر في مسيّر ${currentMonth}/${currentYear}`,
-            payrollPeriod: `${currentMonth}/${currentYear}`,
-        };
+            return {
+                success: true,
+                adjustment: fullAdjustment,
+                message: `تم إنشاء ${dto.type === 'DEDUCTION' ? 'الخصم' : 'المكافأة'} بنجاح وسيظهر في مسيّر ${currentMonth}/${currentYear}`,
+                payrollPeriod: `${currentMonth}/${currentYear}`,
+            };
+        } catch (error: any) {
+            this.logger.error(`❌ Failed to create adjustment: ${error.message}`);
+            throw new BadRequestException(`فشل إنشاء التسوية: ${error.message}`);
+        }
     }
 
     /**
