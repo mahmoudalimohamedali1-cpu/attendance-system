@@ -129,7 +129,7 @@ export class MuqeemService {
         return this.prisma.user.findMany({
             where: {
                 companyId,
-                NOT: { nationality: 'Saudi' }, // Assuming 'Saudi' is the value for Saudi nationals
+                isSaudi: false,
             },
             select: {
                 id: true,
