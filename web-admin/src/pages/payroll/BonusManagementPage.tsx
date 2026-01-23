@@ -343,11 +343,15 @@ export default function BonusManagementPage() {
         <Box>
           <Button
             variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenBonusDialog(true)}
+            color="warning"
+            startIcon={<BoltIcon />}
+            onClick={() => {
+              setTabValue(3); // الانتقال لتاب الخصومات الفورية
+              setOpenInstantDialog(true);
+            }}
             sx={{ mr: 1 }}
           >
-            إضافة مكافأة
+            مكافأة / خصم فوري ⚡
           </Button>
           <Button
             variant="contained"
