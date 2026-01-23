@@ -2444,8 +2444,12 @@ model PayrollAdjustment {
   payrollPeriodId    String?           @map("payroll_period_id")
   disciplinaryCase   DisciplinaryCase? @relation(fields: [disciplinaryCaseId], references: [id])
   disciplinaryCaseId String?           @map("disciplinary_case_id")
-  user               User?             @relation(fields: [userId], references: [id])
-  userId             String?
+
+  // Legacy case_id field - now optional for instant adjustments
+  caseId String? @map("case_id")
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
 
   @@index([payrollRunId])
   @@index([employeeId])

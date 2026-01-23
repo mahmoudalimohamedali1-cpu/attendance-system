@@ -162,6 +162,7 @@ export class PayrollCalculationService {
             case 'CALENDAR_DAYS':
                 return Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
             case 'ACTUAL_WORKING_DAYS':
+                // نستخدم الإعدادات الافتراضية هنا، ولكن في الحساب الفعلي يتم استخدام إعدادات الموظف
                 return this.getWorkingDaysInPeriod(startDate, endDate);
             default:
                 return 30; // الافتراضي 30 يوم
@@ -169,17 +170,17 @@ export class PayrollCalculationService {
     }
 
     /**
-     * حساب أيام العمل في الفترة (أحد-خميس)
+     * حساب أيام العمل في الفترة بناءً على الإعدادات
      */
-    private getWorkingDaysInPeriod(startDate: Date, endDate: Date): number {
-        let workingDays = 0;
+    private getWorkingDaysInPeriod(startDate: Date, endDate: Date, workingDaysStr: string = '0,1,2,3,4'): number {
+        const workingDaysSet = new Set(this.parseWorkingDays(workingDaysStr));
+        let count = 0;
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            const dayOfWeek = d.getDay();
-            if (dayOfWeek >= 0 && dayOfWeek <= 4) {
-                workingDays++;
+            if (workingDaysSet.has(d.getDay())) {
+                count++;
             }
         }
-        return workingDays;
+        return count;
     }
 
     /**
@@ -413,7 +414,7 @@ export class PayrollCalculationService {
         }
     }
 
-    private async getPeriodAttendanceData(employeeId: string, companyId: string, startDate: Date, endDate: Date) {
+    private async getPeriodAttendanceData(employeeId: string, companyId: string, startDate: Date, endDate: Date, settings: any) {
         // جلب بيانات الفرع والقسم للموظف للحصول على أيام العمل وإعدادات رمضان
         // Fetch employee with branch and department for workingDays hierarchy
         const employee = await this.prisma.user.findFirst({
@@ -459,6 +460,7 @@ export class PayrollCalculationService {
         let lateCount = 0; // عدد مرات التأخير (للخصم التراكمي)
         let totalEarlyDepartureMinutes = 0; // دقائق الانصراف المبكر
         let lateDaysOverThreshold = 0; // عدد الأيام التي تجاوز فيها التأخير الحد (للخصم اليومي)
+        let earlyDaysOverThreshold = 0; // عدد الأيام التي تجاوز فيها الانصراف المبكر الحد
 
         for (const att of attendances) {
             const dayOfWeek = new Date(att.date).getDay(); // 0 = Sunday, 6 = Saturday
@@ -487,15 +489,20 @@ export class PayrollCalculationService {
             totalLateMinutes += attLateMinutes;
             if (attLateMinutes > 0) {
                 lateCount++; // عد مرات التأخير
-                // عد الأيام اللي فيها تأخير أكبر من 120 دقيقة (القيمة الافتراضية)
-                // سيتم تعديل الحد لاحقاً حسب الإعدادات في الحساب الفعلي
-                if (attLateMinutes >= 120) {
+                // عد الأيام اللي فيها تأخير أكبر من الحد المحدد في الإعدادات
+                const lateThreshold = settings.lateThresholdMinutes || 120;
+                if (attLateMinutes >= lateThreshold) {
                     lateDaysOverThreshold++;
                 }
             }
 
             // حساب الانصراف المبكر
-            totalEarlyDepartureMinutes += (att as any).earlyDepartureMinutes || 0;
+            const attEarlyMinutes = (att as any).earlyDepartureMinutes || 0;
+            totalEarlyDepartureMinutes += attEarlyMinutes;
+            const earlyThreshold = settings.earlyDepartureThresholdMinutes || 120;
+            if (attEarlyMinutes >= earlyThreshold) {
+                earlyDaysOverThreshold++;
+            }
 
             // حساب الساعات الإضافية حسب نوع اليوم
             const otMinutes = att.overtimeMinutes || 0;
@@ -518,8 +525,9 @@ export class PayrollCalculationService {
             weekendOvertimeHours: weekendOvertimeMinutes / 60,
             recordsCount: attendances.length,
             lateCount, // عدد مرات التأخير (للخصم التراكمي)
-            lateDaysOverThreshold, // عدد الأيام اللي فيها تأخير أكبر من الحد (للخصم اليومي)
             earlyDepartureMinutes: totalEarlyDepartureMinutes, // دقائق الانصراف المبكر
+            lateDaysOverThreshold, // عدد الأيام اللي فيها تأخير أكبر من الحد (للخصم اليومي)
+            earlyDaysOverThreshold, // عدد الأيام اللي فيها انصراف مبكر أكبر من الحد
             // 🌙 Ramadan-aware work hours
             isRamadanActive,
             expectedDailyMinutes,
@@ -729,10 +737,11 @@ export class PayrollCalculationService {
         // ✅ All rates calculated using Decimal
         const daysInPeriodGeneral = this.getDaysInPeriod(startDate, endDate, settings.calculationMethod as any);
         const baseSalary = ctx.BASIC || totalSalary; // Decimal
+        const dailyWorkingHours = settings.dailyWorkingHours || 8;
         const dailyRateGeneral = calcDailyRate(baseSalary, daysInPeriodGeneral);
-        const hourlyRateGeneral = calcHourlyRate(baseSalary, daysInPeriodGeneral, 8);
+        const hourlyRateGeneral = calcHourlyRate(baseSalary, daysInPeriodGeneral, dailyWorkingHours);
 
-        const attendanceData = await this.getPeriodAttendanceData(employeeId, companyId, startDate, endDate);
+        const attendanceData = await this.getPeriodAttendanceData(employeeId, companyId, startDate, endDate, settings);
         let presentDays = attendanceData.presentDays || daysInPeriodGeneral;
         let absentDays = attendanceData.absentDays || 0;
         let lateMinutes = attendanceData.lateMinutes || 0;
@@ -744,7 +753,7 @@ export class PayrollCalculationService {
         const deductionBase = settings.deductAbsenceFromBasic ? baseSalary : totalSalary;
         const daysInPeriodAbsence = this.getDaysInPeriod(startDate, endDate, settings.unpaidLeaveCalcBase as any);
         const dailyRateAbsence = calcDailyRate(deductionBase, daysInPeriodAbsence);
-        const hourlyRateLate = calcHourlyRate(deductionBase, daysInPeriodAbsence, 8);
+        const hourlyRateLate = calcHourlyRate(deductionBase, daysInPeriodAbsence, dailyWorkingHours);
 
         // ✅ حساب خصم الغياب بناءً على طريقة الحساب (absenceDeductionMethod)
         // Using Decimal for all deduction calculations
@@ -820,9 +829,9 @@ export class PayrollCalculationService {
                     earlyDepartureDeduction = mul(earlyHours, hourlyRateLate);
                     break;
                 case 'DAILY_RATE':
-                    const earlyThreshold = settings.earlyDepartureThresholdMinutes || 120;
-                    if (earlyDepartureMinutes >= earlyThreshold) {
-                        earlyDepartureDeduction = dailyRateAbsence;
+                    const earlyDaysCount = (attendanceData as any).earlyDaysOverThreshold || 0;
+                    if (earlyDaysCount > 0) {
+                        earlyDepartureDeduction = mul(earlyDaysCount, dailyRateAbsence);
                     } else {
                         earlyDepartureDeduction = mul(div(earlyDepartureMinutes, 60), hourlyRateLate);
                     }
@@ -895,7 +904,7 @@ export class PayrollCalculationService {
 
         this.logger.debug(`Overtime calculation method: ${overtimeMethod}, base salary: ${toFixed(otBaseSalary)} SAR`);
 
-        const otHourlyRate = calcHourlyRate(otBaseSalary, daysInPeriodOT, 8);
+        const otHourlyRate = calcHourlyRate(otBaseSalary, daysInPeriodOT, dailyWorkingHours);
 
         // ✅ تطبيق الحد الأقصى للوقت الإضافي (إذا مفعل)
         let cappedOvertimeHours = overtimeHours;
@@ -1089,10 +1098,10 @@ export class PayrollCalculationService {
                 otHoursWeekend: attendanceData.weekendOvertimeHours || 0,
                 otHoursHoliday: attendanceData.holidayOvertimeHours || 0,
                 lateMinutes: lateMinutes,
-                lateCount: lateMinutes > 0 ? 1 : 0,
+                lateCount: attendanceData.lateCount || 0,
                 absentDays: absentDays,
-                earlyDepartureMinutes: 0,
-                workingHours: presentDays * 8,
+                earlyDepartureMinutes: attendanceData.earlyDepartureMinutes || 0,
+                workingHours: presentDays * dailyWorkingHours,
                 holidayWorkDays: attendanceData.holidayWorkDays || 0, // عدد أيام العمل في العطلات
             },
         };
@@ -1230,7 +1239,8 @@ export class PayrollCalculationService {
 
         if (gosiConfig) {
             const gosiBase = calculatedLines.filter(l => l.gosiEligible).reduce((s, l) => add(s, l.amount), ZERO);
-            const cappedBase = min(gosiBase, toDecimal(gosiConfig.maxCapAmount));
+            const gosiMaxSalary = settings.gosiMaxSalary || (gosiConfig as any).maxCapAmount || 45000;
+            const cappedBase = min(gosiBase, toDecimal(gosiMaxSalary));
 
             if (employee.isSaudi) {
                 // للسعوديين: التأمينات (9% موظف + 9% شركة) + ساند (0.75% لكل طرف) + الأخطار (2% شركة)
