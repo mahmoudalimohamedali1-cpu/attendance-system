@@ -2423,6 +2423,9 @@ model PayrollAdjustment {
   reason String // سبب التعديل (مطلوب)
   notes  String? // ملاحظات إضافية
 
+  // وحدة القياس (للتوافق مع الـ database)
+  unit AdjustmentUnit @default(AMOUNT)
+
   // سير العمل والاعتماد
   status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
   createdById     String    @map("created_by_id")
