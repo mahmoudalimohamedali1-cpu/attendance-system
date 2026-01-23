@@ -79,6 +79,14 @@ export class NLPParserService {
 
         // 3. محاولة فهم الشرط
         let conditionField: string | null = null;
+        let detectedDate: string | null = null;
+
+        // استخراج التاريخ من النص (لو موجود)
+        const dateMatch = preparedText.match(/(\d{1,2})[-/](\d{1,2})([-/]\d{2,4})?/);
+        if (dateMatch) {
+            detectedDate = dateMatch[0];
+        }
+
         if (conditionValueObj) {
             conditionField = this.detectFieldInSnippet(conditionValueObj.surrounding);
         }
@@ -86,14 +94,23 @@ export class NLPParserService {
             conditionField = this.detectField(preparedText, ['salary', 'راتب']);
         }
 
-        // تحسين للجزاءات والعهد
+        // تحسين للجزاءات والعهد - دايماً نعمل شرط لو لقينا المصطلح
         if (!conditionField) {
-            const specialTerms = ['لفت نظر', 'إنذار', 'انذار', 'مخالفة', 'عهدة', 'عهده'];
+            const specialTerms = ['لفت نظر', 'إنذار', 'انذار', 'مخالفة', 'عهدة', 'عهده', 'العهدة', 'العهده'];
             for (const term of specialTerms) {
                 if (preparedText.includes(term)) {
                     conditionField = this.FIELDS_MAP[term];
-                    // إذا لم نجد رقماً صريحاً ولكننا في سياق جزاءات/عهد، نفترض الرقما الافتراضي 1 (إلا لو في تاريخ)
-                    if (!conditionValueObj && !preparedText.match(/\d{1,2}[-/]\d{1,2}/)) {
+                    // لو لقينا تاريخ، نعمل شرط عليه
+                    if (detectedDate) {
+                        const hasBeforeKeyword = preparedText.includes('قبل');
+                        conditionValueObj = {
+                            value: detectedDate as any,
+                            context: 'condition',
+                            surrounding: `${term} ${hasBeforeKeyword ? 'قبل' : ''} ${detectedDate}`,
+                            position: -1
+                        };
+                    } else if (!conditionValueObj) {
+                        // لو مفيش تاريخ ومفيش رقم، نفترض 1
                         conditionValueObj = { value: 1, context: 'condition', surrounding: term, position: -1 };
                     }
                     break;
@@ -102,12 +119,13 @@ export class NLPParserService {
         }
 
         const operator = this.detectOperator(preparedText);
+        const hasBeforeKeyword = preparedText.includes('قبل');
 
         if (conditionField && conditionValueObj) {
             result.conditions.push({
                 field: conditionField,
-                operator: (operator as any) || 'GREATER_THAN_OR_EQUAL',
-                value: conditionValueObj.value,
+                operator: (hasBeforeKeyword && detectedDate) ? 'BEFORE_DATE' as any : (operator as any) || 'GREATER_THAN_OR_EQUAL',
+                value: conditionValueObj.value as any,
             });
         }
 
