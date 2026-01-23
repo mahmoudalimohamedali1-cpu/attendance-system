@@ -270,7 +270,7 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
 🔥 أمثلة متقدمة:
 
 **مثال 1**: "الموظف الجديد (أقل من 6 شهور) لو تأخر أكتر من 3 مرات يتخصم 50 ريال لكل مرة"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -287,10 +287,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "الموظفين الجدد (أقل من 6 أشهر) إذا تأخروا أكثر من 3 مرات، يُخصم 50 ريال عن كل مرة زيادة"
 }
-\`\`\`
+\```
 
 **مثال 2**: "القسم اللي حضوره فوق 90% كل الموظفين فيه ياخدو بونص 300 ريال"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -306,10 +306,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "DEPARTMENT" },
   "explanation": "إذا حضور القسم أكثر من 90%، كل موظف في القسم يحصل على 300 ريال"
 }
-\`\`\`
+\```
 
 **مثال 3**: "كل ساعة overtime فوق 20 ساعة تُحسب 150% من قيمة الساعة الأساسية"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -325,10 +325,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "حساب ساعات العمل الإضافي الزيادة عن 20 ساعة بقيمة 150% من الساعة الأساسية"
 }
-\`\`\`
+\```
 
 **مثال 4**: "اللي عنده إجازة مرضية أكتر من أسبوع متواصل لازم يقدم تقرير طبي"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -342,10 +342,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "تنبيه HR عند وجود إجازة مرضية متواصلة أكثر من أسبوع لطلب تقرير طبي"
 }
-\`\`\`
+\```
 
 **مثال 5**: "كل سنة خدمة الموظف ياخد علاوة 200 ريال شهرياً"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -362,10 +362,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "علاوة شهرية 200 ريال عن كل سنة خدمة للموظف"
 }
-\`\`\`
+\```
 
 **مثال 6**: "الموظف السعودي ياخد بدل دعم بنسبة 5% من راتبه الأساسي"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -383,10 +383,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "بدل دعم 5% من الراتب الأساسي للموظفين السعوديين"
 }
-\`\`\`
+\```
 
 **مثال 7**: "لو الموظف رجع العهدة متأخر أكتر من 3 أيام يتخصم 100 ريال"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "CUSTODY" },
@@ -403,10 +403,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "خصم 100 ريال عند تأخر إرجاع العهدة أكثر من 3 أيام"
 }
-\`\`\`
+\```
 
 **مثال 13**: "الموظف اللي أتلف عهدته يخصم قيمتها من راتبه"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "CUSTODY" },
@@ -430,10 +430,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
     "description": "الحصول على إجمالي قيمة التعويض للعهدة التالفة"
   }
 }
-\`\`\`
+\```
 
-  ** مثال 8 **: "الموظفين اللي عندهم إنذارين أو أكتر يتخصم منهم 10% من الراتب"
-\`\`\`json
+**مثال 8**: "الموظفين اللي عندهم إنذارين أو أكتر يتخصم منهم 10% من الراتب"
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -451,10 +451,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "خصم 10% من الراتب الأساسي للموظفين الذين لديهم إنذارين أو أكثر نشطين"
 }
-\`\`\`
+\```
 
 **مثال 9**: "لو الحضور أقل من 75% والموظف مش جديد يتخصم 500 ريال"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -472,10 +472,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "scope": { "type": "ALL_EMPLOYEES" },
   "explanation": "خصم 500 ريال للموظفين غير الجدد الذين حضورهم أقل من 75%"
 }
-\`\`\`
+\```
 
 **مثال 10**: "قسم المبيعات لو حققوا التارجت كل واحد ياخد 1000 ريال"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -491,7 +491,7 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
   "explanation": "مكافأة 1000 ريال لكل موظف في قسم المبيعات عند تحقيق الهدف",
   "clarificationNeeded": "يرجى تحديد معايير تحقيق التارجت - هل هو نسبة مبيعات محددة؟"
 }
-\`\`\`
+\```
 
 🎯 مهمتك: فهم أي سياسة مهما كانت معقدة وتحويلها لـ JSON قابل للتنفيذ باستخدام الحقول والمعادلات المناسبة!
 
@@ -499,7 +499,7 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
 إذا كانت السياسة تحتاج بيانات **غير موجودة** في الحقول المذكورة أعلاه (مثل: تاريخ محدد، وقت محدد، شرط خاص)، يجب أن تُولّد "dynamicQuery" بنفسك!
 
 **مثال 11**: "أي موظف يحضر يوم 7-1-2026 الساعة 9 صباحاً يأخذ 100 ريال"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -523,10 +523,10 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
     "description": "التحقق من حضور الموظف في التاريخ والوقت المحدد"
   }
 }
-\`\`\`
+\```
 
 **مثال 12**: "الموظف اللي اشتغل من 3 ل 4 ساعات في أي يوم يتخصم 300 ريال"
-\`\`\`json
+\```json
 {
   "understood": true,
   "trigger": { "event": "PAYROLL" },
@@ -551,7 +551,7 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
     "description": "عد الأيام التي عمل فيها الموظف 3-4 ساعات"
   }
 }
-\`\`\`
+\```
 
 **قاعدة ذهبية**: لو الشرط غير قابل للتنفيذ بالحقول الجاهزة → أضف dynamicQuery!`;
 
@@ -607,7 +607,7 @@ export class PolicyParserService {
       throw new Error("AI service is not available");
     }
 
-    this.logger.log(`Parsing policy: "${naturalText?.substring(0, 60) || "empty"}..."`);
+    this.logger.log(\`Parsing policy: "\${naturalText?.substring(0, 60) || "empty"}..."\`);
 
     const prompt = USER_PROMPT_TEMPLATE.replace("{input}", naturalText || "");
 
@@ -631,35 +631,35 @@ export class PolicyParserService {
         const detectedQuery = this.detectAndGenerateDynamicQuery(naturalText);
         if (detectedQuery) {
           parsed.dynamicQuery = detectedQuery;
-          this.logger.log(`Auto-generated dynamicQuery: ${detectedQuery.description}`);
+          this.logger.log(\`Auto-generated dynamicQuery: \${detectedQuery.description}\`);
 
           // 🔥 إضافة الشروط للـ conditions عشان تظهر في الـ frontend
           if ((!parsed.conditions || parsed.conditions.length === 0) && detectedQuery.where) {
             parsed.conditions = detectedQuery.where.map(w => ({
-              field: `dynamicQuery.${w.field}`,
+              field: \`dynamicQuery.\${w.field}\`,
               operator: w.operator as any,
               value: w.value
             }));
-            this.logger.log(`Added ${parsed.conditions.length} conditions from dynamicQuery`);
+            this.logger.log(\`Added \${parsed.conditions.length} conditions from dynamicQuery\`);
           }
         }
       } else if (parsed.dynamicQuery && parsed.dynamicQuery.where) {
         // 🔥 الـ AI رجّع dynamicQuery صالح - ننقل الشروط للـ frontend
-        this.logger.log(`AI returned dynamicQuery with ${parsed.dynamicQuery.where.length} conditions`);
+        this.logger.log(\`AI returned dynamicQuery with \${parsed.dynamicQuery.where.length} conditions\`);
         if (!parsed.conditions || parsed.conditions.length === 0) {
           parsed.conditions = parsed.dynamicQuery.where.map((w: any) => ({
-            field: `dynamicQuery.${w.field}`,
+            field: \`dynamicQuery.\${w.field}\`,
             operator: w.operator as any,
             value: w.value
           }));
-          this.logger.log(`Copied ${parsed.conditions.length} conditions from AI dynamicQuery`);
+          this.logger.log(\`Copied \${parsed.conditions.length} conditions from AI dynamicQuery\`);
         }
       }
 
-      this.logger.log(`Parsed policy: ${parsed.explanation}`);
+      this.logger.log(\`Parsed policy: \${parsed.explanation}\`);
       return parsed;
     } catch (error) {
-      this.logger.error(`Failed to parse policy: ${error.message}`);
+      this.logger.error(\`Failed to parse policy: \${error.message}\`);
       throw error;
     }
   }
@@ -668,7 +668,7 @@ export class PolicyParserService {
    * 🔥 كشف التواريخ والأوقات في النص وتوليد dynamicQuery تلقائياً
    */
   private detectAndGenerateDynamicQuery(text: string): ParsedPolicyRule['dynamicQuery'] | null {
-    this.logger.log(`🔍 detectAndGenerateDynamicQuery called with: "${text.substring(0, 60)}..."`);
+    this.logger.log(\`🔍 detectAndGenerateDynamicQuery called with: "\${text.substring(0, 60)}..."\`);
 
     type WhereOperator = "=" | "!=" | ">" | "<" | ">=" | "<=" | "BETWEEN" | "IN";
     const whereConditions: Array<{ field: string; operator: WhereOperator; value: any }> = [];
@@ -681,14 +681,14 @@ export class PolicyParserService {
       const day = dateMatch[1].padStart(2, '0');
       const month = dateMatch[2].padStart(2, '0');
       const year = dateMatch[3];
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = \`\${year}-\${month}-\${day}\`;
 
       whereConditions.push({
         field: 'date',
         operator: '=' as WhereOperator,
         value: dateStr
       });
-      this.logger.log(`✅ Detected date: ${dateStr}`);
+      this.logger.log(\`✅ Detected date: \${dateStr}\`);
     }
 
     // 2. كشف الوقت (مثل: الساعة 9 أو الساعه 9)
@@ -698,14 +698,14 @@ export class PolicyParserService {
     if (timeMatch) {
       const hour = parseInt(timeMatch[1]);
       const minutes = timeMatch[2] || '00';
-      const timeStr = `${hour.toString().padStart(2, '0')}:${minutes}:00`;
+      const timeStr = \`\${hour.toString().padStart(2, '0')}:\${minutes}:00\`;
 
       whereConditions.push({
         field: 'checkIn',
         operator: '<=' as WhereOperator,
         value: timeStr
       });
-      this.logger.log(`✅ Detected time: ${timeStr}`);
+      this.logger.log(\`✅ Detected time: \${timeStr}\`);
     }
 
     // 3. كشف نطاق ساعات العمل (مثل: من 3 ل 4 ساعات)
@@ -715,7 +715,7 @@ export class PolicyParserService {
     if (hoursMatch) {
       const minHours = parseInt(hoursMatch[1]);
       const maxHours = parseInt(hoursMatch[2]);
-      this.logger.log(`✅ Detected hours range: ${minHours}-${maxHours}`);
+      this.logger.log(\`✅ Detected hours range: \${minHours}-\${maxHours}\`);
 
       return {
         type: 'COUNT_CONDITION',
@@ -726,23 +726,23 @@ export class PolicyParserService {
         ],
         operation: 'COUNT',
         targetField: 'id',
-        description: `عد الأيام التي عمل فيها الموظف ${minHours}-${maxHours} ساعات`
+        description: \`عد الأيام التي عمل فيها الموظف \${minHours}-\${maxHours} ساعات\`
       };
     }
 
     // 4. إذا وجدنا تاريخ أو وقت، أنشئ dynamicQuery
     if (whereConditions.length > 0) {
-      this.logger.log(`✅ Created dynamicQuery with ${whereConditions.length} conditions`);
+      this.logger.log(\`✅ Created dynamicQuery with \${whereConditions.length} conditions\`);
       return {
         type: 'DATE_SPECIFIC',
         table: 'Attendance',
         where: whereConditions,
         operation: 'EXISTS',
-        description: `التحقق من الحضور: ${whereConditions.map(w => `${w.field} ${w.operator} ${w.value}`).join(' و ')}`
+        description: \`التحقق من الحضور: \${whereConditions.map(w => \`\${w.field} \${w.operator} \${w.value}\`).join(' و ')}\`
       };
     }
 
-    this.logger.log(`❌ No date/time patterns found`);
+    this.logger.log(\`❌ No date/time patterns found\`);
     return null;
   }
 
