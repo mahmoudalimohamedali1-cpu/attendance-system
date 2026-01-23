@@ -249,6 +249,18 @@ export class PayrollCalculationController {
         return this.bonusService.getBonusStatistics(companyId, year ? parseInt(year) : undefined);
     }
 
+    @Post('bonus/trigger/:bonusType')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'تشغيل توليد المكافآت يدوياً حسب النوع' })
+    @ApiParam({ name: 'bonusType', enum: ['MONTHLY', 'QUARTERLY', 'ANNUAL', 'EID', 'RAMADAN'] })
+    async triggerBonusGeneration(
+        @Param('bonusType') bonusType: string,
+    ) {
+        // Import and call the scheduler manually
+        const result = await this.bonusService.triggerScheduledBonuses(bonusType);
+        return result;
+    }
+
     // ==================== نظام العمولات ====================
 
     @Post('commission/plans')

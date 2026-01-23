@@ -269,39 +269,57 @@ export class PayrollAdjustmentsService {
         const currentMonth = now.getMonth() + 1;
         const currentYear = now.getFullYear();
 
-        // البحث عن مسيّر الفترة الحالية أو إنشائه
+        // 1. البحث عن أو إنشاء PayrollPeriod
+        let period = await this.prisma.payrollPeriod.findFirst({
+            where: {
+                companyId,
+                month: currentMonth,
+                year: currentYear,
+            },
+        });
+
+        if (!period) {
+            this.logger.log(`📅 Creating new PayrollPeriod for ${currentYear}-${currentMonth}`);
+            const startDate = new Date(currentYear, currentMonth - 1, 1);
+            const endDate = new Date(currentYear, currentMonth, 0);
+            period = await this.prisma.payrollPeriod.create({
+                data: {
+                    companyId,
+                    month: currentMonth,
+                    year: currentYear,
+                    startDate,
+                    endDate,
+                    status: 'DRAFT',
+                },
+            });
+        }
+
+        // 2. البحث عن أو إنشاء PayrollRun
         let payrollRun = await this.prisma.payrollRun.findFirst({
             where: {
                 companyId,
-                periodMonth: currentMonth,
-                periodYear: currentYear,
-                status: { in: ['DRAFT', 'PROCESSING', 'CALCULATED'] },
+                periodId: period.id,
+                status: { in: ['DRAFT', 'CALCULATED'] },
             },
             orderBy: { createdAt: 'desc' },
         });
 
         if (!payrollRun) {
-            // إنشاء مسيّر جديد للفترة الحالية
-            this.logger.log(`📋 Creating new payroll run for ${currentYear}-${currentMonth}`);
+            this.logger.log(`📋 Creating new PayrollRun for period ${period.id}`);
             payrollRun = await this.prisma.payrollRun.create({
                 data: {
                     companyId,
-                    periodMonth: currentMonth,
-                    periodYear: currentYear,
+                    periodId: period.id,
                     runDate: now,
                     status: 'DRAFT',
-                    totalEmployees: 0,
-                    totalGrossSalary: 0,
-                    totalDeductions: 0,
-                    totalNetSalary: 0,
                 },
             });
         }
 
-        // إنشاء التسوية
+        // 3. إنشاء التسوية
         const adjustmentType = dto.type === 'DEDUCTION' ? 'MANUAL_DEDUCTION' : 'MANUAL_ADDITION';
 
-        const adjustment = await this.prisma.payrollAdjustment.create({
+        const adjustment = await (this.prisma.payrollAdjustment as any).create({
             data: {
                 payrollRunId: payrollRun.id,
                 employeeId: dto.employeeId,
@@ -316,10 +334,13 @@ export class PayrollAdjustmentsService {
                 approvedById: dto.autoApprove ? createdById : null,
                 approvedAt: dto.autoApprove ? now : null,
             },
+        });
+
+        // جلب البيانات بشكل منفصل
+        const fullAdjustment = await (this.prisma.payrollAdjustment as any).findUnique({
+            where: { id: adjustment.id },
             include: {
                 employee: { select: { firstName: true, lastName: true, employeeCode: true } },
-                createdBy: { select: { firstName: true, lastName: true } },
-                payrollRun: { select: { periodMonth: true, periodYear: true } },
             },
         });
 
@@ -327,7 +348,7 @@ export class PayrollAdjustmentsService {
 
         return {
             success: true,
-            adjustment,
+            adjustment: fullAdjustment,
             message: `تم إنشاء ${dto.type === 'DEDUCTION' ? 'الخصم' : 'المكافأة'} بنجاح وسيظهر في مسيّر ${currentMonth}/${currentYear}`,
             payrollPeriod: `${currentMonth}/${currentYear}`,
         };
@@ -337,12 +358,15 @@ export class PayrollAdjustmentsService {
      * 📋 جلب جميع التسويات المعلقة للشركة
      */
     async findPendingByCompany(companyId: string) {
-        return this.prisma.payrollAdjustment.findMany({
+        return (this.prisma.payrollAdjustment as any).findMany({
             where: { companyId, status: 'PENDING' },
             include: {
                 employee: { select: { firstName: true, lastName: true, employeeCode: true } },
-                createdBy: { select: { firstName: true, lastName: true } },
-                payrollRun: { select: { periodMonth: true, periodYear: true } },
+                payrollRun: {
+                    include: {
+                        period: { select: { month: true, year: true } },
+                    },
+                },
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -356,11 +380,30 @@ export class PayrollAdjustmentsService {
         const currentMonth = now.getMonth() + 1;
         const currentYear = now.getFullYear();
 
+        // البحث عن الفترة
+        const period = await this.prisma.payrollPeriod.findFirst({
+            where: {
+                companyId,
+                month: currentMonth,
+                year: currentYear,
+            },
+        });
+
+        if (!period) {
+            return {
+                period: `${currentMonth}/${currentYear}`,
+                pendingCount: 0,
+                approvedCount: 0,
+                totalAdditions: 0,
+                totalDeductions: 0,
+            };
+        }
+
+        // البحث عن الـ Run
         const payrollRun = await this.prisma.payrollRun.findFirst({
             where: {
                 companyId,
-                periodMonth: currentMonth,
-                periodYear: currentYear,
+                periodId: period.id,
             },
         });
 
@@ -374,7 +417,7 @@ export class PayrollAdjustmentsService {
             };
         }
 
-        const adjustments = await this.prisma.payrollAdjustment.findMany({
+        const adjustments = await (this.prisma.payrollAdjustment as any).findMany({
             where: { payrollRunId: payrollRun.id },
         });
 

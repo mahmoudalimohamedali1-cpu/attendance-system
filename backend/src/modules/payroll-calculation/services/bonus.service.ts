@@ -434,4 +434,64 @@ export class BonusService {
       return {};
     }
   }
+
+  /**
+   * تشغيل توليد المكافآت يدوياً حسب النوع
+   * يتم استدعاؤها من الـ API للتشغيل اليدوي
+   */
+  async triggerScheduledBonuses(bonusType: string): Promise<any> {
+    this.logger.log(`🔧 Manual trigger for ${bonusType} bonuses...`);
+
+    // جلب جميع برامج المكافآت النشطة من هذا النوع
+    const bonusPrograms = await this.prisma.salaryComponent.findMany({
+      where: {
+        code: { startsWith: 'BONUS_' },
+        isActive: true,
+      },
+    });
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    let totalGenerated = 0;
+    const processedPrograms: string[] = [];
+
+    for (const program of bonusPrograms) {
+      try {
+        const metadata = this.parseMetadata(program.description);
+
+        // تحقق أن نوع المكافأة يطابق
+        if (metadata.bonusType !== bonusType) {
+          continue;
+        }
+
+        this.logger.log(`📋 Processing bonus program: ${program.code} for company ${program.companyId}`);
+
+        // توليد المكافآت لجميع الموظفين في هذه الشركة
+        const result = await this.generateBulkBonuses(
+          {
+            programId: program.id,
+            periodYear: year,
+            periodMonth: month,
+          },
+          program.companyId!,
+        );
+
+        totalGenerated += result.generated || 0;
+        processedPrograms.push(program.code);
+        this.logger.log(`✅ Generated ${result.generated || 0} bonuses for program ${program.code}`);
+      } catch (err) {
+        this.logger.error(`❌ Error processing program ${program.code}: ${err.message}`);
+      }
+    }
+
+    return {
+      success: true,
+      bonusType,
+      totalGenerated,
+      processedPrograms,
+      message: `تم توليد ${totalGenerated} مكافأة من نوع ${bonusType}`,
+    };
+  }
 }

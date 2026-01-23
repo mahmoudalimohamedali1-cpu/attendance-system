@@ -21,6 +21,7 @@ import { TaxCalculatorService } from "./services/tax-calculator.service";
 import { SalaryAdvanceService } from "./services/salary-advance.service";
 import { PayrollRecalculationService } from "./services/payroll-recalculation.service";
 import { PayrollReportsService } from "./services/payroll-reports.service";
+import { BonusSchedulerService } from "./services/bonus-scheduler.service";
 
 @Module({
     imports: [
@@ -40,7 +41,7 @@ import { PayrollReportsService } from "./services/payroll-reports.service";
         PolicyRuleEvaluatorService,
         FormulaEngineService,
         PayrollLedgerService,
-        
+
         // الخدمات المتقدمة
         BonusService,                    // نظام المكافآت
         CommissionService,               // نظام العمولات
@@ -49,6 +50,7 @@ import { PayrollReportsService } from "./services/payroll-reports.service";
         SalaryAdvanceService,            // نظام السلف المتقدم
         PayrollRecalculationService,     // إعادة الحساب التلقائي
         PayrollReportsService,           // تقارير الرواتب
+        BonusSchedulerService,           // جدولة المكافآت التلقائية
     ],
     exports: [
         // تصدير الخدمات الأساسية
@@ -58,7 +60,7 @@ import { PayrollReportsService } from "./services/payroll-reports.service";
         PolicyRuleEvaluatorService,
         FormulaEngineService,
         PayrollLedgerService,
-        
+
         // تصدير الخدمات المتقدمة
         BonusService,
         CommissionService,
@@ -67,6 +69,7 @@ import { PayrollReportsService } from "./services/payroll-reports.service";
         SalaryAdvanceService,
         PayrollRecalculationService,
         PayrollReportsService,
+        BonusSchedulerService,
     ],
 })
-export class PayrollCalculationModule {}
+export class PayrollCalculationModule { }
