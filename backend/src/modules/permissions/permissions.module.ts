@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { PermissionsService } from './permissions.service';
 import { PermissionsController } from './permissions.controller';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 
+@Global()
 @Module({
     imports: [PrismaModule],
     providers: [PermissionsService],
