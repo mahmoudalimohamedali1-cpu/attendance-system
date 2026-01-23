@@ -35,6 +35,10 @@ import {
   CircularProgress,
   Tooltip,
   InputAdornment,
+  Checkbox,
+  FormControlLabel,
+  Autocomplete,
+  Divider,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -93,7 +97,10 @@ export default function BonusManagementPage() {
   const [tabValue, setTabValue] = useState(0);
   const [openProgramDialog, setOpenProgramDialog] = useState(false);
   const [openBonusDialog, setOpenBonusDialog] = useState(false);
+  const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
   const queryClient = useQueryClient();
 
   // Form State
@@ -134,6 +141,12 @@ export default function BonusManagementPage() {
     queryFn: () => api.get('/payroll-calculation/bonus/programs'),
   });
 
+  // جلب الموظفين
+  const { data: employees } = useQuery({
+    queryKey: ['employees-list'],
+    queryFn: () => api.get('/employees?limit=500'),
+  });
+
   // جلب المكافآت المعلقة
   const { data: pendingBonuses, isLoading: loadingPending } = useQuery({
     queryKey: ['pending-bonuses'],
@@ -170,6 +183,52 @@ export default function BonusManagementPage() {
       toast.error(error.response?.data?.message || 'حدث خطأ أثناء إنشاء البرنامج');
     },
   });
+
+  // توليد مكافآت جماعية
+  const generateBulkMutation = useMutation({
+    mutationFn: (data: any) => api.post('/payroll-calculation/bonus/generate-bulk', data),
+    onSuccess: (result: any) => {
+      toast.success(`تم توليد ${result?.generated || 0} مكافأة بنجاح`);
+      queryClient.invalidateQueries({ queryKey: ['pending-bonuses'] });
+      queryClient.invalidateQueries({ queryKey: ['bonus-statistics'] });
+      setOpenDetailsDialog(false);
+      setSelectedEmployees([]);
+      setSelectAll(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'حدث خطأ أثناء توليد المكافآت');
+    },
+  });
+
+  const handleOpenDetails = (program: any) => {
+    setSelectedProgram(program);
+    setSelectedEmployees([]);
+    setSelectAll(false);
+    setOpenDetailsDialog(true);
+  };
+
+  const handleGenerateBonuses = () => {
+    if (!selectedProgram || selectedEmployees.length === 0) {
+      toast.error('يرجى اختيار موظف واحد على الأقل');
+      return;
+    }
+    generateBulkMutation.mutate({
+      programId: selectedProgram.id,
+      employeeIds: selectedEmployees,
+      periodYear: new Date().getFullYear(),
+      periodMonth: new Date().getMonth() + 1,
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    if (checked && employees) {
+      const allEmployeeIds = ((employees as any)?.data || employees)?.map((e: any) => e.id) || [];
+      setSelectedEmployees(allEmployeeIds);
+    } else {
+      setSelectedEmployees([]);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ar-SA', {
@@ -354,8 +413,12 @@ export default function BonusManagementPage() {
                       </Box>
 
                       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                        <Button size="small" startIcon={<ViewIcon />}>
-                          التفاصيل
+                        <Button
+                          size="small"
+                          startIcon={<ViewIcon />}
+                          onClick={() => handleOpenDetails(program)}
+                        >
+                          التفاصيل وتوزيع المكافآت
                         </Button>
                       </Box>
                     </CardContent>
@@ -597,6 +660,122 @@ export default function BonusManagementPage() {
             startIcon={createProgramMutation.isPending ? <CircularProgress size={20} /> : null}
           >
             {createProgramMutation.isPending ? 'جاري الحفظ...' : 'إنشاء البرنامج'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog تفاصيل البرنامج وتوزيع المكافآت */}
+      <Dialog open={openDetailsDialog} onClose={() => setOpenDetailsDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">تفاصيل برنامج المكافآت</Typography>
+            {selectedProgram && (
+              <Chip
+                label={selectedProgram.code}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedProgram && (
+            <Box sx={{ mt: 2 }}>
+              {/* معلومات البرنامج */}
+              <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary">اسم البرنامج</Typography>
+                    <Typography variant="h6">{selectedProgram.nameAr}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary">طريقة الحساب</Typography>
+                    <Typography variant="h6">
+                      {CALCULATION_METHODS.find(m => m.value === selectedProgram.metadata?.calculationMethod)?.label || 'غير محدد'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">المبلغ الثابت</Typography>
+                    <Typography>{selectedProgram.metadata?.fixedAmount ? formatCurrency(selectedProgram.metadata.fixedAmount) : '-'}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">النسبة</Typography>
+                    <Typography>{selectedProgram.metadata?.percentage ? `${selectedProgram.metadata.percentage}%` : '-'}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">المضاعف</Typography>
+                    <Typography>{selectedProgram.metadata?.multiplier ? `×${selectedProgram.metadata.multiplier}` : '-'}</Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* اختيار الموظفين */}
+              <Typography variant="h6" gutterBottom>توزيع المكافآت على الموظفين</Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                اختر الموظفين الذين تريد توليد مكافآت لهم من هذا البرنامج
+              </Alert>
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectAll}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
+                }
+                label="تحديد جميع الموظفين"
+                sx={{ mb: 2 }}
+              />
+
+              <Autocomplete
+                multiple
+                options={((employees as any)?.data || employees) || []}
+                getOptionLabel={(option: any) => `${option.firstName} ${option.lastName} - ${option.employeeCode || ''}`}
+                value={((employees as any)?.data || employees)?.filter((e: any) => selectedEmployees.includes(e.id)) || []}
+                onChange={(_, newValue) => {
+                  setSelectedEmployees(newValue.map((e: any) => e.id));
+                  setSelectAll(false);
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="اختر الموظفين"
+                    placeholder="ابحث عن موظف..."
+                  />
+                )}
+                renderOption={(props, option: any) => (
+                  <li {...props}>
+                    <Box>
+                      <Typography>{option.firstName} {option.lastName}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {option.employeeCode} - {option.jobTitle?.nameAr || ''}
+                      </Typography>
+                    </Box>
+                  </li>
+                )}
+                sx={{ mb: 2 }}
+              />
+
+              {selectedEmployees.length > 0 && (
+                <Alert severity="success">
+                  تم تحديد {selectedEmployees.length} موظف
+                </Alert>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDetailsDialog(false)}>إغلاق</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            disabled={generateBulkMutation.isPending || selectedEmployees.length === 0}
+            onClick={handleGenerateBonuses}
+            startIcon={generateBulkMutation.isPending ? <CircularProgress size={20} /> : <AddIcon />}
+          >
+            {generateBulkMutation.isPending ? 'جاري التوليد...' : `توليد مكافآت (${selectedEmployees.length})`}
           </Button>
         </DialogActions>
       </Dialog>
