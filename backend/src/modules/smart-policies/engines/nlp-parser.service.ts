@@ -21,6 +21,12 @@ export class NLPParserService {
         'تاخير': 'attendance.currentPeriod.lateMinutes',
         'غياب': 'attendance.currentPeriod.absentDays',
         'حضور': 'attendance.currentPeriod.attendancePercentage',
+        'بدرى': 'attendance.currentPeriod.earlyArrivalMinutes',
+        'بدريه': 'attendance.currentPeriod.earlyArrivalMinutes',
+        'مبكر': 'attendance.currentPeriod.earlyArrivalMinutes',
+        'قبل دوامه': 'attendance.currentPeriod.earlyArrivalMinutes',
+        'قبل الوقت': 'attendance.currentPeriod.earlyArrivalMinutes',
+        'قبل الميعاد': 'attendance.currentPeriod.earlyArrivalMinutes',
         'خدمة': 'employee.tenure.years',
         'سنة': 'employee.tenure.years',
         'سنه': 'employee.tenure.years',
@@ -32,13 +38,13 @@ export class NLPParserService {
         { keywords: ['أكبر', 'اكثر', 'أكثر', 'فوق', 'يزيد', 'تجاوز'], op: 'GREATER_THAN' },
         { keywords: ['أقل', 'اقل', 'تحت', 'ينقص'], op: 'LESS_THAN' },
         { keywords: ['يساوي', 'بالضبط'], op: 'EQUALS' },
-        { keywords: ['من بين', 'ما بين', 'بين'], op: 'GREATER_THAN_OR_EQUAL' }, // "من بين 5000" تعني >= 5000 عادة في سياق الرواتب
+        { keywords: ['من بين', 'ما بين', 'بين', 'بـ'], op: 'GREATER_THAN_OR_EQUAL' },
     ];
 
     // قاموس الإجراءات (Actions)
     private readonly ACTIONS_MAP: Array<{ keywords: string[], type: string }> = [
-        { keywords: ['حافز', 'مكافأة', 'مكافاه', 'بونص', 'ينزل', 'يصرف', 'إضافة', 'اضافة'], type: 'ADD_TO_PAYROLL' },
-        { keywords: ['خصم', 'جزاء', 'عقوبة', 'يخصم'], type: 'DEDUCT_FROM_PAYROLL' },
+        { keywords: ['حافز', 'مكافأة', 'مكافاه', 'بونص', 'ينزل', 'يصرف', 'إضافة', 'اضافة', 'ضيف', 'زود'], type: 'ADD_TO_PAYROLL' },
+        { keywords: ['خصم', 'جزاء', 'عقوبة', 'يخصم', 'نقص'], type: 'DEDUCT_FROM_PAYROLL' },
         { keywords: ['تنبيه', 'إشعار', 'رسالة'], type: 'SEND_NOTIFICATION' },
     ];
 
@@ -51,7 +57,7 @@ export class NLPParserService {
 
         const result: ParsedPolicyRule = {
             understood: false,
-            trigger: { event: 'PAYROLL' }, // افترض رواتب بشكل افتراضي
+            trigger: { event: 'PAYROLL' },
             conditions: [],
             actions: [],
             scope: { type: 'ALL_EMPLOYEES' },
@@ -59,58 +65,79 @@ export class NLPParserService {
             clarificationNeeded: 'false' as any,
         };
 
-        // 1. استخراج الأرقام (Entities)
-        const numbers = this.extractNumbers(safeText);
+        // 1. استخراج الأرقام مع سياقها
+        const numbers = this.extractNumbersWithContext(safeText);
 
         // 2. محاولة فهم الشرط
         const conditionField = this.detectField(safeText);
         const operator = this.detectOperator(safeText);
 
-        if (conditionField && numbers.length > 0) {
+        // البحث عن رقم مرتبط بالشرط (دقائق، أيام، سنوات)
+        const conditionValueObj = numbers.find(n => n.context === 'condition' || (n.context === 'none' && conditionField));
+
+        if (conditionField && conditionValueObj) {
             result.conditions.push({
                 field: conditionField,
                 operator: operator as any || 'GREATER_THAN_OR_EQUAL',
-                value: numbers[0],
+                value: conditionValueObj.value,
             });
         }
 
         // 3. محاولة فهم الإجراء
         const actionType = this.detectAction(safeText);
-        if (actionType && numbers.length > 1) {
+        // البحث عن رقم مرتبط بالإجراء (ريال، بونص)
+        const actionValueObj = numbers.find(n => n.context === 'action' || (n.context === 'none' && n.value !== conditionValueObj?.value));
+
+        if (actionType && actionValueObj) {
             result.actions.push({
                 type: actionType as any,
                 valueType: 'FIXED',
-                value: numbers[1], // الرقم الثاني عادة هو مبلغ الحافز/الخصم
-                description: `تم التحليل آلياً من النص`,
-            });
-        } else if (actionType && numbers.length === 1 && result.conditions.length === 0) {
-            // لو رقم واحد بس ومفيش شرط، يبقى ده قيمة الإجراء
-            result.actions.push({
-                type: actionType as any,
-                valueType: 'FIXED',
-                value: numbers[0],
+                value: actionValueObj.value,
                 description: `تم التحليل آلياً من النص`,
             });
         }
 
         // 4. تحديد الحدث (Trigger)
-        if (safeText.includes('حضور') || safeText.includes('تأخير') || safeText.includes('غياب')) {
+        if (safeText.includes('حضور') || safeText.includes('تأخير') || safeText.includes('غياب') || safeText.includes('دوام') || safeText.includes('يجى')) {
             result.trigger.event = 'ATTENDANCE';
         }
 
         // 5. التحقق من النجاح
         if (result.actions.length > 0) {
             result.understood = true;
-            result.explanation = `تم فهم السياسة: ${actionType === 'ADD_TO_PAYROLL' ? 'مكافأة' : 'خصم'} عند تحقق شرط ${conditionField || 'عام'}`;
+            const actionLabel = actionType === 'ADD_TO_PAYROLL' ? 'إضافة مكافأة' : (actionType === 'DEDUCT_FROM_PAYROLL' ? 'خصم مالي' : 'إجراء');
+            result.explanation = `${actionLabel} بقيمة ${actionValueObj?.value || ''} ر.س عند تحقق شرط ${conditionField || 'عام'}`;
         }
 
         return result;
     }
 
-    private extractNumbers(text: string): number[] {
-        const regex = /\d+/g;
-        const matches = text.match(regex);
-        return matches ? matches.map(m => parseInt(m)) : [];
+    private extractNumbersWithContext(text: string): { value: number, context: 'condition' | 'action' | 'none' }[] {
+        const words = text.split(/[\s,]+/);
+        const result: { value: number, context: 'condition' | 'action' | 'none' }[] = [];
+
+        for (let i = 0; i < words.length; i++) {
+            // تنظيف الكلمة من الحروف اللاصقة مثل "بـ5" أو "5دقائق"
+            const numMatch = words[i].match(/\d+/);
+            if (numMatch) {
+                const num = parseInt(numMatch[0]);
+                let context: 'condition' | 'action' | 'none' = 'none';
+
+                // فحص الكلمات المحيطة في نطاق 3 كلمات
+                const start = Math.max(0, i - 1);
+                const end = Math.min(words.length, i + 2);
+                const surrounding = words.slice(start, end).join(' ');
+
+                if (surrounding.includes('دقيق') || surrounding.includes('يوم') || surrounding.includes('ساع') || surrounding.includes('سنة') || surrounding.includes('دوام')) {
+                    context = 'condition';
+                } else if (surrounding.includes('ريال') || surrounding.includes('جنيه') || surrounding.includes('حافز') || surrounding.includes('مكافأ') || surrounding.includes('بونص') || surrounding.includes('خصم') || surrounding.includes('ضيف')) {
+                    context = 'action';
+                }
+
+                result.push({ value: num, context });
+            }
+        }
+        return result;
     }
 
     private detectField(text: string): string | null {
