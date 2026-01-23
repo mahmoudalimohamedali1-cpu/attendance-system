@@ -2429,12 +2429,12 @@ model PayrollAdjustment {
   amount Decimal?       @db.Decimal(10, 2) // المبلغ المحسوب
 
   // سير العمل والاعتماد
-  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
-  createdById     String    @map("created_by_id")
-  approvedById    String?   @map("approved_by_id")
-  approvedAt      DateTime? @map("approved_at")
-  rejectedAt      DateTime? @map("rejected_at")
-  rejectionReason String?   @map("rejection_reason")
+  status          PayrollAdjustmentStatus @default(PENDING)
+  createdById     String                  @map("created_by_id")
+  approvedById    String?                 @map("approved_by_id")
+  approvedAt      DateTime?               @map("approved_at")
+  rejectedAt      DateTime?               @map("rejected_at")
+  rejectionReason String?                 @map("rejection_reason")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

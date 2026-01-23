@@ -329,7 +329,7 @@ export class PayrollAdjustmentsService {
                     value: dto.amount, // ⚡ مطلوب للـ database
                     reason: dto.reason,
                     notes: dto.notes || `خصم/مكافأة فورية بتاريخ ${now.toLocaleDateString('ar-SA')}`,
-                    status: dto.autoApprove ? 'APPROVED' : 'PENDING',
+                    status: dto.autoApprove ? 'POSTED' : 'PENDING', // POSTED بدل APPROVED عشان الـ database enum
                     approvedAt: dto.autoApprove ? now : null,
                     // Relations using connect
                     payrollRun: { connect: { id: payrollRun.id } },
