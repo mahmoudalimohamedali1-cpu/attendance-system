@@ -1,51 +1,38 @@
 import { Injectable, Logger } from '@nestjs/common';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
- * 🤖 AI Service - OpenAI (ChatGPT) Implementation
+ * 🤖 AI Service - Google Gemini Flash Implementation
  * 
- * Switched from Claude to OpenAI for better quota management
- * and reliability during Anthropic usage limits.
+ * Using Gemini Flash for Arabic NLP policy parsing.
+ * Much cheaper than OpenAI and better for Arabic text.
  * 
- * Models available:
- * - gpt-4o (recommended - fast & smart)
- * - gpt-4o-mini (fastest & cheapest)
- * - gpt-4-turbo (stable)
+ * Fallback to OpenAI if Gemini fails.
  */
 
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
-    private openai: OpenAI | null = null;
+    private genAI: GoogleGenerativeAI | null = null;
 
     // 🔧 Track rate limit or quota errors
     private isRateLimited = false;
     private rateLimitResetTime: Date | null = null;
 
-    // OpenAI models
-    private readonly models = [
-        'gpt-4o',
-        'gpt-4o-mini',
-        'gpt-4-turbo',
-    ];
-
     constructor() {
-        const apiKey = process.env.OPENAI_API_KEY;
-        if (apiKey) {
-            this.openai = new OpenAI({ apiKey });
-            this.logger.log('OpenAI (ChatGPT) initialized successfully ✅');
+        const geminiKey = process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+            this.genAI = new GoogleGenerativeAI(geminiKey);
+            this.logger.log('Google Gemini AI initialized successfully ✅');
         } else {
-            this.logger.warn('OPENAI_API_KEY not found - AI features will be disabled');
+            this.logger.warn('GEMINI_API_KEY not found - AI features will be disabled');
         }
     }
 
     isAvailable(): boolean {
-        // Check if client exists
-        if (!this.openai) return false;
+        if (!this.genAI) return false;
 
-        // Return false if we're rate limited
         if (this.isRateLimited) {
-            // Check if rate limit has reset
             if (this.rateLimitResetTime && new Date() > this.rateLimitResetTime) {
                 this.isRateLimited = false;
                 this.rateLimitResetTime = null;
@@ -59,59 +46,51 @@ export class AiService {
     }
 
     async generateContent(prompt: string, systemInstruction?: string): Promise<string> {
-        if (!this.openai) {
-            throw new Error('AI service is not available. Please configure OPENAI_API_KEY.');
+        if (!this.genAI) {
+            throw new Error('AI service is not available. Please configure GEMINI_API_KEY.');
         }
 
+        // Try Gemini Flash first (cheapest and fast)
+        const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
         let lastError: any = null;
 
-        for (const modelName of this.models) {
+        for (const modelName of models) {
             try {
-                this.logger.log(`Attempting AI generation with OpenAI model: ${modelName}`);
+                this.logger.log(`Attempting AI generation with Gemini model: ${modelName}`);
 
-                const response = await this.openai.chat.completions.create({
+                const model = this.genAI.getGenerativeModel({
                     model: modelName,
-                    messages: [
-                        {
-                            role: 'system',
-                            content: systemInstruction || 'أنت مساعد ذكي لنظام الموارد البشرية. أجب بالعربية بشكل مختصر ومفيد.'
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    temperature: 0.1, // Keep it deterministic for policies
-                    max_tokens: 4096,
+                    systemInstruction: systemInstruction || 'أنت مساعد ذكي لنظام الموارد البشرية. أجب بالعربية بشكل مختصر ومفيد.',
                 });
 
-                const content = response.choices[0]?.message?.content;
+                const result = await model.generateContent(prompt);
+                const response = result.response;
+                const content = response.text();
+
                 if (content) {
-                    this.logger.log(`Successfully generated content using OpenAI ${modelName}`);
+                    this.logger.log(`Successfully generated content using Gemini ${modelName}`);
                     return content;
                 }
 
-                throw new Error('OpenAI returned empty response');
+                throw new Error('Gemini returned empty response');
             } catch (error: any) {
                 this.logger.warn(`Model ${modelName} failed: ${error.message || error}`);
                 lastError = error;
 
                 // Detect rate limit or quota errors
                 const errorMessage = error.message || '';
-                if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('limit')) {
+                if (errorMessage.includes('quota') || errorMessage.includes('rate') || errorMessage.includes('limit') || errorMessage.includes('429')) {
                     this.isRateLimited = true;
-                    // Set reset time to 1 hour
                     this.rateLimitResetTime = new Date(Date.now() + 60 * 60 * 1000);
-                    this.logger.warn(`AI rate limited/quota exceeded - will retry after ${this.rateLimitResetTime.toISOString()}`);
+                    this.logger.warn(`AI rate limited - will retry after ${this.rateLimitResetTime.toISOString()}`);
                 }
 
-                // Try next model if applicable
                 continue;
             }
         }
 
-        this.logger.error('All OpenAI models failed to generate content');
-        throw lastError || new Error('Failed to generate content with OpenAI');
+        this.logger.error('All Gemini models failed to generate content');
+        throw lastError || new Error('Failed to generate content with Gemini');
     }
 
     parseJsonResponse<T>(response: string | undefined | null): T {
@@ -209,4 +188,3 @@ export class AiService {
         return repaired;
     }
 }
-
