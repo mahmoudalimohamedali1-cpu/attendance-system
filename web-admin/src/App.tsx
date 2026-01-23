@@ -543,6 +543,11 @@ function App() {
             </Suspense>
           } />
           {/* Muqeem Integration Routes */}
+          <Route path="muqeem" element={
+            <Suspense fallback={<PageLoader />}>
+              <MuqeemManagementPage />
+            </Suspense>
+          } />
           <Route path="integrations/muqeem" element={
             <Suspense fallback={<PageLoader />}>
               <MuqeemManagementPage />
