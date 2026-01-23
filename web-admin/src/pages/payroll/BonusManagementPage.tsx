@@ -96,6 +96,38 @@ export default function BonusManagementPage() {
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
   const queryClient = useQueryClient();
 
+  // Form State
+  const [programForm, setProgramForm] = useState({
+    code: '',
+    nameAr: '',
+    bonusType: 'MONTHLY',
+    calculationMethod: 'FIXED_AMOUNT',
+    fixedAmount: 0,
+    percentage: 0,
+    multiplier: 1,
+    formula: '',
+    isActive: true
+  });
+
+  const resetForm = () => {
+    setProgramForm({
+      code: '',
+      nameAr: '',
+      bonusType: 'MONTHLY',
+      calculationMethod: 'FIXED_AMOUNT',
+      fixedAmount: 0,
+      percentage: 0,
+      multiplier: 1,
+      formula: '',
+      isActive: true
+    });
+  };
+
+  const handleCreateProgramOpen = () => {
+    resetForm();
+    setOpenProgramDialog(true);
+  };
+
   // جلب برامج المكافآت
   const { data: programs, isLoading: loadingPrograms } = useQuery({
     queryKey: ['bonus-programs'],
@@ -130,11 +162,13 @@ export default function BonusManagementPage() {
   const createProgramMutation = useMutation({
     mutationFn: (data: any) => api.post('/payroll-calculation/bonus/programs', data),
     onSuccess: () => {
-      toast.success('تم إنشاء برنامج المكافآت');
+      toast.success('تم إنشاء برنامج المكافآت بنجاح');
       queryClient.invalidateQueries({ queryKey: ['bonus-programs'] });
       setOpenProgramDialog(false);
     },
-    onError: () => toast.error('حدث خطأ أثناء إنشاء البرنامج'),
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'حدث خطأ أثناء إنشاء البرنامج');
+    },
   });
 
   const formatCurrency = (amount: number) => {
@@ -173,7 +207,7 @@ export default function BonusManagementPage() {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => setOpenProgramDialog(true)}
+            onClick={handleCreateProgramOpen}
           >
             برنامج مكافآت جديد
           </Button>
@@ -264,7 +298,7 @@ export default function BonusManagementPage() {
             {(programs as any[])?.map((program: any) => {
               const metadata = program.metadata || {};
               const typeInfo = getBonusTypeInfo(metadata.bonusType);
-              
+
               return (
                 <Grid item xs={12} md={6} lg={4} key={program.id}>
                   <Card
@@ -294,7 +328,7 @@ export default function BonusManagementPage() {
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         {program.description || 'لا يوجد وصف'}
                       </Typography>
-                      
+
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         {metadata.fixedAmount && (
                           <Chip
@@ -318,7 +352,7 @@ export default function BonusManagementPage() {
                           />
                         )}
                       </Box>
-                      
+
                       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                         <Button size="small" startIcon={<ViewIcon />}>
                           التفاصيل
@@ -329,7 +363,7 @@ export default function BonusManagementPage() {
                 </Grid>
               );
             })}
-            
+
             {(!programs || (programs as any[]).length === 0) && (
               <Grid item xs={12}>
                 <Alert severity="info">
@@ -364,7 +398,7 @@ export default function BonusManagementPage() {
                 {(pendingBonuses as any[])?.map((bonus: any) => {
                   const metadata = bonus.metadata || {};
                   const typeInfo = getBonusTypeInfo(metadata.bonusType);
-                  
+
                   return (
                     <TableRow key={bonus.id} hover>
                       <TableCell>
@@ -413,7 +447,7 @@ export default function BonusManagementPage() {
                     </TableRow>
                   );
                 })}
-                
+
                 {(!pendingBonuses || (pendingBonuses as any[]).length === 0) && (
                   <TableRow>
                     <TableCell colSpan={6} align="center">
@@ -447,7 +481,8 @@ export default function BonusManagementPage() {
                   fullWidth
                   label="كود البرنامج"
                   placeholder="ANNUAL_BONUS"
-                  id="program-code"
+                  value={programForm.code}
+                  onChange={(e) => setProgramForm({ ...programForm, code: e.target.value })}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -455,20 +490,24 @@ export default function BonusManagementPage() {
                   fullWidth
                   label="اسم البرنامج (عربي)"
                   placeholder="مكافأة سنوية"
-                  id="program-name-ar"
+                  value={programForm.nameAr}
+                  onChange={(e) => setProgramForm({ ...programForm, nameAr: e.target.value })}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>نوع المكافأة</InputLabel>
-                  <Select label="نوع المكافأة" defaultValue="">
+                  <Select
+                    label="نوع المكافأة"
+                    value={programForm.bonusType}
+                    onChange={(e) => setProgramForm({ ...programForm, bonusType: e.target.value })}
+                  >
                     {BONUS_TYPES.map(type => (
                       <MenuItem key={type.value} value={type.value}>
-                        <Chip
-                          label={type.label}
-                          size="small"
-                          sx={{ bgcolor: type.color, color: 'white', mr: 1 }}
-                        />
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: type.color, mr: 1 }} />
+                          {type.label}
+                        </Box>
                       </MenuItem>
                     ))}
                   </Select>
@@ -477,7 +516,11 @@ export default function BonusManagementPage() {
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>طريقة الحساب</InputLabel>
-                  <Select label="طريقة الحساب" defaultValue="">
+                  <Select
+                    label="طريقة الحساب"
+                    value={programForm.calculationMethod}
+                    onChange={(e) => setProgramForm({ ...programForm, calculationMethod: e.target.value })}
+                  >
                     {CALCULATION_METHODS.map(method => (
                       <MenuItem key={method.value} value={method.value}>
                         {method.label}
@@ -486,32 +529,60 @@ export default function BonusManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="المبلغ الثابت"
-                  type="number"
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="النسبة المئوية"
-                  type="number"
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                  }}
-                />
-              </Grid>
+
+              {programForm.calculationMethod === 'FIXED_AMOUNT' && (
+                <Grid item xs={12} md={12}>
+                  <TextField
+                    fullWidth
+                    label="المبلغ الثابت"
+                    type="number"
+                    value={programForm.fixedAmount}
+                    onChange={(e) => setProgramForm({ ...programForm, fixedAmount: Number(e.target.value) })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              )}
+
+              {(programForm.calculationMethod === 'PERCENTAGE_OF_BASIC' || programForm.calculationMethod === 'PERCENTAGE_OF_GROSS') && (
+                <Grid item xs={12} md={12}>
+                  <TextField
+                    fullWidth
+                    label="النسبة المئوية"
+                    type="number"
+                    value={programForm.percentage}
+                    onChange={(e) => setProgramForm({ ...programForm, percentage: Number(e.target.value) })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              )}
+
+              {programForm.calculationMethod === 'SALARY_MULTIPLIER' && (
+                <Grid item xs={12} md={12}>
+                  <TextField
+                    fullWidth
+                    label="مضاعف الراتب"
+                    type="number"
+                    value={programForm.multiplier}
+                    onChange={(e) => setProgramForm({ ...programForm, multiplier: Number(e.target.value) })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">شهر</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              )}
+
               <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="وصف البرنامج"
                   multiline
                   rows={3}
+                  value={programForm.formula} // Using formula field as description if method is not formula
+                  onChange={(e) => setProgramForm({ ...programForm, formula: e.target.value })}
                 />
               </Grid>
             </Grid>
@@ -521,12 +592,11 @@ export default function BonusManagementPage() {
           <Button onClick={() => setOpenProgramDialog(false)}>إلغاء</Button>
           <Button
             variant="contained"
-            onClick={() => {
-              // TODO: تنفيذ حفظ البرنامج
-              toast.info('سيتم إضافة هذه الميزة قريباً');
-            }}
+            disabled={createProgramMutation.isPending || !programForm.code || !programForm.nameAr}
+            onClick={() => createProgramMutation.mutate(programForm)}
+            startIcon={createProgramMutation.isPending ? <CircularProgress size={20} /> : null}
           >
-            إنشاء البرنامج
+            {createProgramMutation.isPending ? 'جاري الحفظ...' : 'إنشاء البرنامج'}
           </Button>
         </DialogActions>
       </Dialog>
