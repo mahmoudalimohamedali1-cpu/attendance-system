@@ -44,30 +44,99 @@ export class BonusSchedulerService {
     }
 
     /**
-     * التحقق من مكافآت العيد والرمضان - كل يوم للتحقق من التواريخ الهجرية
-     * سيتم التحقق من التواريخ الهجرية لتحديد موعد العيد ورمضان
+     * التحقق من مكافآت العيد والرمضان - كل يوم للتحقق من التواريخ من الإعدادات
+     * يتم جلب تواريخ رمضان والعيد من إعدادات كل شركة
      */
     @Cron('0 6 * * *', { timeZone: 'Asia/Riyadh' })
     async checkIslamicBonuses() {
         const today = new Date();
-        const month = today.getMonth() + 1;
-        const day = today.getDate();
+        const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
 
-        // تقريب لمواعيد العيد (يتم تحديثها سنوياً حسب التقويم الهجري)
-        // عيد الفطر - تقريباً في شهر 4 أو 5
-        // عيد الأضحى - تقريباً في شهر 6 أو 7
-        // يمكن تحسين هذا باستخدام مكتبة للتقويم الهجري
+        this.logger.log(`🌙 Checking Islamic bonuses for date: ${todayStr}`);
 
-        // مكافأة رمضان - أول رمضان (تقريباً مارس-أبريل)
-        if (month === 3 && day === 10) {
-            this.logger.log('🌙 Ramadan detected - generating RAMADAN bonuses...');
-            await this.generateBonusesByType('RAMADAN');
+        // جلب جميع الشركات مع إعداداتها
+        const companies = await this.prisma.company.findMany({
+            include: {
+                payrollSettings: true,
+            },
+        });
+
+        for (const company of companies) {
+            try {
+                // قراءة تواريخ رمضان والعيد من الإعدادات
+                const settings = company.payrollSettings as any;
+
+                // التواريخ المتوقعة لهذا العام (يمكن تحديثها من لوحة الإعدادات)
+                const ramadanStartDate = settings?.ramadanStartDate || settings?.islamicDates?.ramadanStart;
+                const eidFitrDate = settings?.eidFitrDate || settings?.islamicDates?.eidFitr;
+                const eidAdhaDate = settings?.eidAdhaDate || settings?.islamicDates?.eidAdha;
+
+                // مكافأة رمضان - في بداية رمضان
+                if (ramadanStartDate && this.isMatchingDate(todayStr, ramadanStartDate)) {
+                    this.logger.log(`🌙 Ramadan started for company ${company.id} - generating RAMADAN bonuses...`);
+                    await this.generateBonusesForCompany('RAMADAN', company.id);
+                }
+
+                // مكافأة عيد الفطر - قبل العيد بيومين
+                if (eidFitrDate && this.isDateNDaysBefore(todayStr, eidFitrDate, 2)) {
+                    this.logger.log(`🎉 Eid Al-Fitr approaching for company ${company.id} - generating EID bonuses...`);
+                    await this.generateBonusesForCompany('EID', company.id);
+                }
+
+                // مكافأة عيد الأضحى - قبل العيد بيومين
+                if (eidAdhaDate && this.isDateNDaysBefore(todayStr, eidAdhaDate, 2)) {
+                    this.logger.log(`🐑 Eid Al-Adha approaching for company ${company.id} - generating EID bonuses...`);
+                    await this.generateBonusesForCompany('EID', company.id);
+                }
+            } catch (err) {
+                this.logger.error(`Error checking Islamic dates for company ${company.id}: ${err.message}`);
+            }
         }
+    }
 
-        // مكافأة عيد الفطر - قبل العيد بيومين
-        if (month === 4 && day === 8) {
-            this.logger.log('🎉 Eid Al-Fitr approaching - generating EID bonuses...');
-            await this.generateBonusesByType('EID');
+    /**
+     * التحقق من تطابق التاريخ
+     */
+    private isMatchingDate(todayStr: string, targetDate: string | Date): boolean {
+        if (!targetDate) return false;
+        const target = typeof targetDate === 'string' ? targetDate : targetDate.toISOString().split('T')[0];
+        return todayStr === target;
+    }
+
+    /**
+     * التحقق من أن اليوم قبل التاريخ المحدد بعدد معين من الأيام
+     */
+    private isDateNDaysBefore(todayStr: string, targetDate: string | Date, daysBefore: number): boolean {
+        if (!targetDate) return false;
+        const target = new Date(targetDate);
+        target.setDate(target.getDate() - daysBefore);
+        return todayStr === target.toISOString().split('T')[0];
+    }
+
+    /**
+     * توليد المكافآت لشركة معينة حسب النوع
+     */
+    private async generateBonusesForCompany(bonusType: string, companyId: string) {
+        const bonusPrograms = await this.prisma.salaryComponent.findMany({
+            where: {
+                companyId,
+                code: { startsWith: 'BONUS_' },
+                isActive: true,
+            },
+        });
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+
+        for (const program of bonusPrograms) {
+            const metadata = program.description ? JSON.parse(program.description) : {};
+            if (metadata.bonusType !== bonusType) continue;
+
+            await this.bonusService.generateBulkBonuses(
+                { programId: program.id, periodYear: year, periodMonth: month },
+                companyId,
+            );
         }
     }
 
