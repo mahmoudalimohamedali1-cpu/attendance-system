@@ -142,9 +142,14 @@ export class NLPParserService {
         return t;
     }
 
-    private extractNumbersWithContext(text: string): { value: number, context: 'condition' | 'action' | 'none', surrounding: string }[] {
+    private extractNumbersWithContext(text: string): { value: number, context: 'condition' | 'action' | 'none', surrounding: string, position: number }[] {
         const words = text.split(/[\s,]+/);
-        const result: { value: number, context: 'condition' | 'action' | 'none', surrounding: string }[] = [];
+        const result: { value: number, context: 'condition' | 'action' | 'none', surrounding: string, position: number }[] = [];
+
+        // كلمات الإجراء (حافز، خصم، مكافأة) - الأولوية العليا
+        const actionKeywords = ['حافز', 'مكافأ', 'مكافاه', 'بونص', 'خصم', 'جزاء', 'ينزل', 'يصرف', 'ضيف', 'يخصم'];
+        // كلمات الشرط (راتب، غياب، تأخير) - شروط
+        const conditionKeywords = ['راتبه', 'الاجمالي', 'اجمالي', 'اساسي', 'دقيق', 'يوم', 'ساع', 'سنة', 'دوام', 'بدرى', 'قبل', 'غياب', 'غاب', 'تأخير'];
 
         for (let i = 0; i < words.length; i++) {
             const numMatch = words[i].match(/\d+/);
@@ -161,16 +166,55 @@ export class NLPParserService {
                 const end = Math.min(words.length, i + 3);
                 const surrounding = words.slice(start, end).join(' ');
 
-                if (surrounding.includes('دقيق') || surrounding.includes('يوم') || surrounding.includes('ساع') || surrounding.includes('سنة') || surrounding.includes('دوام') || surrounding.includes('بدرى') || surrounding.includes('قبل') || surrounding.includes('غياب') || surrounding.includes('غاب') || surrounding.includes('تأخير')) {
-                    context = 'condition';
-                } else if (surrounding.includes('ريال') || surrounding.includes('جنيه') || surrounding.includes('حافز') || surrounding.includes('مكافأ') || surrounding.includes('بونص') || surrounding.includes('خصم') || surrounding.includes('ضيف') || surrounding.includes('راتب') || surrounding.includes('يخصم')) {
+                // أولوية: كلمات الإجراء أولاً (حافز، خصم، مكافأة)
+                const hasActionKeyword = actionKeywords.some(kw => surrounding.includes(kw));
+                const hasConditionKeyword = conditionKeywords.some(kw => surrounding.includes(kw));
+
+                if (hasActionKeyword && !hasConditionKeyword) {
                     context = 'action';
+                } else if (hasConditionKeyword && !hasActionKeyword) {
+                    context = 'condition';
+                } else if (hasActionKeyword && hasConditionKeyword) {
+                    // لو فيه الاتنين، نشوف أيهما أقرب للرقم
+                    const actionDist = this.findClosestKeywordDistance(words, i, actionKeywords);
+                    const conditionDist = this.findClosestKeywordDistance(words, i, conditionKeywords);
+                    context = actionDist < conditionDist ? 'action' : 'condition';
+                } else if (surrounding.includes('ريال') || surrounding.includes('جنيه')) {
+                    // ريال بدون كلمة محددة - نحتاج سياق أوسع
+                    context = 'none'; // سيتم تحديده لاحقاً بناءً على الترتيب
                 }
 
-                result.push({ value: num, context, surrounding });
+                result.push({ value: num, context, surrounding, position: i });
             }
         }
+
+        // معالجة الأرقام اللي سياقها none - نفترض الأول شرط والتاني إجراء
+        const noneContextNumbers = result.filter(n => n.context === 'none');
+        if (noneContextNumbers.length >= 2) {
+            noneContextNumbers[0].context = 'condition';
+            noneContextNumbers[1].context = 'action';
+        } else if (noneContextNumbers.length === 1 && result.length >= 2) {
+            // لو عندنا رقم واحد بس none، نحدده بناءً على اللي موجود
+            const hasCondition = result.some(n => n.context === 'condition');
+            const hasAction = result.some(n => n.context === 'action');
+            if (!hasCondition) noneContextNumbers[0].context = 'condition';
+            else if (!hasAction) noneContextNumbers[0].context = 'action';
+        }
+
         return result;
+    }
+
+    private findClosestKeywordDistance(words: string[], numIndex: number, keywords: string[]): number {
+        let minDist = Infinity;
+        for (let i = 0; i < words.length; i++) {
+            for (const kw of keywords) {
+                if (words[i].includes(kw)) {
+                    const dist = Math.abs(i - numIndex);
+                    if (dist < minDist) minDist = dist;
+                }
+            }
+        }
+        return minDist;
     }
 
     private detectFieldInSnippet(snippet: string): string | null {
