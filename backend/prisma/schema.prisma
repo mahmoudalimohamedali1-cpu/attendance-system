@@ -3675,6 +3675,7 @@ model CustodyReturn {
   // في حالة التلف - ربط مع الرواتب
   damageDescription  String?  @map("damage_description")
   estimatedCost      Decimal? @map("estimated_cost") @db.Decimal(12, 2) // تكلفة الإصلاح/التعويض
+  replacementValue   Decimal? @map("replacement_value") @db.Decimal(12, 2) // قيمة الاستبدال الكاملة للعهدة التالفة
   chargeEmployee     Boolean  @default(false) @map("charge_employee") // خصم من الراتب؟
   chargedToPayroll   Boolean  @default(false) @map("charged_to_payroll") // تم الخصم؟
   payrollDeductionId String?  @map("payroll_deduction_id") // رقم خصم الراتب
