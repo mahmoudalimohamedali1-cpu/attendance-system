@@ -67,13 +67,22 @@ export class NLPParserService {
 
         // 1. استخراج الأرقام مع سياقها
         const numbers = this.extractNumbersWithContext(safeText);
+        const conditionValueObj = numbers.find(n => n.context === 'condition');
+        const actionValueObj = numbers.find(n => n.context === 'action');
 
-        // 2. محاولة فهم الشرط
-        const conditionField = this.detectField(safeText);
+        // 2. محاولة فهم الشرط بناءً على رقم الشرط
+        let conditionField: string | null = null;
+        if (conditionValueObj) {
+            // ابحث عن الحقل في الكلمات المحيطة بهذا الرقم تحديداً
+            conditionField = this.detectFieldInSnippet(conditionValueObj.surrounding);
+        }
+
+        // لو ملقيناش حقل جنب الرقم، ابحث في النص كله بس استبعد حقل الراتب لو فيه حافز
+        if (!conditionField) {
+            conditionField = this.detectField(safeText, ['salary', 'راتب']);
+        }
+
         const operator = this.detectOperator(safeText);
-
-        // البحث عن رقم مرتبط بالشرط (دقائق، أيام، سنوات)
-        const conditionValueObj = numbers.find(n => n.context === 'condition' || (n.context === 'none' && conditionField));
 
         if (conditionField && conditionValueObj) {
             result.conditions.push({
@@ -85,8 +94,6 @@ export class NLPParserService {
 
         // 3. محاولة فهم الإجراء
         const actionType = this.detectAction(safeText);
-        // البحث عن رقم مرتبط بالإجراء (ريال، بونص)
-        const actionValueObj = numbers.find(n => n.context === 'action' || (n.context === 'none' && n.value !== conditionValueObj?.value));
 
         if (actionType && actionValueObj) {
             result.actions.push({
@@ -98,7 +105,7 @@ export class NLPParserService {
         }
 
         // 4. تحديد الحدث (Trigger)
-        if (safeText.includes('حضور') || safeText.includes('تأخير') || safeText.includes('غياب') || safeText.includes('دوام') || safeText.includes('يجى')) {
+        if (safeText.includes('حضور') || safeText.includes('تأخير') || safeText.includes('غياب') || safeText.includes('دوام') || safeText.includes('يجى') || safeText.includes('بدرى')) {
             result.trigger.event = 'ATTENDANCE';
         }
 
@@ -106,43 +113,64 @@ export class NLPParserService {
         if (result.actions.length > 0) {
             result.understood = true;
             const actionLabel = actionType === 'ADD_TO_PAYROLL' ? 'إضافة مكافأة' : (actionType === 'DEDUCT_FROM_PAYROLL' ? 'خصم مالي' : 'إجراء');
-            result.explanation = `${actionLabel} بقيمة ${actionValueObj?.value || ''} ر.س عند تحقق شرط ${conditionField || 'عام'}`;
+            const fieldLabelAr = Object.keys(this.FIELDS_MAP).find(k => this.FIELDS_MAP[k] === conditionField) || 'الشرط';
+            result.explanation = `${actionLabel} بقيمة ${actionValueObj?.value || ''} ر.س عند تحقق ${fieldLabelAr} بقيمة ${conditionValueObj?.value || ''}`;
         }
 
         return result;
     }
 
-    private extractNumbersWithContext(text: string): { value: number, context: 'condition' | 'action' | 'none' }[] {
+    private extractNumbersWithContext(text: string): { value: number, context: 'condition' | 'action' | 'none', surrounding: string }[] {
         const words = text.split(/[\s,]+/);
-        const result: { value: number, context: 'condition' | 'action' | 'none' }[] = [];
+        const result: { value: number, context: 'condition' | 'action' | 'none', surrounding: string }[] = [];
 
         for (let i = 0; i < words.length; i++) {
-            // تنظيف الكلمة من الحروف اللاصقة مثل "بـ5" أو "5دقائق"
             const numMatch = words[i].match(/\d+/);
             if (numMatch) {
                 const num = parseInt(numMatch[0]);
                 let context: 'condition' | 'action' | 'none' = 'none';
 
-                // فحص الكلمات المحيطة في نطاق 3 كلمات
-                const start = Math.max(0, i - 1);
-                const end = Math.min(words.length, i + 2);
+                // فحص الكلمات المحيطة بدقة أكبر (قبلها بـ 4 وبعدها بـ 2)
+                const start = Math.max(0, i - 4);
+                const end = Math.min(words.length, i + 3);
                 const surrounding = words.slice(start, end).join(' ');
 
-                if (surrounding.includes('دقيق') || surrounding.includes('يوم') || surrounding.includes('ساع') || surrounding.includes('سنة') || surrounding.includes('دوام')) {
+                if (surrounding.includes('دقيق') || surrounding.includes('يوم') || surrounding.includes('ساع') || surrounding.includes('سنة') || surrounding.includes('دوام') || surrounding.includes('بدرى') || surrounding.includes('قبل')) {
                     context = 'condition';
-                } else if (surrounding.includes('ريال') || surrounding.includes('جنيه') || surrounding.includes('حافز') || surrounding.includes('مكافأ') || surrounding.includes('بونص') || surrounding.includes('خصم') || surrounding.includes('ضيف')) {
+                } else if (surrounding.includes('ريال') || surrounding.includes('جنيه') || surrounding.includes('حافز') || surrounding.includes('مكافأ') || surrounding.includes('بونص') || surrounding.includes('خصم') || surrounding.includes('ضيف') || surrounding.includes('راتب')) {
                     context = 'action';
                 }
 
-                result.push({ value: num, context });
+                result.push({ value: num, context, surrounding });
             }
         }
         return result;
     }
 
-    private detectField(text: string): string | null {
+    private detectFieldInSnippet(snippet: string): string | null {
+        // ترتيب البحث مهم: الأكثر تحديداً أولاً
+        const specificKeywords = [
+            'بدرى', 'بدريه', 'مبكر', 'قبل دوامه', 'قبل الوقت', 'قبل الميعاد', 'تأخير', 'تاخير', 'غياب'
+        ];
+
+        for (const kw of specificKeywords) {
+            if (snippet.includes(kw)) return this.FIELDS_MAP[kw];
+        }
+
         for (const [key, value] of Object.entries(this.FIELDS_MAP)) {
-            if (text.includes(key)) return value;
+            if (snippet.includes(key)) return value;
+        }
+        return null;
+    }
+
+    private detectField(text: string, excludeKeywords: string[] = []): string | null {
+        let filteredText = text;
+        for (const kw of excludeKeywords) {
+            filteredText = filteredText.replace(kw, '');
+        }
+
+        for (const [key, value] of Object.entries(this.FIELDS_MAP)) {
+            if (filteredText.includes(key)) return value;
         }
         return null;
     }
