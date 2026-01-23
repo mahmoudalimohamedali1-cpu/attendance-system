@@ -71,8 +71,11 @@ export class SmartPoliciesService {
         this.logger.log('Trying custom NLP parser...');
         try {
             const nlpResult = this.nlpParser.parse(safeText);
-            if (nlpResult && nlpResult.understood) {
-                this.logger.log('NLP parsing successful');
+
+            // IF NLP understands the whole thing OR even just part of it (has actions), 
+            // we prefer it over random template matching.
+            if (nlpResult && (nlpResult.understood || nlpResult.actions.length > 0)) {
+                this.logger.log(`NLP parsing successful (Understood: ${nlpResult.understood})`);
                 return nlpResult;
             }
         } catch (nlpError) {
@@ -166,25 +169,42 @@ export class SmartPoliciesService {
         return mapping[op] || op;
     }
 
-    /**
-     * مطابقة النص مع القوالب المتاحة
-     */
     private matchTextToTemplate(text: string): any | null {
         const templates = this.templateRegistry.getTemplates();
         const lowerText = text.toLowerCase();
 
-        for (const template of templates) {
-            // Check tags
-            for (const tag of template.tags) {
-                if (lowerText.includes(tag.toLowerCase())) {
-                    return template;
+        const scoredTemplates = templates.map(template => {
+            let score = 0;
+
+            // 1. Direct name match (Highest priority)
+            if (lowerText.includes(template.nameAr.toLowerCase())) score += 10;
+
+            // 2. Tag matching (Requires at least 2 tags for a weak match if no name)
+            const matchedTags = template.tags.filter(tag => lowerText.includes(tag.toLowerCase()));
+            score += matchedTags.length * 2;
+
+            // 3. Negative keywords (if text contains keywords that contradict this template)
+            // e.g., if it's an attendance template but text has 'عهدة' or 'راتب' and template doesn't, reduce score
+            const logicBlockers = ['عهدة', 'عهده', 'انذار', 'إنذار', 'سلفه', 'قرض'];
+            for (const blocker of logicBlockers) {
+                if (lowerText.includes(blocker) && !template.tags.includes(blocker)) {
+                    score -= 5;
                 }
             }
-            // Check name
-            if (lowerText.includes(template.nameAr) || lowerText.includes(template.nameEn.toLowerCase())) {
-                return template;
-            }
+
+            return { template, score };
+        });
+
+        // Filter and sort
+        const validMatches = scoredTemplates
+            .filter(st => st.score >= 4) // Must have at least name match or 2 tags
+            .sort((a, b) => b.score - a.score);
+
+        if (validMatches.length > 0) {
+            this.logger.debug(`Matched template ${validMatches[0].template.id} with score ${validMatches[0].score}`);
+            return validMatches[0].template;
         }
+
         return null;
     }
 
