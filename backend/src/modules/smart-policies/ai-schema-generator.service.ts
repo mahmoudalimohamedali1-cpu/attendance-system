@@ -471,4 +471,159 @@ ${fieldLines}
             message: 'لم يتم إضافة أي models جديدة'
         };
     }
+
+    /**
+     * 🎯 تحليل جاهزية السياسة - هل يمكن تنفيذها بالحقول الحالية؟
+     */
+    async analyzeFeasibility(parsedRule: any, companyId: string): Promise<{
+        isExecutable: boolean;
+        availableFields: Array<{ field: string; source: string; dataType: string; exists: boolean; hasData: boolean }>;
+        missingFields: Array<{ field: string; reason: string; suggestion: string; priority: 'HIGH' | 'MEDIUM' | 'LOW' }>;
+        summary: { totalConditions: number; satisfiedConditions: number; missingConditions: number; executionReadiness: 'READY' | 'PARTIAL' | 'NOT_READY'; confidenceScore: number };
+        recommendations: string[];
+        warnings: string[];
+    }> {
+        this.logger.log('Analyzing policy feasibility...');
+
+        const availableFields: Array<{ field: string; source: string; dataType: string; exists: boolean; hasData: boolean }> = [];
+        const missingFields: Array<{ field: string; reason: string; suggestion: string; priority: 'HIGH' | 'MEDIUM' | 'LOW' }> = [];
+        const warnings: string[] = [];
+        const recommendations: string[] = [];
+
+        // خريطة الحقول المدعومة
+        const supportedFields: Record<string, { model: string; field: string }> = {
+            'employee.tenure.months': { model: 'User', field: 'createdAt' },
+            'employee.tenure.years': { model: 'User', field: 'createdAt' },
+            'attendance.currentPeriod.presentDays': { model: 'Attendance', field: 'status' },
+            'attendance.currentPeriod.absentDays': { model: 'Attendance', field: 'status' },
+            'attendance.currentPeriod.lateDays': { model: 'Attendance', field: 'lateMinutes' },
+            'attendance.currentPeriod.lateMinutes': { model: 'Attendance', field: 'lateMinutes' },
+            'custody.active': { model: 'CustodyAssignment', field: 'status' },
+            'custody.damagedCount': { model: 'CustodyReturn', field: 'conditionOnReturn' },
+            'custody.totalDamagedValue': { model: 'CustodyReturn', field: 'replacementValue' },
+            'leaves.currentMonth.sickDays': { model: 'LeaveRequest', field: 'leaveType' },
+            'leaves.currentMonth.annualDays': { model: 'LeaveRequest', field: 'leaveType' },
+            'contract.basicSalary': { model: 'Contract', field: 'basicSalary' },
+            'contract.totalSalary': { model: 'Contract', field: 'totalSalary' },
+            'disciplinary.activeWarnings': { model: 'DisciplinaryCase', field: 'status' },
+        };
+
+        // قراءة الـ Schema
+        let schemaContent = '';
+        try {
+            schemaContent = fs.readFileSync(this.schemaPath, 'utf-8');
+        } catch (e) {
+            this.logger.warn('Could not read schema for feasibility check');
+        }
+
+        // تحليل الشروط
+        const conditions = parsedRule?.conditions || [];
+        for (const condition of conditions) {
+            const fieldPath = condition.field;
+            const mapping = supportedFields[fieldPath];
+
+            if (mapping) {
+                // تحقق من وجود الحقل في الـ Schema
+                const modelExists = schemaContent.includes(`model ${mapping.model} {`);
+                const fieldExists = modelExists && schemaContent.includes(mapping.field);
+
+                if (modelExists && fieldExists) {
+                    availableFields.push({
+                        field: fieldPath,
+                        source: `${mapping.model}.${mapping.field}`,
+                        dataType: 'computed',
+                        exists: true,
+                        hasData: true,
+                    });
+                } else {
+                    missingFields.push({
+                        field: fieldPath,
+                        reason: modelExists ? `الحقل ${mapping.field} غير موجود في ${mapping.model}` : `الجدول ${mapping.model} غير موجود`,
+                        suggestion: `أضف الحقل المطلوب في جدول ${mapping.model}`,
+                        priority: 'HIGH',
+                    });
+                }
+            } else {
+                // حقل غير معروف - نفترض أنه موجود للسياسات البسيطة
+                availableFields.push({
+                    field: fieldPath,
+                    source: 'dynamic',
+                    dataType: 'unknown',
+                    exists: true,
+                    hasData: true,
+                });
+            }
+        }
+
+        // تحليل الـ dynamicQuery
+        if (parsedRule?.dynamicQuery) {
+            const table = parsedRule.dynamicQuery.table;
+            const tableExists = schemaContent.includes(`model ${table} {`) ||
+                schemaContent.includes(`@@map("${table}")`);
+
+            if (tableExists) {
+                availableFields.push({
+                    field: `${table}.*`,
+                    source: table,
+                    dataType: 'table',
+                    exists: true,
+                    hasData: true,
+                });
+            } else {
+                missingFields.push({
+                    field: table,
+                    reason: `الجدول ${table} غير موجود في قاعدة البيانات`,
+                    suggestion: `أنشئ جدول ${table} في الـ Prisma Schema`,
+                    priority: 'HIGH',
+                });
+            }
+        }
+
+        // حساب الملخص
+        const totalConditions = conditions.length + (parsedRule?.dynamicQuery ? 1 : 0);
+        const satisfiedConditions = availableFields.length;
+        const missingConditions = missingFields.length;
+
+        let executionReadiness: 'READY' | 'PARTIAL' | 'NOT_READY' = 'NOT_READY';
+        let confidenceScore = 0;
+
+        if (missingConditions === 0) {
+            executionReadiness = 'READY';
+            confidenceScore = 100;
+        } else if (satisfiedConditions > 0 && missingConditions > 0) {
+            executionReadiness = 'PARTIAL';
+            confidenceScore = Math.round((satisfiedConditions / (totalConditions || 1)) * 100);
+        } else if (totalConditions === 0) {
+            executionReadiness = 'READY';
+            confidenceScore = 90;
+            warnings.push('⚠️ هذه السياسة ليس لها شروط وستنطبق على جميع الموظفين');
+        }
+
+        // إنشاء التوصيات
+        if (missingFields.length > 0) {
+            recommendations.push(`🔧 يجب إضافة ${missingFields.length} حقول ناقصة قبل تفعيل السياسة`);
+        }
+
+        if (parsedRule?.clarificationNeeded) {
+            warnings.push(`⚠️ السياسة تحتاج توضيح: ${parsedRule.clarificationNeeded}`);
+        }
+
+        this.logger.log(`Feasibility: ${executionReadiness} (${confidenceScore}%)`);
+
+        return {
+            isExecutable: executionReadiness === 'READY',
+            availableFields,
+            missingFields,
+            summary: {
+                totalConditions,
+                satisfiedConditions,
+                missingConditions,
+                executionReadiness,
+                confidenceScore,
+            },
+            recommendations,
+            warnings,
+        };
+    }
 }
+

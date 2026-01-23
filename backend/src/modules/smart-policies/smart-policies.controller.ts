@@ -255,13 +255,30 @@ export class SmartPoliciesController {
     }
 
     /**
-     * تحليل نص السياسة بالذكاء الاصطناعي (معاينة فقط)
+     * تحليل نص السياسة بالذكاء الاصطناعي (معاينة فقط مع فحص الجاهزية)
      */
     @Post('analyze')
-    @ApiOperation({ summary: 'تحليل نص السياسة بالذكاء الاصطناعي - معاينة فقط' })
-    async analyze(@Body() body: { text: string }) {
+    @ApiOperation({ summary: 'تحليل نص السياسة بالذكاء الاصطناعي - معاينة فقط مع فحص الجاهزية' })
+    async analyze(@Body() body: { text: string }, @CurrentUser() user: any) {
         const parsedRule = await this.service.analyzePolicy(body.text);
-        return { success: true, parsedRule };
+
+        // فحص الجاهزية تلقائياً
+        let feasibility = null;
+        try {
+            const { PolicyFeasibilityService } = await import('../ai/services/policy-feasibility.service');
+            const feasibilityService = new PolicyFeasibilityService(
+                (this as any).prisma || require('../../common/prisma/prisma.service').PrismaService,
+                (await import('../ai/services/schema-introspector.service')).SchemaIntrospectorService.prototype
+            );
+            // لو فيه شروط، نحلل الجاهزية
+            if (parsedRule.conditions?.length > 0 || parsedRule.dynamicQuery) {
+                feasibility = await this.schemaGenerator.analyzeFeasibility(parsedRule, user.companyId);
+            }
+        } catch (error) {
+            console.log('Feasibility check skipped:', error.message);
+        }
+
+        return { success: true, parsedRule, feasibility };
     }
 
     /**
