@@ -158,10 +158,13 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
 - leaves.balance.annual - رصيد الإجازات السنوية
 - leaves.balance.sick - رصيد الإجازات المرضية
 
-### بيانات العهد والسلف
+### بيانات العهد والسلف والعهد التالفة
 - custody.active - عدد العهد النشطة
 - custody.lateReturns - عدد مرات التأخير في إرجاع العهد
 - custody.avgReturnDelay - متوسط التأخير بالأيام
+- custody.damagedCount - عدد العهد التالفة
+- custody.totalDamagedValue - إجمالي قيمة التلفيات
+- custody.lastItemName - اسم آخر عهدة
 - advances.active - عدد السلف النشطة
 - advances.hasActiveAdvance - يوجد سلفة نشطة؟ (true/false)
 - advances.remainingAmount - المبلغ المتبقي من السلف
@@ -386,7 +389,7 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
 \`\`\`json
 {
   "understood": true,
-  "trigger": { "event": "CUSTODY", "subEvent": "RETURN_LATE" },
+  "trigger": { "event": "CUSTODY" },
   "conditions": [
     { "field": "custody.avgReturnDelay", "operator": "GREATER_THAN", "value": 3 }
   ],
@@ -402,7 +405,34 @@ const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم �
 }
 \`\`\`
 
-**مثال 8**: "الموظفين اللي عندهم إنذارين أو أكتر يتخصم منهم 10% من الراتب"
+**مثال 13**: "الموظف اللي أتلف عهدته يخصم قيمتها من راتبه"
+\`\`\`json
+{
+  "understood": true,
+  "trigger": { "event": "CUSTODY" },
+  "conditions": [],
+  "actions": [{
+    "type": "DEDUCT_FROM_PAYROLL",
+    "valueType": "FORMULA",
+    "value": "dynamicQuery.replacementValue",
+    "description": "خصم قيمة العهدة التالفة"
+  }],
+  "scope": { "type": "ALL_EMPLOYEES" },
+  "explanation": "خصم القيمة المالية للعهدة التالفة من راتب الموظف",
+  "dynamicQuery": {
+    "type": "AGGREGATE",
+    "table": "Custody",
+    "where": [
+      { "field": "status", "operator": "=", "value": "DAMAGED" }
+    ],
+    "operation": "SUM",
+    "targetField": "replacementValue",
+    "description": "الحصول على إجمالي قيمة التعويض للعهدة التالفة"
+  }
+}
+\`\`\``
+
+  ** مثال 8 **: "الموظفين اللي عندهم إنذارين أو أكتر يتخصم منهم 10% من الراتب"
 \`\`\`json
 {
   "understood": true,

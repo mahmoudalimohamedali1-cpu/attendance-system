@@ -40,14 +40,14 @@ export class BonusService {
   constructor(
     private prisma: PrismaService,
     private formulaEngine: FormulaEngineService,
-  ) {}
+  ) { }
 
   /**
    * إنشاء برنامج مكافآت جديد
    */
   async createBonusProgram(dto: any, companyId: string): Promise<any> {
     const code = dto.code?.startsWith('BONUS_') ? dto.code : `BONUS_${dto.code || 'DEFAULT'}`;
-    
+
     const existing = await this.prisma.salaryComponent.findFirst({
       where: { code, companyId },
     });
@@ -136,7 +136,43 @@ export class BonusService {
     }
 
     const metadata = this.parseMetadata(program.description);
-    const baseSalary = employee.salaryAssignments[0]?.baseSalary?.toNumber() || 0;
+    const salaryAssignment = employee.salaryAssignments[0];
+
+    if (!salaryAssignment) {
+      throw new BadRequestException('لم يتم ضبط راتب لهذا الموظف');
+    }
+
+    const baseSalary = salaryAssignment.baseSalary?.toNumber() || 0;
+
+    // حساب إجمالي الراتب إذا كانت الطريقة تتطلب ذلك
+    let grossSalary = baseSalary;
+    if (metadata.calculationMethod === 'PERCENTAGE_OF_GROSS' || metadata.calculationMethod === 'FORMULA') {
+      const assignment = await this.prisma.employeeSalaryAssignment.findFirst({
+        where: { employeeId: employee.id, isActive: true },
+        include: {
+          structure: {
+            include: {
+              lines: {
+                include: {
+                  component: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (assignment) {
+        const totalAllowances = assignment.structure.lines
+          .filter(line => line.component.type === 'EARNING')
+          .reduce((sum, line) => sum + (line.amount?.toNumber() || 0), 0);
+
+        // إذا كان المكون 'BASIC' موجوداً في الخطوط، نستخدم مجموع الخطوط فقط
+        // وإلا نستخدم baseSalary + البدلات
+        const hasBasicComponent = assignment.structure.lines.some(l => l.component.code === 'BASIC');
+        grossSalary = hasBasicComponent ? totalAllowances : (baseSalary + totalAllowances);
+      }
+    }
 
     let calculatedAmount = 0;
 
@@ -147,8 +183,21 @@ export class BonusService {
       case 'PERCENTAGE_OF_BASIC':
         calculatedAmount = baseSalary * (metadata.percentage || 0) / 100;
         break;
+      case 'PERCENTAGE_OF_GROSS':
+        calculatedAmount = grossSalary * (metadata.percentage || 0) / 100;
+        break;
       case 'SALARY_MULTIPLIER':
         calculatedAmount = baseSalary * (metadata.multiplier || 1);
+        break;
+      case 'FORMULA':
+        if (program.formula) {
+          const context = this.formulaEngine.buildVariableContext({
+            basicSalary: baseSalary,
+            grossSalary: grossSalary,
+          });
+          const result = this.formulaEngine.evaluate(program.formula, context);
+          calculatedAmount = result.value;
+        }
         break;
     }
 
@@ -162,6 +211,7 @@ export class BonusService {
       programId,
       programName: program.nameAr,
       baseSalary,
+      grossSalary,
       calculatedAmount,
       calculationMethod: metadata.calculationMethod,
       status: metadata.requiresApproval ? 'PENDING' : 'APPROVED',
@@ -215,7 +265,7 @@ export class BonusService {
    */
   async createEmployeeBonus(dto: any, companyId: string, createdById: string): Promise<any> {
     const now = new Date();
-    
+
     return this.prisma.retroPay.create({
       data: {
         companyId,
