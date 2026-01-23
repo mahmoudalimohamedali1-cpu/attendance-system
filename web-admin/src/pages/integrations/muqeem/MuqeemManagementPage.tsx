@@ -11,12 +11,20 @@ import {
 } from '@mui/icons-material';
 import { muqeemApi, MuqeemTransactionType, MuqeemTransaction } from '../../../services/muqeem.service';
 
+interface MuqeemConfig {
+    username: string;
+    isActive: boolean;
+    iqamaExpiryDays: number;
+    passportExpiryDays: number;
+    enableNotifications: boolean;
+}
+
 const MuqeemManagementPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState(0);
     const [loading, setLoading] = useState(true);
     const [executing, setExecuting] = useState(false);
     const [transactions, setTransactions] = useState<MuqeemTransaction[]>([]);
-    const [config, setConfig] = useState<any>(null);
+    const [config, setConfig] = useState<MuqeemConfig | null>(null);
     const [showConfigAlert, setShowConfigAlert] = useState(false);
 
     useEffect(() => {
@@ -31,8 +39,9 @@ const MuqeemManagementPage: React.FC = () => {
                 muqeemApi.getConfig().catch(() => null),
             ]);
             setTransactions(txData.items);
-            setConfig(configData);
-            if (!configData || !configData.isActive) {
+            const data = configData as MuqeemConfig;
+            setConfig(data);
+            if (!data || !data.isActive) {
                 setShowConfigAlert(true);
             }
         } catch (error) {

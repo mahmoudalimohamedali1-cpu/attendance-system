@@ -177,7 +177,6 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
     SocialFeedModule,         // 📢 جدار الشركة الاجتماعي (إعلانات، أخبار، ترويج)
     CalendarEventsModule,     // 📅 أحداث التقويم (عطل، فعاليات، تواريخ مهمة)
     EmployeeDebtModule,       // 💰 دفتر ديون الموظفين
-    // EmployeeDebtModule,       // 💰 دفتر ديون الموظفين - DISABLED: Prisma schema desync
     SecurityModule,           // 🔒 أمان المعادلات
     PayrollAdjustmentsModule, // ⚙️ تسويات الرواتب
   ],

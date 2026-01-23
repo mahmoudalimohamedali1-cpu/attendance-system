@@ -98,7 +98,9 @@ const PayrollAuditPage = lazy(() => import('./pages/enterprise-payroll/PayrollAu
 const PayrollSimulationPage = lazy(() => import('./pages/enterprise-payroll/PayrollSimulationPage'));
 const EmployeeDebtPage = lazy(() => import('./pages/employee-debt/EmployeeDebtPage'));
 const CustodyAuditPage = lazy(() => import('./pages/custody-audit/CustodyAuditPage'));
-const AiPredictivePage = lazy(() => import('./pages/ai-predictive/AiPredictivePage'));
+const MuqeemManagementPage = lazy(() => import('./pages/integrations/muqeem/MuqeemManagementPage'));
+const MuqeemSettingsPage = lazy(() => import('./pages/settings/MuqeemSettingsPage'));
+const AiPredictivePage = lazy(() => import('./pages/ai-predictive/AiPredictivePage').then(m => ({ default: m.AiPredictivePage })));
 const SocialFeedPage = lazy(() => import('./pages/social-feed/SocialFeedPage'));
 
 // Loading component for Suspense
@@ -541,6 +543,16 @@ function App() {
             </Suspense>
           } />
           {/* Social Feed Routes */}
+          <Route path="muqeem" element={
+            <Suspense fallback={<PageLoader />}>
+              <MuqeemManagementPage />
+            </Suspense>
+          } />
+          <Route path="settings/muqeem" element={
+            <Suspense fallback={<PageLoader />}>
+              <MuqeemSettingsPage />
+            </Suspense>
+          } />
           <Route path="social-feed" element={
             <Suspense fallback={<PageLoader />}>
               <SocialFeedPage />

@@ -1,0 +1,1 @@
+ssh -i C:\Users\Administrator\.ssh\id_rsa_vps -o StrictHostKeyChecking=no root@72.61.239.170 "ls -d /root/attendance-system/backend/prisma/migrations/20260123011425_add_missing_employee_documents || echo 'NOT_FOUND'"
