@@ -366,8 +366,16 @@ export class PayrollAdjustmentsService {
      * 📋 جلب جميع التسويات المعلقة للشركة
      */
     async findPendingByCompany(companyId: string) {
+        // جلب كل التسويات الحديثة (آخر 30 يوم) - مش بس الـ PENDING
+        // عشان نعرض الـ auto-approved كمان
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         return (this.prisma.payrollAdjustment as any).findMany({
-            where: { companyId, status: 'PENDING' },
+            where: {
+                companyId,
+                createdAt: { gte: thirtyDaysAgo },
+            },
             include: {
                 employee: { select: { firstName: true, lastName: true, employeeCode: true } },
                 payrollRun: {
@@ -377,6 +385,7 @@ export class PayrollAdjustmentsService {
                 },
             },
             orderBy: { createdAt: 'desc' },
+            take: 50, // آخر 50 تسوية
         });
     }
 
