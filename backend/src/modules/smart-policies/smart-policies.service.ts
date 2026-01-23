@@ -7,6 +7,8 @@ import { SmartPolicyTrigger, SmartPolicyStatus } from '@prisma/client';
 // === AI-Free Rule Engine (Phase V2) ===
 import { PolicyTemplateRegistryService } from './templates/policy-template.registry';
 import { PELParserService } from './engines/pel-parser.service';
+import { NLPParserService } from './engines/nlp-parser.service';
+
 
 /**
  * DTO لإنشاء سياسة ذكية
@@ -43,7 +45,9 @@ export class SmartPoliciesService {
         // === AI-Free Rule Engine (Phase V2) ===
         private readonly templateRegistry: PolicyTemplateRegistryService,
         private readonly pelParser: PELParserService,
+        private readonly nlpParser: NLPParserService,
     ) { }
+
 
     /**
      * تحليل نص السياسة (مع fallback للـ PEL والـ Templates لو الـ AI مش متاح)
@@ -63,7 +67,20 @@ export class SmartPoliciesService {
             this.logger.warn(`AI parser unavailable: ${(aiError as Error).message}`);
         }
 
-        // 2️⃣ Fallback to PEL Parser (for structured expressions)
+        // 2️⃣ New NLP Parser (Smart Arabic Understanding without AI)
+        this.logger.log('Trying custom NLP parser...');
+        try {
+            const nlpResult = this.nlpParser.parse(safeText);
+            if (nlpResult && nlpResult.understood) {
+                this.logger.log('NLP parsing successful');
+                return nlpResult;
+            }
+        } catch (nlpError) {
+            this.logger.warn(`NLP parser failed: ${(nlpError as Error).message}`);
+        }
+
+        // 3️⃣ Fallback to PEL Parser (for structured expressions)
+
         this.logger.log('Trying PEL parser fallback...');
         try {
             const pelResult = this.pelParser.parse(safeText);
@@ -92,7 +109,7 @@ export class SmartPoliciesService {
             this.logger.debug(`PEL parser failed: ${(pelError as Error).message}`);
         }
 
-        // 3️⃣ Fallback to Template matching (keyword-based)
+        // 4️⃣ Fallback to Template matching (keyword-based)
         this.logger.log('Trying template matching fallback...');
         const matchedTemplate = this.matchTextToTemplate(safeText);
         if (matchedTemplate) {
@@ -109,7 +126,8 @@ export class SmartPoliciesService {
             };
         }
 
-        // 4️⃣ Return default template based on keywords
+        // 5️⃣ Return default template based on keywords
+
         this.logger.log('Using default template based on keywords...');
         const category = this.detectCategoryFromText(safeText);
         const defaultRule = this.templateRegistry.getDefaultTemplate(category);

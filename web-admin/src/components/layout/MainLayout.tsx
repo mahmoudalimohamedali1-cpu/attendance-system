@@ -161,6 +161,8 @@ const complianceGroup: MenuGroup = {
     { text: 'تكامل قوى', icon: <Business />, path: '/qiwa' },
     { text: '🇸🇦 السعودة ونطاقات', icon: <Business />, path: '/saudization' },
     { text: 'عقود قوى', icon: <Description />, path: '/contracts' },
+    { text: '🇸🇦 منصة مقيم', icon: <LinkIcon />, path: '/integrations/muqeem' },
+    { text: 'إعدادات مقيم', icon: <Settings />, path: '/settings/muqeem' },
     { text: 'سجل الإرسالات', icon: <Security />, path: '/audit/submissions' },
   ],
 };
