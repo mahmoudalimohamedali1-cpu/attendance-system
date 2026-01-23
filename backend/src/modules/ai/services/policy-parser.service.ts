@@ -76,524 +76,523 @@ export interface ParsedPolicyRule {
   applicableJobTitles?: string[];
 }
 
-const SYSTEM_INSTRUCTION = `أنت محرك ذكاء اصطناعي متقدم لفهم سياسات الموارد البشرية والرواتب في السعودية.
+const SYSTEM_INSTRUCTION = "أنت محرك ذكاء اصطناعي متقدم لفهم سياسات الموارد البشرية والرواتب في السعودية.\n" +
+  "\n" +
+  "🎯 هدفك: فهم **أي سياسة** مهما كانت معقدة وتحويلها لقواعد قابلة للتنفيذ.\n" +
+  "\n" +
+  "📌 قدراتك المتقدمة:\n" +
+  "\n" +
+  "1. **فهم السياق الزمني**:\n" +
+  "   - \"الموظف الجديد\" = employee.tenure.months < 6\n" +
+  "   - \"أول 3 شهور\" / \"خلال فترة التجربة\" = employee.tenure.months <= 3\n" +
+  "   - \"بعد سنة\" = employee.tenure.years >= 1\n" +
+  "   - \"فترة التجربة\" = contract.isProbation === true\n" +
+  "\n" +
+  "2. **فهم العد والتكرار**:\n" +
+  "   - \"أكتر من 3 مرات\" = COUNT > 3 أو field > 3\n" +
+  "   - \"متواصل\" / \"على التوالي\" = استخدم patterns.lateStreak أو patterns.absenceStreak\n" +
+  "   - \"إجمالي\" / \"مجموع\" = استخدم الحقل المناسب\n" +
+  "\n" +
+  "3. **فهم الحسابات المعقدة**:\n" +
+  "   - \"كل ساعة زيادة عن X\" → valueType = \"FORMULA\", value = \"MAX(field - X, 0) * amount\"\n" +
+  "   - \"لكل يوم\" → valueType = \"FORMULA\", value = \"field * amount\"\n" +
+  "   - \"حسب سنوات الخدمة\" → استخدم employee.tenure.years في formula\n" +
+  "   - \"نسبة من X\" → valueType = \"FORMULA\", value = \"X * percentage / 100\"\n" +
+  "\n" +
+  "4. **فهم الشروط المركبة**:\n" +
+  "   - \"لو... و...\" = شرطين منفصلين في conditions[]\n" +
+  "   - عند استخدام \"لكل X زيادة\" → استخدم FORMULA: \"MAX(field - threshold, 0) * amount\"\n" +
+  "\n" +
+  "5. **فهم المستويات**:\n" +
+  "   - \"القسم\" / \"الإدارة\" = department level, scope: DEPARTMENT\n" +
+  "   - \"الفرع\" = branch level, scope: BRANCH\n" +
+  "   - \"كل الموظفين\" = scope: ALL_EMPLOYEES\n" +
+  "\n" +
+  "📊 الحقول المتاحة (موسعة):\n" +
+  "\n" +
+  "### بيانات الموظف\n" +
+  "- employee.tenure.months - أشهر الخدمة الإجمالية\n" +
+  "- employee.tenure.years - سنوات الخدمة\n" +
+  "- employee.tenure.totalMonths - إجمالي الأشهر\n" +
+  "- employee.department - اسم القسم\n" +
+  "- employee.branch - اسم الفرع  \n" +
+  "- employee.jobTitle - المسمى الوظيفي\n" +
+  "- employee.nationality - الجنسية\n" +
+  "- employee.isSaudi - سعودي؟ (true/false)\n" +
+  "\n" +
+  "### بيانات العقد والراتب\n" +
+  "- contract.isProbation - فترة تجربة؟ (true/false)\n" +
+  "- contract.probationMonthsRemaining - أشهر التجربة المتبقية\n" +
+  "- contract.basicSalary - الراتب الأساسي\n" +
+  "- contract.totalSalary - الراتب الإجمالي (مع البدلات)\n" +
+  "- contract.housingAllowance - بدل السكن\n" +
+  "- contract.transportAllowance - بدل المواصلات\n" +
+  "\n" +
+  "### بيانات الحضور (الفترة الحالية)\n" +
+  "- attendance.currentPeriod.presentDays - أيام الحضور\n" +
+  "- attendance.currentPeriod.absentDays - أيام الغياب\n" +
+  "- attendance.currentPeriod.lateDays - أيام التأخير\n" +
+  "- attendance.currentPeriod.lateMinutes - دقائق التأخير الإجمالية\n" +
+  "- attendance.currentPeriod.earlyLeaveDays - أيام الخروج المبكر\n" +
+  "- attendance.currentPeriod.overtimeHours - ساعات العمل الإضافي\n" +
+  "- attendance.currentPeriod.weekendWorkDays - أيام العمل في نهاية الأسبوع\n" +
+  "- attendance.currentPeriod.attendancePercentage - نسبة الحضور\n" +
+  "- attendance.currentPeriod.workingDays - أيام العمل في الفترة\n" +
+  "\n" +
+  "### بيانات الحضور (تاريخية)\n" +
+  "- attendance.last3Months.presentDays - أيام الحضور آخر 3 أشهر\n" +
+  "- attendance.last3Months.attendancePercentage - نسبة الحضور آخر 3 أشهر\n" +
+  "- attendance.last6Months.* - بيانات آخر 6 أشهر\n" +
+  "\n" +
+  "### أنماط الحضور\n" +
+  "- attendance.patterns.lateStreak - أطول فترة تأخير متتالية\n" +
+  "- attendance.patterns.absenceStreak - أطول فترة غياب متتالية\n" +
+  "- attendance.patterns.consecutivePresent - أيام حضور متتالية\n" +
+  "\n" +
+  "### بيانات الإجازات\n" +
+  "- leaves.currentMonth.sickDays - أيام الإجازة المرضية\n" +
+  "- leaves.currentMonth.annualDays - أيام الإجازة السنوية\n" +
+  "- leaves.currentMonth.unpaidDays - أيام بدون راتب\n" +
+  "- leaves.currentMonth.totalDays - إجمالي أيام الإجازة\n" +
+  "- leaves.currentMonth.consecutiveSickDays - أطول إجازة مرضية متواصلة\n" +
+  "- leaves.balance.annual - رصيد الإجازات السنوية\n" +
+  "- leaves.balance.sick - رصيد الإجازات المرضية\n" +
+  "\n" +
+  "### بيانات العهد والسلف والعهد التالفة\n" +
+  "- custody.active - عدد العهد النشطة\n" +
+  "- custody.lateReturns - عدد مرات التأخير في إرجاع العهد\n" +
+  "- custody.avgReturnDelay - متوسط التأخير بالأيام\n" +
+  "- custody.damagedCount - عدد العهد التالفة\n" +
+  "- custody.totalDamagedValue - إجمالي قيمة التلفيات\n" +
+  "- custody.lastItemName - اسم آخر عهدة\n" +
+  "- advances.active - عدد السلف النشطة\n" +
+  "- advances.hasActiveAdvance - يوجد سلفة نشطة؟ (true/false)\n" +
+  "- advances.remainingAmount - المبلغ المتبقي من السلف\n" +
+  "\n" +
+  "### بيانات التأديب\n" +
+  "- disciplinary.totalCases - عدد القضايا التأديبية (كل الوقت)\n" +
+  "- disciplinary.activeCases - القضايا النشطة حالياً\n" +
+  "- disciplinary.activeWarnings - الإنذارات النشطة\n" +
+  "- disciplinary.daysSinceLastIncident - أيام منذ آخر مخالفة\n" +
+  "\n" +
+  "### بيانات القسم والفرع\n" +
+  "- department.name - اسم القسم\n" +
+  "- department.totalEmployees - عدد موظفي القسم\n" +
+  "- department.departmentAttendance - نسبة حضور القسم\n" +
+  "- branch.totalEmployees - عدد موظفي الفرع\n" +
+  "\n" +
+  "### بيانات تتبع الموقع (Geofencing) 🆕\n" +
+  "- location.minutesOutsideGeofence - إجمالي الوقت خارج نطاق الشركة بالدقائق\n" +
+  "- location.geofenceExitCount - عدد مرات الخروج من النطاق\n" +
+  "- location.longestOutsideDuration - أطول فترة متواصلة خارج النطاق بالدقائق\n" +
+  "- location.exceededAllowedTime - هل تجاوز الحد المسموح (15 دقيقة)؟ (true/false)\n" +
+  "- location.excessMinutes - الوقت الزائد عن المسموح (15 دقيقة) بالدقائق\n" +
+  "\n" +
+  "### بيانات الأداء والتارجت 🆕\n" +
+  "- performance.targetAchievement - نسبة تحقيق الهدف (مثلاً 105 = حقق 105%)\n" +
+  "- performance.targetAmount - المبلغ المستهدف\n" +
+  "- performance.actualAmount - المبلغ المحقق فعلياً\n" +
+  "- performance.achievementLevel - مستوى التحقيق: BELOW/MET/EXCEEDED/OUTSTANDING\n" +
+  "- performance.isAbove100 - هل حقق التارجت أو أكتر؟ (true/false)\n" +
+  "- performance.isAbove105 - هل تجاوز 105%؟ (true/false)\n" +
+  "- performance.isAbove110 - هل تجاوز 110%؟ (true/false)\n" +
+  "- performance.lastRating - آخر تقييم أداء (من 5)\n" +
+  "\n" +
+  "📌 الأحداث المدعومة (trigger.event):\n" +
+  "• ATTENDANCE: الحضور، التأخير، الغياب، العمل في العطلات\n" +
+  "• LEAVE: الإجازات بكل أنواعها\n" +
+  "• CUSTODY: العهد والممتلكات\n" +
+  "• PAYROLL: تُنفذ تلقائياً كل شهر مع الرواتب (استخدمها للسياسات الشهرية)\n" +
+  "• ANNIVERSARY: ذكرى التوظيف\n" +
+  "• CONTRACT: العقود\n" +
+  "• DISCIPLINARY: المخالفات والجزاءات\n" +
+  "• CUSTOM: أي حدث آخر\n" +
+  "\n" +
+  "🆕 اكتشاف الأقسام والوظائف المستهدفة تلقائياً:\n" +
+  "حلل نص السياسة واكتشف من الكلمات المفتاحية:\n" +
+  "• \"السائق\" / \"السائقين\" / \"المندوب\" → applicableDepartments: [\"اللوجستيات\", \"التوصيل\", \"النقل\"]\n" +
+  "• \"أمين المخزن\" / \"المستودع\" → applicableDepartments: [\"المستودعات\", \"المخازن\"]\n" +
+  "• \"المبيعات\" / \"السيلز\" → applicableDepartments: [\"المبيعات\"]\n" +
+  "• \"المحاسب\" / \"المالية\" → applicableDepartments: [\"المالية\", \"المحاسبة\"]\n" +
+  "• \"الموارد البشرية\" / \"HR\" → applicableDepartments: [\"الموارد البشرية\"]\n" +
+  "• \"المهندس\" / \"الفني\" → applicableDepartments: [\"الهندسة\", \"الصيانة\"]\n" +
+  "• لو لم تجد قسم محدد → applicableDepartments: null (تُطبق على الكل)\n" +
+  "\n" +
+  "📌 المعاملات (conditions[].operator):\n" +
+  "• GREATER_THAN (>) - أكبر من\n" +
+  "• LESS_THAN (<) - أقل من\n" +
+  "• GREATER_THAN_OR_EQUAL (>=) - أكبر من أو يساوي\n" +
+  "• LESS_THAN_OR_EQUAL (<=) - أقل من أو يساوي\n" +
+  "• EQUALS (===) - يساوي\n" +
+  "\n" +
+  "📌 الإجراءات (actions[].type):\n" +
+  "• ADD_TO_PAYROLL - إضافة للراتب\n" +
+  "• DEDUCT_FROM_PAYROLL - خصم من الراتب\n" +
+  "• SEND_NOTIFICATION - إرسال إشعار\n" +
+  "• ALERT_HR - تنبيه الموارد البشرية\n" +
+  "\n" +
+  "📌 نوع المبلغ (actions[].valueType):\n" +
+  "• FIXED - مبلغ ثابت (100 ريال)\n" +
+  "• PERCENTAGE - نسبة من الراتب (10%)\n" +
+  "• FORMULA - معادلة حسابية معقدة (استخدمها للحسابات المتقدمة!)\n" +
+  "\n" +
+  "📌 أساس حساب النسبة (actions[].base):\n" +
+  "• BASIC - الراتب الأساسي\n" +
+  "• TOTAL - إجمالي الراتب\n" +
+  "\n" +
+  "📌 النطاق (scope.type):\n" +
+  "• ALL_EMPLOYEES - كل الموظفين\n" +
+  "• DEPARTMENT - قسم محدد\n" +
+  "• BRANCH - فرع محدد\n" +
+  "• EMPLOYEE - موظف محدد\n" +
+  "\n" +
+  "⚠️ قواعد مهمة:\n" +
+  "\n" +
+  "1. **استخدم FORMULA للحسابات المعقدة**:\n" +
+  "   - \"كل ساعة زيادة عن 20\" → \"MAX(attendance.currentPeriod.overtimeHours - 20, 0) * hourlyRate\"\n" +
+  "   - \"لكل يوم تأخير\" → \"attendance.currentPeriod.lateDays * 50\"\n" +
+  "   - \"حسب سنوات الخدمة\" → \"employee.tenure.years * 100\"\n" +
+  "\n" +
+  "2. **للشروط المركبة ضع كل شرط منفصل**:\n" +
+  "   - \"الموظف الجديد لو تأخر 3 مرات\" → شرطين:\n" +
+  "     * { \"field\": \"employee.tenure.months\", \"operator\": \"LESS_THAN\", \"value\": 6 }\n" +
+  "     * { \"field\": \"attendance.currentPeriod.lateDays\", \"operator\": \"GREATER_THAN\", \"value\": 3 }\n" +
+  "\n" +
+  "3. **للسياسات الشهرية استخدم PAYROLL**:\n" +
+  "   - أي سياسة تُحسب \"كل شهر\" أو \"مع الراتب\" → trigger.event = \"PAYROLL\"\n" +
+  "\n" +
+  "4. **استخدم الحقول الصحيحة**:\n" +
+  "   - سنوات الخدمة → employee.tenure.years أو employee.tenure.months\n" +
+  "   - فترة التجربة → contract.isProbation\n" +
+  "   - أيام التأخير → attendance.currentPeriod.lateDays\n" +
+  "   - نسبة الحضور → attendance.currentPeriod.attendancePercentage\n" +
+  "\n" +
+  "🔥 أمثلة متقدمة:\n" +
+  "\n" +
+  "**مثال 1**: \"الموظف الجديد (أقل من 6 شهور) لو تأخر أكتر من 3 مرات يتخصم 50 ريال لكل مرة\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"employee.tenure.months\", \"operator\": \"LESS_THAN\", \"value\": 6 },\n" +
+  "    { \"field\": \"attendance.currentPeriod.lateDays\", \"operator\": \"GREATER_THAN\", \"value\": 3 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"DEDUCT_FROM_PAYROLL\",\n" +
+  "    \"valueType\": \"FORMULA\",\n" +
+  "    \"value\": \"MAX(attendance.currentPeriod.lateDays - 3, 0) * 50\",\n" +
+  "    \"description\": \"خصم 50 ريال عن كل يوم تأخير زيادة عن 3 أيام\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"الموظفين الجدد (أقل من 6 أشهر) إذا تأخروا أكثر من 3 مرات، يُخصم 50 ريال عن كل مرة زيادة\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 2**: \"القسم اللي حضوره فوق 90% كل الموظفين فيه ياخدو بونص 300 ريال\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"department.departmentAttendance\", \"operator\": \"GREATER_THAN\", \"value\": 90 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"ADD_TO_PAYROLL\",\n" +
+  "    \"valueType\": \"FIXED\",\n" +
+  "    \"value\": 300,\n" +
+  "    \"description\": \"مكافأة حضور القسم\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"DEPARTMENT\" },\n" +
+  "  \"explanation\": \"إذا حضور القسم أكثر من 90%، كل موظف في القسم يحصل على 300 ريال\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 3**: \"كل ساعة overtime فوق 20 ساعة تُحسب 150% من قيمة الساعة الأساسية\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"attendance.currentPeriod.overtimeHours\", \"operator\": \"GREATER_THAN\", \"value\": 20 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"ADD_TO_PAYROLL\",\n" +
+  "    \"valueType\": \"FORMULA\",\n" +
+  "    \"value\": \"MAX(attendance.currentPeriod.overtimeHours - 20, 0) * (contract.basicSalary / 240) * 1.5\",\n" +
+  "    \"description\": \"بدل عمل إضافي 150% للساعات الزيادة عن 20 ساعة\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"حساب ساعات العمل الإضافي الزيادة عن 20 ساعة بقيمة 150% من الساعة الأساسية\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 4**: \"اللي عنده إجازة مرضية أكتر من أسبوع متواصل لازم يقدم تقرير طبي\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"leaves.currentMonth.consecutiveSickDays\", \"operator\": \"GREATER_THAN\", \"value\": 7 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"ALERT_HR\",\n" +
+  "    \"message\": \"الموظف لديه إجازة مرضية أكثر من 7 أيام متواصلة - مطلوب تقرير طبي\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"تنبيه HR عند وجود إجازة مرضية متواصلة أكثر من أسبوع لطلب تقرير طبي\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 5**: \"كل سنة خدمة الموظف ياخد علاوة 200 ريال شهرياً\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"employee.tenure.years\", \"operator\": \"GREATER_THAN\", \"value\": 0 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"ADD_TO_PAYROLL\",\n" +
+  "    \"valueType\": \"FORMULA\",\n" +
+  "    \"value\": \"employee.tenure.years * 200\",\n" +
+  "    \"componentCode\": \"TENURE_BONUS\",\n" +
+  "    \"description\": \"علاوة سنوات الخدمة\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"علاوة شهرية 200 ريال عن كل سنة خدمة للموظف\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 6**: \"الموظف السعودي ياخد بدل دعم بنسبة 5% من راتبه الأساسي\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"employee.isSaudi\", \"operator\": \"EQUALS\", \"value\": true }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"ADD_TO_PAYROLL\",\n" +
+  "    \"valueType\": \"PERCENTAGE\",\n" +
+  "    \"value\": 5,\n" +
+  "    \"base\": \"BASIC\",\n" +
+  "    \"componentCode\": \"SAUDI_SUPPORT\",\n" +
+  "    \"description\": \"بدل دعم السعودة\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"بدل دعم 5% من الراتب الأساسي للموظفين السعوديين\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 7**: \"لو الموظف رجع العهدة متأخر أكتر من 3 أيام يتخصم 100 ريال\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"CUSTODY\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"custody.avgReturnDelay\", \"operator\": \"GREATER_THAN\", \"value\": 3 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"DEDUCT_FROM_PAYROLL\",\n" +
+  "    \"valueType\": \"FIXED\",\n" +
+  "    \"value\": 100,\n" +
+  "    \"componentCode\": \"CUSTODY_PENALTY\",\n" +
+  "    \"description\": \"غرامة تأخير إرجاع العهدة\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"خصم 100 ريال عند تأخر إرجاع العهدة أكثر من 3 أيام\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 13**: \"الموظف اللي أتلف عهدته يخصم قيمتها من راتبه\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"CUSTODY\" },\n" +
+  "  \"conditions\": [],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"DEDUCT_FROM_PAYROLL\",\n" +
+  "    \"valueType\": \"FORMULA\",\n" +
+  "    \"value\": \"dynamicQuery.replacementValue\",\n" +
+  "    \"description\": \"خصم قيمة العهدة التالفة\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"خصم القيمة المالية للعهدة التالفة من راتب الموظف\",\n" +
+  "  \"dynamicQuery\": {\n" +
+  "    \"type\": \"AGGREGATE\",\n" +
+  "    \"table\": \"Custody\",\n" +
+  "    \"where\": [\n" +
+  "      { \"field\": \"status\", \"operator\": \"=\", \"value\": \"DAMAGED\" }\n" +
+  "    ],\n" +
+  "    \"operation\": \"SUM\",\n" +
+  "    \"targetField\": \"replacementValue\",\n" +
+  "    \"description\": \"الحصول على إجمالي قيمة التعويض للعهدة التالفة\"\n" +
+  "  }\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 8**: \"الموظفين اللي عندهم إنذارين أو أكتر يتخصم منهم 10% من الراتب\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"disciplinary.activeWarnings\", \"operator\": \"GREATER_THAN_OR_EQUAL\", \"value\": 2 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"DEDUCT_FROM_PAYROLL\",\n" +
+  "    \"valueType\": \"PERCENTAGE\",\n" +
+  "    \"value\": 10,\n" +
+  "    \"base\": \"BASIC\",\n" +
+  "    \"componentCode\": \"DISCIPLINARY_DEDUCTION\",\n" +
+  "    \"description\": \"خصم تأديبي للإنذارات النشطة\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"خصم 10% من الراتب الأساسي للموظفين الذين لديهم إنذارين أو أكثر نشطين\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 9**: \"لو الحضور أقل من 75% والموظف مش جديد يتخصم 500 ريال\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [\n" +
+  "    { \"field\": \"attendance.currentPeriod.attendancePercentage\", \"operator\": \"LESS_THAN\", \"value\": 75 },\n" +
+  "    { \"field\": \"employee.tenure.months\", \"operator\": \"GREATER_THAN\", \"value\": 3 }\n" +
+  "  ],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"DEDUCT_FROM_PAYROLL\",\n" +
+  "    \"valueType\": \"FIXED\",\n" +
+  "    \"value\": 500,\n" +
+  "    \"componentCode\": \"LOW_ATTENDANCE_PENALTY\",\n" +
+  "    \"description\": \"غرامة انخفاض الحضور\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"خصم 500 ريال للموظفين غير الجدد الذين حضورهم أقل من 75%\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 10**: \"قسم المبيعات لو حققوا التارجت كل واحد ياخد 1000 ريال\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"ADD_TO_PAYROLL\",\n" +
+  "    \"valueType\": \"FIXED\",\n" +
+  "    \"value\": 1000,\n" +
+  "    \"componentCode\": \"SALES_TARGET_BONUS\",\n" +
+  "    \"description\": \"مكافأة تحقيق التارجت\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"DEPARTMENT\", \"targetName\": \"المبيعات\" },\n" +
+  "  \"explanation\": \"مكافأة 1000 ريال لكل موظف في قسم المبيعات عند تحقيق الهدف\",\n" +
+  "  \"clarificationNeeded\": \"يرجى تحديد معايير تحقيق التارجت - هل هو نسبة مبيعات محددة؟\"\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "🎯 مهمتك: فهم أي سياسة مهما كانت معقدة وتحويلها لـ JSON قابل للتنفيذ باستخدام الحقول والمعادلات المناسبة!\n" +
+  "\n" +
+  "🔥 **مهم جداً - الاستعلام الديناميكي (dynamicQuery)**:\n" +
+  "إذا كانت السياسة تحتاج بيانات **غير موجودة** في الحقول المذكورة أعلاه (مثل: تاريخ محدد، وقت محدد، شرط خاص)، يجب أن تُولّد \"dynamicQuery\" بنفسك!\n" +
+  "\n" +
+  "**مثال 11**: \"أي موظف يحضر يوم 7-1-2026 الساعة 9 صباحاً يأخذ 100 ريال\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"ADD_TO_PAYROLL\",\n" +
+  "    \"valueType\": \"FIXED\",\n" +
+  "    \"value\": 100,\n" +
+  "    \"description\": \"مكافأة الحضور المبكر\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"100 ريال للحضور يوم 7-1-2026 الساعة 9 صباحاً أو قبلها\",\n" +
+  "  \"dynamicQuery\": {\n" +
+  "    \"type\": \"DATE_SPECIFIC\",\n" +
+  "    \"table\": \"Attendance\",\n" +
+  "    \"where\": [\n" +
+  "      { \"field\": \"date\", \"operator\": \"=\", \"value\": \"2026-01-07\" },\n" +
+  "      { \"field\": \"checkIn\", \"operator\": \"<=\", \"value\": \"09:00:00\" }\n" +
+  "    ],\n" +
+  "    \"operation\": \"EXISTS\",\n" +
+  "    \"description\": \"التحقق من حضور الموظف في التاريخ والوقت المحدد\"\n" +
+  "  }\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**مثال 12**: \"الموظف اللي اشتغل من 3 ل 4 ساعات في أي يوم يتخصم 300 ريال\"\n" +
+  "```json\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"PAYROLL\" },\n" +
+  "  \"conditions\": [],\n" +
+  "  \"actions\": [{\n" +
+  "    \"type\": \"DEDUCT_FROM_PAYROLL\",\n" +
+  "    \"valueType\": \"FIXED\",\n" +
+  "    \"value\": 300,\n" +
+  "    \"description\": \"خصم العمل الجزئي\"\n" +
+  "  }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\" },\n" +
+  "  \"explanation\": \"خصم 300 ريال للموظف الذي عمل 3-4 ساعات في أي يوم\",\n" +
+  "  \"dynamicQuery\": {\n" +
+  "    \"type\": \"COUNT_CONDITION\",\n" +
+  "    \"table\": \"Attendance\",\n" +
+  "    \"where\": [\n" +
+  "      { \"field\": \"workingHours\", \"operator\": \">=\", \"value\": 3 },\n" +
+  "      { \"field\": \"workingHours\", \"operator\": \"<=\", \"value\": 4 }\n" +
+  "    ],\n" +
+  "    \"operation\": \"COUNT\",\n" +
+  "    \"targetField\": \"id\",\n" +
+  "    \"description\": \"عد الأيام التي عمل فيها الموظف 3-4 ساعات\"\n" +
+  "  }\n" +
+  "}\n" +
+  "```\n" +
+  "\n" +
+  "**قاعدة ذهبية**: لو الشرط غير قابل للتنفيذ بالحقول الجاهزة → أضف dynamicQuery!";
 
-🎯 هدفك: فهم **أي سياسة** مهما كانت معقدة وتحويلها لقواعد قابلة للتنفيذ.
-
-📌 قدراتك المتقدمة:
-
-1. **فهم السياق الزمني**:
-   - "الموظف الجديد" = employee.tenure.months < 6
-   - "أول 3 شهور" / "خلال فترة التجربة" = employee.tenure.months <= 3
-   - "بعد سنة" = employee.tenure.years >= 1
-   - "فترة التجربة" = contract.isProbation === true
-
-2. **فهم العد والتكرار**:
-   - "أكتر من 3 مرات" = COUNT > 3 أو field > 3
-   - "متواصل" / "على التوالي" = استخدم patterns.lateStreak أو patterns.absenceStreak
-   - "إجمالي" / "مجموع" = استخدم الحقل المناسب
-
-3. **فهم الحسابات المعقدة**:
-   - "كل ساعة زيادة عن X" → valueType = "FORMULA", value = "MAX(field - X, 0) * amount"
-   - "لكل يوم" → valueType = "FORMULA", value = "field * amount"
-   - "حسب سنوات الخدمة" → استخدم employee.tenure.years في formula
-   - "نسبة من X" → valueType = "FORMULA", value = "X * percentage / 100"
-
-4. **فهم الشروط المركبة**:
-   - "لو... و..." = شرطين منفصلين في conditions[]
-   - عند استخدام "لكل X زيادة" → استخدم FORMULA: "MAX(field - threshold, 0) * amount"
-
-5. **فهم المستويات**:
-   - "القسم" / "الإدارة" = department level, scope: DEPARTMENT
-   - "الفرع" = branch level, scope: BRANCH
-   - "كل الموظفين" = scope: ALL_EMPLOYEES
-
-📊 الحقول المتاحة (موسعة):
-
-### بيانات الموظف
-- employee.tenure.months - أشهر الخدمة الإجمالية
-- employee.tenure.years - سنوات الخدمة
-- employee.tenure.totalMonths - إجمالي الأشهر
-- employee.department - اسم القسم
-- employee.branch - اسم الفرع  
-- employee.jobTitle - المسمى الوظيفي
-- employee.nationality - الجنسية
-- employee.isSaudi - سعودي؟ (true/false)
-
-### بيانات العقد والراتب
-- contract.isProbation - فترة تجربة؟ (true/false)
-- contract.probationMonthsRemaining - أشهر التجربة المتبقية
-- contract.basicSalary - الراتب الأساسي
-- contract.totalSalary - الراتب الإجمالي (مع البدلات)
-- contract.housingAllowance - بدل السكن
-- contract.transportAllowance - بدل المواصلات
-
-### بيانات الحضور (الفترة الحالية)
-- attendance.currentPeriod.presentDays - أيام الحضور
-- attendance.currentPeriod.absentDays - أيام الغياب
-- attendance.currentPeriod.lateDays - أيام التأخير
-- attendance.currentPeriod.lateMinutes - دقائق التأخير الإجمالية
-- attendance.currentPeriod.earlyLeaveDays - أيام الخروج المبكر
-- attendance.currentPeriod.overtimeHours - ساعات العمل الإضافي
-- attendance.currentPeriod.weekendWorkDays - أيام العمل في نهاية الأسبوع
-- attendance.currentPeriod.attendancePercentage - نسبة الحضور
-- attendance.currentPeriod.workingDays - أيام العمل في الفترة
-
-### بيانات الحضور (تاريخية)
-- attendance.last3Months.presentDays - أيام الحضور آخر 3 أشهر
-- attendance.last3Months.attendancePercentage - نسبة الحضور آخر 3 أشهر
-- attendance.last6Months.* - بيانات آخر 6 أشهر
-
-### أنماط الحضور
-- attendance.patterns.lateStreak - أطول فترة تأخير متتالية
-- attendance.patterns.absenceStreak - أطول فترة غياب متتالية
-- attendance.patterns.consecutivePresent - أيام حضور متتالية
-
-### بيانات الإجازات
-- leaves.currentMonth.sickDays - أيام الإجازة المرضية
-- leaves.currentMonth.annualDays - أيام الإجازة السنوية
-- leaves.currentMonth.unpaidDays - أيام بدون راتب
-- leaves.currentMonth.totalDays - إجمالي أيام الإجازة
-- leaves.currentMonth.consecutiveSickDays - أطول إجازة مرضية متواصلة
-- leaves.balance.annual - رصيد الإجازات السنوية
-- leaves.balance.sick - رصيد الإجازات المرضية
-
-### بيانات العهد والسلف والعهد التالفة
-- custody.active - عدد العهد النشطة
-- custody.lateReturns - عدد مرات التأخير في إرجاع العهد
-- custody.avgReturnDelay - متوسط التأخير بالأيام
-- custody.damagedCount - عدد العهد التالفة
-- custody.totalDamagedValue - إجمالي قيمة التلفيات
-- custody.lastItemName - اسم آخر عهدة
-- advances.active - عدد السلف النشطة
-- advances.hasActiveAdvance - يوجد سلفة نشطة؟ (true/false)
-- advances.remainingAmount - المبلغ المتبقي من السلف
-
-### بيانات التأديب
-- disciplinary.totalCases - عدد القضايا التأديبية (كل الوقت)
-- disciplinary.activeCases - القضايا النشطة حالياً
-- disciplinary.activeWarnings - الإنذارات النشطة
-- disciplinary.daysSinceLastIncident - أيام منذ آخر مخالفة
-
-### بيانات القسم والفرع
-- department.name - اسم القسم
-- department.totalEmployees - عدد موظفي القسم
-- department.departmentAttendance - نسبة حضور القسم
-- branch.totalEmployees - عدد موظفي الفرع
-
-### بيانات تتبع الموقع (Geofencing) 🆕
-- location.minutesOutsideGeofence - إجمالي الوقت خارج نطاق الشركة بالدقائق
-- location.geofenceExitCount - عدد مرات الخروج من النطاق
-- location.longestOutsideDuration - أطول فترة متواصلة خارج النطاق بالدقائق
-- location.exceededAllowedTime - هل تجاوز الحد المسموح (15 دقيقة)؟ (true/false)
-- location.excessMinutes - الوقت الزائد عن المسموح (15 دقيقة) بالدقائق
-
-### بيانات الأداء والتارجت 🆕
-- performance.targetAchievement - نسبة تحقيق الهدف (مثلاً 105 = حقق 105%)
-- performance.targetAmount - المبلغ المستهدف
-- performance.actualAmount - المبلغ المحقق فعلياً
-- performance.achievementLevel - مستوى التحقيق: BELOW/MET/EXCEEDED/OUTSTANDING
-- performance.isAbove100 - هل حقق التارجت أو أكتر؟ (true/false)
-- performance.isAbove105 - هل تجاوز 105%؟ (true/false)
-- performance.isAbove110 - هل تجاوز 110%؟ (true/false)
-- performance.lastRating - آخر تقييم أداء (من 5)
-
-📌 الأحداث المدعومة (trigger.event):
-• ATTENDANCE: الحضور، التأخير، الغياب، العمل في العطلات
-• LEAVE: الإجازات بكل أنواعها
-• CUSTODY: العهد والممتلكات
-• PAYROLL: تُنفذ تلقائياً كل شهر مع الرواتب (استخدمها للسياسات الشهرية)
-• ANNIVERSARY: ذكرى التوظيف
-• CONTRACT: العقود
-• DISCIPLINARY: المخالفات والجزاءات
-• CUSTOM: أي حدث آخر
-
-🆕 اكتشاف الأقسام والوظائف المستهدفة تلقائياً:
-حلل نص السياسة واكتشف من الكلمات المفتاحية:
-• "السائق" / "السائقين" / "المندوب" → applicableDepartments: ["اللوجستيات", "التوصيل", "النقل"]
-• "أمين المخزن" / "المستودع" → applicableDepartments: ["المستودعات", "المخازن"]
-• "المبيعات" / "السيلز" → applicableDepartments: ["المبيعات"]
-• "المحاسب" / "المالية" → applicableDepartments: ["المالية", "المحاسبة"]
-• "الموارد البشرية" / "HR" → applicableDepartments: ["الموارد البشرية"]
-• "المهندس" / "الفني" → applicableDepartments: ["الهندسة", "الصيانة"]
-• لو لم تجد قسم محدد → applicableDepartments: null (تُطبق على الكل)
-
-📌 المعاملات (conditions[].operator):
-• GREATER_THAN (>) - أكبر من
-• LESS_THAN (<) - أقل من
-• GREATER_THAN_OR_EQUAL (>=) - أكبر من أو يساوي
-• LESS_THAN_OR_EQUAL (<=) - أقل من أو يساوي
-• EQUALS (===) - يساوي
-
-📌 الإجراءات (actions[].type):
-• ADD_TO_PAYROLL - إضافة للراتب
-• DEDUCT_FROM_PAYROLL - خصم من الراتب
-• SEND_NOTIFICATION - إرسال إشعار
-• ALERT_HR - تنبيه الموارد البشرية
-
-📌 نوع المبلغ (actions[].valueType):
-• FIXED - مبلغ ثابت (100 ريال)
-• PERCENTAGE - نسبة من الراتب (10%)
-• FORMULA - معادلة حسابية معقدة (استخدمها للحسابات المتقدمة!)
-
-📌 أساس حساب النسبة (actions[].base):
-• BASIC - الراتب الأساسي
-• TOTAL - إجمالي الراتب
-
-📌 النطاق (scope.type):
-• ALL_EMPLOYEES - كل الموظفين
-• DEPARTMENT - قسم محدد
-• BRANCH - فرع محدد
-• EMPLOYEE - موظف محدد
-
-⚠️ قواعد مهمة:
-
-1. **استخدم FORMULA للحسابات المعقدة**:
-   - "كل ساعة زيادة عن 20" → "MAX(attendance.currentPeriod.overtimeHours - 20, 0) * hourlyRate"
-   - "لكل يوم تأخير" → "attendance.currentPeriod.lateDays * 50"
-   - "حسب سنوات الخدمة" → "employee.tenure.years * 100"
-
-2. **للشروط المركبة ضع كل شرط منفصل**:
-   - "الموظف الجديد لو تأخر 3 مرات" → شرطين:
-     * { "field": "employee.tenure.months", "operator": "LESS_THAN", "value": 6 }
-     * { "field": "attendance.currentPeriod.lateDays", "operator": "GREATER_THAN", "value": 3 }
-
-3. **للسياسات الشهرية استخدم PAYROLL**:
-   - أي سياسة تُحسب "كل شهر" أو "مع الراتب" → trigger.event = "PAYROLL"
-
-4. **استخدم الحقول الصحيحة**:
-   - سنوات الخدمة → employee.tenure.years أو employee.tenure.months
-   - فترة التجربة → contract.isProbation
-   - أيام التأخير → attendance.currentPeriod.lateDays
-   - نسبة الحضور → attendance.currentPeriod.attendancePercentage
-
-🔥 أمثلة متقدمة:
-
-**مثال 1**: "الموظف الجديد (أقل من 6 شهور) لو تأخر أكتر من 3 مرات يتخصم 50 ريال لكل مرة"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "employee.tenure.months", "operator": "LESS_THAN", "value": 6 },
-    { "field": "attendance.currentPeriod.lateDays", "operator": "GREATER_THAN", "value": 3 }
-  ],
-  "actions": [{
-    "type": "DEDUCT_FROM_PAYROLL",
-    "valueType": "FORMULA",
-    "value": "MAX(attendance.currentPeriod.lateDays - 3, 0) * 50",
-    "description": "خصم 50 ريال عن كل يوم تأخير زيادة عن 3 أيام"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "الموظفين الجدد (أقل من 6 أشهر) إذا تأخروا أكثر من 3 مرات، يُخصم 50 ريال عن كل مرة زيادة"
-}
-\x60\x60\x60
-
-**مثال 2**: "القسم اللي حضوره فوق 90% كل الموظفين فيه ياخدو بونص 300 ريال"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "department.departmentAttendance", "operator": "GREATER_THAN", "value": 90 }
-  ],
-  "actions": [{
-    "type": "ADD_TO_PAYROLL",
-    "valueType": "FIXED",
-    "value": 300,
-    "description": "مكافأة حضور القسم"
-  }],
-  "scope": { "type": "DEPARTMENT" },
-  "explanation": "إذا حضور القسم أكثر من 90%، كل موظف في القسم يحصل على 300 ريال"
-}
-\x60\x60\x60
-
-**مثال 3**: "كل ساعة overtime فوق 20 ساعة تُحسب 150% من قيمة الساعة الأساسية"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "attendance.currentPeriod.overtimeHours", "operator": "GREATER_THAN", "value": 20 }
-  ],
-  "actions": [{
-    "type": "ADD_TO_PAYROLL",
-    "valueType": "FORMULA",
-    "value": "MAX(attendance.currentPeriod.overtimeHours - 20, 0) * (contract.basicSalary / 240) * 1.5",
-    "description": "بدل عمل إضافي 150% للساعات الزيادة عن 20 ساعة"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "حساب ساعات العمل الإضافي الزيادة عن 20 ساعة بقيمة 150% من الساعة الأساسية"
-}
-\x60\x60\x60
-
-**مثال 4**: "اللي عنده إجازة مرضية أكتر من أسبوع متواصل لازم يقدم تقرير طبي"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "leaves.currentMonth.consecutiveSickDays", "operator": "GREATER_THAN", "value": 7 }
-  ],
-  "actions": [{
-    "type": "ALERT_HR",
-    "message": "الموظف لديه إجازة مرضية أكثر من 7 أيام متواصلة - مطلوب تقرير طبي"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "تنبيه HR عند وجود إجازة مرضية متواصلة أكثر من أسبوع لطلب تقرير طبي"
-}
-\x60\x60\x60
-
-**مثال 5**: "كل سنة خدمة الموظف ياخد علاوة 200 ريال شهرياً"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "employee.tenure.years", "operator": "GREATER_THAN", "value": 0 }
-  ],
-  "actions": [{
-    "type": "ADD_TO_PAYROLL",
-    "valueType": "FORMULA",
-    "value": "employee.tenure.years * 200",
-    "componentCode": "TENURE_BONUS",
-    "description": "علاوة سنوات الخدمة"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "علاوة شهرية 200 ريال عن كل سنة خدمة للموظف"
-}
-\x60\x60\x60
-
-**مثال 6**: "الموظف السعودي ياخد بدل دعم بنسبة 5% من راتبه الأساسي"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "employee.isSaudi", "operator": "EQUALS", "value": true }
-  ],
-  "actions": [{
-    "type": "ADD_TO_PAYROLL",
-    "valueType": "PERCENTAGE",
-    "value": 5,
-    "base": "BASIC",
-    "componentCode": "SAUDI_SUPPORT",
-    "description": "بدل دعم السعودة"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "بدل دعم 5% من الراتب الأساسي للموظفين السعوديين"
-}
-\x60\x60\x60
-
-**مثال 7**: "لو الموظف رجع العهدة متأخر أكتر من 3 أيام يتخصم 100 ريال"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "CUSTODY" },
-  "conditions": [
-    { "field": "custody.avgReturnDelay", "operator": "GREATER_THAN", "value": 3 }
-  ],
-  "actions": [{
-    "type": "DEDUCT_FROM_PAYROLL",
-    "valueType": "FIXED",
-    "value": 100,
-    "componentCode": "CUSTODY_PENALTY",
-    "description": "غرامة تأخير إرجاع العهدة"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "خصم 100 ريال عند تأخر إرجاع العهدة أكثر من 3 أيام"
-}
-\x60\x60\x60
-
-**مثال 13**: "الموظف اللي أتلف عهدته يخصم قيمتها من راتبه"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "CUSTODY" },
-  "conditions": [],
-  "actions": [{
-    "type": "DEDUCT_FROM_PAYROLL",
-    "valueType": "FORMULA",
-    "value": "dynamicQuery.replacementValue",
-    "description": "خصم قيمة العهدة التالفة"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "خصم القيمة المالية للعهدة التالفة من راتب الموظف",
-  "dynamicQuery": {
-    "type": "AGGREGATE",
-    "table": "Custody",
-    "where": [
-      { "field": "status", "operator": "=", "value": "DAMAGED" }
-    ],
-    "operation": "SUM",
-    "targetField": "replacementValue",
-    "description": "الحصول على إجمالي قيمة التعويض للعهدة التالفة"
-  }
-}
-\x60\x60\x60
-
-**مثال 8**: "الموظفين اللي عندهم إنذارين أو أكتر يتخصم منهم 10% من الراتب"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "disciplinary.activeWarnings", "operator": "GREATER_THAN_OR_EQUAL", "value": 2 }
-  ],
-  "actions": [{
-    "type": "DEDUCT_FROM_PAYROLL",
-    "valueType": "PERCENTAGE",
-    "value": 10,
-    "base": "BASIC",
-    "componentCode": "DISCIPLINARY_DEDUCTION",
-    "description": "خصم تأديبي للإنذارات النشطة"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "خصم 10% من الراتب الأساسي للموظفين الذين لديهم إنذارين أو أكثر نشطين"
-}
-\x60\x60\x60
-
-**مثال 9**: "لو الحضور أقل من 75% والموظف مش جديد يتخصم 500 ريال"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [
-    { "field": "attendance.currentPeriod.attendancePercentage", "operator": "LESS_THAN", "value": 75 },
-    { "field": "employee.tenure.months", "operator": "GREATER_THAN", "value": 3 }
-  ],
-  "actions": [{
-    "type": "DEDUCT_FROM_PAYROLL",
-    "valueType": "FIXED",
-    "value": 500,
-    "componentCode": "LOW_ATTENDANCE_PENALTY",
-    "description": "غرامة انخفاض الحضور"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "خصم 500 ريال للموظفين غير الجدد الذين حضورهم أقل من 75%"
-}
-\x60\x60\x60
-
-**مثال 10**: "قسم المبيعات لو حققوا التارجت كل واحد ياخد 1000 ريال"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [],
-  "actions": [{
-    "type": "ADD_TO_PAYROLL",
-    "valueType": "FIXED",
-    "value": 1000,
-    "componentCode": "SALES_TARGET_BONUS",
-    "description": "مكافأة تحقيق التارجت"
-  }],
-  "scope": { "type": "DEPARTMENT", "targetName": "المبيعات" },
-  "explanation": "مكافأة 1000 ريال لكل موظف في قسم المبيعات عند تحقيق الهدف",
-  "clarificationNeeded": "يرجى تحديد معايير تحقيق التارجت - هل هو نسبة مبيعات محددة؟"
-}
-\x60\x60\x60
-
-🎯 مهمتك: فهم أي سياسة مهما كانت معقدة وتحويلها لـ JSON قابل للتنفيذ باستخدام الحقول والمعادلات المناسبة!
-
-🔥 **مهم جداً - الاستعلام الديناميكي (dynamicQuery)**:
-إذا كانت السياسة تحتاج بيانات **غير موجودة** في الحقول المذكورة أعلاه (مثل: تاريخ محدد، وقت محدد، شرط خاص)، يجب أن تُولّد "dynamicQuery" بنفسك!
-
-**مثال 11**: "أي موظف يحضر يوم 7-1-2026 الساعة 9 صباحاً يأخذ 100 ريال"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [],
-  "actions": [{
-    "type": "ADD_TO_PAYROLL",
-    "valueType": "FIXED",
-    "value": 100,
-    "description": "مكافأة الحضور المبكر"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "100 ريال للحضور يوم 7-1-2026 الساعة 9 صباحاً أو قبلها",
-  "dynamicQuery": {
-    "type": "DATE_SPECIFIC",
-    "table": "Attendance",
-    "where": [
-      { "field": "date", "operator": "=", "value": "2026-01-07" },
-      { "field": "checkIn", "operator": "<=", "value": "09:00:00" }
-    ],
-    "operation": "EXISTS",
-    "description": "التحقق من حضور الموظف في التاريخ والوقت المحدد"
-  }
-}
-\x60\x60\x60
-
-**مثال 12**: "الموظف اللي اشتغل من 3 ل 4 ساعات في أي يوم يتخصم 300 ريال"
-\x60\x60\x60json
-{
-  "understood": true,
-  "trigger": { "event": "PAYROLL" },
-  "conditions": [],
-  "actions": [{
-    "type": "DEDUCT_FROM_PAYROLL",
-    "valueType": "FIXED",
-    "value": 300,
-    "description": "خصم العمل الجزئي"
-  }],
-  "scope": { "type": "ALL_EMPLOYEES" },
-  "explanation": "خصم 300 ريال للموظف الذي عمل 3-4 ساعات في أي يوم",
-  "dynamicQuery": {
-    "type": "COUNT_CONDITION",
-    "table": "Attendance",
-    "where": [
-      { "field": "workingHours", "operator": ">=", "value": 3 },
-      { "field": "workingHours", "operator": "<=", "value": 4 }
-    ],
-    "operation": "COUNT",
-    "targetField": "id",
-    "description": "عد الأيام التي عمل فيها الموظف 3-4 ساعات"
-  }
-}
-\x60\x60\x60
-
-**قاعدة ذهبية**: لو الشرط غير قابل للتنفيذ بالحقول الجاهزة → أضف dynamicQuery!`;
-
-const USER_PROMPT_TEMPLATE = `
-تحليل السياسة التالية وتحويلها لـ JSON:
-
-"{input}"
-
-الرد يجب أن يكون JSON فقط بهذا الشكل بدون أي نص إضافي:
-{
-  "understood": true,
-  "trigger": { "event": "...", "subEvent": "..." },
-  "conditions": [{ "field": "...", "operator": "GREATER_THAN", "value": ... }],
-  "conditionLogic": "ALL أو ANY",
-  "lookbackMonths": null,
-  "actions": [{ "type": "ADD_TO_PAYROLL", "valueType": "FIXED", "value": ..., "description": "..." }],
-  "scope": { "type": "ALL_EMPLOYEES", "targetName": null },
-  "explanation": "شرح بسيط بالعربي",
-  "clarificationNeeded": null,
-  "applicableDepartments": ["اللوجستيات", "التوصيل"] أو null,
-  "applicableJobTitles": ["سائق", "مندوب"] أو null,
-  "dateRange": { "type": "SPECIFIC_DATE أو DATE_RANGE أو MONTH أو HIJRI_MONTH", "startDate": "2026-01-01", "endDate": null },
-  "dynamicQuery": {
-    "type": "DATE_SPECIFIC أو TIME_RANGE أو COUNT_CONDITION",
-    "table": "Attendance",
-    "where": [{ "field": "date", "operator": "=", "value": "2026-01-07" }],
-    "operation": "EXISTS أو COUNT",
-    "description": "وصف الاستعلام"
-  }
-}
-
-⚠️ قواعد مهمة جداً:
-1. إذا السياسة تذكر **تاريخ محدد** (مثل: 7-1-2026) → يجب إضافة dynamicQuery مع where: [{ field: "date", operator: "=", value: "تاريخ" }]
-2. إذا السياسة تذكر **وقت محدد** (مثل: الساعة 9) → يجب إضافة where: [{ field: "checkIn", operator: "<=", value: "09:00:00" }]
-3. إذا السياسة تذكر **نطاق ساعات** (مثل: 3-4 ساعات) → يجب إضافة dynamicQuery مع operation: "COUNT"
-4. لا تترك conditions فارغة إذا كان هناك شرط واضح في السياسة!
-5. **conditionLogic**: استخدم "ALL" إذا كان كل الشروط مطلوبة (و/AND)، أو "ANY" إذا كان أي شرط كافي (أو/OR)
-6. **lookbackMonths**: استخدم هذا إذا السياسة تذكر "آخر X أشهر" أو "خلال 3 أشهر الماضية"
-7. **dateRange**: استخدم هذا للتواريخ المحددة أو الشهور (مثل: "في رمضان" → hijriMonth: 9)
-8. **applicableDepartments**: اكتشف الأقسام من نص السياسة (سائق → اللوجستيات، مبيعات → المبيعات، إلخ). إذا السياسة عامة ضعها null
-9. **applicableJobTitles**: اكتشف المسميات الوظيفية من النص (سائق، مندوب، محاسب، إلخ). إذا لم تذكر ضعها null
-`;
+const USER_PROMPT_TEMPLATE =
+  "تحليل السياسة التالية وتحويلها لـ JSON:\n" +
+  "\n" +
+  "\"{input}\"\n" +
+  "\n" +
+  "الرد يجب أن يكون JSON فقط بهذا الشكل بدون أي نص إضافي:\n" +
+  "{\n" +
+  "  \"understood\": true,\n" +
+  "  \"trigger\": { \"event\": \"...\", \"subEvent\": \"...\" },\n" +
+  "  \"conditions\": [{ \"field\": \"...\", \"operator\": \"GREATER_THAN\", \"value\": ... }],\n" +
+  "  \"conditionLogic\": \"ALL أو ANY\",\n" +
+  "  \"lookbackMonths\": null,\n" +
+  "  \"actions\": [{ \"type\": \"ADD_TO_PAYROLL\", \"valueType\": \"FIXED\", \"value\": ..., \"description\": \"...\" }],\n" +
+  "  \"scope\": { \"type\": \"ALL_EMPLOYEES\", \"targetName\": null },\n" +
+  "  \"explanation\": \"شرح بسيط بالعربي\",\n" +
+  "  \"clarificationNeeded\": null,\n" +
+  "  \"applicableDepartments\": [\"اللوجستيات\", \"التوصيل\"] أو null,\n" +
+  "  \"applicableJobTitles\": [\"سائق\", \"مندوب\"] أو null,\n" +
+  "  \"dateRange\": { \"type\": \"SPECIFIC_DATE أو DATE_RANGE أو MONTH أو HIJRI_MONTH\", \"startDate\": \"2026-01-01\", \"endDate\": null },\n" +
+  "  \"dynamicQuery\": {\n" +
+  "    \"type\": \"DATE_SPECIFIC أو TIME_RANGE أو COUNT_CONDITION\",\n" +
+  "    \"table\": \"Attendance\",\n" +
+  "    \"where\": [{ \"field\": \"date\", \"operator\": \"=\", \"value\": \"2026-01-07\" }],\n" +
+  "    \"operation\": \"EXISTS أو COUNT\",\n" +
+  "    \"description\": \"وصف الاستعلام\"\n" +
+  "  }\n" +
+  "}\n" +
+  "\n" +
+  "⚠️ قواعد مهمة جداً:\n" +
+  "1. إذا السياسة تذكر **تاريخ محدد** (مثل: 7-1-2026) → يجب إضافة dynamicQuery مع where: [{ field: \"date\", operator: \"=\", value: \"تاريخ\" }]\n" +
+  "2. إذا السياسة تذكر **وقت محدد** (مثل: الساعة 9) → يجب إضافة where: [{ field: \"checkIn\", operator: \"<=\", value: \"09:00:00\" }]\n" +
+  "3. إذا السياسة تذكر **نطاق ساعات** (مثل: 3-4 ساعات) → يجب إضافة dynamicQuery مع operation: \"COUNT\"\n" +
+  "4. لا تترك conditions فارغة إذا كان هناك شرط واضح في السياسة!\n" +
+  "5. **conditionLogic**: استخدم \"ALL\" إذا كان كل الشروط مطلوبة (و/AND)، أو \"ANY\" إذا كان أي شرط كافي (أو/OR)\n" +
+  "6. **lookbackMonths**: استخدم هذا إذا السياسة تذكر \"آخر X أشهر\" أو \"خلال 3 أشهر الماضية\"\n" +
+  "7. **dateRange**: استخدم هذا للتواريخ المحددة أو الشهور (مثل: \"في رمضان\" → hijriMonth: 9)\n" +
+  "8. **applicableDepartments**: اكتشف الأقسام من نص السياسة (سائق → اللوجستيات، مبيعات → المبيعات، إلخ). إذا السياسة عامة ضعها null\n" +
+  "9. **applicableJobTitles**: اكتشف المسميات الوظيفية من النص (سائق، مندوب، محاسب، إلخ). إذا لم تذكر ضعها null\n";
 
 
 @Injectable()
@@ -607,7 +606,7 @@ export class PolicyParserService {
       throw new Error("AI service is not available");
     }
 
-    this.logger.log(\`Parsing policy: \${naturalText?.substring(0, 60) || "empty"}...\`);
+    this.logger.log("Parsing policy: " + (naturalText?.substring(0, 60) || "empty") + "...");
 
     const prompt = USER_PROMPT_TEMPLATE.replace("{input}", naturalText || "");
 
@@ -621,7 +620,6 @@ export class PolicyParserService {
       }
 
       // 🔥 Post-processing: كشف التواريخ والأوقات وتوليد dynamicQuery تلقائياً
-      // تحقق من وجود dynamicQuery صالح (مع شروط فعلية)
       const hasMeaningfulDynamicQuery = parsed.dynamicQuery &&
         parsed.dynamicQuery.where &&
         Array.isArray(parsed.dynamicQuery.where) &&
@@ -631,49 +629,43 @@ export class PolicyParserService {
         const detectedQuery = this.detectAndGenerateDynamicQuery(naturalText);
         if (detectedQuery) {
           parsed.dynamicQuery = detectedQuery;
-          this.logger.log(\`Auto-generated dynamicQuery: \${detectedQuery.description}\`);
+          this.logger.log("Auto-generated dynamicQuery: " + detectedQuery.description);
 
-          // 🔥 إضافة الشروط للـ conditions عشان تظهر في الـ frontend
           if ((!parsed.conditions || parsed.conditions.length === 0) && detectedQuery.where) {
             parsed.conditions = detectedQuery.where.map(w => ({
-              field: \`dynamicQuery.\${w.field}\`,
+              field: "dynamicQuery." + w.field,
               operator: w.operator as any,
               value: w.value
             }));
-            this.logger.log(\`Added \${parsed.conditions.length} conditions from dynamicQuery\`);
+            this.logger.log("Added " + parsed.conditions.length + " conditions from dynamicQuery");
           }
         }
       } else if (parsed.dynamicQuery && parsed.dynamicQuery.where) {
-        // 🔥 الـ AI رجّع dynamicQuery صالح - ننقل الشروط للـ frontend
-        this.logger.log(\`AI returned dynamicQuery with \${parsed.dynamicQuery.where.length} conditions\`);
+        this.logger.log("AI returned dynamicQuery with " + parsed.dynamicQuery.where.length + " conditions");
         if (!parsed.conditions || parsed.conditions.length === 0) {
           parsed.conditions = parsed.dynamicQuery.where.map((w: any) => ({
-            field: \`dynamicQuery.\${w.field}\`,
+            field: "dynamicQuery." + w.field,
             operator: w.operator as any,
             value: w.value
           }));
-          this.logger.log(\`Copied \${parsed.conditions.length} conditions from AI dynamicQuery\`);
+          this.logger.log("Copied " + parsed.conditions.length + " conditions from AI dynamicQuery");
         }
       }
 
-      this.logger.log(\`Parsed policy: \${parsed.explanation}\`);
+      this.logger.log("Parsed policy: " + parsed.explanation);
       return parsed;
     } catch (error) {
-      this.logger.error(\`Failed to parse policy: \${error.message}\`);
+      this.logger.error("Failed to parse policy: " + error.message);
       throw error;
     }
   }
 
-  /**
-   * 🔥 كشف التواريخ والأوقات في النص وتوليد dynamicQuery تلقائياً
-   */
   private detectAndGenerateDynamicQuery(text: string): ParsedPolicyRule['dynamicQuery'] | null {
-    this.logger.log(\`🔍 detectAndGenerateDynamicQuery called with: \${text.substring(0, 60)}...\`);
+    this.logger.log("🔍 detectAndGenerateDynamicQuery called with: " + text.substring(0, 60) + "...");
 
     type WhereOperator = "=" | "!=" | ">" | "<" | ">=" | "<=" | "BETWEEN" | "IN";
     const whereConditions: Array<{ field: string; operator: WhereOperator; value: any }> = [];
 
-    // 1. كشف التاريخ (مثل: 7-1-2026)
     const datePattern = /(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/;
     const dateMatch = text.match(datePattern);
 
@@ -681,41 +673,39 @@ export class PolicyParserService {
       const day = dateMatch[1].padStart(2, '0');
       const month = dateMatch[2].padStart(2, '0');
       const year = dateMatch[3];
-      const dateStr = \`\${year}-\${month}-\${day}\`;
+      const dateStr = year + "-" + month + "-" + day;
 
       whereConditions.push({
         field: 'date',
         operator: '=' as WhereOperator,
         value: dateStr
       });
-      this.logger.log(\`✅ Detected date: \${dateStr}\`);
+      this.logger.log("✅ Detected date: " + dateStr);
     }
 
-    // 2. كشف الوقت (مثل: الساعة 9 أو الساعه 9)
     const timePattern = /(?:الساعة|الساعه|ساعة|ساعه)\s*(\d{1,2})(?::(\d{2}))?/i;
     const timeMatch = text.match(timePattern);
 
     if (timeMatch) {
       const hour = parseInt(timeMatch[1]);
       const minutes = timeMatch[2] || '00';
-      const timeStr = \`\${hour.toString().padStart(2, '0')}:\${minutes}:00\`;
+      const timeStr = hour.toString().padStart(2, '0') + ":" + minutes + ":00";
 
       whereConditions.push({
         field: 'checkIn',
         operator: '<=' as WhereOperator,
         value: timeStr
       });
-      this.logger.log(\`✅ Detected time: \${timeStr}\`);
+      this.logger.log("✅ Detected time: " + timeStr);
     }
 
-    // 3. كشف نطاق ساعات العمل (مثل: من 3 ل 4 ساعات)
     const hoursPattern = /من?\s*(\d+)\s*(?:ل|إلى|الى|-)\s*(\d+)\s*ساع/i;
     const hoursMatch = text.match(hoursPattern);
 
     if (hoursMatch) {
       const minHours = parseInt(hoursMatch[1]);
       const maxHours = parseInt(hoursMatch[2]);
-      this.logger.log(\`✅ Detected hours range: \${minHours}-\${maxHours}\`);
+      this.logger.log("✅ Detected hours range: " + minHours + "-" + maxHours);
 
       return {
         type: 'COUNT_CONDITION',
@@ -726,41 +716,29 @@ export class PolicyParserService {
         ],
         operation: 'COUNT',
         targetField: 'id',
-        description: \`عد الأيام التي عمل فيها الموظف \${minHours}-\${maxHours} ساعات\`
+        description: "عد الأيام التي عمل فيها الموظف " + minHours + "-" + maxHours + " ساعات"
       };
     }
 
-    // 4. إذا وجدنا تاريخ أو وقت، أنشئ dynamicQuery
     if (whereConditions.length > 0) {
-      this.logger.log(\`✅ Created dynamicQuery with \${whereConditions.length} conditions\`);
+      this.logger.log("✅ Created dynamicQuery with " + whereConditions.length + " conditions");
       return {
         type: 'DATE_SPECIFIC',
         table: 'Attendance',
         where: whereConditions,
         operation: 'EXISTS',
-        description: \`التحقق من الحضور: \${whereConditions.map(w => \`\${w.field} \${w.operator} \${w.value}\`).join(' و ')}\`
+        description: "التحقق من الحضور: " + whereConditions.map(w => w.field + " " + w.operator + " " + w.value).join(' و ')
       };
     }
 
-    this.logger.log(\`❌ No date/time patterns found\`);
     return null;
   }
 
   validateParsedRule(rule: ParsedPolicyRule): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
-
-    if (!rule.understood) {
-      errors.push("السياسة غير مفهومة");
-    }
-
-    if (!rule.trigger?.event) {
-      errors.push("لم يتم تحديد الحدث المُحفز");
-    }
-
-    if (!rule.actions || rule.actions.length === 0) {
-      errors.push("لم يتم تحديد أي إجراء");
-    }
-
+    if (!rule.understood) errors.push("السياسة غير مفهومة");
+    if (!rule.trigger?.event) errors.push("لم يتم تحديد الحدث المُحفز");
+    if (!rule.actions || rule.actions.length === 0) errors.push("لم يتم تحديد أي إجراء");
     return { valid: errors.length === 0, errors };
   }
 }
