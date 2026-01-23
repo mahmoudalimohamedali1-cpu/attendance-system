@@ -142,9 +142,12 @@ export default function BonusManagementPage() {
   });
 
   // جلب الموظفين
-  const { data: employees } = useQuery({
-    queryKey: ['employees-list'],
-    queryFn: () => api.get('/employees?limit=500'),
+  const { data: employeesData } = useQuery({
+    queryKey: ['employees-for-bonus'],
+    queryFn: async () => {
+      const res = await api.get('/users?status=ACTIVE&limit=500');
+      return (res as any)?.data || res || [];
+    },
   });
 
   // جلب المكافآت المعلقة
@@ -222,8 +225,8 @@ export default function BonusManagementPage() {
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
-    if (checked && employees) {
-      const allEmployeeIds = ((employees as any)?.data || employees)?.map((e: any) => e.id) || [];
+    if (checked && employeesData) {
+      const allEmployeeIds = (employeesData as any[])?.map((e: any) => e.id) || [];
       setSelectedEmployees(allEmployeeIds);
     } else {
       setSelectedEmployees([]);
@@ -731,9 +734,9 @@ export default function BonusManagementPage() {
 
               <Autocomplete
                 multiple
-                options={((employees as any)?.data || employees) || []}
+                options={(employeesData as any[]) || []}
                 getOptionLabel={(option: any) => `${option.firstName} ${option.lastName} - ${option.employeeCode || ''}`}
-                value={((employees as any)?.data || employees)?.filter((e: any) => selectedEmployees.includes(e.id)) || []}
+                value={(employeesData as any[])?.filter((e: any) => selectedEmployees.includes(e.id)) || []}
                 onChange={(_, newValue) => {
                   setSelectedEmployees(newValue.map((e: any) => e.id));
                   setSelectAll(false);

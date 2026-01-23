@@ -122,9 +122,38 @@ class SmartPoliciesService {
     /**
      * تحليل نص السياسة بالذكاء الاصطناعي (معاينة فقط)
      */
-    async analyzePolicy(text: string): Promise<{ success: boolean; parsedRule: ParsedPolicyRule }> {
+    async analyzePolicy(text: string): Promise<{
+        success: boolean;
+        parsedRule: ParsedPolicyRule;
+        feasibility?: {
+            isExecutable: boolean;
+            availableFields: Array<{
+                field: string;
+                source: string;
+                dataType: string;
+                exists: boolean;
+                hasData: boolean;
+            }>;
+            missingFields: Array<{
+                field: string;
+                reason: string;
+                suggestion: string;
+                priority: 'HIGH' | 'MEDIUM' | 'LOW';
+            }>;
+            summary: {
+                totalConditions: number;
+                satisfiedConditions: number;
+                missingConditions: number;
+                executionReadiness: 'READY' | 'PARTIAL' | 'NOT_READY';
+                confidenceScore: number;
+            };
+            recommendations: string[];
+            warnings: string[];
+        };
+    }> {
         return await api.post(`${this.baseUrl}/analyze`, { text });
     }
+
 
     /**
      * إنشاء سياسة ذكية جديدة

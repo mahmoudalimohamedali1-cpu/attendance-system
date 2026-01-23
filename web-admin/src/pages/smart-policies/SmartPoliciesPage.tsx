@@ -91,6 +91,14 @@ export default function SmartPoliciesPage() {
     const [policyText, setPolicyText] = useState('');
     const [analyzing, setAnalyzing] = useState(false);
     const [parsedRule, setParsedRule] = useState<ParsedPolicyRule | null>(null);
+    const [feasibility, setFeasibility] = useState<{
+        isExecutable: boolean;
+        availableFields: Array<{ field: string; source: string; dataType: string; exists: boolean; hasData: boolean }>;
+        missingFields: Array<{ field: string; reason: string; suggestion: string; priority: 'HIGH' | 'MEDIUM' | 'LOW' }>;
+        summary: { totalConditions: number; satisfiedConditions: number; missingConditions: number; executionReadiness: 'READY' | 'PARTIAL' | 'NOT_READY'; confidenceScore: number };
+        recommendations: string[];
+        warnings: string[];
+    } | null>(null);
     const [saving, setSaving] = useState(false);
 
     // حوار التفاصيل
@@ -360,10 +368,22 @@ export default function SmartPoliciesPage() {
 
         setAnalyzing(true);
         setParsedRule(null);
+        setFeasibility(null);
         try {
             const result = await smartPoliciesService.analyzePolicy(policyText);
             setParsedRule(result.parsedRule);
-            showSnackbar('تم تحليل السياسة بنجاح! ✨', 'success');
+            if (result.feasibility) {
+                setFeasibility(result.feasibility);
+                if (result.feasibility.isExecutable) {
+                    showSnackbar('✅ تم تحليل السياسة بنجاح! السياسة جاهزة للتنفيذ', 'success');
+                } else if (result.feasibility.summary.executionReadiness === 'PARTIAL') {
+                    showSnackbar('⚠️ تم تحليل السياسة - بعض الشروط ناقصة', 'warning');
+                } else {
+                    showSnackbar('❌ السياسة تحتاج إضافات - راجع التفاصيل', 'error');
+                }
+            } else {
+                showSnackbar('تم تحليل السياسة بنجاح! ✨', 'success');
+            }
         } catch (error: any) {
             console.error('Error analyzing policy:', error);
             showSnackbar(error.response?.data?.error || 'فشل في تحليل السياسة', 'error');
@@ -883,6 +903,114 @@ export default function SmartPoliciesPage() {
                                             </Grid>
                                         )}
                                     </Grid>
+                                </Paper>
+                            )}
+
+                            {/* 🎯 عرض نتيجة فحص الجاهزية */}
+                            {feasibility && (
+                                <Paper sx={{
+                                    p: 3,
+                                    mt: 2,
+                                    borderRadius: 2,
+                                    bgcolor: feasibility.isExecutable ? 'success.light' :
+                                        feasibility.summary.executionReadiness === 'PARTIAL' ? 'warning.light' : 'error.light',
+                                    border: 2,
+                                    borderColor: feasibility.isExecutable ? 'success.main' :
+                                        feasibility.summary.executionReadiness === 'PARTIAL' ? 'warning.main' : 'error.main',
+                                }}>
+                                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {feasibility.isExecutable ? '✅ السياسة جاهزة للتنفيذ!' :
+                                            feasibility.summary.executionReadiness === 'PARTIAL' ? '⚠️ السياسة جاهزة جزئياً' :
+                                                '❌ السياسة تحتاج إضافات'}
+                                    </Typography>
+
+                                    {/* Progress Bar */}
+                                    <Box sx={{ mb: 2 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2">نسبة الجاهزية</Typography>
+                                            <Typography variant="body2" fontWeight="bold">
+                                                {feasibility.summary.confidenceScore}%
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{
+                                            height: 10,
+                                            bgcolor: 'grey.300',
+                                            borderRadius: 5,
+                                            overflow: 'hidden'
+                                        }}>
+                                            <Box sx={{
+                                                height: '100%',
+                                                width: `${feasibility.summary.confidenceScore}%`,
+                                                bgcolor: feasibility.isExecutable ? 'success.main' :
+                                                    feasibility.summary.executionReadiness === 'PARTIAL' ? 'warning.main' : 'error.main',
+                                                transition: 'width 0.5s ease',
+                                            }} />
+                                        </Box>
+                                    </Box>
+
+                                    {/* الشروط المتوفرة */}
+                                    {feasibility.availableFields.length > 0 && (
+                                        <Box sx={{ mb: 2 }}>
+                                            <Typography variant="subtitle2" gutterBottom>
+                                                ✅ الحقول المتوفرة ({feasibility.availableFields.length}):
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                                {feasibility.availableFields.map((f, i) => (
+                                                    <Chip
+                                                        key={i}
+                                                        label={f.field}
+                                                        size="small"
+                                                        color="success"
+                                                        variant="outlined"
+                                                        title={`المصدر: ${f.source}`}
+                                                    />
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    )}
+
+                                    {/* الحقول الناقصة */}
+                                    {feasibility.missingFields.length > 0 && (
+                                        <Box sx={{ mb: 2 }}>
+                                            <Typography variant="subtitle2" gutterBottom color="error">
+                                                ❌ الحقول الناقصة ({feasibility.missingFields.length}):
+                                            </Typography>
+                                            {feasibility.missingFields.map((f, i) => (
+                                                <Alert key={i} severity="error" sx={{ mb: 1, py: 0 }}>
+                                                    <strong>{f.field}</strong>: {f.reason}
+                                                    <br />
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        💡 {f.suggestion}
+                                                    </Typography>
+                                                </Alert>
+                                            ))}
+                                        </Box>
+                                    )}
+
+                                    {/* التحذيرات */}
+                                    {feasibility.warnings.length > 0 && (
+                                        <Box sx={{ mb: 2 }}>
+                                            {feasibility.warnings.map((w, i) => (
+                                                <Alert key={i} severity="warning" sx={{ mb: 0.5, py: 0 }}>
+                                                    {w}
+                                                </Alert>
+                                            ))}
+                                        </Box>
+                                    )}
+
+                                    {/* التوصيات */}
+                                    {feasibility.recommendations.length > 0 && (
+                                        <Box>
+                                            <Typography variant="subtitle2" gutterBottom>
+                                                💡 التوصيات:
+                                            </Typography>
+                                            {feasibility.recommendations.map((r, i) => (
+                                                <Typography key={i} variant="body2" sx={{ mb: 0.5 }}>
+                                                    {r}
+                                                </Typography>
+                                            ))}
+                                        </Box>
+                                    )}
                                 </Paper>
                             )}
                         </Collapse>
