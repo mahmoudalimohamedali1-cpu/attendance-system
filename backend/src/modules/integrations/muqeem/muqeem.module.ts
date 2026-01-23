@@ -5,10 +5,12 @@ import { MuqeemExpiryJob } from './muqeem-expiry.job';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { PermissionsModule } from '../../permissions/permissions.module';
 
+import { MuqeemRobotService } from './muqeem-robot.service';
+
 @Module({
     imports: [NotificationsModule, PermissionsModule],
     controllers: [MuqeemController],
-    providers: [MuqeemService, MuqeemExpiryJob],
-    exports: [MuqeemService],
+    providers: [MuqeemService, MuqeemRobotService, MuqeemExpiryJob],
+    exports: [MuqeemService, MuqeemRobotService],
 })
 export class MuqeemModule { }

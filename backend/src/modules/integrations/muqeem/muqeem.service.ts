@@ -3,11 +3,17 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { MuqeemTransactionType, MuqeemResponse } from './interfaces/muqeem.interface';
 import { MuqeemTransactionStatus } from '@prisma/client';
 
+import { MuqeemRobotService, RobotStatus } from './muqeem-robot.service';
+
 @Injectable()
 export class MuqeemService {
     private readonly logger = new Logger(MuqeemService.name);
+    private robotStatuses: Map<string, { status: RobotStatus, message: string }> = new Map();
 
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private muqeemRobot: MuqeemRobotService,
+    ) { }
 
     /**
      * Execute a Muqeem Transaction (Simulated)
@@ -43,29 +49,26 @@ export class MuqeemService {
         try {
             this.logger.log(`Executing Muqeem transaction ${type} for user ${userId}`);
 
-            // 3. Simulate API Call Delay
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            // 3. Launch Robot instead of simulation
+            await this.muqeemRobot.launchRobot(transaction.id);
 
-            // 4. Handle Simulation Logic
-            const result = await this.simulateMuqeemResponse(type, payload);
-
-            // 5. Update Transaction with Result
-            await this.prisma.muqeemTransaction.update({
-                where: { id: transaction.id },
-                data: {
-                    status: result.success ? 'COMPLETED' : 'FAILED',
-                    response: result.data || result.message,
-                    externalRef: result.externalRef,
-                    fileUrl: result.pdfUrl,
-                    executedAt: new Date(),
-                    errorMessage: result.success ? null : result.message,
-                },
+            // Listen for status changes
+            this.muqeemRobot.onStatusChange(transaction.id, (data) => {
+                this.robotStatuses.set(transaction.id, data);
             });
 
-            // 6. Special Handling: Update User Records on Success
-            if (result.success) {
-                await this.updateUserRecordsAfterMuqeemAction(userId, type, result.data);
-            }
+            // 4. Get Credentials (from config)
+            const credentials = {
+                username: config.username,
+                password: config.password, // Ideally decrypted here
+            };
+
+            // 5. Start Login & Action
+            await this.muqeemRobot.login(transaction.id, credentials);
+
+            // Note: The execution continues asynchronously or waits for OTP
+            // For now we'll handle the initial result
+            const result = { success: true, message: 'جاري تشغيل الروبوت للقيام بالعملية...' };
 
             return {
                 ...result,
@@ -120,6 +123,30 @@ export class MuqeemService {
     }
 
     /**
+     * Get eligible employees for Muqeem services (Non-Saudi)
+     */
+    async getEligibleEmployees(companyId: string) {
+        return this.prisma.user.findMany({
+            where: {
+                companyId,
+                NOT: { nationality: 'Saudi' }, // Assuming 'Saudi' is the value for Saudi nationals
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                employeeCode: true,
+                nationalId: true,
+                iqamaExpiryDate: true,
+                passportNumber: true,
+                passportExpiryDate: true,
+                jobTitle: true,
+            },
+            orderBy: { firstName: 'asc' },
+        });
+    }
+
+    /**
      * Simulate Muqeem API Behavior
      */
     private async simulateMuqeemResponse(type: MuqeemTransactionType, payload: any): Promise<MuqeemResponse> {
@@ -139,13 +166,19 @@ export class MuqeemService {
 
         switch (type) {
             case MuqeemTransactionType.IQAMA_RENEW:
-                message = 'تم تجديد الإقامة بنجاح لمدة سنة واحدة';
-                data = { newExpiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) };
+                const years = payload.years || 1;
+                message = `تم تجديد الإقامة بنجاح لمدة ${years} سنة`;
+                data = { newExpiryDate: new Date(Date.now() + years * 365 * 24 * 60 * 60 * 1000) };
                 break;
             case MuqeemTransactionType.VISA_EXIT_REENTRY_ISSUE:
                 message = 'تم إصدار تأشيرة الخروج والعودة';
                 pdfUrl = '/simulated-files/visa-reentry.pdf';
                 data = { visaNumber: '600' + Math.floor(Math.random() * 9000000) };
+                break;
+            case MuqeemTransactionType.VISA_FINAL_EXIT_ISSUE:
+                message = 'تم إصدار تأشيرة الخروج النهائي بنجاح';
+                pdfUrl = '/simulated-files/final-exit.pdf';
+                data = { visaNumber: '700' + Math.floor(Math.random() * 9000000) };
                 break;
             case MuqeemTransactionType.PASSPORT_RENEW:
                 message = 'تم تحديث بيانات جواز السفر بنجاح';
@@ -197,5 +230,20 @@ export class MuqeemService {
             update: data,
             create: { ...data, companyId },
         });
+    }
+
+    /**
+     * Robot Interaction Methods
+     */
+    getTransactionStatus(transactionId: string) {
+        return this.robotStatuses.get(transactionId) || { status: 'UNKNOWN', message: 'جاري البدء...' };
+    }
+
+    async resolveOtp(transactionId: string, otp: string) {
+        await this.muqeemRobot.resolveOtp(transactionId, otp);
+
+        // After OTP, the robot should continue. 
+        // We'll return success to the UI and the robot will update status via event.
+        return { success: true, message: 'تم إرسال الرمز للروبوت' };
     }
 }

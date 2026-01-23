@@ -24,6 +24,13 @@ export class MuqeemController {
         return this.muqeemService.getTransactions(companyId, query);
     }
 
+    @Get('employees')
+    @RequirePermission('MUQEEM_VIEW')
+    @ApiOperation({ summary: 'جلب الموظفين غير السعوديين لإدارة مستنداتهم' })
+    getEligibleEmployees(@CurrentUser('companyId') companyId: string) {
+        return this.muqeemService.getEligibleEmployees(companyId);
+    }
+
     @Post('transaction/execute')
     @RequirePermission('MUQEEM_EXECUTE')
     @ApiOperation({ summary: 'تنفيذ عملية في مقيم (إصدار، تجديد، إلخ)' })
@@ -56,5 +63,22 @@ export class MuqeemController {
         @Body() data: any,
     ) {
         return this.muqeemService.updateConfig(companyId, data);
+    }
+
+    @Get('transaction/:id/status')
+    @RequirePermission('MUQEEM_VIEW')
+    @ApiOperation({ summary: 'جلب حالة الروبوت لعملية معينة' })
+    getTransactionStatus(@Param('id') id: string) {
+        return this.muqeemService.getTransactionStatus(id);
+    }
+
+    @Post('transaction/:id/resolve-otp')
+    @RequirePermission('MUQEEM_EXECUTE')
+    @ApiOperation({ summary: 'إرسال رمز التحقق للروبوت' })
+    resolveOtp(
+        @Param('id') id: string,
+        @Body() body: { otp: string },
+    ) {
+        return this.muqeemService.resolveOtp(id, body.otp);
     }
 }

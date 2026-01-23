@@ -56,7 +56,7 @@ export class NLPParserService {
      * التحليل الرئيسي للنص
      */
     parse(text: string): ParsedPolicyRule {
-        const safeText = text.toLowerCase();
+        const safeText = text.toLowerCase().trim();
         this.logger.log(`NLP Parsing: "${safeText}"`);
 
         const result: ParsedPolicyRule = {
@@ -69,11 +69,15 @@ export class NLPParserService {
             clarificationNeeded: 'false' as any,
         };
 
+        // 1. تنظيف النص وتحويل الأرقام المكتوبة كلمات لأرقام
         const preparedText = this.prepareText(safeText);
+
+        // 2. استخراج الأرقام مع سياقها
         const numbers = this.extractNumbersWithContext(preparedText);
         let conditionValueObj = numbers.find(n => n.context === 'condition');
         const actionValueObj = numbers.find(n => n.context === 'action');
 
+        // 3. محاولة فهم الشرط
         let conditionField: string | null = null;
         if (conditionValueObj) {
             conditionField = this.detectFieldInSnippet(conditionValueObj.surrounding);
@@ -82,8 +86,8 @@ export class NLPParserService {
             conditionField = this.detectField(preparedText, ['salary', 'راتب']);
         }
 
-        // تحسين: لو فيه كلمة "لفت نظر" أو "إنذار" بدون رقم، نعتبر الرقم 1
-        if (!conditionField) {
+        // تحسين: لو فيه كلمة مربوطة بالجزاءات ومفيش رقم، نفترض 1
+        if (!conditionField || !conditionValueObj) {
             const disciplinaryTerms = ['لفت نظر', 'إنذار', 'انذار', 'مخالفة', 'مخالفه'];
             for (const term of disciplinaryTerms) {
                 if (preparedText.includes(term)) {
@@ -101,36 +105,53 @@ export class NLPParserService {
         if (conditionField && conditionValueObj) {
             result.conditions.push({
                 field: conditionField,
-                operator: operator as any || 'GREATER_THAN_OR_EQUAL',
+                operator: (operator as any) || 'GREATER_THAN_OR_EQUAL',
                 value: conditionValueObj.value,
             });
         }
 
+        // 4. محاولة فهم الإجراء
         const actionType = this.detectAction(preparedText);
+        let actionVal = actionValueObj?.value;
 
-        if (actionType && actionValueObj) {
+        // لو ملقيناش رقم للإجراء بس فيه رقم لسه ملقاش سياق، ناخده كقيمة إجراء
+        if (actionType && !actionVal) {
+            const spareNum = numbers.find(n => n.context === 'none');
+            if (spareNum) {
+                actionVal = spareNum.value;
+            }
+        }
+
+        if (actionType && actionVal) {
             const isPerUnit = preparedText.includes('لكل') || preparedText.includes('عن كل');
             result.actions.push({
                 type: actionType as any,
                 valueType: 'FIXED',
-                value: actionValueObj.value,
+                value: actionVal,
                 description: isPerUnit ? `يخصم لكل وحدة (تكرار)` : `مبلغ ثابت`,
             });
         }
 
         // 5. تحديد الحدث (Trigger)
-        if (preparedText.includes('حضور') || preparedText.includes('تأخير') || preparedText.includes('غياب') || preparedText.includes('غاب') || preparedText.includes('دوام') || preparedText.includes('يجى')) {
+        if (preparedText.includes('حضور') || preparedText.includes('تأخير') || preparedText.includes('غياب') || preparedText.includes('غاب') || preparedText.includes('دوام') || preparedText.includes('بدرى')) {
             result.trigger.event = 'ATTENDANCE';
-        } else if (preparedText.includes('لفت نظر') || preparedText.includes('إنذار') || preparedText.includes('انذار') || preparedText.includes('مخالفة')) {
+        } else if (preparedText.includes('لفت نظر') || preparedText.includes('إنذار') || preparedText.includes('انذار') || preparedText.includes('مخالفة') || preparedText.includes('جزاء')) {
             result.trigger.event = 'DISCIPLINARY';
         }
 
-        // 6. التحقق من النجاح
+        // 6. التحقق من النجاح وتوليد الشرح
         if (result.actions.length > 0) {
             result.understood = true;
             const actionLabel = actionType === 'ADD_TO_PAYROLL' ? 'إضافة مكافأة' : (actionType === 'DEDUCT_FROM_PAYROLL' ? 'خصم مالي' : 'إجراء');
-            const fieldLabelAr = Object.keys(this.FIELDS_MAP).find(k => this.FIELDS_MAP[k] === conditionField) || 'الشرط';
-            result.explanation = `${actionLabel} بقيمة ${actionValueObj?.value || ''} ر.س عند تحقق ${fieldLabelAr} بقيمة ${conditionValueObj?.value || ''}`;
+
+            // محاولة البحث عن الكلمة المستخدمة فعلياً في النص من القاموس
+            const actualFieldWord = Object.keys(this.FIELDS_MAP).find(k =>
+                this.FIELDS_MAP[k] === conditionField && safeText.includes(k.toLowerCase())
+            );
+            const fieldLabelAr = actualFieldWord || Object.keys(this.FIELDS_MAP).find(k => this.FIELDS_MAP[k] === conditionField) || 'الشرط';
+
+            const condValue = conditionValueObj?.value ?? '';
+            result.explanation = `${actionLabel} بقيمة ${actionVal ?? ''} ر.س عند تحقق ${fieldLabelAr} بقيمة ${condValue}`;
         }
 
         return result;
@@ -138,22 +159,17 @@ export class NLPParserService {
 
     private prepareText(text: string): string {
         let t = text;
-        // تحويل كلمات الأرقام الشائعة
         const wordNumbers: Record<string, string> = {
-            'واحد': '1',
-            'واحدة': '1',
-            'واحده': '1',
-            'اثنين': '2',
-            'يومين': '2',
-            'ثلاثة': '3',
-            'ثلاث': '3',
-            'اربعة': '4',
-            'اربع': '4',
-            'خمسة': '5',
-            'خمس': '5',
+            'واحد': '1', 'واحده': '1', 'واحدة': '1',
+            'اول': '1', 'أول': '1', 'الاول': '1', 'الأول': '1',
+            'اثنين': '2', 'يومين': '2', 'ثاني': '2', 'الثاني': '2',
+            'ثلاثة': '3', 'ثلاث': '3', 'ثالث': '3', 'الثالث': '3',
+            'اربعة': '4', 'اربع': '4', 'رابع': '4', 'الرابع': '4',
+            'خمسة': '5', 'خمس': '5', 'خامس': '5', 'الخامس': '5',
         };
         for (const [word, num] of Object.entries(wordNumbers)) {
-            t = t.replace(new RegExp(`${word}`, 'g'), num);
+            // استبدال الكلمة بالرقم مع التعامل مع المسافات وبداية/نهاية النص
+            t = t.replace(new RegExp(`(^|\\s)${word}($|\\s)`, 'g'), `$1${num}$2`);
         }
         return t;
     }
@@ -163,9 +179,9 @@ export class NLPParserService {
         const result: { value: number, context: 'condition' | 'action' | 'none', surrounding: string, position: number }[] = [];
 
         // كلمات الإجراء (حافز، خصم، مكافأة) - الأولوية العليا
-        const actionKeywords = ['حافز', 'مكافأ', 'مكافاه', 'بونص', 'خصم', 'جزاء', 'ينزل', 'يصرف', 'ضيف', 'يخصم'];
+        const actionKeywords = ['حافز', 'مكافأ', 'مكافاه', 'بونص', 'خصم', 'جزاء', 'عقوبة', 'ينزل', 'يصرف', 'ضيف', 'يخصم'];
         // كلمات الشرط (راتب، غياب، تأخير، تأديب) - شروط
-        const conditionKeywords = ['راتبه', 'الاجمالي', 'اجمالي', 'اساسي', 'دقيق', 'يوم', 'ساع', 'سنة', 'دوام', 'بدرى', 'قبل', 'غياب', 'غاب', 'تأخير', 'لفت نظر', 'إنذار', 'انذار', 'مخالفة', 'مخالفه'];
+        const conditionKeywords = ['راتبه', 'الاجمالي', 'اجمالي', 'اساسي', 'دقيق', 'يوم', 'ساع', 'سنة', 'سنه', 'دوام', 'بدرى', 'قبل', 'غياب', 'غاب', 'تأخير', 'لفت نظر', 'إنذار', 'انذار', 'مخالفة', 'مخالفه'];
 
         for (let i = 0; i < words.length; i++) {
             const numMatch = words[i].match(/\d+/);
@@ -196,8 +212,7 @@ export class NLPParserService {
                     const conditionDist = this.findClosestKeywordDistance(words, i, conditionKeywords);
                     context = actionDist < conditionDist ? 'action' : 'condition';
                 } else if (surrounding.includes('ريال') || surrounding.includes('جنيه')) {
-                    // ريال بدون كلمة محددة - نحتاج سياق أوسع
-                    context = 'none'; // سيتم تحديده لاحقاً بناءً على الترتيب
+                    context = 'none';
                 }
 
                 result.push({ value: num, context, surrounding, position: i });
@@ -210,7 +225,6 @@ export class NLPParserService {
             noneContextNumbers[0].context = 'condition';
             noneContextNumbers[1].context = 'action';
         } else if (noneContextNumbers.length === 1 && result.length >= 2) {
-            // لو عندنا رقم واحد بس none، نحدده بناءً على اللي موجود
             const hasCondition = result.some(n => n.context === 'condition');
             const hasAction = result.some(n => n.context === 'action');
             if (!hasCondition) noneContextNumbers[0].context = 'condition';
@@ -234,11 +248,8 @@ export class NLPParserService {
     }
 
     private detectFieldInSnippet(snippet: string): string | null {
-        // ترتيب البحث مهم: الأكثر تحديداً أولاً
-        const specificKeywords = [
-            'غياب', 'غاب', 'تأخير', 'تاخير', 'بدرى', 'مبكر', 'قبل دوامه'
-        ];
-        for (const kw of specificKeywords) {
+        const priority = ['غياب', 'غاب', 'تأخير', 'تاخير', 'بدرى', 'مبكر', 'قبل دوامه', 'انذار', 'إنذار', 'لفت نظر', 'مخالفة', 'مخالفه'];
+        for (const kw of priority) {
             if (snippet.includes(kw)) return this.FIELDS_MAP[kw];
         }
         for (const [key, value] of Object.entries(this.FIELDS_MAP)) {
@@ -249,9 +260,7 @@ export class NLPParserService {
 
     private detectField(text: string, excludeKeywords: string[] = []): string | null {
         let filteredText = text;
-        for (const kw of excludeKeywords) {
-            filteredText = filteredText.replace(kw, '');
-        }
+        for (const kw of excludeKeywords) { filteredText = filteredText.replace(kw, ''); }
         for (const [key, value] of Object.entries(this.FIELDS_MAP)) {
             if (filteredText.includes(key)) return value;
         }
@@ -260,18 +269,14 @@ export class NLPParserService {
 
     private detectOperator(text: string): string | null {
         for (const item of this.OPERATORS_MAP) {
-            for (const kw of item.keywords) {
-                if (text.includes(kw)) return item.op;
-            }
+            for (const kw of item.keywords) { if (text.includes(kw)) return item.op; }
         }
         return null;
     }
 
     private detectAction(text: string): string | null {
         for (const item of this.ACTIONS_MAP) {
-            for (const kw of item.keywords) {
-                if (text.includes(kw)) return item.type;
-            }
+            for (const kw of item.keywords) { if (text.includes(kw)) return item.type; }
         }
         return null;
     }

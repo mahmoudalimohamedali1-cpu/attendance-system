@@ -542,8 +542,8 @@ function App() {
               <TeamCollaborationPage />
             </Suspense>
           } />
-          {/* Social Feed Routes */}
-          <Route path="muqeem" element={
+          {/* Muqeem Integration Routes */}
+          <Route path="integrations/muqeem" element={
             <Suspense fallback={<PageLoader />}>
               <MuqeemManagementPage />
             </Suspense>

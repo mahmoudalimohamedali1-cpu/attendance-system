@@ -41,4 +41,13 @@ export const muqeemApi = {
     getConfig: () => api.get('/integrations/muqeem/config'),
 
     updateConfig: (data: any) => api.post('/integrations/muqeem/config', data),
+
+    getEligibleEmployees: () =>
+        api.get<any[]>('/integrations/muqeem/employees'),
+
+    getTransactionStatus: (id: string) =>
+        api.get<{ status: string; message: string }>(`/integrations/muqeem/transaction/${id}/status`),
+
+    resolveOtp: (id: string, otp: string) =>
+        api.post(`/integrations/muqeem/transaction/${id}/resolve-otp`, { otp }),
 };
