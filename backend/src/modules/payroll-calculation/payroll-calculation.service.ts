@@ -229,7 +229,8 @@ export class PayrollCalculationService {
         hireDate: Date | null,
         terminationDate: Date | null,
         calcBase: string,
-        method: string
+        method: string,
+        effectiveWorkingDays: string = '0,1,2,3,4'
     ): Decimal {
         const daysInPeriod = Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
@@ -248,11 +249,13 @@ export class PayrollCalculationService {
             workedDays = Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
             totalDays = calcBase === 'FIXED_30_DAYS' ? 30 : daysInPeriod;
         } else if (method === 'EXCLUDE_WEEKENDS') {
-            // حساب أيام العمل فقط (أحد-خميس)
+            // حساب أيام العمل فقط بناءً على إعدادات الشركة/الموظف
+            const workingDaysSet = new Set(this.parseWorkingDays(effectiveWorkingDays));
+
             for (let d = new Date(effectiveStart); d <= effectiveEnd; d.setDate(d.getDate() + 1)) {
-                if (d.getDay() >= 0 && d.getDay() <= 4) workedDays++;
+                if (workingDaysSet.has(d.getDay())) workedDays++;
             }
-            totalDays = calcBase === 'FIXED_30_DAYS' ? 22 : this.getWorkingDaysInPeriod(startDate, endDate);
+            totalDays = calcBase === 'FIXED_30_DAYS' ? 22 : this.getWorkingDaysInPeriod(startDate, endDate, effectiveWorkingDays);
         }
 
         // ✅ Use Decimal for division to maintain precision
@@ -414,20 +417,20 @@ export class PayrollCalculationService {
         }
     }
 
-    private async getPeriodAttendanceData(employeeId: string, companyId: string, startDate: Date, endDate: Date, settings: any) {
-        // جلب بيانات الفرع والقسم للموظف للحصول على أيام العمل وإعدادات رمضان
-        // Fetch employee with branch and department for workingDays hierarchy
+    private async getPeriodAttendanceData(
+        employeeId: string,
+        companyId: string,
+        startDate: Date,
+        endDate: Date,
+        settings: any,
+        effectiveWorkingDays: string
+    ) {
+        // Fetch employee branch for Ramadan config (needed separately or passed)
         const employee = await this.prisma.user.findFirst({
             where: { id: employeeId, companyId },
-            include: { branch: true, department: true },
+            include: { branch: true },
         });
-        // Type cast to access fields that may not be in prisma client yet
-        const emp = employee as any;
-        const branch = emp?.branch as any;
-        const department = emp?.department as any;
-
-        // 📅 Working days hierarchy: Employee → Department → Branch
-        const effectiveWorkingDays = emp?.workingDays || department?.workingDays || branch?.workingDays || '0,1,2,3,4';
+        const branch = (employee as any)?.branch as any;
 
         // 🌙 Calculate expected daily minutes based on Ramadan mode
         const branchConfig: BranchRamadanConfig = {
@@ -566,6 +569,8 @@ export class PayrollCalculationService {
                     where: { status: 'ACTIVE' },
                     take: 1
                 },
+                branch: true,
+                department: true,
             },
         });
 
@@ -614,6 +619,13 @@ export class PayrollCalculationService {
         const assignment = employee.salaryAssignments[0];
         if (!assignment) throw new NotFoundException('لا يوجد هيكل راتب للموظف');
 
+        // 📅 Working days hierarchy: Employee → Department → Branch
+        const emp = employee as any;
+        const branch = emp?.branch as any;
+        const department = emp?.department as any;
+        const effectiveWorkingDays = emp?.workingDays || department?.workingDays || branch?.workingDays || '0,1,2,3,4';
+        (this as any)._currentEffectiveWorkingDays = effectiveWorkingDays; // For getProRataFactor fallback if needed
+
         // ✅ Use Decimal for all financial calculations
         const ctx: Record<string, Decimal> = {};
         const totalSalary = toDecimal(assignment.baseSalary);
@@ -635,7 +647,8 @@ export class PayrollCalculationService {
         const proRataFactor = this.getProRataFactor(
             startDate, endDate, employee.hireDate, terminationDate,
             settings.hireTerminationCalcBase,
-            settings.hireTerminationMethod
+            settings.hireTerminationMethod,
+            effectiveWorkingDays
         );
 
         // ✅ Use Decimal for all line amounts
@@ -741,7 +754,7 @@ export class PayrollCalculationService {
         const dailyRateGeneral = calcDailyRate(baseSalary, daysInPeriodGeneral);
         const hourlyRateGeneral = calcHourlyRate(baseSalary, daysInPeriodGeneral, dailyWorkingHours);
 
-        const attendanceData = await this.getPeriodAttendanceData(employeeId, companyId, startDate, endDate, settings);
+        const attendanceData = await this.getPeriodAttendanceData(employeeId, companyId, startDate, endDate, settings, effectiveWorkingDays);
         let presentDays = attendanceData.presentDays || daysInPeriodGeneral;
         let absentDays = attendanceData.absentDays || 0;
         let lateMinutes = attendanceData.lateMinutes || 0;
@@ -906,23 +919,26 @@ export class PayrollCalculationService {
 
         const otHourlyRate = calcHourlyRate(otBaseSalary, daysInPeriodOT, dailyWorkingHours);
 
-        // ✅ تطبيق الحد الأقصى للوقت الإضافي (إذا مفعل)
-        let cappedOvertimeHours = overtimeHours;
+        // ✅ التحقق من إجمالي ساعات العمل الإضافي (العادي + الويكند + العطلات) قبل تطبيق الحد الأقصى
+        const weekendOT = toDecimal(attendanceData.weekendOvertimeHours || 0);
+        const holidayOT = toDecimal(attendanceData.holidayOvertimeHours || 0);
+        const totalSumOTBeforeCap = add(add(overtimeHours, weekendOT), holidayOT);
+
+        // تطبيق الحد الأقصى للوقت الإضافي (إذا مفعل)
+        let totalOTHours = totalSumOTBeforeCap;
         if (settings.enableOvertimeCap && (settings.maxOvertimeHoursPerMonth || 50) > 0) {
             const maxOT = toDecimal(settings.maxOvertimeHoursPerMonth || 50);
-            if (overtimeHours.gt(maxOT)) {
-                this.logger.warn(`⚠️ Overtime capped for employee ${employeeId}: ${toFixed(overtimeHours)}h -> ${toFixed(maxOT)}h`);
-                cappedOvertimeHours = maxOT;
+            if (totalSumOTBeforeCap.gt(maxOT)) {
+                this.logger.warn(`⚠️ Overtime capped for employee ${employeeId}: ${toFixed(totalSumOTBeforeCap)}h -> ${toFixed(maxOT)}h`);
+                totalOTHours = maxOT;
             }
         }
 
-        // حساب الوقت الإضافي بالمعاملات المختلفة
-        const totalOTHours = cappedOvertimeHours; // استخدام القيمة المحددة
-        const weekendOT = toDecimal(attendanceData.weekendOvertimeHours || 0);
-        const holidayOT = toDecimal(attendanceData.holidayOvertimeHours || 0);
-        const regularOvertimeHours = max(ZERO, sub(sub(totalOTHours, weekendOT), holidayOT));
-        const weekendOvertimeHours = min(weekendOT, sub(totalOTHours, regularOvertimeHours));
-        const holidayOvertimeHours = min(holidayOT, sub(sub(totalOTHours, regularOvertimeHours), weekendOvertimeHours));
+        // توزيع الساعات المسموح بها حسب الأولوية (عطلات -> ويكند -> عادي)؟ 
+        // أو بالأحرى استخراج الساعات الفعلية المسموح بها لكل نوع
+        const holidayOvertimeHours = min(holidayOT, totalOTHours);
+        const weekendOvertimeHours = min(weekendOT, sub(totalOTHours, holidayOvertimeHours));
+        const regularOvertimeHours = max(ZERO, sub(sub(totalOTHours, holidayOvertimeHours), weekendOvertimeHours));
 
         let overtimeAmount: Decimal = ZERO;
         // الوقت الإضافي العادي
