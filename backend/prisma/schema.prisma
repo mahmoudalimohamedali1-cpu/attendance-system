@@ -132,7 +132,9 @@ model Company {
   posts Post[]
 
   // Calendar Events (أحداث التقويم)
-  events Event[]
+  events             Event[]
+  muqeemTransactions MuqeemTransaction[]
+  muqeemConfig       MuqeemConfig?
 
   @@map("companies")
 }
@@ -325,6 +327,8 @@ enum Role {
   MANAGER
   EMPLOYEE
   HR
+  MUQEEM_ADMIN
+  MUQEEM_VIEWER
 }
 
 enum UserStatus {
@@ -599,10 +603,12 @@ model User {
   workingDays String? @map("working_days") // e.g., "1,2,3" for Mon-Wed
 
   // تسويات الرواتب
-  employeeAdjustments PayrollAdjustment[] @relation("EmployeeAdjustments")
-  createdAdjustments  PayrollAdjustment[] @relation("AdjustmentCreator")
-  approvedAdjustments PayrollAdjustment[] @relation("AdjustmentApprover")
-  payrollAdjustments  PayrollAdjustment[]
+  employeeAdjustments       PayrollAdjustment[] @relation("EmployeeAdjustments")
+  createdAdjustments        PayrollAdjustment[] @relation("AdjustmentCreator")
+  approvedAdjustments       PayrollAdjustment[] @relation("AdjustmentApprover")
+  payrollAdjustments        PayrollAdjustment[]
+  muqeemTransactions        MuqeemTransaction[] @relation("MuqeemUserTransactions")
+  muqeemTransactionsCreated MuqeemTransaction[] @relation("MuqeemCreatedTransactions")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -7355,4 +7361,80 @@ model OdooConflict {
   @@index([entityType])
   @@index([resolution])
   @@map("odoo_conflicts")
+}
+
+// ==================== Muqeem Platform Integration ====================
+
+enum MuqeemTransactionType {
+  IQAMA_ISSUE
+  IQAMA_RENEW
+  IQAMA_TRANSFER
+  VISA_EXIT_REENTRY_ISSUE
+  VISA_EXIT_REENTRY_CANCEL
+  VISA_EXIT_REENTRY_EXTEND
+  VISA_EXIT_REENTRY_REPRINT
+  VISA_FINAL_EXIT_ISSUE
+  VISA_FINAL_EXIT_CANCEL
+  PASSPORT_EXTEND
+  PASSPORT_RENEW
+}
+
+enum MuqeemTransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model MuqeemTransaction {
+  id        String                  @id @default(uuid())
+  companyId String                  @map("company_id")
+  company   Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String                  @map("user_id")
+  user      User                    @relation("MuqeemUserTransactions", fields: [userId], references: [id])
+  type      MuqeemTransactionType
+  status    MuqeemTransactionStatus @default(PENDING)
+
+  // Transaction Details
+  payload      Json? // Data sent to Muqeem
+  response     Json? // Data received from Muqeem
+  externalRef  String? @map("external_ref") // Transaction ID in Muqeem
+  errorMessage String? @map("error_message")
+
+  // File attachments (e.g. PDF Visa, PDF Iqama)
+  fileUrl String? @map("file_url")
+
+  createdById String? @map("created_by_id")
+  createdBy   User?   @relation("MuqeemCreatedTransactions", fields: [createdById], references: [id])
+
+  executedAt DateTime? @map("executed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@map("muqeem_transactions")
+}
+
+model MuqeemConfig {
+  id        String  @id @default(uuid())
+  companyId String  @unique @map("company_id")
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  username String
+  password String // Should be encrypted
+  isActive Boolean @default(true) @map("is_active")
+
+  // Notification settings
+  iqamaExpiryDays     Int     @default(30) @map("iqama_expiry_days")
+  passportExpiryDays  Int     @default(60) @map("passport_expiry_days")
+  enableNotifications Boolean @default(true) @map("enable_notifications")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("muqeem_configs")
 }

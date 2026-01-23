@@ -1,0 +1,22 @@
+export enum MuqeemTransactionType {
+    IQAMA_ISSUE = 'IQAMA_ISSUE',
+    IQAMA_RENEW = 'IQAMA_RENEW',
+    IQAMA_TRANSFER = 'IQAMA_TRANSFER',
+    VISA_EXIT_REENTRY_ISSUE = 'VISA_EXIT_REENTRY_ISSUE',
+    VISA_EXIT_REENTRY_CANCEL = 'VISA_EXIT_REENTRY_CANCEL',
+    VISA_EXIT_REENTRY_EXTEND = 'VISA_EXIT_REENTRY_EXTEND',
+    VISA_EXIT_REENTRY_REPRINT = 'VISA_EXIT_REENTRY_REPRINT',
+    VISA_FINAL_EXIT_ISSUE = 'VISA_FINAL_EXIT_ISSUE',
+    VISA_FINAL_EXIT_CANCEL = 'VISA_FINAL_EXIT_CANCEL',
+    PASSPORT_EXTEND = 'PASSPORT_EXTEND',
+    PASSPORT_RENEW = 'PASSPORT_RENEW',
+}
+
+export interface MuqeemResponse {
+    success: boolean;
+    message: string;
+    transactionId?: string;
+    externalRef?: string;
+    pdfUrl?: string;
+    data?: any;
+}

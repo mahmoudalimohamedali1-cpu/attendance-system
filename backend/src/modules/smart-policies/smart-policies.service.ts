@@ -4,6 +4,9 @@ import { PolicyParserService, ParsedPolicyRule } from '../ai/services/policy-par
 import { PolicyContextService } from './policy-context.service';
 import { SmartPolicyExecutorService } from './smart-policy-executor.service';
 import { SmartPolicyTrigger, SmartPolicyStatus } from '@prisma/client';
+// === AI-Free Rule Engine (Phase V2) ===
+import { PolicyTemplateRegistryService } from './templates/policy-template.registry';
+import { PELParserService } from './engines/pel-parser.service';
 
 /**
  * DTO لإنشاء سياسة ذكية
@@ -37,15 +40,154 @@ export class SmartPoliciesService {
         private readonly policyContext: PolicyContextService,
         @Inject(forwardRef(() => SmartPolicyExecutorService))
         private readonly policyExecutor: SmartPolicyExecutorService,
+        // === AI-Free Rule Engine (Phase V2) ===
+        private readonly templateRegistry: PolicyTemplateRegistryService,
+        private readonly pelParser: PELParserService,
     ) { }
 
     /**
-     * تحليل نص السياسة بالذكاء الاصطناعي (بدون حفظ)
+     * تحليل نص السياسة (مع fallback للـ PEL والـ Templates لو الـ AI مش متاح)
      */
     async analyzePolicy(originalText: string): Promise<ParsedPolicyRule> {
         const safeText = originalText || '';
         this.logger.log(`Analyzing policy: "${safeText.substring(0, 50)}..."`);
-        return await this.policyParser.parsePolicy(safeText);
+
+        // 1️⃣ Try AI Parser first
+        try {
+            const aiResult = await this.policyParser.parsePolicy(safeText);
+            if (aiResult && aiResult.understood) {
+                this.logger.log('AI parsing successful');
+                return aiResult;
+            }
+        } catch (aiError) {
+            this.logger.warn(`AI parser unavailable: ${(aiError as Error).message}`);
+        }
+
+        // 2️⃣ Fallback to PEL Parser (for structured expressions)
+        this.logger.log('Trying PEL parser fallback...');
+        try {
+            const pelResult = this.pelParser.parse(safeText);
+            if (pelResult.success && pelResult.parsedRule) {
+                this.logger.log('PEL parsing successful');
+                // Map PEL types to ParsedPolicyRule types
+                const mappedConditions = (pelResult.parsedRule.conditions || []).map((c: any) => ({
+                    ...c,
+                    operator: this.mapPelOperator(c.operator),
+                }));
+                const mappedActions = (pelResult.parsedRule.actions || []).map((a: any) => ({
+                    ...a,
+                    type: a.type === 'ADD' ? 'ADD_TO_PAYROLL' : a.type === 'DEDUCT' ? 'DEDUCT_FROM_PAYROLL' : a.type,
+                }));
+                return {
+                    understood: true,
+                    explanation: `تم التحليل بواسطة محرك PEL: ${pelResult.parsedRule.explanation || safeText}`,
+                    trigger: { event: 'PAYROLL', subEvent: null },
+                    conditions: mappedConditions as any,
+                    actions: mappedActions as any,
+                    scope: { type: 'ALL_EMPLOYEES' as const },
+                    clarificationNeeded: 'false' as any,
+                };
+            }
+        } catch (pelError) {
+            this.logger.debug(`PEL parser failed: ${(pelError as Error).message}`);
+        }
+
+        // 3️⃣ Fallback to Template matching (keyword-based)
+        this.logger.log('Trying template matching fallback...');
+        const matchedTemplate = this.matchTextToTemplate(safeText);
+        if (matchedTemplate) {
+            this.logger.log(`Template matched: ${matchedTemplate.id}`);
+            const generated = this.templateRegistry.generateParsedRule(matchedTemplate.id);
+            return {
+                understood: generated.understood,
+                explanation: `تم المطابقة مع قالب: ${matchedTemplate.nameAr}`,
+                trigger: { event: matchedTemplate.trigger, subEvent: null },
+                conditions: generated.conditions as any || [],
+                actions: generated.actions as any || [],
+                scope: { type: 'ALL_EMPLOYEES' as const },
+                clarificationNeeded: 'false' as any,
+            };
+        }
+
+        // 4️⃣ Return default template based on keywords
+        this.logger.log('Using default template based on keywords...');
+        const category = this.detectCategoryFromText(safeText);
+        const defaultRule = this.templateRegistry.getDefaultTemplate(category);
+        return {
+            understood: defaultRule.understood,
+            explanation: `تم استخدام قالب افتراضي. يمكنك تخصيص الشروط والإجراءات.`,
+            trigger: { event: 'PAYROLL', subEvent: null },
+            conditions: defaultRule.conditions as any || [],
+            actions: defaultRule.actions as any || [],
+            scope: { type: 'ALL_EMPLOYEES' as const },
+            clarificationNeeded: 'true' as any,
+        };
+    }
+
+    /**
+     * تحويل operators من PEL إلى القيم المطلوبة
+     */
+    private mapPelOperator(op: string): string {
+        const mapping: Record<string, string> = {
+            '>': 'GREATER_THAN',
+            '<': 'LESS_THAN',
+            '>=': 'GREATER_THAN_OR_EQUAL',
+            '<=': 'LESS_THAN_OR_EQUAL',
+            '=': 'EQUALS',
+            '==': 'EQUALS',
+            '!=': '!=',
+            'GREATER_THAN': 'GREATER_THAN',
+            'LESS_THAN': 'LESS_THAN',
+            'GREATER_THAN_OR_EQUAL': 'GREATER_THAN_OR_EQUAL',
+            'LESS_THAN_OR_EQUAL': 'LESS_THAN_OR_EQUAL',
+            'EQUALS': 'EQUALS',
+            'CONTAINS': 'CONTAINS',
+            'IN': 'IN',
+            'BETWEEN': 'BETWEEN',
+        };
+        return mapping[op] || op;
+    }
+
+    /**
+     * مطابقة النص مع القوالب المتاحة
+     */
+    private matchTextToTemplate(text: string): any | null {
+        const templates = this.templateRegistry.getTemplates();
+        const lowerText = text.toLowerCase();
+
+        for (const template of templates) {
+            // Check tags
+            for (const tag of template.tags) {
+                if (lowerText.includes(tag.toLowerCase())) {
+                    return template;
+                }
+            }
+            // Check name
+            if (lowerText.includes(template.nameAr) || lowerText.includes(template.nameEn.toLowerCase())) {
+                return template;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * اكتشاف الفئة من النص
+     */
+    private detectCategoryFromText(text: string): any {
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('خصم') || lowerText.includes('تأخير') || lowerText.includes('غياب') || lowerText.includes('penalty')) {
+            return 'PENALTIES';
+        }
+        if (lowerText.includes('مكافأة') || lowerText.includes('حافز') || lowerText.includes('bonus') || lowerText.includes('عيد')) {
+            return 'BONUSES';
+        }
+        if (lowerText.includes('حضور') || lowerText.includes('انضباط') || lowerText.includes('attendance')) {
+            return 'ATTENDANCE';
+        }
+        if (lowerText.includes('إضافي') || lowerText.includes('overtime')) {
+            return 'OVERTIME';
+        }
+        return 'BONUSES'; // Default
     }
 
     /**
@@ -376,11 +518,11 @@ export class SmartPoliciesService {
     async delete(id: string) {
         const existing = await this.findOne(id); // التحقق من الوجود
         const result = await this.prisma.smartPolicy.delete({ where: { id } });
-        
+
         // 🔧 FIX: إبطال الـ cache بعد الحذف
         this.policyExecutor.invalidatePolicyCache(existing.companyId);
         this.logger.log(`Cache invalidated for company ${existing.companyId} after policy delete`);
-        
+
         return result;
     }
 
