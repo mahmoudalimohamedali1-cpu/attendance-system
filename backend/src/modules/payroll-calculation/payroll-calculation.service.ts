@@ -1474,7 +1474,7 @@ export class PayrollCalculationService {
                     componentId: `DISC-${adj.id}`,
                     componentCode: 'DISC_ADJ',
                     componentName: adj.description || 'تسوية جزاء إداري',
-                    sign: adj.adjustmentType === 'DEDUCTION' || adj.adjustmentType === 'SUSPENSION_UNPAID' ? 'DEDUCTION' : 'EARNING',
+                    sign: (adj.adjustmentType === 'DEDUCTION' || adj.adjustmentType === 'SUSPENSION_UNPAID' || adj.adjustmentType === 'MANUAL_DEDUCTION') ? 'DEDUCTION' : 'EARNING',
                     amount: Math.round(adjAmount * 100) / 100,
                     descriptionAr: (adj.description || 'جزاء إداري') + descriptionExtra,
                     source: {
@@ -1616,11 +1616,11 @@ export class PayrollCalculationService {
 
             switch (unpaidLeaveMethod) {
                 case 'BASED_ON_SHIFTS':
-                    // خصم أيام الإجازة التي تقع في أيام عمل الموظف فقط (أحد-خميس)
+                    // خصم أيام الإجازة التي تقع في أيام عمل الموظف فقط
+                    // 🔧 FIX: استخدام effectiveWorkingDays بدلاً من القيم الثابتة
+                    const workingDaysSetForUnpaid = new Set(this.parseWorkingDays(effectiveWorkingDays));
                     for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
-                        const dayOfWeek = d.getDay();
-                        // أيام العمل: الأحد (0) إلى الخميس (4)
-                        if (dayOfWeek >= 0 && dayOfWeek <= 4) {
+                        if (workingDaysSetForUnpaid.has(d.getDay())) {
                             unpaidDaysCount++;
                         }
                     }
@@ -1632,10 +1632,11 @@ export class PayrollCalculationService {
                     break;
 
                 case 'BASED_ON_WORKING_DAYS':
-                    // خصم أيام العمل فقط (22 يوم بدلاً من 30)
+                    // خصم أيام العمل فقط
+                    // 🔧 FIX: استخدام effectiveWorkingDays بدلاً من القيم الثابتة
+                    const workingDaysSetForWorking = new Set(this.parseWorkingDays(effectiveWorkingDays));
                     for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
-                        const dayOfWeek = d.getDay();
-                        if (dayOfWeek >= 0 && dayOfWeek <= 4) {
+                        if (workingDaysSetForWorking.has(d.getDay())) {
                             unpaidDaysCount++;
                         }
                     }
@@ -1696,11 +1697,12 @@ export class PayrollCalculationService {
         }
 
         // --- Retroactive Pay (Backpay) ---
+        // 🔧 FIX: جلب الفروقات المعتمدة (APPROVED) بدلاً من المعلقة (PENDING)
         const retroPays = await this.prisma.retroPay.findMany({
             where: {
                 employeeId,
                 companyId,
-                status: 'PENDING',
+                status: 'APPROVED',
                 effectiveFrom: { lte: policyPeriodEnd }
             }
         });
