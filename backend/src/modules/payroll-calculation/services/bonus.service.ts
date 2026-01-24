@@ -352,6 +352,31 @@ export class BonusService {
   }
 
   /**
+   * إلغاء / استرجاع مكافأة معتمدة
+   */
+  async revertBonus(bonusId: string, companyId: string, reason?: string): Promise<any> {
+    const bonus = await this.prisma.retroPay.findFirst({
+      where: { id: bonusId, companyId },
+    });
+
+    if (!bonus) {
+      throw new NotFoundException('المكافأة غير موجودة');
+    }
+
+    if (bonus.status === 'PAID') {
+      throw new BadRequestException('لا يمكن إلغاء مكافأة تم صرفها بالفعل');
+    }
+
+    return this.prisma.retroPay.update({
+      where: { id: bonusId },
+      data: {
+        status: 'CANCELLED',
+        notes: reason ? `${bonus.notes || ''} | إلغاء: ${reason}` : bonus.notes,
+      },
+    });
+  }
+
+  /**
    * جلب المكافآت المعلقة
    */
   async getPendingBonuses(companyId: string): Promise<any[]> {
