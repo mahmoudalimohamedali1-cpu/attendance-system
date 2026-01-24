@@ -24,6 +24,7 @@ import { differenceInDays } from 'date-fns';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { disciplinaryService } from '@/services/disciplinary.service';
 import { usersService } from '@/services/users.service';
+import { useAuthStore } from '@/store/auth.store';
 import { Info, Warning, Person, LocationOn, CalendarMonth, Description, Group, Category, AttachFile, Delete, CloudUpload } from '@mui/icons-material';
 
 interface CreateInvestigationDialogProps {
@@ -47,6 +48,10 @@ const VIOLATION_TYPES = [
 
 export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateInvestigationDialogProps) => {
     const queryClient = useQueryClient();
+    const user = useAuthStore((state) => state.user);
+    const isAdmin = user?.role === 'ADMIN';
+    const isManager = user?.role === 'MANAGER';
+
     const [formData, setFormData] = useState({
         employeeId: '',
         title: '',
@@ -60,10 +65,21 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
     const [attachments, setAttachments] = useState<File[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // جلب قائمة الموظفين
+    // جلب قائمة الموظفين حسب الدور
+    // Admin: كل الموظفين
+    // Manager: موظفي الفريق فقط
     const { data: employeesData } = useQuery({
-        queryKey: ['employees-list'],
-        queryFn: () => usersService.getUsers({ role: 'EMPLOYEE', limit: 500 }),
+        queryKey: ['employees-list-disciplinary', isAdmin ? 'all' : 'my-team'],
+        queryFn: async () => {
+            if (isAdmin) {
+                // Admin يشوف كل الموظفين
+                return usersService.getUsers({ role: 'EMPLOYEE', limit: 500 });
+            } else {
+                // Manager يشوف موظفينه فقط
+                const teamData = await usersService.getMyTeam();
+                return { data: teamData };
+            }
+        },
         enabled: open,
     });
     const employees = employeesData?.data || [];

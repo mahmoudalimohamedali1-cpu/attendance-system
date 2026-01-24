@@ -72,6 +72,13 @@ class UsersService {
         });
         return response.data || [];
     }
+
+    /**
+     * جلب موظفي الفريق (للمدير)
+     */
+    async getMyTeam(): Promise<User[]> {
+        return api.get<User[]>('/users/my-team');
+    }
 }
 
 export const usersService = new UsersService();
