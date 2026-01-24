@@ -140,6 +140,7 @@ export default function RaisesPage() {
     const [selectedRequest, setSelectedRequest] = useState<RaiseRequest | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [decisionNotes, setDecisionNotes] = useState('');
+    const [effectiveMonth, setEffectiveMonth] = useState<string>('');
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
     // Tab mapping: 0=Manager Inbox, 1=HR Inbox, 2=PENDING, 3=MGR_APPROVED, 4=APPROVED, 5=REJECTED
@@ -170,8 +171,8 @@ export default function RaisesPage() {
 
     // Manager Decision Mutation
     const managerDecisionMutation = useMutation({
-        mutationFn: ({ id, decision, notes }: { id: string; decision: 'APPROVED' | 'REJECTED' | 'DELAYED'; notes?: string }) =>
-            api.post(`/raises/${id}/manager-decision`, { decision, notes }),
+        mutationFn: ({ id, decision, notes, effectiveMonth }: { id: string; decision: 'APPROVED' | 'REJECTED' | 'DELAYED'; notes?: string; effectiveMonth?: string }) =>
+            api.post(`/raises/${id}/manager-decision`, { decision, notes, effectiveMonth }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['raises'] });
             queryClient.invalidateQueries({ queryKey: ['raises-manager-inbox'] });
@@ -186,8 +187,8 @@ export default function RaisesPage() {
 
     // HR Decision Mutation
     const hrDecisionMutation = useMutation({
-        mutationFn: ({ id, decision, notes }: { id: string; decision: 'APPROVED' | 'REJECTED' | 'DELAYED'; notes?: string }) =>
-            api.post(`/raises/${id}/hr-decision`, { decision, notes }),
+        mutationFn: ({ id, decision, notes, effectiveMonth }: { id: string; decision: 'APPROVED' | 'REJECTED' | 'DELAYED'; notes?: string; effectiveMonth?: string }) =>
+            api.post(`/raises/${id}/hr-decision`, { decision, notes, effectiveMonth }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['raises'] });
             queryClient.invalidateQueries({ queryKey: ['raises-hr-inbox'] });
@@ -212,17 +213,28 @@ export default function RaisesPage() {
         setDialogOpen(false);
         setSelectedRequest(null);
         setDecisionNotes('');
+        setEffectiveMonth('');
     };
 
     const handleManagerDecision = (decision: 'APPROVED' | 'REJECTED' | 'DELAYED') => {
         if (selectedRequest) {
-            managerDecisionMutation.mutate({ id: selectedRequest.id, decision, notes: decisionNotes });
+            managerDecisionMutation.mutate({
+                id: selectedRequest.id,
+                decision,
+                notes: decisionNotes,
+                effectiveMonth: effectiveMonth || undefined
+            });
         }
     };
 
     const handleHRDecision = (decision: 'APPROVED' | 'REJECTED' | 'DELAYED') => {
         if (selectedRequest) {
-            hrDecisionMutation.mutate({ id: selectedRequest.id, decision, notes: decisionNotes });
+            hrDecisionMutation.mutate({
+                id: selectedRequest.id,
+                decision,
+                notes: decisionNotes,
+                effectiveMonth: effectiveMonth || undefined
+            });
         }
     };
 
@@ -530,6 +542,52 @@ export default function RaisesPage() {
                                             value={decisionNotes}
                                             onChange={(e) => setDecisionNotes(e.target.value)}
                                         />
+                                    </Grid>
+                                )}
+
+                                {/* Effective Month Selection for Manager/HR */}
+                                {(isManagerInbox || isHRInbox) && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>
+                                            شهر بدء الزيادة (اختياري)
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                                            <Button
+                                                size="small"
+                                                variant={effectiveMonth === '' ? 'contained' : 'outlined'}
+                                                onClick={() => setEffectiveMonth('')}
+                                            >
+                                                التاريخ الأصلي
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant={effectiveMonth === new Date().toISOString().slice(0, 7) + '-01' ? 'contained' : 'outlined'}
+                                                onClick={() => setEffectiveMonth(new Date().toISOString().slice(0, 7) + '-01')}
+                                            >
+                                                الشهر الحالي
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant={effectiveMonth === new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().slice(0, 7) + '-01' ? 'contained' : 'outlined'}
+                                                onClick={() => setEffectiveMonth(new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().slice(0, 7) + '-01')}
+                                            >
+                                                الشهر القادم
+                                            </Button>
+                                        </Box>
+                                        <TextField
+                                            fullWidth
+                                            type="month"
+                                            label="أو اختر شهر محدد"
+                                            value={effectiveMonth ? effectiveMonth.slice(0, 7) : ''}
+                                            onChange={(e) => setEffectiveMonth(e.target.value ? e.target.value + '-01' : '')}
+                                            InputLabelProps={{ shrink: true }}
+                                            size="small"
+                                        />
+                                        {effectiveMonth && (
+                                            <Typography variant="caption" color="info.main" sx={{ mt: 1, display: 'block' }}>
+                                                سيتم احتساب الزيادة بدءاً من: {format(new Date(effectiveMonth), 'MMMM yyyy', { locale: ar })}
+                                            </Typography>
+                                        )}
                                     </Grid>
                                 )}
                             </Grid>
