@@ -144,7 +144,7 @@ export const PayrollRunDetailsPage = () => {
     const fetchAdjustments = async () => {
         try {
             setAdjustmentsLoading(true);
-            const data = await api.get(`/payroll-adjustments?payrollRunId=${id}`) as any[];
+            const data = await api.get(`/payroll-adjustments/by-run/${id}`) as any[];
             setAdjustments(data);
         } catch (err: any) {
             console.error('Failed to fetch adjustments:', err);
