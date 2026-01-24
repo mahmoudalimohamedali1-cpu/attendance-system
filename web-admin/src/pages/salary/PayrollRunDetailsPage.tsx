@@ -177,7 +177,7 @@ export const PayrollRunDetailsPage = () => {
         const reason = window.prompt('سبب الرفض:');
         if (!reason) return;
         try {
-            await api.post('/payroll-adjustments/approve', { adjustmentId, approved: false, reason });
+            await api.post('/payroll-adjustments/approve', { adjustmentId, approved: false, rejectionReason: reason });
             alert('تم رفض التسوية ❌');
             fetchAdjustments();
         } catch (err: any) {
