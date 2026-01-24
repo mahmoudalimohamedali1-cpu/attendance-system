@@ -607,38 +607,11 @@ export class PayrollRunsService {
             const gosiAmount = toDecimal(gosiLine?.amount || 0);
             totalGosi = add(totalGosi, gosiAmount);
 
-            // ✅ إضافة التسويات المعتمدة للمعاينة (تأثير مرئي في الـ Wizard)
-            const approvedAdjustments = await this.adjustmentsService.getApprovedAdjustmentsTotal(
-                employee.id,
-                period.id
-            );
-
-            let bonusAmount = ZERO;
-            let deductionAmount = ZERO;
-
-            if (approvedAdjustments.netAdjustment !== 0) {
-                bonusAmount = toDecimal(approvedAdjustments.totalAdditions);
-                deductionAmount = toDecimal(approvedAdjustments.totalDeductions);
-
-                if (isPositive(bonusAmount)) {
-                    earnings.push({
-                        name: 'تسويات (إضافات)',
-                        code: 'ADJ_EARN',
-                        amount: toNumber(bonusAmount)
-                    });
-                }
-                if (isPositive(deductionAmount)) {
-                    deductionItems.push({
-                        name: 'تسويات (خصومات)',
-                        code: 'ADJ_DED',
-                        amount: toNumber(deductionAmount)
-                    });
-                }
-            }
-
             // ✅ Using Decimal for calculations
-            const finalGross = add(toDecimal(calculation.grossSalary), bonusAmount);
-            const finalDeductions = add(add(toDecimal(calculation.totalDeductions), employeeAdvanceAmount), deductionAmount);
+            // ملاحظة: التسويات (adjustments) يتم إضافتها تلقائياً في `payroll-calculation.service.ts`
+            // لذلك لا نضيفها هنا مرة أخرى لتجنب التكرار
+            const finalGross = toDecimal(calculation.grossSalary);
+            const finalDeductions = add(toDecimal(calculation.totalDeductions), employeeAdvanceAmount);
             const finalNet = sub(finalGross, finalDeductions);
 
             totalGross = add(totalGross, finalGross);
