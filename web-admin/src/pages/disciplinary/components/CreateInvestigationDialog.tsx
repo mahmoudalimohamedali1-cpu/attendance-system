@@ -53,7 +53,7 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
     const isManager = user?.role === 'MANAGER';
 
     const [formData, setFormData] = useState({
-        employeeId: '',
+        employeeIds: [] as string[],
         title: '',
         violationType: '',
         incidentDate: null as Date | null,
@@ -107,7 +107,7 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
 
     const resetForm = () => {
         setFormData({
-            employeeId: '',
+            employeeIds: [],
             title: '',
             violationType: '',
             incidentDate: null,
@@ -121,7 +121,7 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
     };
 
     const handleSubmit = () => {
-        if (!formData.employeeId || !formData.title || !formData.incidentDate || !formData.incidentLocation || !formData.description) {
+        if (formData.employeeIds.length === 0 || !formData.title || !formData.incidentDate || !formData.incidentLocation || !formData.description) {
             setError('الرجاء ملء جميع الحقول المطلوبة');
             return;
         }
@@ -132,12 +132,25 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
         }
 
         const submitData: any = {
-            employeeId: formData.employeeId,
+            employeeId: formData.employeeIds[0], // أول موظف هو الأساسي
             title: formData.title,
             incidentDate: formData.incidentDate.toISOString(),
             incidentLocation: formData.incidentLocation,
             description: formData.description,
         };
+
+        // إذا كان فيه أكثر من موظف معني، نضيفهم كأطراف معنية
+        if (formData.employeeIds.length > 1) {
+            const otherEmployeeNames = formData.employeeIds.slice(1).map(id => {
+                const emp = employees.find((e: any) => e.id === id);
+                return emp ? `${emp.firstName} ${emp.lastName}` : id;
+            }).join(', ');
+            submitData.involvedParties = {
+                ...submitData.involvedParties,
+                otherAccused: otherEmployeeNames,
+                otherAccusedIds: formData.employeeIds.slice(1)
+            };
+        }
 
         if (formData.violationType) submitData.violationType = formData.violationType;
         if (formData.witnessIds.length > 0) {
@@ -196,15 +209,27 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
                         <Grid item xs={12} md={6}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                 <Person fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle2" fontWeight="bold">الموظف المعني *</Typography>
+                                <Typography variant="subtitle2" fontWeight="bold">الموظفين المعنيين *</Typography>
                             </Box>
                             <Autocomplete
+                                multiple
                                 options={employees}
                                 getOptionLabel={(option: any) => `${option.firstName} ${option.lastName} (${option.employeeCode || '-'})`}
-                                value={selectedEmployee || null}
-                                onChange={(_, newValue: any) => setFormData({ ...formData, employeeId: newValue?.id || '' })}
+                                value={employees.filter((e: any) => formData.employeeIds.includes(e.id))}
+                                onChange={(_, newValue: any[]) => setFormData({ ...formData, employeeIds: newValue.map((v: any) => v.id) })}
+                                renderTags={(value, getTagProps) =>
+                                    value.map((option: any, index: number) => (
+                                        <Chip
+                                            label={`${option.firstName} ${option.lastName}`}
+                                            size="small"
+                                            color="primary"
+                                            {...getTagProps({ index })}
+                                            key={option.id}
+                                        />
+                                    ))
+                                }
                                 renderInput={(params) => (
-                                    <TextField {...params} placeholder="اختر الموظف" required />
+                                    <TextField {...params} placeholder="اختر الموظفين المعنيين" required />
                                 )}
                                 noOptionsText="لا توجد نتائج"
                             />
@@ -294,7 +319,7 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
                             </Box>
                             <Autocomplete
                                 multiple
-                                options={employees.filter((e: any) => e.id !== formData.employeeId)}
+                                options={employees.filter((e: any) => !formData.employeeIds.includes(e.id))}
                                 getOptionLabel={(option: any) => `${option.firstName} ${option.lastName}`}
                                 value={employees.filter((e: any) => formData.witnessIds.includes(e.id))}
                                 onChange={(_, newValue: any[]) => setFormData({ ...formData, witnessIds: newValue.map((v: any) => v.id) })}

@@ -330,6 +330,77 @@ export class PayrollRunsService {
                     this.logger.log(`Applied adjustments for employee ${employee.id}: +${approvedAdjustments.totalAdditions} -${approvedAdjustments.totalDeductions}`);
                 }
 
+                // ✅ خصم أقساط السلف المعتمدة تلقائياً من الراتب
+                let advanceDeductionTotal: Decimal = ZERO;
+                const employeeAdvances = (employee as any).advanceRequests || [];
+
+                for (const advance of employeeAdvances) {
+                    // جلب الدفعات السابقة لحساب المتبقي
+                    const previousPayments = await tx.loanPayment.findMany({
+                        where: { advanceId: advance.id },
+                        select: { amount: true }
+                    });
+
+                    const approvedAmount = (advance.approvedAmount || advance.amount).toNumber();
+                    const monthlyDeduction = (advance.approvedMonthlyDeduction || advance.monthlyDeduction).toNumber();
+                    const totalPaid = previousPayments.reduce((sum, p) => sum + p.amount.toNumber(), 0);
+                    const remainingBalance = approvedAmount - totalPaid;
+
+                    if (remainingBalance <= 0) continue; // السلفة مسددة بالكامل
+
+                    // ✅ خصم الأقل: القسط الشهري أو المتبقي (للشهر الأخير)
+                    const deductionAmount = Math.min(monthlyDeduction, remainingBalance);
+                    const deductionDecimal = toDecimal(deductionAmount);
+
+                    advanceDeductionTotal = add(advanceDeductionTotal, deductionDecimal);
+
+                    // إضافة سطر خصم السلفة
+                    payslipLines.push({
+                        componentId: adjDedId,
+                        amount: round(deductionDecimal),
+                        sourceType: 'ADVANCE_DEDUCTION' as any,
+                        sign: 'DEDUCTION',
+                        descriptionAr: `قسط سلفة (${advance.type === 'CASH' ? 'نقدية' : 'تحويل بنكي'}) - متبقي: ${(remainingBalance - deductionAmount).toFixed(0)} ريال`,
+                        sourceRef: `ADVANCE_${advance.id}`,
+                        costCenterId: primaryCostCenterId,
+                    });
+
+                    // ✅ تسجيل الدفعة تلقائياً
+                    await tx.loanPayment.create({
+                        data: {
+                            advanceId: advance.id,
+                            amount: deductionAmount,
+                            paymentDate: new Date(),
+                            paymentType: 'SALARY_DEDUCTION',
+                            notes: `خصم تلقائي من مسير الرواتب - فترة ${period.month}/${period.year}`,
+                            createdById: userId,
+                        }
+                    });
+
+                    // تحديث حالة السلفة إذا تم السداد بالكامل
+                    const newRemainingBalance = remainingBalance - deductionAmount;
+                    if (newRemainingBalance <= 0) {
+                        await tx.advanceRequest.update({
+                            where: { id: advance.id },
+                            data: { status: 'PAID' }
+                        });
+                        this.logger.log(`Advance ${advance.id} fully paid!`);
+                    }
+
+                    this.logger.log(`Deducted ${deductionAmount} SAR from employee ${employee.id} for advance (remaining: ${newRemainingBalance})`);
+                }
+
+                if (isPositive(advanceDeductionTotal)) {
+                    adjustmentDeduction = add(adjustmentDeduction, advanceDeductionTotal);
+
+                    calculation.calculationTrace.push({
+                        step: 'ADVANCE_DEDUCTION',
+                        description: 'خصم أقساط السلف',
+                        formula: `إجمالي أقساط السلف: ${toFixed(advanceDeductionTotal)} ريال`,
+                        result: toNumber(advanceDeductionTotal),
+                    });
+                }
+
                 // ✅ Using Decimal for final calculations
                 const finalGross = round(add(toDecimal(calculation.grossSalary), adjustmentBonus));
                 let finalDeductions = round(add(toDecimal(calculation.totalDeductions), adjustmentDeduction));
