@@ -39,6 +39,7 @@ import {
   FormControlLabel,
   Autocomplete,
   Divider,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -190,9 +191,29 @@ export default function BonusManagementPage() {
     onSuccess: () => {
       toast.success('تم الموافقة على المكافأة');
       queryClient.invalidateQueries({ queryKey: ['pending-bonuses'] });
+      queryClient.invalidateQueries({ queryKey: ['approved-bonuses'] });
       queryClient.invalidateQueries({ queryKey: ['bonus-statistics'] });
     },
     onError: () => toast.error('حدث خطأ أثناء الموافقة'),
+  });
+
+  // جلب المكافآت المعتمدة (يمكن إلغاؤها)
+  const { data: approvedBonuses, isLoading: loadingApproved } = useQuery({
+    queryKey: ['approved-bonuses'],
+    queryFn: () => api.get('/payroll-calculation/bonus/approved'),
+  });
+
+  // إلغاء مكافأة معتمدة
+  const revertMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      api.post(`/payroll-calculation/bonus/${id}/revert`, { reason }),
+    onSuccess: () => {
+      toast.success('تم إلغاء المكافأة');
+      queryClient.invalidateQueries({ queryKey: ['approved-bonuses'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-bonuses'] });
+      queryClient.invalidateQueries({ queryKey: ['bonus-statistics'] });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'حدث خطأ أثناء الإلغاء'),
   });
 
   // إنشاء برنامج مكافآت
@@ -432,6 +453,7 @@ export default function BonusManagementPage() {
         <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
           <Tab label="برامج المكافآت" />
           <Tab label={`الموافقات المعلقة (${(pendingBonuses as any[])?.length || 0})`} />
+          <Tab label={`المعتمدة - يمكن إلغاؤها (${(approvedBonuses as any[])?.length || 0})`} sx={{ color: 'success.main' }} />
           <Tab label="سجل المكافآت" />
           <Tab
             icon={<BoltIcon />}
@@ -621,15 +643,88 @@ export default function BonusManagementPage() {
         )}
       </TabPanel>
 
-      {/* سجل المكافآت */}
+      {/* ✅ المكافآت المعتمدة - يمكن إلغاؤها */}
       <TabPanel value={tabValue} index={2}>
+        {loadingApproved ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (approvedBonuses as any[])?.length === 0 ? (
+          <Alert severity="info">لا توجد مكافآت معتمدة حالياً</Alert>
+        ) : (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>الموظف</TableCell>
+                  <TableCell>السبب</TableCell>
+                  <TableCell>المبلغ</TableCell>
+                  <TableCell>تاريخ الاعتماد</TableCell>
+                  <TableCell>الإجراءات</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(approvedBonuses as any[])?.map((bonus: any) => (
+                  <TableRow key={bonus.id}>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: 'success.main' }}>
+                          {bonus.employee?.firstName?.[0] || '؟'}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2">
+                            {bonus.employee?.firstName} {bonus.employee?.lastName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {bonus.employee?.employeeCode}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>{bonus.reason}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={`${bonus.totalAmount?.toLocaleString()} ر.س`}
+                        color="success"
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {bonus.approvedAt ? new Date(bonus.approvedAt).toLocaleDateString('ar-SA') : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title="إلغاء المكافأة">
+                        <IconButton
+                          color="error"
+                          size="small"
+                          onClick={() => {
+                            if (confirm('هل أنت متأكد من إلغاء هذه المكافأة؟')) {
+                              revertMutation.mutate({ id: bonus.id, reason: 'إلغاء يدوي' });
+                            }
+                          }}
+                          disabled={revertMutation.isPending}
+                        >
+                          <RejectIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </TabPanel>
+
+      {/* سجل المكافآت */}
+      <TabPanel value={tabValue} index={3}>
         <Alert severity="info">
           سيتم عرض سجل جميع المكافآت المصروفة هنا
         </Alert>
       </TabPanel>
 
       {/* ⚡ الخصومات والمكافآت الفورية */}
-      <TabPanel value={tabValue} index={3}>
+      <TabPanel value={tabValue} index={4}>
         <Box sx={{ mb: 3 }}>
           <Button
             variant="contained"
