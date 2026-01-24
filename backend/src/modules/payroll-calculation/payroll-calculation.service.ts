@@ -1826,7 +1826,7 @@ export class PayrollCalculationService {
                 this.logger.log(`💰 Found ${approvedBonuses.length} approved bonuses for employee ${employeeId}`);
             }
         } catch (err) {
-            this.logger.error(`Failed to load bonuses for ${employeeId}: ${err.message}`);
+            this.logger.error(`❌ RETRO PAY ERROR for ${employeeId}: ${err.message}`, err.stack);
         }
 
 
