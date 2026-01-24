@@ -379,11 +379,31 @@ export class PayrollAdjustmentsService {
                         },
                     });
 
+                    // إيجاد أو إنشاء component للتسويات
+                    let adjustmentComponent = await this.prisma.salaryComponent.findFirst({
+                        where: {
+                            companyId,
+                            code: dto.type === 'DEDUCTION' ? 'INSTANT_DED' : 'INSTANT_ADD',
+                        },
+                    });
+
+                    if (!adjustmentComponent) {
+                        adjustmentComponent = await this.prisma.salaryComponent.create({
+                            data: {
+                                companyId,
+                                code: dto.type === 'DEDUCTION' ? 'INSTANT_DED' : 'INSTANT_ADD',
+                                nameAr: dto.type === 'DEDUCTION' ? 'خصم فوري' : 'مكافأة فورية',
+                                type: dto.type === 'DEDUCTION' ? 'DEDUCTION' : 'EARNING',
+                                nature: 'VARIABLE',
+                            } as any,
+                        });
+                    }
+
                     // إضافة سطر للـ payslip
                     await this.prisma.payslipLine.create({
                         data: {
                             payslipId: existingPayslip.id,
-                            componentId: null,
+                            componentId: adjustmentComponent.id,
                             amount: adjustmentAmount,
                             sourceType: 'ADJUSTMENT' as any,
                             sign: dto.type === 'DEDUCTION' ? 'DEDUCTION' : 'EARNING',
