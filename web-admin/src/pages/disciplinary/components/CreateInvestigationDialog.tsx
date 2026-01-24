@@ -184,8 +184,6 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
 
-    const selectedEmployee = employees.find((e: any) => e.id === formData.employeeId);
-
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
             <DialogTitle sx={{

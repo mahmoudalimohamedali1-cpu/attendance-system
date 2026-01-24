@@ -334,6 +334,50 @@ export class PayrollRunsService {
                     this.logger.log(`Applied adjustments for employee ${employee.id}: +${approvedAdjustments.totalAdditions} -${approvedAdjustments.totalDeductions}`);
                 }
 
+                // ✅ إضافة مكافآت برامج المكافآت (retroPay) المعتمدة
+                const approvedBonuses = await tx.retroPay.findMany({
+                    where: {
+                        employeeId: employee.id,
+                        companyId,
+                        status: 'APPROVED',
+                        effectiveFrom: { lte: period.endDate },
+                        effectiveTo: { gte: period.startDate },
+                    }
+                });
+
+                let totalBonusFromPrograms: Decimal = ZERO;
+                for (const bonus of approvedBonuses) {
+                    const bonusAmount = toDecimal(bonus.totalAmount);
+                    totalBonusFromPrograms = add(totalBonusFromPrograms, bonusAmount);
+
+                    adjustmentBonus = add(adjustmentBonus, bonusAmount);
+                    payslipLines.push({
+                        componentId: adjAddId,
+                        amount: round(bonusAmount),
+                        sourceType: 'BONUS_PROGRAM' as any,
+                        sign: 'EARNING',
+                        descriptionAr: bonus.reason || 'مكافأة برنامج',
+                        sourceRef: `RETRO_PAY_${bonus.id}`,
+                        costCenterId: primaryCostCenterId,
+                    });
+
+                    // تحديث حالة المكافأة لـ PAID
+                    await tx.retroPay.update({
+                        where: { id: bonus.id },
+                        data: { status: 'PAID', paidAt: new Date() }
+                    });
+                }
+
+                if (isPositive(totalBonusFromPrograms)) {
+                    calculation.calculationTrace.push({
+                        step: 'BONUS_PROGRAM_APPLIED',
+                        description: 'تطبيق مكافآت برامج المكافآت',
+                        formula: `إجمالي ${approvedBonuses.length} مكافأة = ${toFixed(totalBonusFromPrograms)} ريال`,
+                        result: toNumber(totalBonusFromPrograms),
+                    });
+                    this.logger.log(`✅ Applied ${approvedBonuses.length} bonus(es) for employee ${employee.id}: ${toFixed(totalBonusFromPrograms)} SAR`);
+                }
+
                 // ✅ تسجيل دفعات السلف تلقائياً (السطور موجودة بالفعل في policyLines من payroll-calculation)
                 // ⚠️ ملاحظة: خصم السلف محسوب في calculation.totalDeductions من LOAN_DED - لا نضيفه مرة أخرى
                 const employeeAdvances = (employee as any).advanceRequests || [];
