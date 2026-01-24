@@ -423,7 +423,7 @@ export class PayrollRunsService {
                         grossSalary: finalGross,
                         totalDeductions: finalDeductions,
                         netSalary: finalNet,
-                        status: (hasNegativeBalance ? 'REQUIRES_REVIEW' : 'DRAFT') as any,
+                        status: PayrollStatus.DRAFT, // Always DRAFT, negative balances are flagged in netSalary
                         calculationTrace: calculation.calculationTrace as any,
                         lines: {
                             create: validatedPayslipLines
