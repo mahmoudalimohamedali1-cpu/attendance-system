@@ -209,6 +209,7 @@ export class PayrollAdjustmentsService {
                                 ? Number(payslip.totalDeductions) - adjustmentAmount
                                 : Number(payslip.totalDeductions);
 
+                        // تحديث ملخص الـ Payslip
                         await this.prisma.payslip.update({
                             where: { id: payslip.id },
                             data: {
@@ -217,7 +218,29 @@ export class PayrollAdjustmentsService {
                             },
                         });
 
-                        this.logger.log(`💰 Updated payslip ${payslip.id}: netSalary adjusted by ${adjustmentAmount}`);
+                        // 🔧 إضافة PayslipLine جديد لعرض التسوية في التفاصيل
+                        const sign = adjustmentAmount > 0 ? 'EARNING' : 'DEDUCTION';
+                        const descriptionAr = adjustment.adjustmentType === 'WAIVE_DEDUCTION'
+                            ? `تسوية: إلغاء خصم (${adjustment.reason || ''})`
+                            : adjustment.adjustmentType === 'CONVERT_TO_LEAVE'
+                                ? `تسوية: تحويل لإجازة (${adjustment.leaveDaysDeducted} يوم)`
+                                : adjustment.adjustmentType === 'MANUAL_ADDITION'
+                                    ? `تسوية: إضافة يدوية (${adjustment.reason || ''})`
+                                    : `تسوية: خصم يدوي (${adjustment.reason || ''})`;
+
+                        await this.prisma.payslipLine.create({
+                            data: {
+                                payslipId: payslip.id,
+                                componentId: null as any, // تسوية بدون مكوّن
+                                amount: Math.abs(adjustmentAmount),
+                                sign,
+                                sourceType: 'ADJUSTMENT' as any,
+                                descriptionAr,
+                                sourceRef: `ADJ-${dto.adjustmentId}`,
+                            },
+                        });
+
+                        this.logger.log(`💰 Updated payslip ${payslip.id}: netSalary adjusted by ${adjustmentAmount}, added PayslipLine`);
                     }
                 }
             }
