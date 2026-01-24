@@ -26,6 +26,7 @@ import {
     isZero,
     abs,
     round,
+    max,
     ZERO,
     applyDeductionCap,
     percent,
@@ -430,6 +431,16 @@ export class PayrollRunsService {
                     return false;
                 });
 
+                // 🔧 FIX: Recalculate gross and deductions from ACTUAL validated lines
+                // This ensures totals match the lines that are actually saved
+                const linesGross = validatedPayslipLines
+                    .filter(l => l.sign === 'EARNING')
+                    .reduce((sum, l) => add(sum, toDecimal(l.amount)), ZERO);
+                const linesDeductions = validatedPayslipLines
+                    .filter(l => l.sign === 'DEDUCTION')
+                    .reduce((sum, l) => add(sum, toDecimal(l.amount)), ZERO);
+                const linesNet = sub(linesGross, linesDeductions);
+
                 await tx.payslip.create({
                     data: {
                         employeeId: employee.id,
@@ -437,10 +448,10 @@ export class PayrollRunsService {
                         periodId: dto.periodId,
                         runId: run.id,
                         baseSalary: baseSalary,
-                        grossSalary: finalGross,
-                        totalDeductions: finalDeductions,
-                        netSalary: finalNet,
-                        status: PayrollStatus.DRAFT, // Always DRAFT, negative balances are flagged in netSalary
+                        grossSalary: linesGross, // ✅ From actual lines
+                        totalDeductions: linesDeductions, // ✅ From actual lines
+                        netSalary: max(ZERO, linesNet), // ✅ Recalculated, min 0
+                        status: PayrollStatus.DRAFT,
                         calculationTrace: calculation.calculationTrace as any,
                         lines: {
                             create: validatedPayslipLines
