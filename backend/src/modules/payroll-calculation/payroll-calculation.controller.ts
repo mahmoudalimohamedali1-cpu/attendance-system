@@ -231,11 +231,29 @@ export class PayrollCalculationController {
         return this.bonusService.approveBonus({ bonusId, ...dto }, companyId, userId);
     }
 
+    @Post('bonus/:id/revert')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'إلغاء / استرجاع مكافأة معتمدة' })
+    async revertBonus(
+        @Param('id') bonusId: string,
+        @Body() dto: { reason?: string },
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.bonusService.revertBonus(bonusId, companyId, dto.reason);
+    }
+
     @Get('bonus/pending')
     @Roles('ADMIN', 'HR')
     @ApiOperation({ summary: 'جلب المكافآت المعلقة للموافقة' })
     async getPendingBonuses(@CurrentUser('companyId') companyId: string) {
         return this.bonusService.getPendingBonuses(companyId);
+    }
+
+    @Get('bonus/approved')
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'جلب المكافآت المعتمدة (يمكن إلغاؤها)' })
+    async getApprovedBonuses(@CurrentUser('companyId') companyId: string) {
+        return this.bonusService.getApprovedBonuses(companyId);
     }
 
     @Get('bonus/statistics')

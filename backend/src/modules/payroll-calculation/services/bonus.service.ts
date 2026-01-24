@@ -395,6 +395,24 @@ export class BonusService {
   }
 
   /**
+   * جلب المكافآت المعتمدة (يمكن إلغاؤها)
+   */
+  async getApprovedBonuses(companyId: string): Promise<any[]> {
+    return this.prisma.retroPay.findMany({
+      where: {
+        companyId,
+        status: 'APPROVED',
+      },
+      include: {
+        employee: {
+          select: { id: true, firstName: true, lastName: true, employeeCode: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
    * إحصائيات المكافآت
    */
   async getBonusStatistics(companyId: string, year?: number): Promise<any> {
