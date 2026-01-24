@@ -436,20 +436,63 @@ export class PayrollRunsService {
                 const linesGross = validatedPayslipLines
                     .filter(l => l.sign === 'EARNING')
                     .reduce((sum, l) => add(sum, toDecimal(l.amount)), ZERO);
-                let linesDeductions = validatedPayslipLines
+                const originalDeductions = validatedPayslipLines
                     .filter(l => l.sign === 'DEDUCTION')
                     .reduce((sum, l) => add(sum, toDecimal(l.amount)), ZERO);
 
                 // ✅ Apply deduction cap (Saudi Labor Law Article 91 - max 50%)
                 const maxDeductionPercent = 50; // TODO: get from settings
-                const capResult = applyDeductionCap(linesGross, linesDeductions, maxDeductionPercent);
+                const capResult = applyDeductionCap(linesGross, originalDeductions, maxDeductionPercent);
+                let linesDeductions = originalDeductions;
+                let excessDeductionAmount = ZERO;
+
                 if (capResult.wasCapped) {
-                    this.logger.warn(`⚠️ Deductions capped for employee ${employee.id}: ` +
-                        `${toFixed(linesDeductions)} → ${toFixed(capResult.cappedDeductions)} (excess: ${toFixed(capResult.excessAmount)})`);
                     linesDeductions = capResult.cappedDeductions;
+                    excessDeductionAmount = capResult.excessAmount;
+
+                    this.logger.warn(`⚠️ Deductions capped for employee ${employee.id}: ` +
+                        `${toFixed(originalDeductions)} → ${toFixed(linesDeductions)} (excess: ${toFixed(excessDeductionAmount)})`);
+
+                    // 🔧 Update calculation trace to show the cap was applied
+                    calculation.calculationTrace.push({
+                        step: 'DEDUCTION_CAP_APPLIED',
+                        description: `تطبيق سقف الخصومات (المادة 91 - ${maxDeductionPercent}%)`,
+                        formula: `الخصومات الأصلية ${toFixed(originalDeductions)} → بعد السقف ${toFixed(linesDeductions)}`,
+                        result: toNumber(linesDeductions),
+                    });
+
+                    // ✅ Record excess deduction as employee debt for carryforward to next month
+                    if (isPositive(excessDeductionAmount)) {
+                        await this.employeeDebtService.createDebt({
+                            companyId,
+                            employeeId: employee.id,
+                            amount: excessDeductionAmount,
+                            sourceType: DebtSourceType.OTHER, // Deduction excess carryforward
+                            sourceId: run.id,
+                            periodId: dto.periodId,
+                            reason: `خصومات مؤجلة للشهر القادم (تجاوز سقف ${maxDeductionPercent}% من الراتب)`,
+                        });
+
+                        calculation.calculationTrace.push({
+                            step: 'DEFERRED_DEDUCTION_CARRYFORWARD',
+                            description: `خصم مؤجل للشهر القادم`,
+                            formula: `المبلغ الزائد ${toFixed(excessDeductionAmount)} سيُخصم من الراتب القادم`,
+                            result: toNumber(excessDeductionAmount),
+                        });
+
+                        this.logger.log(`💰 Created debt record for employee ${employee.id}: ${toFixed(excessDeductionAmount)} SAR (deduction excess)`);
+                    }
                 }
 
                 const linesNet = sub(linesGross, linesDeductions);
+
+                // 🔧 Final trace step showing actual values
+                calculation.calculationTrace.push({
+                    step: 'FINAL_CALCULATION',
+                    description: 'الحساب النهائي',
+                    formula: `إجمالي ${toFixed(linesGross)} - خصومات ${toFixed(linesDeductions)} = صافي ${toFixed(linesNet)}`,
+                    result: toNumber(linesNet),
+                });
 
                 await tx.payslip.create({
                     data: {
@@ -459,7 +502,7 @@ export class PayrollRunsService {
                         runId: run.id,
                         baseSalary: baseSalary,
                         grossSalary: linesGross, // ✅ From actual lines
-                        totalDeductions: linesDeductions, // ✅ From actual lines
+                        totalDeductions: linesDeductions, // ✅ After cap
                         netSalary: max(ZERO, linesNet), // ✅ Recalculated, min 0
                         status: PayrollStatus.DRAFT,
                         calculationTrace: calculation.calculationTrace as any,
