@@ -266,9 +266,10 @@ export class PayrollRunsService {
                 }
 
                 // ✅ تطبيق التسويات المعتمدة من قاعدة البيانات (PayrollAdjustments)
+                // ⚡ البحث باستخدام periodId للموظف لأنها قد لا تكون مربوطة بـ runId بعد
                 const approvedAdjustments = await this.adjustmentsService.getApprovedAdjustmentsTotal(
                     employee.id,
-                    run.id
+                    period.id // استخدام periodId بدلاً من runId
                 );
 
                 if (approvedAdjustments.netAdjustment !== 0) {
@@ -428,6 +429,19 @@ export class PayrollRunsService {
                     }
                 });
             }
+
+            // ⚡ ربط كل التسويات المعتمدة للفترة بهذا المسيّر (لأرشفة البيانات)
+            await tx.payrollAdjustment.updateMany({
+                where: {
+                    companyId,
+                    payrollPeriodId: dto.periodId,
+                    status: 'POSTED',
+                    payrollRunId: null
+                },
+                data: {
+                    payrollRunId: run.id
+                }
+            });
 
             const runWithPayslips = await tx.payrollRun.findUnique({
                 where: { id: run.id },

@@ -2401,10 +2401,10 @@ model PayrollRun {
 
 // ==================== تسويات الرواتب ====================
 model PayrollAdjustment {
-  id           String @id @default(uuid())
-  payrollRunId String @map("payroll_run_id")
-  employeeId   String @map("employee_id")
-  companyId    String @map("company_id")
+  id           String  @id @default(uuid())
+  payrollRunId String? @map("payroll_run_id")
+  employeeId   String  @map("employee_id")
+  companyId    String  @map("company_id")
 
   // نوع التسوية
   adjustmentType String @map("adjustment_type") // WAIVE_DEDUCTION, CONVERT_TO_LEAVE, MANUAL_ADDITION, MANUAL_DEDUCTION
@@ -2440,7 +2440,7 @@ model PayrollAdjustment {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  payrollRun         PayrollRun        @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  payrollRun         PayrollRun?       @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee           User              @relation("EmployeeAdjustments", fields: [employeeId], references: [id])
   company            Company           @relation(fields: [companyId], references: [id])
   createdBy          User              @relation("AdjustmentCreator", fields: [createdById], references: [id])

@@ -169,7 +169,7 @@ export class PayrollAdjustmentsService {
     /**
      * حساب إجمالي التسويات المعتمدة لموظف في مسيّر
      */
-    async getApprovedAdjustmentsTotal(employeeId: string, payrollRunId: string): Promise<{
+    async getApprovedAdjustmentsTotal(employeeId: string, runOrPeriodId: string): Promise<{
         totalAdditions: number;
         totalDeductions: number;
         netAdjustment: number;
@@ -179,8 +179,10 @@ export class PayrollAdjustmentsService {
         const adjustments = await this.prisma.payrollAdjustment.findMany({
             where: {
                 employeeId,
-                payrollRunId,
-                // ✅ البحث عن APPROVED أو POSTED (الـ instant adjustments تستخدم POSTED)
+                OR: [
+                    { payrollRunId: runOrPeriodId },
+                    { payrollPeriodId: runOrPeriodId }
+                ],
                 status: { in: ['POSTED'] }, // POSTED = معتمد
             },
         });
@@ -296,30 +298,7 @@ export class PayrollAdjustmentsService {
             });
         }
 
-        // 2. البحث عن أو إنشاء PayrollRun
-        // ⚡ البحث عن أي run موجود (مش بس DRAFT) عشان الخصومات تتربط بالـ run الصح
-        let payrollRun = await this.prisma.payrollRun.findFirst({
-            where: {
-                companyId,
-                periodId: period.id,
-                status: { notIn: ['CANCELLED', 'ARCHIVED'] }, // أي حالة ماعدا الملغي
-            },
-            orderBy: { createdAt: 'desc' },
-        });
-
-        if (!payrollRun) {
-            this.logger.log(`📋 Creating new PayrollRun for period ${period.id}`);
-            payrollRun = await this.prisma.payrollRun.create({
-                data: {
-                    companyId,
-                    periodId: period.id,
-                    runDate: now,
-                    status: 'DRAFT',
-                },
-            });
-        }
-
-        this.logger.log(`🔗 Linking adjustment to PayrollRun ${payrollRun.id} (status: ${payrollRun.status})`);
+        this.logger.log(`🔗 Linking adjustment for period ${period.id}`);
         // 3. إنشاء التسوية
         const adjustmentType = dto.type === 'DEDUCTION' ? 'MANUAL_DEDUCTION' : 'MANUAL_ADDITION';
 
@@ -330,13 +309,13 @@ export class PayrollAdjustmentsService {
                     originalAmount: 0,
                     adjustedAmount: dto.amount,
                     leaveDaysDeducted: 0,
-                    value: dto.amount, // ⚡ مطلوب للـ database
+                    value: dto.amount,
                     reason: dto.reason,
                     notes: dto.notes || `خصم/مكافأة فورية بتاريخ ${now.toLocaleDateString('ar-SA')}`,
-                    status: dto.autoApprove ? 'POSTED' : 'PENDING', // POSTED بدل APPROVED عشان الـ database enum
+                    status: dto.autoApprove ? 'POSTED' : 'PENDING',
                     approvedAt: dto.autoApprove ? now : null,
-                    // Relations using connect
-                    payrollRun: { connect: { id: payrollRun.id } },
+                    // Relations
+                    payrollPeriod: { connect: { id: period.id } }, // decoupled from run
                     employee: { connect: { id: dto.employeeId } },
                     company: { connect: { id: companyId } },
                     createdBy: { connect: { id: createdById } },
@@ -346,79 +325,7 @@ export class PayrollAdjustmentsService {
 
             this.logger.log(`✅ Instant adjustment created: ${adjustment.id} (${adjustmentType}: ${dto.amount} SAR)`);
 
-            // ⚡ تحديث الـ Payslip لو موجود (عشان الخصم/المكافأة يظهر فورًا)
-            if (dto.autoApprove) {
-                const existingPayslip = await this.prisma.payslip.findFirst({
-                    where: {
-                        runId: payrollRun.id,
-                        employeeId: dto.employeeId,
-                    },
-                });
-
-                if (existingPayslip) {
-                    const adjustmentAmount = new Decimal(dto.amount);
-                    let newGross = new Decimal(existingPayslip.grossSalary.toString());
-                    let newDeductions = new Decimal(existingPayslip.totalDeductions.toString());
-                    let newNet: Decimal;
-
-                    if (dto.type === 'DEDUCTION') {
-                        // خصم = زيادة الخصومات
-                        newDeductions = newDeductions.plus(adjustmentAmount);
-                        newNet = newGross.minus(newDeductions);
-                    } else {
-                        // مكافأة = زيادة الإجمالي
-                        newGross = newGross.plus(adjustmentAmount);
-                        newNet = newGross.minus(newDeductions);
-                    }
-
-                    // تحديث الـ Payslip
-                    await this.prisma.payslip.update({
-                        where: { id: existingPayslip.id },
-                        data: {
-                            grossSalary: newGross,
-                            totalDeductions: newDeductions,
-                            netSalary: newNet.isNegative() ? 0 : newNet,
-                        },
-                    });
-
-                    // إيجاد أو إنشاء component للتسويات
-                    let adjustmentComponent = await this.prisma.salaryComponent.findFirst({
-                        where: {
-                            companyId,
-                            code: dto.type === 'DEDUCTION' ? 'INSTANT_DED' : 'INSTANT_ADD',
-                        },
-                    });
-
-                    if (!adjustmentComponent) {
-                        adjustmentComponent = await this.prisma.salaryComponent.create({
-                            data: {
-                                companyId,
-                                code: dto.type === 'DEDUCTION' ? 'INSTANT_DED' : 'INSTANT_ADD',
-                                nameAr: dto.type === 'DEDUCTION' ? 'خصم فوري' : 'مكافأة فورية',
-                                type: dto.type === 'DEDUCTION' ? 'DEDUCTION' : 'EARNING',
-                                nature: 'VARIABLE',
-                            } as any,
-                        });
-                    }
-
-                    // إضافة سطر للـ payslip
-                    await this.prisma.payslipLine.create({
-                        data: {
-                            payslipId: existingPayslip.id,
-                            componentId: adjustmentComponent.id,
-                            amount: adjustmentAmount,
-                            sourceType: 'ADJUSTMENT' as any,
-                            sign: dto.type === 'DEDUCTION' ? 'DEDUCTION' : 'EARNING',
-                            descriptionAr: `${dto.type === 'DEDUCTION' ? 'خصم فوري' : 'مكافأة فورية'}: ${dto.reason}`,
-                            sourceRef: `INSTANT_${adjustment.id}`,
-                        },
-                    });
-
-                    this.logger.log(`📊 Updated payslip ${existingPayslip.id} with instant ${dto.type}: ${dto.amount} SAR`);
-                }
-            }
-
-            // جلب البيانات مع العلاقات
+            // Fetch with relations
             const fullAdjustment = await this.prisma.payrollAdjustment.findUnique({
                 where: { id: adjustment.id },
                 include: {
