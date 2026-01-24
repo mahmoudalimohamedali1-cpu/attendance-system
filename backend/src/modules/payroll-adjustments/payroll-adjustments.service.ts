@@ -193,23 +193,28 @@ export class PayrollAdjustmentsService {
         let leaveDaysDeducted = 0;
 
         for (const adj of adjustments) {
+            // 🔧 FIX: تحويل Decimal إلى Number لضمان الحساب الصحيح
+            const originalAmt = Number(adj.originalAmount) || 0;
+            const adjustedAmt = Number(adj.adjustedAmount) || 0;
+            const leaveDays = Number(adj.leaveDaysDeducted) || 0;
+
             switch (adj.adjustmentType) {
                 case 'WAIVE_DEDUCTION':
                     // إلغاء خصم = إضافة للموظف
-                    waivedDeductions += adj.originalAmount;
-                    totalAdditions += adj.originalAmount;
+                    waivedDeductions += originalAmt;
+                    totalAdditions += originalAmt;
                     break;
                 case 'CONVERT_TO_LEAVE':
                     // تحويل لإجازة = إلغاء الخصم + خصم أيام إجازة
-                    waivedDeductions += adj.originalAmount;
-                    totalAdditions += adj.originalAmount;
-                    leaveDaysDeducted += adj.leaveDaysDeducted;
+                    waivedDeductions += originalAmt;
+                    totalAdditions += originalAmt;
+                    leaveDaysDeducted += leaveDays;
                     break;
                 case 'MANUAL_ADDITION':
-                    totalAdditions += adj.adjustedAmount;
+                    totalAdditions += adjustedAmt;
                     break;
                 case 'MANUAL_DEDUCTION':
-                    totalDeductions += adj.adjustedAmount;
+                    totalDeductions += adjustedAmt;
                     break;
             }
         }
@@ -354,7 +359,7 @@ export class PayrollAdjustmentsService {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        return (this.prisma.payrollAdjustment as any).findMany({
+        return this.prisma.payrollAdjustment.findMany({
             where: {
                 companyId,
                 createdAt: { gte: thirtyDaysAgo },
@@ -417,7 +422,7 @@ export class PayrollAdjustmentsService {
             };
         }
 
-        const adjustments = await (this.prisma.payrollAdjustment as any).findMany({
+        const adjustments = await this.prisma.payrollAdjustment.findMany({
             where: { payrollRunId: payrollRun.id },
         });
 
@@ -428,7 +433,8 @@ export class PayrollAdjustmentsService {
 
         for (const adj of adjustments) {
             if (adj.status === 'PENDING') pendingCount++;
-            if (adj.status === 'APPROVED') {
+            // 🔧 FIX: تغيير APPROVED إلى POSTED للتوافق مع دالة approve()
+            if (adj.status === 'POSTED') {
                 approvedCount++;
                 if (adj.adjustmentType === 'MANUAL_ADDITION' || adj.adjustmentType === 'WAIVE_DEDUCTION') {
                     totalAdditions += Number(adj.adjustedAmount);
