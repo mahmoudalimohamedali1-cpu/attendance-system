@@ -179,7 +179,8 @@ export class PayrollAdjustmentsService {
             where: {
                 employeeId,
                 payrollRunId,
-                status: 'APPROVED',
+                // ✅ البحث عن APPROVED أو POSTED (الـ instant adjustments تستخدم POSTED)
+                status: { in: ['APPROVED', 'POSTED'] },
             },
         });
 
