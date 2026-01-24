@@ -222,14 +222,18 @@ export class PayrollRunsService {
                     for (const pl of calculation.policyLines) {
                         // تحديد مصدر السطر بناءً على نوع المكوّن
                         let sourceType = PayslipLineSource.STRUCTURE;
+                        let componentIdToUse = pl.componentId;
+
                         if (pl.componentId === 'GOSI-STATUTORY') {
                             sourceType = (PayslipLineSource as any).STATUTORY || 'STATUTORY';
                         } else if (pl.componentCode === 'SMART' || pl.componentId?.startsWith('SMART-')) {
                             sourceType = (PayslipLineSource as any).SMART || 'SMART';
+                            // 🔧 FIX: Use valid component IDs for SMART policies
+                            componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         }
 
                         payslipLines.push({
-                            componentId: pl.componentId,
+                            componentId: componentIdToUse,
                             amount: new Decimal(pl.amount.toFixed(2)),
                             sourceType,
                             sign: pl.sign,
