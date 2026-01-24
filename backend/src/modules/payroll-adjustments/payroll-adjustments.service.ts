@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export enum AdjustmentType {
     WAIVE_DEDUCTION = 'WAIVE_DEDUCTION',           // إلغاء خصم
@@ -146,7 +147,7 @@ export class PayrollAdjustmentsService {
             return this.prisma.payrollAdjustment.update({
                 where: { id: dto.adjustmentId },
                 data: {
-                    status: 'APPROVED',
+                    status: 'POSTED', // POSTED = معتمد في الـ enum
                     approvedById,
                     approvedAt: new Date(),
                 },
@@ -156,7 +157,7 @@ export class PayrollAdjustmentsService {
             return this.prisma.payrollAdjustment.update({
                 where: { id: dto.adjustmentId },
                 data: {
-                    status: 'REJECTED',
+                    status: 'CANCELLED', // CANCELLED = مرفوض في الـ enum
                     approvedById,
                     rejectedAt: new Date(),
                     rejectionReason: dto.rejectionReason,
@@ -180,7 +181,7 @@ export class PayrollAdjustmentsService {
                 employeeId,
                 payrollRunId,
                 // ✅ البحث عن APPROVED أو POSTED (الـ instant adjustments تستخدم POSTED)
-                status: { in: ['APPROVED', 'POSTED'] },
+                status: { in: ['POSTED'] }, // POSTED = معتمد
             },
         });
 
@@ -342,6 +343,58 @@ export class PayrollAdjustmentsService {
             });
 
             this.logger.log(`✅ Instant adjustment created: ${adjustment.id} (${adjustmentType}: ${dto.amount} SAR)`);
+
+            // ⚡ تحديث الـ Payslip لو موجود (عشان الخصم/المكافأة يظهر فورًا)
+            if (dto.autoApprove) {
+                const existingPayslip = await this.prisma.payslip.findFirst({
+                    where: {
+                        runId: payrollRun.id,
+                        employeeId: dto.employeeId,
+                    },
+                });
+
+                if (existingPayslip) {
+                    const adjustmentAmount = new Decimal(dto.amount);
+                    let newGross = new Decimal(existingPayslip.grossSalary.toString());
+                    let newDeductions = new Decimal(existingPayslip.totalDeductions.toString());
+                    let newNet: Decimal;
+
+                    if (dto.type === 'DEDUCTION') {
+                        // خصم = زيادة الخصومات
+                        newDeductions = newDeductions.plus(adjustmentAmount);
+                        newNet = newGross.minus(newDeductions);
+                    } else {
+                        // مكافأة = زيادة الإجمالي
+                        newGross = newGross.plus(adjustmentAmount);
+                        newNet = newGross.minus(newDeductions);
+                    }
+
+                    // تحديث الـ Payslip
+                    await this.prisma.payslip.update({
+                        where: { id: existingPayslip.id },
+                        data: {
+                            grossSalary: newGross,
+                            totalDeductions: newDeductions,
+                            netSalary: newNet.isNegative() ? 0 : newNet,
+                        },
+                    });
+
+                    // إضافة سطر للـ payslip
+                    await this.prisma.payslipLine.create({
+                        data: {
+                            payslipId: existingPayslip.id,
+                            componentId: null,
+                            amount: adjustmentAmount,
+                            sourceType: 'ADJUSTMENT' as any,
+                            sign: dto.type === 'DEDUCTION' ? 'DEDUCTION' : 'EARNING',
+                            descriptionAr: `${dto.type === 'DEDUCTION' ? 'خصم فوري' : 'مكافأة فورية'}: ${dto.reason}`,
+                            sourceRef: `INSTANT_${adjustment.id}`,
+                        },
+                    });
+
+                    this.logger.log(`📊 Updated payslip ${existingPayslip.id} with instant ${dto.type}: ${dto.amount} SAR`);
+                }
+            }
 
             // جلب البيانات مع العلاقات
             const fullAdjustment = await this.prisma.payrollAdjustment.findUnique({
