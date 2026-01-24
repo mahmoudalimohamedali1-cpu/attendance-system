@@ -1697,47 +1697,57 @@ export class PayrollCalculationService {
         }
 
         // --- Retroactive Pay (Backpay) ---
-        // 🔧 FIX: جلب الفروقات المعتمدة (APPROVED) بدلاً من المعلقة (PENDING)
-        const retroPays = await this.prisma.retroPay.findMany({
-            where: {
-                employeeId,
-                companyId,
-                status: 'APPROVED',
-                effectiveFrom: { lte: policyPeriodEnd }
-            }
-        });
+        // 🆕 استخدام شهر الصرف (paymentMonth/paymentYear) أو الفترة (effectiveFrom/effectiveTo) للتوافقية
+        this.logger.log(`🔍 RETRO PAY: Checking for employee=${employeeId}, month=${effectiveMonth}, year=${effectiveYear}`);
+
+        const retroPaySql = `
+            SELECT id, reason, notes, total_amount, difference 
+            FROM retro_pays 
+            WHERE employee_id = '${employeeId}'
+              AND company_id = '${companyId}'
+              AND status = 'APPROVED'
+              AND (
+                (payment_year = ${effectiveYear} AND payment_month = ${effectiveMonth})
+                OR 
+                (payment_month IS NULL AND effective_from <= '${policyPeriodEnd.toISOString().split('T')[0]}')
+              )
+        `;
+
+        const retroPays = await this.prisma.$queryRawUnsafe<any[]>(retroPaySql);
+        this.logger.log(`📊 RETRO PAY: Found ${retroPays.length} entries`);
 
         const retroIdsToUpdate: string[] = [];
         for (const retro of retroPays) {
-            const retroAmount = Number(retro.totalAmount);
-            policyLines.push({
-                componentId: `RETRO-${retro.id}`,
-                componentCode: 'RETRO_PAY',
-                componentName: retro.reason || 'فروقات رواتب رجعية',
-                sign: retroAmount > 0 ? 'EARNING' : 'DEDUCTION',
-                amount: Math.abs(retroAmount),
-                descriptionAr: retro.reason || 'تسوية رجعية',
-                source: {
-                    policyId: retro.id,
-                    policyCode: 'RETRO_PAY',
-                    ruleId: 'RETRO',
-                    ruleCode: 'RETRO',
-                },
-                gosiEligible: false,
-            });
-            retroIdsToUpdate.push(retro.id);
+            const retroAmount = Number(retro.total_amount) || Number(retro.difference) || 0;
+            this.logger.log(`💵 RETRO PAY: Processing ${retro.reason} = ${retroAmount} SAR`);
+            if (retroAmount !== 0) {
+                policyLines.push({
+                    componentId: `RETRO-${retro.id}`,
+                    componentCode: 'RETRO_PAY',
+                    componentName: retro.reason || 'فروقات رواتب',
+                    sign: retroAmount > 0 ? 'EARNING' : 'DEDUCTION',
+                    amount: Math.abs(retroAmount),
+                    descriptionAr: retro.notes || retro.reason || 'فرق راتب',
+                    source: {
+                        policyId: retro.id,
+                        policyCode: 'RETRO_PAY',
+                        ruleId: 'RETRO',
+                        ruleCode: 'RETRO',
+                    },
+                    gosiEligible: false,
+                });
+                retroIdsToUpdate.push(retro.id);
+                this.logger.log(`✅ RETRO PAY ADDED: ${retro.reason} - ${retroAmount} SAR`);
+            }
         }
 
-        // ✅ تحديث حالة الفروقات الرجعية لتجنب التطبيق المزدوج
+        // تحديث حالة الفروقات لتجنب التطبيق المزدوج
         if (retroIdsToUpdate.length > 0) {
-            await this.prisma.retroPay.updateMany({
-                where: { id: { in: retroIdsToUpdate } },
-                data: {
-                    status: 'PAID',
-                    paidAt: new Date(),
-                    notes: `تم التطبيق في فترة ${effectiveYear}-${effectiveMonth}`
-                }
-            });
+            await this.prisma.$executeRawUnsafe(`
+                UPDATE retro_pays SET status = 'PAID', paid_at = NOW() 
+                WHERE id IN (${retroIdsToUpdate.map(id => `'${id}'`).join(',')})
+            `);
+            this.logger.log(`🔒 RETRO PAY: Marked ${retroIdsToUpdate.length} entries as PAID`);
         }
 
         // --- End of Service (EOS) Settlement ---
@@ -1771,57 +1781,6 @@ export class PayrollCalculationService {
             } catch (err) {
                 this.logger.error(`Failed to calculate EOS for ${employeeId}: ${err.message}`);
             }
-        }
-
-        // --- Approved Bonuses Integration ---
-        // جلب الفروقات المعتمدة للموظف وإضافتها للرواتب
-        try {
-            this.logger.log(`🔍 RETRO PAY: Looking for employee=${employeeId}, company=${companyId}`);
-
-            // Simple query - fetch ALL approved retro pays for this employee
-            const sql = `
-                SELECT id, reason, notes, total_amount, difference 
-                FROM retro_pays 
-                WHERE employee_id = '${employeeId}'
-                  AND company_id = '${companyId}'
-                  AND status = 'APPROVED'
-            `;
-            this.logger.log(`🔍 RETRO PAY SQL: ${sql}`);
-
-            const approvedBonuses = await this.prisma.$queryRawUnsafe<any[]>(sql);
-
-            this.logger.log(`📊 RETRO PAY: Found ${approvedBonuses.length} approved entries`);
-
-            for (const bonus of approvedBonuses) {
-                const bonusAmount = Number(bonus.total_amount) || Number(bonus.difference) || 0;
-                this.logger.log(`💵 RETRO PAY: Processing ${bonus.reason} = ${bonusAmount} SAR`);
-                if (bonusAmount > 0) {
-                    const bonusCode = `BONUS_${bonus.id.slice(0, 8)}`;
-                    if (!existingComponentCodes.has(bonusCode)) {
-                        policyLines.push({
-                            componentId: bonus.id,
-                            componentCode: bonusCode,
-                            componentName: bonus.reason || 'فرق راتب',
-                            sign: 'EARNING',
-                            amount: Math.round(bonusAmount * 100) / 100,
-                            descriptionAr: bonus.notes || bonus.reason || 'فرق راتب معتمد',
-                            source: {
-                                policyId: bonus.id,
-                                policyCode: 'RETRO_PAY',
-                                ruleId: bonusCode,
-                                ruleCode: 'RETRO_PAY',
-                            },
-                            gosiEligible: false,
-                        });
-                        existingComponentCodes.add(bonusCode);
-                        this.logger.log(`✅ RETRO PAY ADDED: ${bonus.reason} - ${bonusAmount} SAR`);
-                    } else {
-                        this.logger.log(`⚠️ RETRO PAY SKIP: ${bonusCode} already exists`);
-                    }
-                }
-            }
-        } catch (err) {
-            this.logger.error(`❌ RETRO PAY ERROR: ${err.message}`, err.stack);
         }
 
 
