@@ -27,6 +27,8 @@ import {
     abs,
     round,
     ZERO,
+    applyDeductionCap,
+    percent,
 } from '../../common/utils/decimal.util';
 
 
@@ -593,14 +595,20 @@ export class PayrollRunsService {
                 .filter(pl => pl.sign === 'DEDUCTION')
                 .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
 
-            // إضافة السلف للمعاينة - Using Decimal
+            // إضافة السلف للمعاينة - Display only, NOT added to deductions
+            // ✅ ملاحظة: السلف تم حسابها بالفعل في payroll-calculation.service.ts كـ LOAN_DED
+            // وهي مضمنة في calculation.totalDeductions الذي تم تطبيق الحد الأقصى للخصومات (50%) عليه
             let employeeAdvanceAmount: Decimal = ZERO;
             const advanceDetails: { id: string; amount: number }[] = [];
-            for (const adv of (employee as any).advanceRequests || []) {
-                const amount = toDecimal(adv.approvedMonthlyDeduction || adv.monthlyDeduction);
+
+            // ✅ حساب مبلغ السلف للعرض فقط - البحث في policyLines
+            const loanLines = (calculation.policyLines || []).filter(pl => pl.componentCode === 'LOAN_DED');
+            for (const loanLine of loanLines) {
+                const amount = toDecimal(loanLine.amount);
                 employeeAdvanceAmount = add(employeeAdvanceAmount, amount);
-                advanceDetails.push({ id: adv.id, amount: toNumber(amount) });
-                deductionItems.push({ name: 'خصم سلفة', code: 'ADVANCE', amount: toNumber(amount) });
+                // Extract loan ID from componentId (format: LOAN-{id})
+                const loanId = loanLine.componentId?.replace('LOAN-', '') || '';
+                advanceDetails.push({ id: loanId, amount: toNumber(amount) });
             }
 
             const gosiLine = (calculation.policyLines || []).find(pl => pl.componentCode === 'GOSI');
@@ -609,9 +617,10 @@ export class PayrollRunsService {
 
             // ✅ Using Decimal for calculations
             // ملاحظة: التسويات (adjustments) يتم إضافتها تلقائياً في `payroll-calculation.service.ts`
-            // لذلك لا نضيفها هنا مرة أخرى لتجنب التكرار
+            // وكذلك السلف (LOAN_DED) - لذلك لا نضيفها هنا مرة أخرى لتجنب التكرار
+            // calculation.totalDeductions تحتوي على كل الخصومات بعد تطبيق الحد الأقصى (50%)
             const finalGross = toDecimal(calculation.grossSalary);
-            const finalDeductions = add(toDecimal(calculation.totalDeductions), employeeAdvanceAmount);
+            const finalDeductions = toDecimal(calculation.totalDeductions); // ✅ Already capped at 50%
             const finalNet = sub(finalGross, finalDeductions);
 
             totalGross = add(totalGross, finalGross);
