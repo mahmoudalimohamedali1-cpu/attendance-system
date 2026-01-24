@@ -297,11 +297,12 @@ export class PayrollAdjustmentsService {
         }
 
         // 2. البحث عن أو إنشاء PayrollRun
+        // ⚡ البحث عن أي run موجود (مش بس DRAFT) عشان الخصومات تتربط بالـ run الصح
         let payrollRun = await this.prisma.payrollRun.findFirst({
             where: {
                 companyId,
                 periodId: period.id,
-                status: { in: ['DRAFT', 'CALCULATED'] },
+                status: { notIn: ['CANCELLED', 'ARCHIVED'] }, // أي حالة ماعدا الملغي
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -318,6 +319,7 @@ export class PayrollAdjustmentsService {
             });
         }
 
+        this.logger.log(`🔗 Linking adjustment to PayrollRun ${payrollRun.id} (status: ${payrollRun.status})`);
         // 3. إنشاء التسوية
         const adjustmentType = dto.type === 'DEDUCTION' ? 'MANUAL_DEDUCTION' : 'MANUAL_ADDITION';
 
