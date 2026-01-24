@@ -861,4 +861,31 @@ export class PayrollRunsService {
             return run;
         });
     }
+
+    /**
+     * إلغاء مسير الرواتب (يعمل فقط إذا كان DRAFT)
+     */
+    async cancel(id: string, companyId: string) {
+        const run = await this.prisma.payrollRun.findFirst({
+            where: { id, companyId },
+        });
+
+        if (!run) throw new NotFoundException('تشغيل الرواتب غير موجود');
+
+        // التحقق من أن المسير غير معتمد
+        if (run.status !== 'DRAFT') {
+            throw new BadRequestException(
+                `لا يمكن إلغاء مسير معتمد أو مدفوع. الحالة الحالية: ${run.status}`
+            );
+        }
+
+        await this.prisma.payrollRun.update({
+            where: { id },
+            data: { status: 'CANCELLED' },
+        });
+
+        this.logger.log(`Payroll run ${id} cancelled`);
+
+        return { message: 'تم إلغاء المسير بنجاح', id };
+    }
 }

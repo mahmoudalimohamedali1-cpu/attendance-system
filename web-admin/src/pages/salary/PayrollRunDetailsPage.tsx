@@ -197,6 +197,20 @@ export const PayrollRunDetailsPage = () => {
         }
     };
 
+    // 🔧 Cancel payroll run (DRAFT only)
+    const handleCancel = async () => {
+        if (!window.confirm('هل أنت متأكد من إلغاء هذا المسير؟ سيتم تغيير الحالة إلى ملغي ويمكنك تشغيل مسير جديد.')) return;
+        try {
+            setLoading(true);
+            await api.patch(`/payroll-runs/${id}/cancel`, {});
+            alert('تم إلغاء المسير بنجاح ✅');
+            navigate('/salary'); // Return to list
+        } catch (err: any) {
+            setError(err.message || 'فشل في إلغاء المسير');
+            setLoading(false);
+        }
+    };
+
     if (loading) return <Box display="flex" justifyContent="center" py={10}><CircularProgress /></Box>;
     if (error) return <Alert severity="error">{error}</Alert>;
     if (!run) return <Alert severity="warning">Run not found</Alert>;
@@ -375,6 +389,16 @@ export const PayrollRunDetailsPage = () => {
                         disabled={!isLocked}
                     >
                         تصدير SARIE
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        startIcon={<Close />}
+                        onClick={handleCancel}
+                        disabled={run.status !== 'DRAFT'}
+                        sx={{ display: run.status === 'DRAFT' ? 'flex' : 'none' }}
+                    >
+                        إلغاء المسير
                     </Button>
                     <Button
                         variant="contained"

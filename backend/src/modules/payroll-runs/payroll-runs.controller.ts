@@ -134,6 +134,13 @@ export class PayrollRunsController {
         return this.service.pay(id, companyId);
     }
 
+    @Patch(':id/cancel')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'إلغاء مسير الرواتب (DRAFT فقط)' })
+    cancel(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
+        return this.service.cancel(id, companyId);
+    }
+
     @Get(':id/excel')
     @Roles('ADMIN')
     @ApiOperation({ summary: 'تحميل مسير الرواتب Excel' })
