@@ -24,6 +24,7 @@ export interface GetUsersParams {
     departmentId?: string;
     branchId?: string;
     isActive?: boolean;
+    status?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 }
 
 export interface PaginatedResponse<T> {
@@ -47,6 +48,7 @@ class UsersService {
         if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
         if (params?.branchId) queryParams.append('branchId', params.branchId);
         if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+        if (params?.status) queryParams.append('status', params.status);
 
         const queryString = queryParams.toString();
         const url = queryString ? `/users?${queryString}` : '/users';
