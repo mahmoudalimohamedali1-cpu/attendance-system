@@ -74,6 +74,7 @@ export const PayrollRunDetailsPage = () => {
         originalDeductionType: 'LATE_DEDUCTION',
         originalAmount: 0,
         adjustedAmount: 0,
+        leaveDaysDeducted: 0, // 🔧 عدد أيام الإجازة المخصومة (لـ CONVERT_TO_LEAVE)
         reason: '',
         notes: '',
     });
@@ -200,6 +201,7 @@ export const PayrollRunDetailsPage = () => {
             originalDeductionType: 'LATE_DEDUCTION',
             originalAmount: totalDeductions,
             adjustedAmount: 0,
+            leaveDaysDeducted: 0, // 🔧 إعادة تعيين أيام الإجازة
             reason: '',
             notes: '',
         });
@@ -709,28 +711,46 @@ export const PayrollRunDetailsPage = () => {
                         {/* 🔧 عرض الحقول بناءً على نوع التسوية */}
                         {(adjustmentData.adjustmentType === 'WAIVE_DEDUCTION' || adjustmentData.adjustmentType === 'CONVERT_TO_LEAVE') ? (
                             // إلغاء خصم أو تحويل لإجازة: نحتاج المبلغ الأصلي والمعدل
-                            <Grid container spacing={2}>
-                                <Grid item xs={6}>
+                            <>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            label="المبلغ الأصلي (ر.س)"
+                                            value={adjustmentData.originalAmount}
+                                            onChange={(e) => setAdjustmentData({ ...adjustmentData, originalAmount: parseFloat(e.target.value) || 0 })}
+                                            helperText="المبلغ اللي كان هيتخصم"
+                                        />
+                                    </Grid>
+                                    <Grid item xs={6}>
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            label="المبلغ بعد التعديل (ر.س)"
+                                            value={adjustmentData.adjustedAmount}
+                                            onChange={(e) => setAdjustmentData({ ...adjustmentData, adjustedAmount: parseFloat(e.target.value) || 0 })}
+                                            helperText="0 = إلغاء كامل الخصم"
+                                        />
+                                    </Grid>
+                                </Grid>
+
+                                {/* 🔧 حقل عدد أيام الإجازة - يظهر فقط لتحويل لإجازة */}
+                                {adjustmentData.adjustmentType === 'CONVERT_TO_LEAVE' && (
                                     <TextField
                                         fullWidth
                                         type="number"
-                                        label="المبلغ الأصلي (ر.س)"
-                                        value={adjustmentData.originalAmount}
-                                        onChange={(e) => setAdjustmentData({ ...adjustmentData, originalAmount: parseFloat(e.target.value) || 0 })}
-                                        helperText="المبلغ اللي كان هيتخصم"
+                                        label="عدد أيام الإجازة المخصومة"
+                                        value={adjustmentData.leaveDaysDeducted}
+                                        onChange={(e) => setAdjustmentData({ ...adjustmentData, leaveDaysDeducted: parseInt(e.target.value) || 0 })}
+                                        helperText="عدد الأيام اللي هتتخصم من رصيد الإجازات بدل الفلوس"
+                                        InputProps={{
+                                            inputProps: { min: 0, max: 30 }
+                                        }}
+                                        sx={{ mt: 2 }}
                                     />
-                                </Grid>
-                                <Grid item xs={6}>
-                                    <TextField
-                                        fullWidth
-                                        type="number"
-                                        label="المبلغ بعد التعديل (ر.س)"
-                                        value={adjustmentData.adjustedAmount}
-                                        onChange={(e) => setAdjustmentData({ ...adjustmentData, adjustedAmount: parseFloat(e.target.value) || 0 })}
-                                        helperText="0 = إلغاء كامل الخصم"
-                                    />
-                                </Grid>
-                            </Grid>
+                                )}
+                            </>
                         ) : (
                             // إضافة أو خصم يدوي: نحتاج مبلغ واحد فقط
                             <TextField
