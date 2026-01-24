@@ -3191,6 +3191,9 @@ enum DecisionType {
 
 enum PayrollAdjustmentStatus {
   PENDING
+  APPROVED
+  REJECTED
+  APPLIED
   POSTED
   REVERSED
   CANCELLED
