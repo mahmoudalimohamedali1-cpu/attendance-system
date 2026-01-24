@@ -506,8 +506,8 @@ export default function AdvancesPage() {
                                         <Typography variant="subtitle2" color="info.main" gutterBottom>
                                             تعديل المبلغ والاستقطاع (اختياري)
                                         </Typography>
-                                        <Grid container spacing={2}>
-                                            <Grid item xs={6}>
+                                        <Grid container spacing={2} alignItems="center">
+                                            <Grid item xs={4}>
                                                 <TextField
                                                     label="المبلغ المعتمد"
                                                     type="number"
@@ -518,7 +518,7 @@ export default function AdvancesPage() {
                                                     InputProps={{ endAdornment: 'ريال' }}
                                                 />
                                             </Grid>
-                                            <Grid item xs={6}>
+                                            <Grid item xs={4}>
                                                 <TextField
                                                     label="الاستقطاع الشهري المعتمد"
                                                     type="number"
@@ -528,6 +528,26 @@ export default function AdvancesPage() {
                                                     onChange={(e) => setApprovedDeduction(Number(e.target.value))}
                                                     InputProps={{ endAdornment: 'ريال' }}
                                                 />
+                                            </Grid>
+                                            <Grid item xs={4}>
+                                                <Paper
+                                                    elevation={0}
+                                                    sx={{
+                                                        p: 1.5,
+                                                        bgcolor: 'success.light',
+                                                        borderRadius: 2,
+                                                        textAlign: 'center'
+                                                    }}
+                                                >
+                                                    <Typography variant="caption" color="success.dark">
+                                                        عدد الأشهر المحسوب
+                                                    </Typography>
+                                                    <Typography variant="h5" fontWeight="bold" color="success.dark">
+                                                        {approvedAmount && approvedDeduction && Number(approvedDeduction) > 0
+                                                            ? Math.ceil(Number(approvedAmount) / Number(approvedDeduction))
+                                                            : '-'} شهر
+                                                    </Typography>
+                                                </Paper>
                                             </Grid>
                                         </Grid>
                                     </Paper>
