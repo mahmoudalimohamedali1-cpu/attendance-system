@@ -231,6 +231,10 @@ export class PayrollRunsService {
                             sourceType = (PayslipLineSource as any).SMART || 'SMART';
                             // 🔧 FIX: Use valid component IDs for SMART policies
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
+                        } else if (pl.componentCode === 'LOAN_DED' || pl.componentId?.startsWith('LOAN-')) {
+                            // 🔧 FIX: Use valid component ID for loan/advance deductions
+                            sourceType = (PayslipLineSource as any).LOAN || 'LOAN';
+                            componentIdToUse = loanComp.id; // Use LOAN_DED component
                         }
 
                         payslipLines.push({
@@ -330,8 +334,8 @@ export class PayrollRunsService {
                     this.logger.log(`Applied adjustments for employee ${employee.id}: +${approvedAdjustments.totalAdditions} -${approvedAdjustments.totalDeductions}`);
                 }
 
-                // ✅ خصم أقساط السلف المعتمدة تلقائياً من الراتب
-                let advanceDeductionTotal: Decimal = ZERO;
+                // ✅ تسجيل دفعات السلف تلقائياً (السطور موجودة بالفعل في policyLines من payroll-calculation)
+                // ⚠️ ملاحظة: خصم السلف محسوب في calculation.totalDeductions من LOAN_DED - لا نضيفه مرة أخرى
                 const employeeAdvances = (employee as any).advanceRequests || [];
 
                 for (const advance of employeeAdvances) {
@@ -350,22 +354,8 @@ export class PayrollRunsService {
 
                     // ✅ خصم الأقل: القسط الشهري أو المتبقي (للشهر الأخير)
                     const deductionAmount = Math.min(monthlyDeduction, remainingBalance);
-                    const deductionDecimal = toDecimal(deductionAmount);
 
-                    advanceDeductionTotal = add(advanceDeductionTotal, deductionDecimal);
-
-                    // إضافة سطر خصم السلفة
-                    payslipLines.push({
-                        componentId: adjDedId,
-                        amount: round(deductionDecimal),
-                        sourceType: 'ADVANCE_DEDUCTION' as any,
-                        sign: 'DEDUCTION',
-                        descriptionAr: `قسط سلفة (${advance.type === 'CASH' ? 'نقدية' : 'تحويل بنكي'}) - متبقي: ${(remainingBalance - deductionAmount).toFixed(0)} ريال`,
-                        sourceRef: `ADVANCE_${advance.id}`,
-                        costCenterId: primaryCostCenterId,
-                    });
-
-                    // ✅ تسجيل الدفعة تلقائياً
+                    // ✅ تسجيل الدفعة في LoanPayment
                     await tx.loanPayment.create({
                         data: {
                             advanceId: advance.id,
@@ -384,21 +374,10 @@ export class PayrollRunsService {
                             where: { id: advance.id },
                             data: { status: 'PAID' }
                         });
-                        this.logger.log(`Advance ${advance.id} fully paid!`);
+                        this.logger.log(`✅ Advance ${advance.id} fully paid!`);
                     }
 
-                    this.logger.log(`Deducted ${deductionAmount} SAR from employee ${employee.id} for advance (remaining: ${newRemainingBalance})`);
-                }
-
-                if (isPositive(advanceDeductionTotal)) {
-                    adjustmentDeduction = add(adjustmentDeduction, advanceDeductionTotal);
-
-                    calculation.calculationTrace.push({
-                        step: 'ADVANCE_DEDUCTION',
-                        description: 'خصم أقساط السلف',
-                        formula: `إجمالي أقساط السلف: ${toFixed(advanceDeductionTotal)} ريال`,
-                        result: toNumber(advanceDeductionTotal),
-                    });
+                    this.logger.log(`📝 Recorded payment ${deductionAmount} SAR for advance ${advance.id} (remaining: ${newRemainingBalance})`);
                 }
 
                 // ✅ Using Decimal for final calculations
