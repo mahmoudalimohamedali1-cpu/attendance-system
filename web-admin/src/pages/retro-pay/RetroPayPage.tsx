@@ -51,6 +51,8 @@ export const RetroPayPage = () => {
         oldAmount: 0,
         newAmount: 0,
         notes: '',
+        paymentMonth: new Date().getMonth() + 1, // الشهر الحالي
+        paymentYear: new Date().getFullYear(),
     });
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
@@ -72,7 +74,7 @@ export const RetroPayPage = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['retro-pays'] });
             setDialogOpen(false);
-            setFormData({ employeeId: '', reason: '', effectiveFrom: '', effectiveTo: '', oldAmount: 0, newAmount: 0, notes: '' });
+            setFormData({ employeeId: '', reason: '', effectiveFrom: '', effectiveTo: '', oldAmount: 0, newAmount: 0, notes: '', paymentMonth: new Date().getMonth() + 1, paymentYear: new Date().getFullYear() });
             setSelectedUser(null);
         },
     });
@@ -251,6 +253,44 @@ export const RetroPayPage = () => {
                                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                                 multiline
                                 rows={2}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, mt: 1, fontWeight: 'bold' }}>
+                                📅 شهر الصرف (الشهر اللي هينزل فيه الفرق في المسير)
+                            </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField
+                                fullWidth
+                                select
+                                label="الشهر"
+                                value={formData.paymentMonth}
+                                onChange={(e) => setFormData({ ...formData, paymentMonth: parseInt(e.target.value) })}
+                                SelectProps={{ native: true }}
+                            >
+                                <option value={1}>يناير</option>
+                                <option value={2}>فبراير</option>
+                                <option value={3}>مارس</option>
+                                <option value={4}>أبريل</option>
+                                <option value={5}>مايو</option>
+                                <option value={6}>يونيو</option>
+                                <option value={7}>يوليو</option>
+                                <option value={8}>أغسطس</option>
+                                <option value={9}>سبتمبر</option>
+                                <option value={10}>أكتوبر</option>
+                                <option value={11}>نوفمبر</option>
+                                <option value={12}>ديسمبر</option>
+                            </TextField>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label="السنة"
+                                value={formData.paymentYear}
+                                onChange={(e) => setFormData({ ...formData, paymentYear: parseInt(e.target.value) })}
+                                inputProps={{ min: 2020, max: 2100 }}
                             />
                         </Grid>
                     </Grid>

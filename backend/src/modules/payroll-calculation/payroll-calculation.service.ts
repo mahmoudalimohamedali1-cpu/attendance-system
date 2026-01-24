@@ -1774,16 +1774,26 @@ export class PayrollCalculationService {
         }
 
         // --- Approved Bonuses Integration ---
-        // جلب المكافآت المعتمدة للموظف في هذه الفترة وإضافتها للرواتب
+        // جلب المكافآت/الفروقات المعتمدة للموظف في هذه الفترة وإضافتها للرواتب
         try {
             const approvedBonuses = await this.prisma.retroPay.findMany({
                 where: {
                     employeeId,
                     companyId,
                     status: 'APPROVED',
-                    // المكافآت التي تنطبق على هذه الفترة
-                    effectiveFrom: { lte: endDate },
-                    effectiveTo: { gte: startDate },
+                    OR: [
+                        // 🆕 الطريقة الجديدة: بناءً على شهر الصرف المحدد
+                        {
+                            paymentYear: effectiveYear,
+                            paymentMonth: effectiveMonth,
+                        },
+                        // الطريقة القديمة: بناءً على الفترة (للتوافقية)
+                        {
+                            paymentMonth: null,
+                            effectiveFrom: { lte: endDate },
+                            effectiveTo: { gte: startDate },
+                        },
+                    ],
                 },
             });
 

@@ -39,6 +39,9 @@ export class RetroPayService {
                 notes: dto.notes,
                 createdById,
                 status: 'PENDING',
+                // 🆕 شهر الصرف - محدد من المستخدم
+                paymentMonth: dto.paymentMonth,
+                paymentYear: dto.paymentYear,
             },
             include: { employee: true },
         });

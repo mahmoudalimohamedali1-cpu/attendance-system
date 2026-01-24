@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNumber, IsDateString, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsDateString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
 
 export class CreateRetroPayDto {
     @ApiProperty({ description: 'معرف الموظف' })
@@ -30,4 +30,19 @@ export class CreateRetroPayDto {
     @IsString()
     @IsOptional()
     notes?: string;
+
+    @ApiPropertyOptional({ description: 'شهر الصرف (1-12) - الشهر اللي هينزل فيه الفرق في المسير' })
+    @IsInt()
+    @Min(1)
+    @Max(12)
+    @IsOptional()
+    paymentMonth?: number;
+
+    @ApiPropertyOptional({ description: 'سنة الصرف (مثال: 2026)' })
+    @IsInt()
+    @Min(2020)
+    @Max(2100)
+    @IsOptional()
+    paymentYear?: number;
 }
+

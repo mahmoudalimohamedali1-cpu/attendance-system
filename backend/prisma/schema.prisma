@@ -2545,6 +2545,10 @@ model RetroPay {
   effectiveFrom DateTime @map("effective_from") // تاريخ بداية الفرق
   effectiveTo   DateTime @map("effective_to") // تاريخ نهاية الفرق
 
+  // 🆕 شهر الصرف - الشهر اللي هينزل فيه الفرق في المسير
+  paymentMonth Int? @map("payment_month") // 1-12
+  paymentYear  Int? @map("payment_year") // السنة (مثال: 2026)
+
   oldAmount  Decimal @map("old_amount") @db.Decimal(10, 2)
   newAmount  Decimal @map("new_amount") @db.Decimal(10, 2)
   difference Decimal @db.Decimal(10, 2) // الفرق = new - old
@@ -2563,6 +2567,7 @@ model RetroPay {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([companyId, employeeId, paymentYear, paymentMonth])
   @@map("retro_pays")
 }
 
