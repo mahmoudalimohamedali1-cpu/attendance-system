@@ -603,19 +603,48 @@ export class PayrollRunsService {
                 deductionItems.push({ name: 'خصم سلفة', code: 'ADVANCE', amount: toNumber(amount) });
             }
 
+            const gosiLine = (calculation.policyLines || []).find(pl => pl.componentCode === 'GOSI');
+            const gosiAmount = toDecimal(gosiLine?.amount || 0);
+            totalGosi = add(totalGosi, gosiAmount);
+
+            // ✅ إضافة التسويات المعتمدة للمعاينة (تأثير مرئي في الـ Wizard)
+            const approvedAdjustments = await this.adjustmentsService.getApprovedAdjustmentsTotal(
+                employee.id,
+                period.id
+            );
+
+            let bonusAmount = ZERO;
+            let deductionAmount = ZERO;
+
+            if (approvedAdjustments.netAdjustment !== 0) {
+                bonusAmount = toDecimal(approvedAdjustments.totalAdditions);
+                deductionAmount = toDecimal(approvedAdjustments.totalDeductions);
+
+                if (isPositive(bonusAmount)) {
+                    earnings.push({
+                        name: 'تسويات (إضافات)',
+                        code: 'ADJ_EARN',
+                        amount: toNumber(bonusAmount)
+                    });
+                }
+                if (isPositive(deductionAmount)) {
+                    deductionItems.push({
+                        name: 'تسويات (خصومات)',
+                        code: 'ADJ_DED',
+                        amount: toNumber(deductionAmount)
+                    });
+                }
+            }
+
             // ✅ Using Decimal for calculations
-            const finalGross = toDecimal(calculation.grossSalary);
-            const finalDeductions = add(toDecimal(calculation.totalDeductions), employeeAdvanceAmount);
+            const finalGross = add(toDecimal(calculation.grossSalary), bonusAmount);
+            const finalDeductions = add(add(toDecimal(calculation.totalDeductions), employeeAdvanceAmount), deductionAmount);
             const finalNet = sub(finalGross, finalDeductions);
 
             totalGross = add(totalGross, finalGross);
             totalDeductions = add(totalDeductions, finalDeductions);
             totalNet = add(totalNet, finalNet);
             totalAdvances = add(totalAdvances, employeeAdvanceAmount);
-
-            const gosiLine = (calculation.policyLines || []).find(pl => pl.componentCode === 'GOSI');
-            const gosiAmount = toDecimal(gosiLine?.amount || 0);
-            totalGosi = add(totalGosi, gosiAmount);
 
             const branchName = (employee as any).branch?.name || 'غير محدد';
             const deptName = (employee as any).department?.name || 'غير محدد';
