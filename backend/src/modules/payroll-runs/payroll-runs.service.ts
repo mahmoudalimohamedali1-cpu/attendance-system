@@ -459,7 +459,7 @@ export class PayrollRunsService {
                 excludedCount: excludedIds.size,
                 adjustmentsCount: adjustmentsMap.size,
             };
-        });
+        }, { timeout: 60000 }); // 60 seconds timeout for payroll calculation
 
         // تحضير رسالة التدقيق
         let auditMessage = `إنشاء دورة رواتب جديدة لـ ${result.payslipsCount} موظف`;
