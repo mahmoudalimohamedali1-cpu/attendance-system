@@ -689,6 +689,7 @@ export default function BonusManagementPage() {
                   <TableCell>المبلغ</TableCell>
                   <TableCell>السبب</TableCell>
                   <TableCell>التاريخ</TableCell>
+                  <TableCell>الحالة</TableCell>
                   <TableCell align="center">الإجراءات</TableCell>
                 </TableRow>
               </TableHead>
@@ -729,29 +730,52 @@ export default function BonusManagementPage() {
                     <TableCell>
                       {new Date(adj.createdAt).toLocaleDateString('ar-SA')}
                     </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={
+                          adj.status === 'PENDING' ? 'معلق' :
+                            adj.status === 'POSTED' ? 'معتمد' :
+                              adj.status === 'REVERSED' ? 'ملغي' : adj.status
+                        }
+                        size="small"
+                        color={
+                          adj.status === 'PENDING' ? 'warning' :
+                            adj.status === 'POSTED' ? 'success' :
+                              adj.status === 'REVERSED' ? 'error' : 'default'
+                        }
+                      />
+                    </TableCell>
                     <TableCell align="center">
-                      <Tooltip title="اعتماد">
-                        <IconButton
-                          color="success"
-                          onClick={() => approveAdjustmentMutation.mutate({
-                            adjustmentId: adj.id,
-                            approved: true,
-                          })}
-                        >
-                          <ApproveIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="رفض">
-                        <IconButton
-                          color="error"
-                          onClick={() => approveAdjustmentMutation.mutate({
-                            adjustmentId: adj.id,
-                            approved: false,
-                          })}
-                        >
-                          <RejectIcon />
-                        </IconButton>
-                      </Tooltip>
+                      {adj.status === 'PENDING' ? (
+                        <>
+                          <Tooltip title="اعتماد">
+                            <IconButton
+                              color="success"
+                              onClick={() => approveAdjustmentMutation.mutate({
+                                adjustmentId: adj.id,
+                                approved: true,
+                              })}
+                            >
+                              <ApproveIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="رفض">
+                            <IconButton
+                              color="error"
+                              onClick={() => approveAdjustmentMutation.mutate({
+                                adjustmentId: adj.id,
+                                approved: false,
+                              })}
+                            >
+                              <RejectIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          تم
+                        </Typography>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
