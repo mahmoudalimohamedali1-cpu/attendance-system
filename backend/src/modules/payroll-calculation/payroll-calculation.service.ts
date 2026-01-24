@@ -1774,59 +1774,54 @@ export class PayrollCalculationService {
         }
 
         // --- Approved Bonuses Integration ---
-        // جلب المكافآت/الفروقات المعتمدة للموظف في هذه الفترة وإضافتها للرواتب
+        // جلب الفروقات المعتمدة للموظف وإضافتها للرواتب
         try {
-            this.logger.log(`🔍 Looking for retro pays: employeeId=${employeeId}, year=${effectiveYear}, month=${effectiveMonth}`);
+            this.logger.log(`🔍 RETRO PAY: Looking for employee=${employeeId}, company=${companyId}`);
 
-            // استخدام Raw SQL لتجاوز مشاكل Prisma types
-            const approvedBonuses = await this.prisma.$queryRaw<any[]>`
+            // Simple query - fetch ALL approved retro pays for this employee
+            const sql = `
                 SELECT id, reason, notes, total_amount, difference 
                 FROM retro_pays 
-                WHERE employee_id = ${employeeId}
-                  AND company_id = ${companyId}
+                WHERE employee_id = '${employeeId}'
+                  AND company_id = '${companyId}'
                   AND status = 'APPROVED'
-                  AND (
-                    (payment_year = ${effectiveYear} AND payment_month = ${effectiveMonth})
-                    OR 
-                    (payment_month IS NULL AND effective_from <= ${endDate} AND effective_to >= ${startDate})
-                  )
             `;
+            this.logger.log(`🔍 RETRO PAY SQL: ${sql}`);
 
-            this.logger.log(`📊 Found ${approvedBonuses.length} approved retro pays for employee`);
+            const approvedBonuses = await this.prisma.$queryRawUnsafe<any[]>(sql);
+
+            this.logger.log(`📊 RETRO PAY: Found ${approvedBonuses.length} approved entries`);
 
             for (const bonus of approvedBonuses) {
-                // Raw SQL returns snake_case field names
                 const bonusAmount = Number(bonus.total_amount) || Number(bonus.difference) || 0;
+                this.logger.log(`💵 RETRO PAY: Processing ${bonus.reason} = ${bonusAmount} SAR`);
                 if (bonusAmount > 0) {
-                    // تحقق من أن هذه المكافأة لم تُضف مسبقاً
                     const bonusCode = `BONUS_${bonus.id.slice(0, 8)}`;
                     if (!existingComponentCodes.has(bonusCode)) {
                         policyLines.push({
                             componentId: bonus.id,
                             componentCode: bonusCode,
-                            componentName: bonus.reason || 'مكافأة',
+                            componentName: bonus.reason || 'فرق راتب',
                             sign: 'EARNING',
                             amount: Math.round(bonusAmount * 100) / 100,
-                            descriptionAr: bonus.notes || bonus.reason || 'مكافأة معتمدة',
+                            descriptionAr: bonus.notes || bonus.reason || 'فرق راتب معتمد',
                             source: {
                                 policyId: bonus.id,
-                                policyCode: 'BONUS',
+                                policyCode: 'RETRO_PAY',
                                 ruleId: bonusCode,
-                                ruleCode: 'BONUS',
+                                ruleCode: 'RETRO_PAY',
                             },
                             gosiEligible: false,
                         });
                         existingComponentCodes.add(bonusCode);
-                        this.logger.log(`✅ Added bonus to payroll: ${bonus.reason || 'مكافأة'} - ${bonusAmount} SAR`);
+                        this.logger.log(`✅ RETRO PAY ADDED: ${bonus.reason} - ${bonusAmount} SAR`);
+                    } else {
+                        this.logger.log(`⚠️ RETRO PAY SKIP: ${bonusCode} already exists`);
                     }
                 }
             }
-
-            if (approvedBonuses.length > 0) {
-                this.logger.log(`💰 Found ${approvedBonuses.length} approved bonuses for employee ${employeeId}`);
-            }
         } catch (err) {
-            this.logger.error(`❌ RETRO PAY ERROR for ${employeeId}: ${err.message}`, err.stack);
+            this.logger.error(`❌ RETRO PAY ERROR: ${err.message}`, err.stack);
         }
 
 
