@@ -111,6 +111,25 @@ export default function CommissionManagementPage() {
   });
   const queryClient = useQueryClient();
 
+  // حالة نموذج الخطة
+  const [planForm, setPlanForm] = useState({
+    code: '',
+    nameAr: '',
+    commissionType: '',
+    calculationMethod: '',
+    baseRate: '',
+    cappedAmount: '',
+  });
+
+  // حالة نموذج تسجيل العمولة
+  const [recordForm, setRecordForm] = useState({
+    employeeId: '',
+    planId: '',
+    transactionValue: '',
+    transactionRef: '',
+    notes: '',
+  });
+
   // جلب خطط العمولات
   const { data: plans, isLoading: loadingPlans } = useQuery({
     queryKey: ['commission-plans'],
@@ -127,6 +146,39 @@ export default function CommissionManagementPage() {
   const { data: commissionReport } = useQuery({
     queryKey: ['commission-report', dateRange],
     queryFn: () => api.get(`/payroll-calculation/commission/report?startDate=${dateRange.start}&endDate=${dateRange.end}`),
+  });
+
+  // جلب الموظفين
+  const { data: employees } = useQuery({
+    queryKey: ['employees-for-commission'],
+    queryFn: async () => {
+      const res = await api.get('/users?status=ACTIVE&limit=500');
+      return (res as any)?.data || res || [];
+    },
+  });
+
+  // إنشاء خطة عمولات
+  const createPlanMutation = useMutation({
+    mutationFn: (data: any) => api.post('/payroll-calculation/commission/plans', data),
+    onSuccess: () => {
+      toast.success('تم إنشاء خطة العمولات بنجاح');
+      queryClient.invalidateQueries({ queryKey: ['commission-plans'] });
+      setOpenPlanDialog(false);
+      setPlanForm({ code: '', nameAr: '', commissionType: '', calculationMethod: '', baseRate: '', cappedAmount: '' });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'حدث خطأ أثناء الإنشاء'),
+  });
+
+  // تسجيل عمولة
+  const recordCommissionMutation = useMutation({
+    mutationFn: (data: any) => api.post('/payroll-calculation/commission/record', data),
+    onSuccess: () => {
+      toast.success('تم تسجيل العمولة بنجاح');
+      queryClient.invalidateQueries({ queryKey: ['pending-commissions'] });
+      setOpenRecordDialog(false);
+      setRecordForm({ employeeId: '', planId: '', transactionValue: '', transactionRef: '', notes: '' });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'حدث خطأ أثناء التسجيل'),
   });
 
   // الموافقة على عمولة
@@ -283,7 +335,7 @@ export default function CommissionManagementPage() {
             {(plans as any[])?.map((plan: any) => {
               const metadata = plan.metadata || {};
               const typeInfo = getCommissionTypeInfo(metadata.commissionType);
-              
+
               return (
                 <Grid item xs={12} md={6} lg={4} key={plan.id}>
                   <Card
@@ -310,7 +362,7 @@ export default function CommissionManagementPage() {
                       <Typography variant="h6" fontWeight="bold" gutterBottom>
                         {plan.nameAr}
                       </Typography>
-                      
+
                       <Box sx={{ mt: 2 }}>
                         <Typography variant="body2" color="text.secondary">
                           طريقة الحساب: {CALCULATION_METHODS.find(m => m.value === metadata.calculationMethod)?.label || '-'}
@@ -326,7 +378,7 @@ export default function CommissionManagementPage() {
                           </Typography>
                         )}
                       </Box>
-                      
+
                       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                         <Button size="small" startIcon={<ViewIcon />}>
                           التفاصيل
@@ -337,7 +389,7 @@ export default function CommissionManagementPage() {
                 </Grid>
               );
             })}
-            
+
             {(!plans || (plans as any[]).length === 0) && (
               <Grid item xs={12}>
                 <Alert severity="info">
@@ -411,7 +463,7 @@ export default function CommissionManagementPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                
+
                 {(!pendingCommissions || (pendingCommissions as any[]).length === 0) && (
                   <TableRow>
                     <TableCell colSpan={5} align="center">
@@ -534,7 +586,7 @@ export default function CommissionManagementPage() {
                 <Grid item xs={6}>
                   <Typography color="text.secondary">المتوسط لكل موظف</Typography>
                   <Typography variant="h5" fontWeight="bold" color="primary.main">
-                    {report?.uniqueEmployees 
+                    {report?.uniqueEmployees
                       ? formatCurrency(report.totalAmount / report.uniqueEmployees)
                       : '0'}
                   </Typography>
@@ -552,15 +604,31 @@ export default function CommissionManagementPage() {
           <Box component="form" sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
-                <TextField fullWidth label="كود الخطة" placeholder="SALES_COMMISSION" />
+                <TextField
+                  fullWidth
+                  label="كود الخطة"
+                  placeholder="SALES_COMMISSION"
+                  value={planForm.code}
+                  onChange={(e) => setPlanForm({ ...planForm, code: e.target.value })}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField fullWidth label="اسم الخطة" placeholder="عمولة المبيعات" />
+                <TextField
+                  fullWidth
+                  label="اسم الخطة"
+                  placeholder="عمولة المبيعات"
+                  value={planForm.nameAr}
+                  onChange={(e) => setPlanForm({ ...planForm, nameAr: e.target.value })}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>نوع العمولة</InputLabel>
-                  <Select label="نوع العمولة" defaultValue="">
+                  <Select
+                    label="نوع العمولة"
+                    value={planForm.commissionType}
+                    onChange={(e) => setPlanForm({ ...planForm, commissionType: e.target.value })}
+                  >
                     {COMMISSION_TYPES.map(type => (
                       <MenuItem key={type.value} value={type.value}>
                         {type.label}
@@ -572,7 +640,11 @@ export default function CommissionManagementPage() {
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>طريقة الحساب</InputLabel>
-                  <Select label="طريقة الحساب" defaultValue="">
+                  <Select
+                    label="طريقة الحساب"
+                    value={planForm.calculationMethod}
+                    onChange={(e) => setPlanForm({ ...planForm, calculationMethod: e.target.value })}
+                  >
                     {CALCULATION_METHODS.map(method => (
                       <MenuItem key={method.value} value={method.value}>
                         {method.label}
@@ -586,6 +658,8 @@ export default function CommissionManagementPage() {
                   fullWidth
                   label="المعدل الأساسي"
                   type="number"
+                  value={planForm.baseRate}
+                  onChange={(e) => setPlanForm({ ...planForm, baseRate: e.target.value })}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">%</InputAdornment>,
                   }}
@@ -596,6 +670,8 @@ export default function CommissionManagementPage() {
                   fullWidth
                   label="الحد الأقصى"
                   type="number"
+                  value={planForm.cappedAmount}
+                  onChange={(e) => setPlanForm({ ...planForm, cappedAmount: e.target.value })}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
                   }}
@@ -606,8 +682,12 @@ export default function CommissionManagementPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenPlanDialog(false)}>إلغاء</Button>
-          <Button variant="contained" onClick={() => toast.info('سيتم إضافة هذه الميزة قريباً')}>
-            إنشاء الخطة
+          <Button
+            variant="contained"
+            disabled={createPlanMutation.isPending || !planForm.code || !planForm.nameAr}
+            onClick={() => createPlanMutation.mutate(planForm)}
+          >
+            {createPlanMutation.isPending ? 'جاري الإنشاء...' : 'إنشاء الخطة'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -619,13 +699,25 @@ export default function CommissionManagementPage() {
           <Box component="form" sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <FormControl fullWidth>
               <InputLabel>الموظف</InputLabel>
-              <Select label="الموظف" defaultValue="">
-                <MenuItem value="">اختر الموظف</MenuItem>
+              <Select
+                label="الموظف"
+                value={recordForm.employeeId}
+                onChange={(e) => setRecordForm({ ...recordForm, employeeId: e.target.value })}
+              >
+                {(employees as any[])?.map((emp: any) => (
+                  <MenuItem key={emp.id} value={emp.id}>
+                    {emp.firstName} {emp.lastName} - {emp.employeeCode}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             <FormControl fullWidth>
               <InputLabel>خطة العمولة</InputLabel>
-              <Select label="خطة العمولة" defaultValue="">
+              <Select
+                label="خطة العمولة"
+                value={recordForm.planId}
+                onChange={(e) => setRecordForm({ ...recordForm, planId: e.target.value })}
+              >
                 {(plans as any[])?.map(plan => (
                   <MenuItem key={plan.id} value={plan.id}>
                     {plan.nameAr}
@@ -637,18 +729,43 @@ export default function CommissionManagementPage() {
               fullWidth
               label="قيمة المعاملة"
               type="number"
+              value={recordForm.transactionValue}
+              onChange={(e) => setRecordForm({ ...recordForm, transactionValue: e.target.value })}
               InputProps={{
                 endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
               }}
             />
-            <TextField fullWidth label="مرجع المعاملة" placeholder="رقم الفاتورة أو العقد" />
-            <TextField fullWidth label="ملاحظات" multiline rows={2} />
+            <TextField
+              fullWidth
+              label="مرجع المعاملة"
+              placeholder="رقم الفاتورة أو العقد"
+              value={recordForm.transactionRef}
+              onChange={(e) => setRecordForm({ ...recordForm, transactionRef: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="ملاحظات"
+              multiline
+              rows={2}
+              value={recordForm.notes}
+              onChange={(e) => setRecordForm({ ...recordForm, notes: e.target.value })}
+            />
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenRecordDialog(false)}>إلغاء</Button>
-          <Button variant="contained" onClick={() => toast.info('سيتم إضافة هذه الميزة قريباً')}>
-            تسجيل العمولة
+          <Button
+            variant="contained"
+            disabled={recordCommissionMutation.isPending || !recordForm.employeeId || !recordForm.planId || !recordForm.transactionValue}
+            onClick={() => recordCommissionMutation.mutate({
+              employeeId: recordForm.employeeId,
+              planId: recordForm.planId,
+              transactionValue: Number(recordForm.transactionValue),
+              transactionRef: recordForm.transactionRef,
+              notes: recordForm.notes,
+            })}
+          >
+            {recordCommissionMutation.isPending ? 'جاري التسجيل...' : 'تسجيل العمولة'}
           </Button>
         </DialogActions>
       </Dialog>
