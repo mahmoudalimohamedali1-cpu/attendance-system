@@ -436,9 +436,19 @@ export class PayrollRunsService {
                 const linesGross = validatedPayslipLines
                     .filter(l => l.sign === 'EARNING')
                     .reduce((sum, l) => add(sum, toDecimal(l.amount)), ZERO);
-                const linesDeductions = validatedPayslipLines
+                let linesDeductions = validatedPayslipLines
                     .filter(l => l.sign === 'DEDUCTION')
                     .reduce((sum, l) => add(sum, toDecimal(l.amount)), ZERO);
+
+                // ✅ Apply deduction cap (Saudi Labor Law Article 91 - max 50%)
+                const maxDeductionPercent = 50; // TODO: get from settings
+                const capResult = applyDeductionCap(linesGross, linesDeductions, maxDeductionPercent);
+                if (capResult.wasCapped) {
+                    this.logger.warn(`⚠️ Deductions capped for employee ${employee.id}: ` +
+                        `${toFixed(linesDeductions)} → ${toFixed(capResult.cappedDeductions)} (excess: ${toFixed(capResult.excessAmount)})`);
+                    linesDeductions = capResult.cappedDeductions;
+                }
+
                 const linesNet = sub(linesGross, linesDeductions);
 
                 await tx.payslip.create({
