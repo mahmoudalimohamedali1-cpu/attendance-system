@@ -706,26 +706,46 @@ export const PayrollRunDetailsPage = () => {
                             </TextField>
                         )}
 
-                        <Grid container spacing={2}>
-                            <Grid item xs={6}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="المبلغ الأصلي (ر.س)"
-                                    value={adjustmentData.originalAmount}
-                                    onChange={(e) => setAdjustmentData({ ...adjustmentData, originalAmount: parseFloat(e.target.value) || 0 })}
-                                />
+                        {/* 🔧 عرض الحقول بناءً على نوع التسوية */}
+                        {(adjustmentData.adjustmentType === 'WAIVE_DEDUCTION' || adjustmentData.adjustmentType === 'CONVERT_TO_LEAVE') ? (
+                            // إلغاء خصم أو تحويل لإجازة: نحتاج المبلغ الأصلي والمعدل
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        type="number"
+                                        label="المبلغ الأصلي (ر.س)"
+                                        value={adjustmentData.originalAmount}
+                                        onChange={(e) => setAdjustmentData({ ...adjustmentData, originalAmount: parseFloat(e.target.value) || 0 })}
+                                        helperText="المبلغ اللي كان هيتخصم"
+                                    />
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField
+                                        fullWidth
+                                        type="number"
+                                        label="المبلغ بعد التعديل (ر.س)"
+                                        value={adjustmentData.adjustedAmount}
+                                        onChange={(e) => setAdjustmentData({ ...adjustmentData, adjustedAmount: parseFloat(e.target.value) || 0 })}
+                                        helperText="0 = إلغاء كامل الخصم"
+                                    />
+                                </Grid>
                             </Grid>
-                            <Grid item xs={6}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="المبلغ المعدل (ر.س)"
-                                    value={adjustmentData.adjustedAmount}
-                                    onChange={(e) => setAdjustmentData({ ...adjustmentData, adjustedAmount: parseFloat(e.target.value) || 0 })}
-                                />
-                            </Grid>
-                        </Grid>
+                        ) : (
+                            // إضافة أو خصم يدوي: نحتاج مبلغ واحد فقط
+                            <TextField
+                                fullWidth
+                                type="number"
+                                label={adjustmentData.adjustmentType === 'MANUAL_ADDITION' ? 'المبلغ المضاف (ر.س)' : 'المبلغ المخصوم (ر.س)'}
+                                value={adjustmentData.adjustedAmount}
+                                onChange={(e) => setAdjustmentData({
+                                    ...adjustmentData,
+                                    adjustedAmount: parseFloat(e.target.value) || 0,
+                                    originalAmount: 0 // لا يوجد مبلغ أصلي للتسويات اليدوية
+                                })}
+                                helperText={adjustmentData.adjustmentType === 'MANUAL_ADDITION' ? 'مبلغ يضاف للراتب' : 'مبلغ يخصم من الراتب'}
+                            />
+                        )}
 
                         <TextField
                             fullWidth
