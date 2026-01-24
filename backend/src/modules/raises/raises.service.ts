@@ -191,8 +191,14 @@ export class RaisesService {
             throw new BadRequestException('هذا الطلب ليس في مرحلة موافقة المدير');
         }
 
-        // Verify manager is the user's manager
-        if (request.user.managerId !== managerId) {
+        // Verify approver has permission to approve this employee's requests
+        const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
+            managerId,
+            companyId,
+            'RAISES_APPROVE_MANAGER',
+        );
+
+        if (!accessibleEmployeeIds.includes(request.userId)) {
             throw new ForbiddenException('لا يمكنك الموافقة على هذا الطلب');
         }
 

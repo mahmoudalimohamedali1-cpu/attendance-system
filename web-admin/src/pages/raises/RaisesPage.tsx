@@ -248,13 +248,26 @@ export default function RaisesPage() {
                                 variant="outlined"
                                 onClick={() => {
                                     const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || '';
-                                    window.open(`${baseUrl}${att.url || att.path}`, '_blank');
+                                    const fileUrl = att.url || att.path || '';
+                                    // Handle full URLs, /uploads paths, and bare filenames
+                                    const finalUrl = fileUrl.startsWith('http')
+                                        ? fileUrl
+                                        : fileUrl.startsWith('/uploads')
+                                            ? `${baseUrl}${fileUrl}`
+                                            : `${baseUrl}/uploads/raises/${fileUrl}`;
+                                    window.open(finalUrl, '_blank');
                                 }}
                                 deleteIcon={<Download />}
                                 onDelete={() => {
                                     const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace('/api/v1', '') || '';
+                                    const fileUrl = att.url || att.path || '';
+                                    const finalUrl = fileUrl.startsWith('http')
+                                        ? fileUrl
+                                        : fileUrl.startsWith('/uploads')
+                                            ? `${baseUrl}${fileUrl}`
+                                            : `${baseUrl}/uploads/raises/${fileUrl}`;
                                     const link = document.createElement('a');
-                                    link.href = `${baseUrl}${att.url || att.path}`;
+                                    link.href = finalUrl;
                                     link.download = att.originalName || att.filename;
                                     link.click();
                                 }}
