@@ -11,11 +11,13 @@ import { ApprovalWorkflowService } from '../../common/services/approval-workflow
 export class FinanceDecisionDto {
     decision: DecisionType;
     notes?: string;
+    effectiveMonth?: string; // شهر بدء الزيادة (بأثر رجعي أو مستقبلي)
 }
 
 export class CEODecisionDto {
     decision: DecisionType;
     notes?: string;
+    effectiveMonth?: string; // شهر بدء الزيادة (بأثر رجعي أو مستقبلي)
 }
 
 @Injectable()
@@ -226,6 +228,8 @@ export class RaisesService {
                 managerNotes: dto.notes,
                 status: newStatus,
                 currentStep: newStep,
+                // Update effectiveMonth if approver specifies a different date
+                ...(dto.effectiveMonth && decision === ApprovalDecision.APPROVED ? { effectiveMonth: new Date(dto.effectiveMonth) } : {}),
             },
             include: {
                 user: {
@@ -399,6 +403,8 @@ export class RaisesService {
                 hrAttachments: dto.attachments,
                 status: newStatus,
                 currentStep: newCurrentStep,
+                // Update effectiveMonth if HR specifies a different date
+                ...(dto.effectiveMonth && decision === ApprovalDecision.APPROVED ? { effectiveMonth: new Date(dto.effectiveMonth) } : {}),
             },
             include: {
                 user: {
@@ -564,6 +570,8 @@ export class RaisesService {
                 financeDecisionNotes: dto.notes,
                 status: newStatus,
                 currentStep: newCurrentStep,
+                // Update effectiveMonth if Finance specifies a different date
+                ...(dto.effectiveMonth && decision === ApprovalDecision.APPROVED ? { effectiveMonth: new Date(dto.effectiveMonth) } : {}),
             },
             include: { user: { select: { id: true, firstName: true, lastName: true } } },
         });
@@ -687,6 +695,8 @@ export class RaisesService {
                 ceoDecisionNotes: dto.notes,
                 status: newStatus,
                 currentStep: decision === ApprovalDecision.DELAYED ? ApprovalStep.CEO : ApprovalStep.COMPLETED,
+                // Update effectiveMonth if CEO specifies a different date
+                ...(dto.effectiveMonth && decision === ApprovalDecision.APPROVED ? { effectiveMonth: new Date(dto.effectiveMonth) } : {}),
             },
             include: { user: { select: { id: true, firstName: true, lastName: true } } },
         });

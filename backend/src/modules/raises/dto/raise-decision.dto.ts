@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, IsArray } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, IsArray, IsDateString } from 'class-validator';
 
 export enum DecisionType {
     APPROVED = 'APPROVED',
@@ -21,6 +21,14 @@ export class ManagerDecisionDto {
     @IsString()
     @MaxLength(500)
     notes?: string;
+
+    @ApiPropertyOptional({
+        description: 'شهر بدء الزيادة (يمكن أن يكون بأثر رجعي أو مستقبلي)',
+        example: '2025-11-01'
+    })
+    @IsOptional()
+    @IsDateString()
+    effectiveMonth?: string;
 }
 
 export class HRDecisionDto {
@@ -39,6 +47,14 @@ export class HRDecisionDto {
     notes?: string;
 
     @ApiPropertyOptional({
+        description: 'شهر بدء الزيادة (يمكن أن يكون بأثر رجعي أو مستقبلي)',
+        example: '2025-11-01'
+    })
+    @IsOptional()
+    @IsDateString()
+    effectiveMonth?: string;
+
+    @ApiPropertyOptional({
         description: 'المرفقات',
         type: 'array',
         items: { type: 'object' }
@@ -47,3 +63,4 @@ export class HRDecisionDto {
     @IsArray()
     attachments?: any[];
 }
+
