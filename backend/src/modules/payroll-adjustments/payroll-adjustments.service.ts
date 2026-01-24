@@ -173,6 +173,55 @@ export class PayrollAdjustmentsService {
                 this.logger.log(`📅 Deducted ${leaveDays} leave days from employee ${adjustment.employeeId}`);
             }
 
+            // 🔧 تحديث الـ Payslip تلقائياً بعد اعتماد التسوية
+            if (adjustment.payrollRunId) {
+                const payslip = await this.prisma.payslip.findFirst({
+                    where: {
+                        runId: adjustment.payrollRunId,
+                        employeeId: adjustment.employeeId,
+                    },
+                });
+
+                if (payslip) {
+                    let adjustmentAmount = 0;
+
+                    switch (adjustment.adjustmentType) {
+                        case 'WAIVE_DEDUCTION':
+                        case 'CONVERT_TO_LEAVE':
+                            // إلغاء خصم أو تحويل لإجازة: نضيف الفرق (المبلغ الأصلي - المعدل) للصافي
+                            adjustmentAmount = Number(adjustment.originalAmount || 0) - Number(adjustment.adjustedAmount || 0);
+                            break;
+                        case 'MANUAL_ADDITION':
+                            // إضافة يدوية: نضيف المبلغ للصافي
+                            adjustmentAmount = Number(adjustment.adjustedAmount || 0);
+                            break;
+                        case 'MANUAL_DEDUCTION':
+                            // خصم يدوي: نخصم المبلغ من الصافي
+                            adjustmentAmount = -Number(adjustment.adjustedAmount || 0);
+                            break;
+                    }
+
+                    if (adjustmentAmount !== 0) {
+                        const newNetSalary = Number(payslip.netSalary) + adjustmentAmount;
+                        const newTotalDeductions = adjustment.adjustmentType === 'MANUAL_DEDUCTION'
+                            ? Number(payslip.totalDeductions) + Math.abs(adjustmentAmount)
+                            : (adjustment.adjustmentType === 'WAIVE_DEDUCTION' || adjustment.adjustmentType === 'CONVERT_TO_LEAVE')
+                                ? Number(payslip.totalDeductions) - adjustmentAmount
+                                : Number(payslip.totalDeductions);
+
+                        await this.prisma.payslip.update({
+                            where: { id: payslip.id },
+                            data: {
+                                netSalary: newNetSalary,
+                                totalDeductions: Math.max(0, newTotalDeductions),
+                            },
+                        });
+
+                        this.logger.log(`💰 Updated payslip ${payslip.id}: netSalary adjusted by ${adjustmentAmount}`);
+                    }
+                }
+            }
+
             return this.prisma.payrollAdjustment.update({
                 where: { id: dto.adjustmentId },
                 data: {
