@@ -235,7 +235,7 @@ export class PayrollAdjustmentsService {
             return this.prisma.payrollAdjustment.update({
                 where: { id: dto.adjustmentId },
                 data: {
-                    status: 'CANCELLED', // CANCELLED = مرفوض في الـ enum
+                    status: 'REJECTED', // REJECTED = مرفوض في الـ enum
                     approvedById,
                     rejectedAt: new Date(),
                     rejectionReason: dto.rejectionReason,
