@@ -72,8 +72,8 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
         queryKey: ['employees-list-disciplinary', isAdmin ? 'all' : 'my-team'],
         queryFn: async () => {
             if (isAdmin) {
-                // Admin يشوف كل الموظفين النشطين فقط
-                return usersService.getUsers({ role: 'EMPLOYEE', limit: 500, status: 'ACTIVE' });
+                // Admin يشوف كل الموظفين والمدراء النشطين (ما عدا Admins آخرين)
+                return usersService.getUsers({ limit: 500, status: 'ACTIVE' });
             } else {
                 // Manager يشوف موظفينه فقط
                 const teamData = await usersService.getMyTeam();

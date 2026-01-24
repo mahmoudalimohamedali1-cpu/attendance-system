@@ -392,5 +392,25 @@ class ApiClient {
   Future<Response> acknowledgePost(String postId) async {
     return await _dio.post('/social-feed/$postId/acknowledge');
   }
+
+  // ==================== Payslips endpoints ====================
+
+  /// جلب كشوفات راتب الموظف
+  Future<Response> getMyPayslips() async {
+    debugPrint('📤 Fetching my payslips from: ${_dio.options.baseUrl}/payslips/my');
+    try {
+      final response = await _dio.get('/payslips/my');
+      debugPrint('✅ Payslips response: ${response.statusCode}');
+      return response;
+    } catch (e) {
+      debugPrint('❌ Error fetching payslips: $e');
+      rethrow;
+    }
+  }
+
+  /// جلب تفاصيل كشف راتب واحد
+  Future<Response> getPayslipById(String id) async {
+    return await _dio.get('/payslips/$id');
+  }
 }
 

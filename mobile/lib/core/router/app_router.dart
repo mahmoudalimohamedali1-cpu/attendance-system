@@ -46,6 +46,7 @@ import '../../features/requests/presentation/pages/my_requests_page.dart';
 import '../../features/social_feed/presentation/pages/social_feed_page.dart';
 import '../../features/social_feed/presentation/pages/post_detail_page.dart';
 import '../../features/social_feed/data/models/post_model.dart';
+import '../../features/payslips/presentation/pages/payslips_page.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -338,6 +339,12 @@ class AppRouter {
             path: '/social-feed',
             name: 'social-feed',
             builder: (context, state) => const SocialFeedPage(),
+          ),
+          // Payslips routes
+          GoRoute(
+            path: '/my-payslips',
+            name: 'my-payslips',
+            builder: (context, state) => const PayslipsPage(),
           ),
         ],
       ),

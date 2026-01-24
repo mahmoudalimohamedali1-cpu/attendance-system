@@ -460,6 +460,12 @@ class _QuickActionsCard extends StatelessWidget {
                   onTap: () => context.go('/my-tasks'),
                 ),
                 _QuickActionButton(
+                  icon: Icons.receipt_long,
+                  label: 'رواتبي',
+                  color: Colors.teal,
+                  onTap: () => context.go('/my-payslips'),
+                ),
+                _QuickActionButton(
                   icon: Icons.forum,
                   label: 'التواصل',
                   color: Colors.pink,
@@ -470,12 +476,6 @@ class _QuickActionsCard extends StatelessWidget {
                   label: 'أهدافي',
                   color: Colors.green,
                   onTap: () => context.go('/my-goals'),
-                ),
-                _QuickActionButton(
-                  icon: Icons.star_rate,
-                  label: 'التقييم',
-                  color: Colors.amber,
-                  onTap: () => context.go('/performance-reviews'),
                 ),
               ],
             ),
