@@ -400,109 +400,132 @@ class _QuickActionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // ========== الطلبات ==========
-        _CategoryCard(
-          title: 'الطلبات',
-          icon: Icons.assignment,
-          color: Colors.blue,
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        // تحديد صلاحيات المستخدم
+        bool isManager = false;
+        bool isAdmin = false;
+        
+        if (authState is AuthAuthenticated) {
+          isAdmin = authState.user.role == 'ADMIN';
+          isManager = authState.user.role == 'MANAGER' || isAdmin;
+        }
+        
+        return Column(
           children: [
-            _QuickActionButton(
-              icon: Icons.beach_access,
-              label: 'إجازة',
+            // ========== الطلبات ==========
+            _CategoryCard(
+              title: 'الطلبات',
+              icon: Icons.assignment,
               color: Colors.blue,
-              onTap: () => context.push('/leaves/new'),
+              children: [
+                _QuickActionButton(
+                  icon: Icons.beach_access,
+                  label: 'إجازة',
+                  color: Colors.blue,
+                  onTap: () => context.push('/leaves/new'),
+                ),
+                _QuickActionButton(
+                  icon: Icons.description,
+                  label: 'خطاب',
+                  color: Colors.green,
+                  onTap: () => context.push('/letters/new'),
+                ),
+                _QuickActionButton(
+                  icon: Icons.account_balance_wallet,
+                  label: 'سلفة',
+                  color: Colors.orange,
+                  onTap: () => context.push('/advances/new'),
+                ),
+                _QuickActionButton(
+                  icon: Icons.trending_up,
+                  label: 'زيادة',
+                  color: Colors.purple,
+                  onTap: () => context.push('/raises/new'),
+                ),
+              ],
             ),
-            _QuickActionButton(
-              icon: Icons.description,
-              label: 'خطاب',
-              color: Colors.green,
-              onTap: () => context.push('/letters/new'),
-            ),
-            _QuickActionButton(
-              icon: Icons.account_balance_wallet,
-              label: 'سلفة',
-              color: Colors.orange,
-              onTap: () => context.push('/advances/new'),
-            ),
-            _QuickActionButton(
-              icon: Icons.trending_up,
-              label: 'زيادة',
-              color: Colors.purple,
-              onTap: () => context.push('/raises/new'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        
-        // ========== العمل والأداء ==========
-        _CategoryCard(
-          title: 'العمل والأداء',
-          icon: Icons.work,
-          color: Colors.indigo,
-          children: [
-            _QuickActionButton(
-              icon: Icons.task_alt,
-              label: 'مهامي',
+            const SizedBox(height: 12),
+            
+            // ========== العمل والأداء ==========
+            _CategoryCard(
+              title: 'العمل والأداء',
+              icon: Icons.work,
               color: Colors.indigo,
-              onTap: () => context.go('/my-tasks'),
+              children: [
+                _QuickActionButton(
+                  icon: Icons.task_alt,
+                  label: 'مهامي',
+                  color: Colors.indigo,
+                  onTap: () => context.go('/my-tasks'),
+                ),
+                _QuickActionButton(
+                  icon: Icons.forum,
+                  label: 'التواصل',
+                  color: Colors.pink,
+                  onTap: () => context.go('/social-feed'),
+                ),
+                _QuickActionButton(
+                  icon: Icons.flag,
+                  label: 'أهدافي',
+                  color: Colors.green,
+                  onTap: () => context.go('/my-goals'),
+                ),
+                _QuickActionButton(
+                  icon: Icons.star_rate,
+                  label: 'التقييم',
+                  color: Colors.amber,
+                  onTap: () => context.go('/performance-reviews'),
+                ),
+              ],
             ),
-            _QuickActionButton(
-              icon: Icons.forum,
-              label: 'التواصل',
-              color: Colors.pink,
-              onTap: () => context.go('/social-feed'),
-            ),
-            _QuickActionButton(
-              icon: Icons.flag,
-              label: 'أهدافي',
-              color: Colors.green,
-              onTap: () => context.go('/my-goals'),
-            ),
-            _QuickActionButton(
-              icon: Icons.star_rate,
-              label: 'التقييم',
-              color: Colors.amber,
-              onTap: () => context.go('/performance-reviews'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        
-        // ========== الإدارة ==========
-        _CategoryCard(
-          title: 'الإدارة والأصول',
-          icon: Icons.admin_panel_settings,
-          color: Colors.brown,
-          children: [
-            _QuickActionButton(
-              icon: Icons.inventory_2,
-              label: 'العهد',
+            const SizedBox(height: 12),
+            
+            // ========== الإدارة والأصول ==========
+            // ✅ يظهر للجميع لكن الأزرار تختلف حسب الصلاحية
+            _CategoryCard(
+              title: isManager ? 'الإدارة والأصول' : 'الأصول والجزاءات',
+              icon: isManager ? Icons.admin_panel_settings : Icons.inventory_2,
               color: Colors.brown,
-              onTap: () => context.go('/my-custody'),
-            ),
-            _QuickActionButton(
-              icon: Icons.pending_actions,
-              label: 'طلبات معلقة',
-              color: Colors.red,
-              onTap: () => context.go('/pending'),
-            ),
-            _QuickActionButton(
-              icon: Icons.gavel,
-              label: 'الجزاءات',
-              color: Colors.redAccent,
-              onTap: () => context.go('/disciplinary'),
-            ),
-            _QuickActionButton(
-              icon: Icons.bar_chart,
-              label: 'تقرير شهري',
-              color: Colors.teal,
-              onTap: () => context.go('/monthly-report'),
+              children: [
+                // ✅ العهد - يظهر للجميع
+                _QuickActionButton(
+                  icon: Icons.inventory_2,
+                  label: 'العهد',
+                  color: Colors.brown,
+                  onTap: () => context.go('/my-custody'),
+                ),
+                
+                // ✅ الجزاءات - يظهر للجميع (المحتوى يختلف حسب الدور في صفحة الجزاءات)
+                _QuickActionButton(
+                  icon: Icons.gavel,
+                  label: 'الجزاءات',
+                  color: Colors.redAccent,
+                  onTap: () => context.go('/disciplinary'),
+                ),
+                
+                // ⛔ طلبات معلقة - للمدراء فقط
+                if (isManager)
+                  _QuickActionButton(
+                    icon: Icons.pending_actions,
+                    label: 'طلبات معلقة',
+                    color: Colors.red,
+                    onTap: () => context.go('/pending'),
+                  ),
+                
+                // ⛔ تقرير شهري - للمدراء فقط
+                if (isManager)
+                  _QuickActionButton(
+                    icon: Icons.bar_chart,
+                    label: 'تقرير شهري',
+                    color: Colors.teal,
+                    onTap: () => context.go('/monthly-report'),
+                  ),
+              ],
             ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 }

@@ -170,6 +170,19 @@ export class PayrollRunsService {
                 }
             });
 
+            // 🔧 Fetch or create adjustment components for manual/adjustment payslip lines
+            const adjAddComponent = await tx.salaryComponent.findFirst({
+                where: { companyId, code: 'ADJ_ADD' }
+            });
+            const adjDedComponent = await tx.salaryComponent.findFirst({
+                where: { companyId, code: 'ADJ_DED' }
+            });
+            const adjAddId = adjAddComponent?.id || null;
+            const adjDedId = adjDedComponent?.id || null;
+            if (!adjAddId || !adjDedId) {
+                this.logger.warn('⚠️ ADJ_ADD or ADJ_DED component not found. Payslip lines may fail.')
+            }
+
             for (const employee of filteredEmployees) {
                 // محرك الحساب المركزي (Consolidated Breakdown)
                 const calculation = await this.calculationService.calculateForEmployee(
@@ -245,7 +258,7 @@ export class PayrollRunsService {
                     if (adj.type === 'bonus') {
                         adjustmentBonus = add(adjustmentBonus, adjAmount);
                         payslipLines.push({
-                            componentId: null, // تعديل يدوي
+                            componentId: adjAddId, // تعديل إضافة
                             amount: round(adjAmount),
                             sourceType: 'MANUAL' as any,
                             sign: 'EARNING',
@@ -256,7 +269,7 @@ export class PayrollRunsService {
                     } else {
                         adjustmentDeduction = add(adjustmentDeduction, adjAmount);
                         payslipLines.push({
-                            componentId: null, // تعديل يدوي
+                            componentId: adjDedId, // تعديل خصم
                             amount: round(adjAmount),
                             sourceType: 'MANUAL' as any,
                             sign: 'DEDUCTION',
@@ -279,7 +292,7 @@ export class PayrollRunsService {
                     if (approvedAdjustments.totalAdditions > 0) {
                         adjustmentBonus = add(adjustmentBonus, toDecimal(approvedAdjustments.totalAdditions));
                         payslipLines.push({
-                            componentId: null,
+                            componentId: adjAddId,
                             amount: round(toDecimal(approvedAdjustments.totalAdditions)),
                             sourceType: 'ADJUSTMENT' as any,
                             sign: 'EARNING',
@@ -292,7 +305,7 @@ export class PayrollRunsService {
                     if (approvedAdjustments.totalDeductions > 0) {
                         adjustmentDeduction = add(adjustmentDeduction, toDecimal(approvedAdjustments.totalDeductions));
                         payslipLines.push({
-                            componentId: null,
+                            componentId: adjDedId,
                             amount: round(toDecimal(approvedAdjustments.totalDeductions)),
                             sourceType: 'ADJUSTMENT' as any,
                             sign: 'DEDUCTION',
@@ -336,7 +349,7 @@ export class PayrollRunsService {
 
                         // إضافة سطر خصم الدين
                         payslipLines.push({
-                            componentId: null,
+                            componentId: adjDedId, // سداد ديون
                             amount: round(debtDeductionAmount),
                             sourceType: 'DEBT_REPAYMENT' as any,
                             sign: 'DEDUCTION',
