@@ -14,6 +14,7 @@ import {
     Typography,
     Box,
     Autocomplete,
+    Chip,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -52,7 +53,7 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
         violationType: '',
         incidentDate: null as Date | null,
         incidentLocation: '',
-        witnesses: '',
+        witnessIds: [] as string[],
         description: '',
         retrospectiveReason: '',
     });
@@ -95,7 +96,7 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
             violationType: '',
             incidentDate: null,
             incidentLocation: '',
-            witnesses: '',
+            witnessIds: [],
             description: '',
             retrospectiveReason: '',
         });
@@ -123,7 +124,13 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
         };
 
         if (formData.violationType) submitData.violationType = formData.violationType;
-        if (formData.witnesses) submitData.involvedParties = { witnesses: formData.witnesses };
+        if (formData.witnessIds.length > 0) {
+            const witnessNames = formData.witnessIds.map(id => {
+                const emp = employees.find((e: any) => e.id === id);
+                return emp ? `${emp.firstName} ${emp.lastName}` : id;
+            }).join(', ');
+            submitData.involvedParties = { witnesses: witnessNames, witnessIds: formData.witnessIds };
+        }
         if (formData.retrospectiveReason) submitData.retrospectiveReason = formData.retrospectiveReason;
 
         mutation.mutate(submitData);
@@ -267,15 +274,28 @@ export const CreateInvestigationDialog = ({ open, onClose, onSuccess }: CreateIn
                         <Grid item xs={12} md={6}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                 <Group fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                                <Typography variant="subtitle2" fontWeight="bold">أطراف المشكلة / الشهود</Typography>
+                                <Typography variant="subtitle2" fontWeight="bold">الشهود (اختياري)</Typography>
                             </Box>
-                            <TextField
-                                fullWidth
-                                placeholder="أسماء الشهود أو الأطراف الأخرى (اختياري)"
-                                value={formData.witnesses}
-                                onChange={(e) => setFormData({ ...formData, witnesses: e.target.value })}
-                                multiline
-                                rows={2}
+                            <Autocomplete
+                                multiple
+                                options={employees.filter((e: any) => e.id !== formData.employeeId)}
+                                getOptionLabel={(option: any) => `${option.firstName} ${option.lastName}`}
+                                value={employees.filter((e: any) => formData.witnessIds.includes(e.id))}
+                                onChange={(_, newValue: any[]) => setFormData({ ...formData, witnessIds: newValue.map((v: any) => v.id) })}
+                                renderTags={(value, getTagProps) =>
+                                    value.map((option: any, index: number) => (
+                                        <Chip
+                                            label={`${option.firstName} ${option.lastName}`}
+                                            size="small"
+                                            {...getTagProps({ index })}
+                                            key={option.id}
+                                        />
+                                    ))
+                                }
+                                renderInput={(params) => (
+                                    <TextField {...params} placeholder="اختر الشهود من الموظفين" />
+                                )}
+                                noOptionsText="لا توجد نتائج"
                             />
                         </Grid>
 
