@@ -144,6 +144,35 @@ export class PayrollAdjustmentsService {
 
         if (dto.approved) {
             this.logger.log(`✅ Approving adjustment ${dto.adjustmentId}`);
+
+            // 🔧 FIX: إذا كانت التسوية "تحويل لإجازة"، نخصم أيام الإجازة من رصيد الموظف
+            if (adjustment.adjustmentType === 'CONVERT_TO_LEAVE' && adjustment.leaveDaysDeducted > 0) {
+                const leaveDays = adjustment.leaveDaysDeducted;
+
+                // التحقق من رصيد الإجازات
+                const employee = await this.prisma.user.findUnique({
+                    where: { id: adjustment.employeeId },
+                    select: { remainingLeaveDays: true, firstName: true, lastName: true },
+                });
+
+                if (employee && employee.remainingLeaveDays < leaveDays) {
+                    throw new BadRequestException(
+                        `رصيد الإجازات غير كافي. الرصيد المتبقي: ${employee.remainingLeaveDays} يوم، المطلوب: ${leaveDays} يوم`
+                    );
+                }
+
+                // خصم أيام الإجازة من رصيد الموظف
+                await this.prisma.user.update({
+                    where: { id: adjustment.employeeId },
+                    data: {
+                        usedLeaveDays: { increment: leaveDays },
+                        remainingLeaveDays: { decrement: leaveDays },
+                    },
+                });
+
+                this.logger.log(`📅 Deducted ${leaveDays} leave days from employee ${adjustment.employeeId}`);
+            }
+
             return this.prisma.payrollAdjustment.update({
                 where: { id: dto.adjustmentId },
                 data: {
