@@ -733,11 +733,7 @@ export class RaisesService {
         // Apply raise based on type
         const currentBaseSalary = Number(assignment.baseSalary);
         const raiseAmount = Number(request.amount);
-        let newBaseSalary = currentBaseSalary;
-
-        // All raise types add the amount to salary
-        // Type determines what it's called (SALARY_INCREASE, BONUS, ALLOWANCE, etc.)
-        newBaseSalary = currentBaseSalary + raiseAmount;
+        const newBaseSalary = currentBaseSalary + raiseAmount;
 
         // Update salary assignment
         await this.prisma.employeeSalaryAssignment.update({
@@ -750,6 +746,42 @@ export class RaisesService {
             where: { id: requestId },
             data: { appliedToSalary: true },
         });
+
+        // Calculate retroactive months if effectiveMonth is in the past
+        if (request.effectiveMonth) {
+            const effectiveDate = new Date(request.effectiveMonth);
+            const currentDate = new Date();
+
+            // Set to start of month for accurate calculation
+            effectiveDate.setDate(1);
+            currentDate.setDate(1);
+
+            // Calculate months difference
+            const monthsDiff = (currentDate.getFullYear() - effectiveDate.getFullYear()) * 12
+                + (currentDate.getMonth() - effectiveDate.getMonth());
+
+            // If there are retroactive months, create RetroPay entry
+            if (monthsDiff > 0) {
+                const retroTotal = raiseAmount * monthsDiff;
+
+                await this.prisma.retroPay.create({
+                    data: {
+                        companyId,
+                        employeeId: request.userId,
+                        reason: `زيادة راتب بأثر رجعي - ${request.type}`,
+                        effectiveFrom: effectiveDate,
+                        effectiveTo: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1), // Last month
+                        oldAmount: currentBaseSalary,
+                        newAmount: newBaseSalary,
+                        difference: raiseAmount,
+                        monthsCount: monthsDiff,
+                        totalAmount: retroTotal,
+                        status: 'PENDING',
+                        notes: `طلب زيادة رقم: ${requestId}`,
+                    },
+                });
+            }
+        }
 
         // Create audit log
         await this.prisma.auditLog.create({
