@@ -228,10 +228,28 @@ export class PayrollAdjustmentsService {
                                     ? `تسوية: إضافة يدوية (${adjustment.reason || ''})`
                                     : `تسوية: خصم يدوي (${adjustment.reason || ''})`;
 
+                        // 🔧 الحصول على أو إنشاء مكوّن التسوية
+                        const componentCode = sign === 'EARNING' ? 'ADJ_ADD' : 'ADJ_DED';
+                        const componentName = sign === 'EARNING' ? 'تسوية إضافة' : 'تسوية خصم';
+                        let adjustmentComponent = await this.prisma.salaryComponent.findFirst({
+                            where: { code: componentCode, companyId },
+                        });
+                        if (!adjustmentComponent) {
+                            adjustmentComponent = await this.prisma.salaryComponent.create({
+                                data: {
+                                    code: componentCode,
+                                    nameAr: componentName,
+                                    type: sign === 'EARNING' ? 'EARNING' : 'DEDUCTION',
+                                    nature: 'VARIABLE',
+                                    companyId,
+                                } as any,
+                            });
+                        }
+
                         await this.prisma.payslipLine.create({
                             data: {
                                 payslipId: payslip.id,
-                                componentId: null as any, // تسوية بدون مكوّن
+                                componentId: adjustmentComponent.id,
                                 amount: Math.abs(adjustmentAmount),
                                 sign,
                                 sourceType: 'ADJUSTMENT' as any,
