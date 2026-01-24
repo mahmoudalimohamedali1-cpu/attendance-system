@@ -178,7 +178,51 @@ export interface PayrollSettingsData {
     paymentDayType?: 'LAST_WORKING_DAY' | 'FIXED_DAY';
     // 52. يوم الدفع (إذا كان نوع الدفع يوم محدد)
     paymentDay?: number;
+
+    // === NEW: Sick Leave Settings (إعدادات الإجازة المرضية) ===
+    enableSickLeaveDeduction?: boolean;
+    sickLeavePartialPayPercent?: number;
+    sickLeaveFullPayDays?: number;
+    sickLeavePartialPayDays?: number;
+    sickLeaveUnpaidDays?: number;
+
+    // === NEW: Working Hours Settings (إعدادات ساعات العمل) ===
+    dailyWorkingHours?: number;
+    weeklyWorkingDays?: number;
+    workingDaysPerWeek?: number;
+
+    // === NEW: Rate Settings (إعدادات المعدلات) ===
+    overtimeRate?: number;
+    weekendOvertimeRate?: number;
+    holidayOvertimeRate?: number;
+    lateDeductionRate?: number;
+    absenceDeductionRate?: number;
+
+    // === NEW: GOSI Configuration (إعدادات التأمينات) ===
+    includeHousingInGosi?: boolean;
+    includeTransportInGosi?: boolean;
+
+    // === NEW: Leave Settings (إعدادات الإجازات) ===
+    defaultLeaveDays?: number;
+    leaveCarryOverDays?: number;
+    probationLeaveEnabled?: boolean;
+    autoApproveLeave?: boolean;
+    enableOvertimeApproval?: boolean;
+
+    // === NEW: EOS Settings (إعدادات نهاية الخدمة) ===
+    autoCalculateEos?: boolean;
+    eosFirstYearsRate?: number;
+    eosLaterYearsRate?: number;
+    eosThresholdYears?: number;
+    eosContractualRate?: number;
+
+    // === NEW: Display Settings (إعدادات العرض) ===
+    calculationMethod?: string;
+    payslipTemplate?: string;
+    showSalaryBreakdown?: boolean;
+    showYtdTotals?: boolean;
 }
+
 
 export const payrollSettingsService = {
     async getSettings(): Promise<PayrollSettingsData> {

@@ -1882,6 +1882,302 @@ export default function PayrollSettingsPage() {
                     </Grid>
                 </Grid>
             </SettingsSection>
+
+            {/* 33. إعدادات الإجازة المرضية */}
+            <SettingsSection
+                icon={<WorkOffIcon />}
+                title="إعدادات الإجازة المرضية"
+                description="تحديد أيام الإجازة المرضية والخصومات حسب نظام العمل السعودي"
+                defaultExpanded={false}
+            >
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.enableSickLeaveDeduction ?? true}
+                                    onChange={(e) => handleChange('enableSickLeaveDeduction', e.target.checked)}
+                                />
+                            }
+                            label="تفعيل خصم الإجازة المرضية"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            label="أيام المرضى براتب كامل"
+                            type="number"
+                            fullWidth
+                            value={settings.sickLeaveFullPayDays ?? 30}
+                            onChange={(e) => handleChange('sickLeaveFullPayDays', parseInt(e.target.value))}
+                            helperText="أول 30 يوم براتب كامل (100%)"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            label="أيام المرضى براتب جزئي"
+                            type="number"
+                            fullWidth
+                            value={settings.sickLeavePartialPayDays ?? 60}
+                            onChange={(e) => handleChange('sickLeavePartialPayDays', parseInt(e.target.value))}
+                            helperText="من يوم 31 إلى 90 براتب جزئي"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            label="نسبة الراتب الجزئي (%)"
+                            type="number"
+                            fullWidth
+                            value={settings.sickLeavePartialPayPercent ?? 75}
+                            onChange={(e) => handleChange('sickLeavePartialPayPercent', parseFloat(e.target.value))}
+                            helperText="75% = خصم 25% من الراتب"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            label="أيام المرضى بدون راتب"
+                            type="number"
+                            fullWidth
+                            value={settings.sickLeaveUnpaidDays ?? 30}
+                            onChange={(e) => handleChange('sickLeaveUnpaidDays', parseInt(e.target.value))}
+                            helperText="بعد 90 يوم = بدون راتب"
+                        />
+                    </Grid>
+                </Grid>
+            </SettingsSection>
+
+            {/* 34. إعدادات ساعات العمل */}
+            <SettingsSection
+                icon={<AccessTimeIcon />}
+                title="إعدادات ساعات العمل"
+                description="تحديد ساعات وأيام العمل الأسبوعية"
+                defaultExpanded={false}
+            >
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="ساعات العمل اليومية"
+                            type="number"
+                            fullWidth
+                            value={settings.dailyWorkingHours ?? 8}
+                            onChange={(e) => handleChange('dailyWorkingHours', parseFloat(e.target.value))}
+                            helperText="عدد ساعات العمل في اليوم"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="أيام العمل الأسبوعية"
+                            type="number"
+                            fullWidth
+                            value={settings.weeklyWorkingDays ?? 5}
+                            onChange={(e) => handleChange('weeklyWorkingDays', parseInt(e.target.value))}
+                            helperText="عدد أيام العمل في الأسبوع"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="أيام العمل في الأسبوع"
+                            type="number"
+                            fullWidth
+                            value={settings.workingDaysPerWeek ?? 5}
+                            onChange={(e) => handleChange('workingDaysPerWeek', parseInt(e.target.value))}
+                            helperText="للحسابات الشهرية"
+                        />
+                    </Grid>
+                </Grid>
+            </SettingsSection>
+
+            {/* 35. إعدادات التأمينات التفصيلية */}
+            <SettingsSection
+                icon={<ReceiptIcon />}
+                title="إعدادات التأمينات التفصيلية"
+                description="تحديد البدلات الخاضعة للتأمينات"
+                defaultExpanded={false}
+            >
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.includeHousingInGosi ?? true}
+                                    onChange={(e) => handleChange('includeHousingInGosi', e.target.checked)}
+                                />
+                            }
+                            label="تضمين بدل السكن في التأمينات"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.includeTransportInGosi ?? false}
+                                    onChange={(e) => handleChange('includeTransportInGosi', e.target.checked)}
+                                />
+                            }
+                            label="تضمين بدل المواصلات في التأمينات"
+                        />
+                    </Grid>
+                </Grid>
+            </SettingsSection>
+
+            {/* 36. إعدادات الإجازات */}
+            <SettingsSection
+                icon={<BeachAccessIcon />}
+                title="إعدادات الإجازات"
+                description="الرصيد الافتراضي والترحيل والموافقة التلقائية"
+                defaultExpanded={false}
+            >
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="أيام الإجازة الافتراضية"
+                            type="number"
+                            fullWidth
+                            value={settings.defaultLeaveDays ?? 21}
+                            onChange={(e) => handleChange('defaultLeaveDays', parseInt(e.target.value))}
+                            helperText="رصيد الإجازة السنوي للموظف الجديد"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="أيام ترحيل الإجازة"
+                            type="number"
+                            fullWidth
+                            value={settings.leaveCarryOverDays ?? 5}
+                            onChange={(e) => handleChange('leaveCarryOverDays', parseInt(e.target.value))}
+                            helperText="الحد الأقصى للأيام المرحلة للسنة التالية"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.probationLeaveEnabled ?? false}
+                                    onChange={(e) => handleChange('probationLeaveEnabled', e.target.checked)}
+                                />
+                            }
+                            label="إجازة فترة التجربة"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.autoApproveLeave ?? false}
+                                    onChange={(e) => handleChange('autoApproveLeave', e.target.checked)}
+                                />
+                            }
+                            label="موافقة تلقائية على الإجازات"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.enableOvertimeApproval ?? true}
+                                    onChange={(e) => handleChange('enableOvertimeApproval', e.target.checked)}
+                                />
+                            }
+                            label="تفعيل موافقة الساعات الإضافية"
+                        />
+                    </Grid>
+                </Grid>
+            </SettingsSection>
+
+            {/* 37. إعدادات نهاية الخدمة التفصيلية */}
+            <SettingsSection
+                icon={<ReceiptIcon />}
+                title="إعدادات نهاية الخدمة التفصيلية"
+                description="معدلات حساب مكافأة نهاية الخدمة"
+                defaultExpanded={false}
+            >
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.autoCalculateEos ?? true}
+                                    onChange={(e) => handleChange('autoCalculateEos', e.target.checked)}
+                                />
+                            }
+                            label="حساب نهاية الخدمة تلقائياً"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            label="سنوات العتبة"
+                            type="number"
+                            fullWidth
+                            value={settings.eosThresholdYears ?? 5}
+                            onChange={(e) => handleChange('eosThresholdYears', parseInt(e.target.value))}
+                            helperText="عدد السنوات قبل تغيير المعدل"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="معدل أول 5 سنوات"
+                            type="number"
+                            fullWidth
+                            value={settings.eosFirstYearsRate ?? 0.5}
+                            onChange={(e) => handleChange('eosFirstYearsRate', parseFloat(e.target.value))}
+                            helperText="0.5 = نصف راتب لكل سنة"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="معدل بعد 5 سنوات"
+                            type="number"
+                            fullWidth
+                            value={settings.eosLaterYearsRate ?? 1.0}
+                            onChange={(e) => handleChange('eosLaterYearsRate', parseFloat(e.target.value))}
+                            helperText="1.0 = راتب كامل لكل سنة"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                        <TextField
+                            label="المعدل التعاقدي"
+                            type="number"
+                            fullWidth
+                            value={settings.eosContractualRate ?? 1.0}
+                            onChange={(e) => handleChange('eosContractualRate', parseFloat(e.target.value))}
+                            helperText="للعقود الخاصة"
+                        />
+                    </Grid>
+                </Grid>
+            </SettingsSection>
+
+            {/* 38. إعدادات العرض */}
+            <SettingsSection
+                icon={<ReceiptIcon />}
+                title="إعدادات العرض"
+                description="إعدادات عرض كشف الراتب والحسابات"
+                defaultExpanded={false}
+            >
+                <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.showSalaryBreakdown ?? true}
+                                    onChange={(e) => handleChange('showSalaryBreakdown', e.target.checked)}
+                                />
+                            }
+                            label="عرض تفصيل الراتب"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={settings.showYtdTotals ?? true}
+                                    onChange={(e) => handleChange('showYtdTotals', e.target.checked)}
+                                />
+                            }
+                            label="عرض إجمالي السنة"
+                        />
+                    </Grid>
+                </Grid>
+            </SettingsSection>
         </Box >
+
     );
 }
