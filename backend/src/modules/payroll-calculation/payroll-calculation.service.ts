@@ -1778,41 +1778,25 @@ export class PayrollCalculationService {
         try {
             this.logger.log(`🔍 Looking for retro pays: employeeId=${employeeId}, year=${effectiveYear}, month=${effectiveMonth}`);
 
-            // 🆕 الطريقة الجديدة: بناءً على شهر الصرف المحدد
-            const byPaymentMonth = await this.prisma.retroPay.findMany({
-                where: {
-                    employeeId,
-                    companyId,
-                    status: 'APPROVED',
-                    paymentYear: effectiveYear,
-                    paymentMonth: effectiveMonth,
-                },
-            });
+            // استخدام Raw SQL لتجاوز مشاكل Prisma types
+            const approvedBonuses = await this.prisma.$queryRaw<any[]>`
+                SELECT id, reason, notes, total_amount, difference 
+                FROM retro_pays 
+                WHERE employee_id = ${employeeId}
+                  AND company_id = ${companyId}
+                  AND status = 'APPROVED'
+                  AND (
+                    (payment_year = ${effectiveYear} AND payment_month = ${effectiveMonth})
+                    OR 
+                    (payment_month IS NULL AND effective_from <= ${endDate} AND effective_to >= ${startDate})
+                  )
+            `;
 
-            // الطريقة القديمة: بناءً على الفترة (للتوافقية)
-            const byDateRange = await this.prisma.retroPay.findMany({
-                where: {
-                    employeeId,
-                    companyId,
-                    status: 'APPROVED',
-                    paymentMonth: null,
-                    effectiveFrom: { lte: endDate },
-                    effectiveTo: { gte: startDate },
-                },
-            });
-
-            // دمج النتائج (بدون تكرار)
-            const seenIds = new Set<string>();
-            const approvedBonuses = [...byPaymentMonth, ...byDateRange].filter(b => {
-                if (seenIds.has(b.id)) return false;
-                seenIds.add(b.id);
-                return true;
-            });
-
-            this.logger.log(`📊 Found ${byPaymentMonth.length} by payment month, ${byDateRange.length} by date range, ${approvedBonuses.length} total`);
+            this.logger.log(`📊 Found ${approvedBonuses.length} approved retro pays for employee`);
 
             for (const bonus of approvedBonuses) {
-                const bonusAmount = bonus.totalAmount?.toNumber() || bonus.difference?.toNumber() || 0;
+                // Raw SQL returns snake_case field names
+                const bonusAmount = Number(bonus.total_amount) || Number(bonus.difference) || 0;
                 if (bonusAmount > 0) {
                     // تحقق من أن هذه المكافأة لم تُضف مسبقاً
                     const bonusCode = `BONUS_${bonus.id.slice(0, 8)}`;
