@@ -26,6 +26,8 @@ import {
     InputAdornment,
     Paper,
     MenuItem,
+    Tabs,
+    Tab,
 } from '@mui/material';
 import {
     ArrowBack,
@@ -45,6 +47,9 @@ import {
     Receipt,
     Edit,
     Close,
+    ThumbUp,
+    ThumbDown,
+    ListAlt,
 } from '@mui/icons-material';
 import { api, API_URL } from '@/services/api.service';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -79,6 +84,11 @@ export const PayrollRunDetailsPage = () => {
         notes: '',
     });
     const [adjustmentLoading, setAdjustmentLoading] = useState(false);
+
+    // 🔧 Adjustments List State
+    const [adjustments, setAdjustments] = useState<any[]>([]);
+    const [adjustmentsLoading, setAdjustmentsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState(0);
 
     const adjustmentTypes = [
         { value: 'WAIVE_DEDUCTION', label: 'إلغاء خصم' },
@@ -129,6 +139,51 @@ export const PayrollRunDetailsPage = () => {
         };
         fetchRun();
     }, [id]);
+
+    // 🔧 Fetch Adjustments List
+    const fetchAdjustments = async () => {
+        try {
+            setAdjustmentsLoading(true);
+            const data = await api.get(`/payroll-adjustments?payrollRunId=${id}`) as any[];
+            setAdjustments(data);
+        } catch (err: any) {
+            console.error('Failed to fetch adjustments:', err);
+        } finally {
+            setAdjustmentsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (id) fetchAdjustments();
+    }, [id]);
+
+    // 🔧 Approve Adjustment
+    const handleApproveAdjustment = async (adjustmentId: string) => {
+        if (!window.confirm('هل تريد اعتماد هذه التسوية؟')) return;
+        try {
+            await api.post('/payroll-adjustments/approve', { adjustmentId, approved: true });
+            alert('تم اعتماد التسوية بنجاح ✅');
+            fetchAdjustments();
+            // Refresh run data to update payslips
+            const data = await api.get(`/payroll-runs/${id}`) as PayrollRun;
+            setRun(data);
+        } catch (err: any) {
+            alert(err.message || 'فشل في اعتماد التسوية');
+        }
+    };
+
+    // 🔧 Reject Adjustment
+    const handleRejectAdjustment = async (adjustmentId: string) => {
+        const reason = window.prompt('سبب الرفض:');
+        if (!reason) return;
+        try {
+            await api.post('/payroll-adjustments/approve', { adjustmentId, approved: false, reason });
+            alert('تم رفض التسوية ❌');
+            fetchAdjustments();
+        } catch (err: any) {
+            alert(err.message || 'فشل في رفض التسوية');
+        }
+    };
 
     const handleApprove = async () => {
         if (!window.confirm('هل أنت متأكد من اعتماد هذا المسير؟ لن تتمكن من حذفه بعد الاعتماد.')) return;
@@ -222,7 +277,8 @@ export const PayrollRunDetailsPage = () => {
             });
             alert('تم إضافة التسوية بنجاح');
             setAdjustmentDialogOpen(false);
-            // Refresh the run data
+            // Refresh adjustments list and run data
+            fetchAdjustments();
             const data = await api.get(`/payroll-runs/${id}`) as PayrollRun;
             setRun(data);
         } catch (err: any) {
@@ -405,84 +461,186 @@ export const PayrollRunDetailsPage = () => {
                 ))}
             </Grid>
 
-            {/* Employees Table */}
+            {/* Tabs: Employees & Adjustments */}
             <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-                <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6" fontWeight="bold">
-                        قسائم الموظفين ({filteredPayslips.length})
-                    </Typography>
-                    <TextField
-                        size="small"
-                        placeholder="بحث بالاسم أو الكود..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <Search />
-                                </InputAdornment>
-                            ),
-                        }}
-                        sx={{ width: 280 }}
-                    />
-                </Box>
-                <Divider />
-                <TableContainer>
-                    <Table>
-                        <TableHead sx={{ bgcolor: 'grey.50' }}>
-                            <TableRow>
-                                <TableCell>الموظف</TableCell>
-                                <TableCell>الراتب الأساسي</TableCell>
-                                <TableCell>إجمالي الاستحقاقات</TableCell>
-                                <TableCell>إجمالي الاستقطاعات</TableCell>
-                                <TableCell>صافي الراتب</TableCell>
-                                <TableCell align="center">الإجراءات</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredPayslips.map((payslip) => (
-                                <TableRow key={payslip.id} hover>
-                                    <TableCell>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <Avatar sx={{ width: 32, height: 32 }}>{payslip.employee?.firstName[0]}</Avatar>
-                                            <Box>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    {payslip.employee?.firstName} {payslip.employee?.lastName}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary">{payslip.employee?.employeeCode}</Typography>
-                                            </Box>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>{parseFloat(payslip.baseSalary).toLocaleString()} ريال</TableCell>
-                                    <TableCell sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                                        {parseFloat(payslip.grossSalary).toLocaleString()} ريال
-                                    </TableCell>
-                                    <TableCell sx={{ color: 'error.main' }}>
-                                        {parseFloat(payslip.totalDeductions).toLocaleString()} ريال
-                                    </TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.50' }}>
-                                        {parseFloat(payslip.netSalary).toLocaleString()} ريال
-                                    </TableCell>
-                                    <TableCell align="center">
-                                        <IconButton size="small" onClick={() => setSelectedPayslip(payslip)} title="عرض التفاصيل">
-                                            <Visibility fontSize="small" />
-                                        </IconButton>
-                                        {!isLocked && (
-                                            <IconButton
-                                                size="small"
-                                                color="primary"
-                                                onClick={() => handleOpenAdjustment(payslip)}
-                                                title="إضافة تسوية"
-                                            >
-                                                <Edit fontSize="small" />
-                                            </IconButton>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
+                    <Tab icon={<People />} iconPosition="start" label={`قسائم الموظفين (${filteredPayslips.length})`} />
+                    <Tab icon={<ListAlt />} iconPosition="start" label={`التسويات (${adjustments.length})`} />
+                </Tabs>
+
+                {/* Tab 0: Employees */}
+                {activeTab === 0 && (
+                    <>
+                        <Box p={2} display="flex" justifyContent="flex-end">
+                            <TextField
+                                size="small"
+                                placeholder="بحث بالاسم أو الكود..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                                sx={{ width: 280 }}
+                            />
+                        </Box>
+                        <Divider />
+                        <TableContainer>
+                            <Table>
+                                <TableHead sx={{ bgcolor: 'grey.50' }}>
+                                    <TableRow>
+                                        <TableCell>الموظف</TableCell>
+                                        <TableCell>الراتب الأساسي</TableCell>
+                                        <TableCell>إجمالي الاستحقاقات</TableCell>
+                                        <TableCell>إجمالي الاستقطاعات</TableCell>
+                                        <TableCell>صافي الراتب</TableCell>
+                                        <TableCell align="center">الإجراءات</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {filteredPayslips.map((payslip) => (
+                                        <TableRow key={payslip.id} hover>
+                                            <TableCell>
+                                                <Box display="flex" alignItems="center" gap={1}>
+                                                    <Avatar sx={{ width: 32, height: 32 }}>{payslip.employee?.firstName[0]}</Avatar>
+                                                    <Box>
+                                                        <Typography variant="body2" fontWeight="bold">
+                                                            {payslip.employee?.firstName} {payslip.employee?.lastName}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">{payslip.employee?.employeeCode}</Typography>
+                                                    </Box>
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell>{parseFloat(payslip.baseSalary).toLocaleString()} ريال</TableCell>
+                                            <TableCell sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                                                {parseFloat(payslip.grossSalary).toLocaleString()} ريال
+                                            </TableCell>
+                                            <TableCell sx={{ color: 'error.main' }}>
+                                                {parseFloat(payslip.totalDeductions).toLocaleString()} ريال
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold', bgcolor: 'primary.50' }}>
+                                                {parseFloat(payslip.netSalary).toLocaleString()} ريال
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <IconButton size="small" onClick={() => setSelectedPayslip(payslip)} title="عرض التفاصيل">
+                                                    <Visibility fontSize="small" />
+                                                </IconButton>
+                                                {!isLocked && (
+                                                    <IconButton
+                                                        size="small"
+                                                        color="primary"
+                                                        onClick={() => handleOpenAdjustment(payslip)}
+                                                        title="إضافة تسوية"
+                                                    >
+                                                        <Edit fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </>
+                )}
+
+                {/* Tab 1: Adjustments */}
+                {activeTab === 1 && (
+                    <>
+                        {adjustmentsLoading ? (
+                            <Box display="flex" justifyContent="center" py={4}>
+                                <CircularProgress />
+                            </Box>
+                        ) : adjustments.length === 0 ? (
+                            <Box textAlign="center" py={4}>
+                                <Typography color="text.secondary">لا توجد تسويات لهذه الدورة</Typography>
+                            </Box>
+                        ) : (
+                            <TableContainer>
+                                <Table>
+                                    <TableHead sx={{ bgcolor: 'grey.50' }}>
+                                        <TableRow>
+                                            <TableCell>الموظف</TableCell>
+                                            <TableCell>نوع التسوية</TableCell>
+                                            <TableCell>المبلغ الأصلي</TableCell>
+                                            <TableCell>المبلغ المعدل</TableCell>
+                                            <TableCell>أيام الإجازة</TableCell>
+                                            <TableCell>السبب</TableCell>
+                                            <TableCell>الحالة</TableCell>
+                                            <TableCell align="center">الإجراءات</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {adjustments.map((adj) => (
+                                            <TableRow key={adj.id} hover>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        {adj.employee?.firstName} {adj.employee?.lastName}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        size="small"
+                                                        label={adjustmentTypes.find(t => t.value === adj.adjustmentType)?.label || adj.adjustmentType}
+                                                        color={adj.adjustmentType === 'MANUAL_DEDUCTION' ? 'error' : 'info'}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{parseFloat(adj.originalAmount || 0).toLocaleString()} ريال</TableCell>
+                                                <TableCell>{parseFloat(adj.adjustedAmount || 0).toLocaleString()} ريال</TableCell>
+                                                <TableCell>
+                                                    {adj.adjustmentType === 'CONVERT_TO_LEAVE' ? (
+                                                        <Chip size="small" label={`${adj.leaveDaysDeducted || 0} يوم`} color="warning" />
+                                                    ) : '-'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="caption" sx={{ maxWidth: 150, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {adj.reason}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        size="small"
+                                                        label={adj.status === 'PENDING' ? 'معلق' : adj.status === 'POSTED' ? 'معتمد' : 'مرفوض'}
+                                                        color={adj.status === 'PENDING' ? 'warning' : adj.status === 'POSTED' ? 'success' : 'error'}
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    {adj.status === 'PENDING' ? (
+                                                        <>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="success"
+                                                                onClick={() => handleApproveAdjustment(adj.id)}
+                                                                title="اعتماد"
+                                                            >
+                                                                <ThumbUp fontSize="small" />
+                                                            </IconButton>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => handleRejectAdjustment(adj.id)}
+                                                                title="رفض"
+                                                            >
+                                                                <ThumbDown fontSize="small" />
+                                                            </IconButton>
+                                                        </>
+                                                    ) : (
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {adj.status === 'POSTED' ? '✅ تم الاعتماد' : '❌ مرفوض'}
+                                                        </Typography>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
+                    </>
+                )}
             </Paper>
 
             <Dialog open={!!selectedPayslip} onClose={() => setSelectedPayslip(null)} maxWidth="md" fullWidth>
