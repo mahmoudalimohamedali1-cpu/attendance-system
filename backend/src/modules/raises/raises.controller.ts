@@ -108,7 +108,7 @@ export class RaisesController {
 
     @Get('inbox/manager')
     @ApiOperation({ summary: 'صندوق وارد المدير' })
-    @Roles(Role.MANAGER, Role.ADMIN)
+    @Roles(Role.MANAGER, Role.ADMIN, Role.HR)
     async getManagerInbox(
         @CurrentUser('id') managerId: string,
         @TenantId() companyId: string,
@@ -118,7 +118,7 @@ export class RaisesController {
 
     @Post(':id/manager-decision')
     @ApiOperation({ summary: 'قرار المدير على طلب الزيادة' })
-    @Roles(Role.MANAGER, Role.ADMIN)
+    @Roles(Role.MANAGER, Role.ADMIN, Role.HR)
     async managerDecision(
         @Param('id') id: string,
         @CurrentUser('id') managerId: string,
@@ -132,7 +132,7 @@ export class RaisesController {
 
     @Get('inbox/hr')
     @ApiOperation({ summary: 'صندوق وارد HR' })
-    @Roles(Role.MANAGER, Role.ADMIN)
+    @Roles(Role.MANAGER, Role.ADMIN, Role.HR)
     async getHRInbox(
         @CurrentUser('id') hrUserId: string,
         @TenantId() companyId: string,
@@ -142,7 +142,7 @@ export class RaisesController {
 
     @Post(':id/hr-decision')
     @ApiOperation({ summary: 'قرار HR على طلب الزيادة' })
-    @Roles(Role.MANAGER, Role.ADMIN)
+    @Roles(Role.MANAGER, Role.ADMIN, Role.HR)
     async hrDecision(
         @Param('id') id: string,
         @CurrentUser('id') hrUserId: string,
@@ -156,7 +156,7 @@ export class RaisesController {
 
     @Get('inbox/finance')
     @ApiOperation({ summary: 'صندوق وارد المدير المالي' })
-    @Roles(Role.MANAGER, Role.ADMIN)
+    @Roles(Role.MANAGER, Role.ADMIN, Role.HR)
     async getFinanceInbox(
         @CurrentUser('id') financeUserId: string,
         @TenantId() companyId: string,
@@ -166,7 +166,7 @@ export class RaisesController {
 
     @Post(':id/finance-decision')
     @ApiOperation({ summary: 'قرار المدير المالي على طلب الزيادة' })
-    @Roles(Role.MANAGER, Role.ADMIN)
+    @Roles(Role.MANAGER, Role.ADMIN, Role.HR)
     async financeDecision(
         @Param('id') id: string,
         @CurrentUser('id') financeUserId: string,
