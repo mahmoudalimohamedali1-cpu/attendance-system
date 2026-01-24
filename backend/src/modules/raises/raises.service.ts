@@ -431,6 +431,11 @@ export class RaisesService {
             { raiseRequestId: requestId },
         );
 
+        // If approved and this is final step (HR is last in chain), apply to salary
+        if (decision === ApprovalDecision.APPROVED && newCurrentStep === ApprovalStep.COMPLETED) {
+            await this.applyRaiseToSalary(requestId, companyId);
+        }
+
         return updated;
     }
 
