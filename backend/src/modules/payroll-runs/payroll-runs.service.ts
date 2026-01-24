@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { Decimal } from '@prisma/client/runtime/library';
-import { PayslipLineSource, AuditAction } from '@prisma/client';
+import { PayslipLineSource, AuditAction, PayrollStatus } from '@prisma/client';
 
 import { PayrollCalculationService } from '../payroll-calculation/payroll-calculation.service';
 import { PayrollLedgerService } from '../payroll-calculation/payroll-ledger.service';
@@ -85,7 +85,7 @@ export class PayrollRunsService {
             where: {
                 periodId: dto.periodId,
                 companyId,
-                status: { notIn: ['CANCELLED', 'ARCHIVED'] }
+                status: { notIn: [PayrollStatus.CANCELLED, PayrollStatus.ARCHIVED] }
             }
         });
 
