@@ -79,10 +79,40 @@ const AI_EVALUATOR_PROMPT = `أنت محرك تنفيذ سياسات الروا�
 export class AIPolicyEvaluatorService {
     private readonly logger = new Logger(AIPolicyEvaluatorService.name);
 
+    // 🔧 Cache for AI policy results (key: companyId-employeeId-periodKey, value: { results, timestamp })
+    private readonly policyCache = new Map<string, { results: PolicyPayrollLine[], timestamp: number }>();
+    private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
     constructor(
         private prisma: PrismaService,
         private aiService: AiService,
     ) { }
+
+    /**
+     * Generate cache key for employee policy evaluation
+     */
+    private getCacheKey(companyId: string, employeeId: string, month: number, year: number): string {
+        return `${companyId}-${employeeId}-${month}-${year}`;
+    }
+
+    /**
+     * Check if cache is valid (not expired)
+     */
+    private isCacheValid(timestamp: number): boolean {
+        return Date.now() - timestamp < this.CACHE_TTL_MS;
+    }
+
+    /**
+     * Clear expired cache entries (called periodically)
+     */
+    private cleanupCache(): void {
+        const now = Date.now();
+        for (const [key, value] of this.policyCache.entries()) {
+            if (now - value.timestamp >= this.CACHE_TTL_MS) {
+                this.policyCache.delete(key);
+            }
+        }
+    }
 
     /**
      * Evaluate ALL active smart policies for an employee using AI
@@ -91,6 +121,17 @@ export class AIPolicyEvaluatorService {
         companyId: string,
         context: EmployeePayrollContext
     ): Promise<PolicyPayrollLine[]> {
+        // 🔧 Cleanup old cache entries periodically
+        this.cleanupCache();
+
+        // 🔧 Check cache first - avoid recalculating if preview was done recently
+        const cacheKey = this.getCacheKey(companyId, context.employeeId, context.month, context.year);
+        const cached = this.policyCache.get(cacheKey);
+        if (cached && this.isCacheValid(cached.timestamp)) {
+            this.logger.log(`📦 [CACHE HIT] Using cached AI policy results for ${context.employeeName} (${cached.results.length} policies)`);
+            return cached.results;
+        }
+
         const policyLines: PolicyPayrollLine[] = [];
 
         // 🔧 FIX: Graceful degradation when AI is unavailable
@@ -175,6 +216,10 @@ export class AIPolicyEvaluatorService {
         } catch (error) {
             this.logger.error(`Error fetching policies: ${error.message}`);
         }
+
+        // 🔧 Save results to cache for future use (e.g., payroll run after preview)
+        this.policyCache.set(cacheKey, { results: policyLines, timestamp: Date.now() });
+        this.logger.log(`💾 [CACHE SAVE] Cached AI policy results for ${context.employeeName} (${policyLines.length} policies)`);
 
         return policyLines;
     }
