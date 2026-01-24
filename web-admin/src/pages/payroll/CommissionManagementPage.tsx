@@ -130,6 +130,10 @@ export default function CommissionManagementPage() {
     notes: '',
   });
 
+  // حالة الخطة المحددة للعرض
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
+
   // جلب خطط العمولات
   const { data: plans, isLoading: loadingPlans } = useQuery({
     queryKey: ['commission-plans'],
@@ -380,7 +384,14 @@ export default function CommissionManagementPage() {
                       </Box>
 
                       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                        <Button size="small" startIcon={<ViewIcon />}>
+                        <Button
+                          size="small"
+                          startIcon={<ViewIcon />}
+                          onClick={() => {
+                            setSelectedPlan(plan);
+                            setOpenDetailsDialog(true);
+                          }}
+                        >
                           التفاصيل
                         </Button>
                       </Box>
@@ -653,30 +664,54 @@ export default function CommissionManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="المعدل الأساسي"
-                  type="number"
-                  value={planForm.baseRate}
-                  onChange={(e) => setPlanForm({ ...planForm, baseRate: e.target.value })}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="الحد الأقصى"
-                  type="number"
-                  value={planForm.cappedAmount}
-                  onChange={(e) => setPlanForm({ ...planForm, cappedAmount: e.target.value })}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
-                  }}
-                />
-              </Grid>
+
+              {/* المبلغ الثابت - يظهر فقط مع FLAT_RATE أو PER_UNIT */}
+              {(planForm.calculationMethod === 'FLAT_RATE' || planForm.calculationMethod === 'PER_UNIT') && (
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label={planForm.calculationMethod === 'PER_UNIT' ? 'المبلغ لكل وحدة' : 'المبلغ الثابت'}
+                    type="number"
+                    value={planForm.baseRate}
+                    onChange={(e) => setPlanForm({ ...planForm, baseRate: e.target.value })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              )}
+
+              {/* النسبة المئوية - يظهر فقط مع PERCENTAGE أو TIERED */}
+              {(planForm.calculationMethod === 'PERCENTAGE' || planForm.calculationMethod === 'TIERED') && (
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="النسبة المئوية"
+                    type="number"
+                    value={planForm.baseRate}
+                    onChange={(e) => setPlanForm({ ...planForm, baseRate: e.target.value })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              )}
+
+              {/* الحد الأقصى - يظهر مع جميع الطرق ما عدا FLAT_RATE */}
+              {planForm.calculationMethod && planForm.calculationMethod !== 'FLAT_RATE' && (
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="الحد الأقصى للعمولة"
+                    type="number"
+                    value={planForm.cappedAmount}
+                    onChange={(e) => setPlanForm({ ...planForm, cappedAmount: e.target.value })}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">ر.س</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              )}
             </Grid>
           </Box>
         </DialogContent>
@@ -767,6 +802,84 @@ export default function CommissionManagementPage() {
           >
             {recordCommissionMutation.isPending ? 'جاري التسجيل...' : 'تسجيل العمولة'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog تفاصيل الخطة */}
+      <Dialog open={openDetailsDialog} onClose={() => setOpenDetailsDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">تفاصيل خطة العمولة</Typography>
+            {selectedPlan && (
+              <Chip label={selectedPlan.code} size="small" color="primary" variant="outlined" />
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedPlan && (
+            <Box sx={{ mt: 2 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">اسم الخطة</Typography>
+                    <Typography variant="h6">{selectedPlan.nameAr}</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">نوع العمولة</Typography>
+                    <Chip
+                      label={getCommissionTypeInfo(selectedPlan.metadata?.commissionType).label}
+                      sx={{ bgcolor: getCommissionTypeInfo(selectedPlan.metadata?.commissionType).color, color: 'white', mt: 0.5 }}
+                    />
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">طريقة الحساب</Typography>
+                    <Typography variant="h6">
+                      {CALCULATION_METHODS.find(m => m.value === selectedPlan.metadata?.calculationMethod)?.label || 'غير محدد'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      {selectedPlan.metadata?.calculationMethod === 'FLAT_RATE' || selectedPlan.metadata?.calculationMethod === 'PER_UNIT'
+                        ? 'المبلغ'
+                        : 'النسبة'}
+                    </Typography>
+                    <Typography variant="h6" color="success.main">
+                      {selectedPlan.metadata?.baseRate
+                        ? (selectedPlan.metadata.calculationMethod === 'FLAT_RATE' || selectedPlan.metadata.calculationMethod === 'PER_UNIT'
+                          ? formatCurrency(selectedPlan.metadata.baseRate)
+                          : `${selectedPlan.metadata.baseRate}%`)
+                        : '-'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                {selectedPlan.metadata?.cappedAmount && (
+                  <Grid item xs={12} md={6}>
+                    <Paper sx={{ p: 2, bgcolor: 'warning.light' }}>
+                      <Typography variant="subtitle2" color="text.secondary">الحد الأقصى للعمولة</Typography>
+                      <Typography variant="h6">{formatCurrency(selectedPlan.metadata.cappedAmount)}</Typography>
+                    </Paper>
+                  </Grid>
+                )}
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">تاريخ الإنشاء</Typography>
+                    <Typography variant="h6">
+                      {selectedPlan.createdAt ? new Date(selectedPlan.createdAt).toLocaleDateString('ar-SA') : '-'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDetailsDialog(false)}>إغلاق</Button>
         </DialogActions>
       </Dialog>
     </Box>
