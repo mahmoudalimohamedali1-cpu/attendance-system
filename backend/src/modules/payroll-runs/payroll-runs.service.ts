@@ -233,7 +233,7 @@ export class PayrollRunsService {
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         } else if (pl.componentCode === 'LOAN_DED' || pl.componentId?.startsWith('LOAN-')) {
                             // 🔧 FIX: Use valid component ID for loan/advance deductions
-                            sourceType = PayslipLineSource.ADJUSTMENT; // LOAN not in enum, using ADJUSTMENT
+                            sourceType = (PayslipLineSource as any).LOAN || 'LOAN';
                             componentIdToUse = loanComp.id; // Use LOAN_DED component
                         }
 
@@ -242,10 +242,10 @@ export class PayrollRunsService {
                             amount: new Decimal(pl.amount.toFixed(2)),
                             sourceType,
                             sign: pl.sign,
-                            // ✅ حفظ اسم المكون في descriptionAr لضمان ظهوره دائماً
-                            descriptionAr: pl.descriptionAr || pl.componentName || pl.componentCode || undefined,
+                            descriptionAr: pl.descriptionAr || undefined,
                             sourceRef: pl.source ? `${pl.source.policyId}:${pl.source.ruleId}` : undefined,
-                            costCenterId: primaryCostCenterId,
+                            costCenterId: primaryCostCenterId, // ربط بمركز التكلفة
+                            // 🔧 إضافة الوحدات والمعدل للعرض التفصيلي
                             units: pl.units ? new Decimal(pl.units) : null,
                             rate: pl.rate ? new Decimal(pl.rate) : null,
                         });
@@ -269,7 +269,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjAddId, // تعديل إضافة
                             amount: round(adjAmount),
-                            sourceType: PayslipLineSource.MANUAL,
+                            sourceType: 'MANUAL' as any,
                             sign: 'EARNING',
                             descriptionAr: `مكافأة يدوية: ${adj.reason}`,
                             sourceRef: 'WIZARD_ADJUSTMENT',
@@ -280,7 +280,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId, // تعديل خصم
                             amount: round(adjAmount),
-                            sourceType: PayslipLineSource.MANUAL,
+                            sourceType: 'MANUAL' as any,
                             sign: 'DEDUCTION',
                             descriptionAr: `خصم يدوي: ${adj.reason}`,
                             sourceRef: 'WIZARD_ADJUSTMENT',
@@ -303,7 +303,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjAddId,
                             amount: round(toDecimal(approvedAdjustments.totalAdditions)),
-                            sourceType: PayslipLineSource.ADJUSTMENT,
+                            sourceType: 'ADJUSTMENT' as any,
                             sign: 'EARNING',
                             descriptionAr: `تسويات معتمدة (إلغاء خصم/إضافة يدوية)`,
                             sourceRef: 'PAYROLL_ADJUSTMENTS',
@@ -316,7 +316,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId,
                             amount: round(toDecimal(approvedAdjustments.totalDeductions)),
-                            sourceType: PayslipLineSource.ADJUSTMENT,
+                            sourceType: 'ADJUSTMENT' as any,
                             sign: 'DEDUCTION',
                             descriptionAr: `تسويات معتمدة (خصم يدوي)`,
                             sourceRef: 'PAYROLL_ADJUSTMENTS',
@@ -335,15 +335,14 @@ export class PayrollRunsService {
                 }
 
                 // ✅ إضافة مكافآت برامج المكافآت (retroPay) المعتمدة
-                // 🔧 FIX: فلترة بـ paymentMonth و paymentYear بدل effectiveFrom/effectiveTo
                 const approvedBonuses = await tx.retroPay.findMany({
                     where: {
                         employeeId: employee.id,
                         companyId,
                         status: 'APPROVED',
-                        paymentMonth: period.month,
-                        paymentYear: period.year,
-                    } as any
+                        effectiveFrom: { lte: period.endDate },
+                        effectiveTo: { gte: period.startDate },
+                    }
                 });
 
                 let totalBonusFromPrograms: Decimal = ZERO;
@@ -355,7 +354,7 @@ export class PayrollRunsService {
                     payslipLines.push({
                         componentId: adjAddId,
                         amount: round(bonusAmount),
-                        sourceType: PayslipLineSource.ADJUSTMENT, // RetroPay/Bonus
+                        sourceType: 'BONUS_PROGRAM' as any,
                         sign: 'EARNING',
                         descriptionAr: bonus.reason || 'مكافأة برنامج',
                         sourceRef: `RETRO_PAY_${bonus.id}`,
@@ -451,7 +450,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId, // سداد ديون
                             amount: round(debtDeductionAmount),
-                            sourceType: PayslipLineSource.ADJUSTMENT, // Debt Repayment
+                            sourceType: 'DEBT_REPAYMENT' as any,
                             sign: 'DEDUCTION',
                             descriptionAr: `سداد ديون سابقة (${debtResult.transactions.length} دين)`,
                             sourceRef: 'DEBT_LEDGER',
@@ -771,24 +770,6 @@ export class PayrollRunsService {
                 .filter(pl => pl.sign === 'DEDUCTION')
                 .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
 
-            // ✅ NEW: payslipLines with full details for unified preview/payslip format
-            const payslipLines = (calculation.policyLines || []).map(pl => ({
-                id: `preview-${employee.id}-${pl.componentCode || 'line'}-${Math.random().toString(36).substr(2, 9)}`,
-                component: {
-                    nameAr: pl.componentName || pl.componentCode || 'بند راتب',
-                    code: pl.componentCode,
-                    type: pl.sign === 'EARNING' ? 'ALLOWANCE' : 'DEDUCTION',
-                },
-                sourceType: pl.componentCode === 'GOSI' ? 'STATUTORY' :
-                    pl.source ? 'POLICY' :
-                        pl.componentCode?.startsWith('SMART') ? 'SMART' : 'STRUCTURE',
-                descriptionAr: pl.descriptionAr || (pl.sign === 'EARNING' ? 'من هيكل الراتب' : 'خصم'),
-                sign: pl.sign,
-                amount: pl.amount,
-                units: pl.units || null,
-                rate: pl.rate || null,
-            }));
-
             // إضافة السلف للمعاينة - Display only, NOT added to deductions
             // ✅ ملاحظة: السلف تم حسابها بالفعل في payroll-calculation.service.ts كـ LOAN_DED
             // وهي مضمنة في calculation.totalDeductions الذي تم تطبيق الحد الأقصى للخصومات (50%) عليه
@@ -809,51 +790,11 @@ export class PayrollRunsService {
             const gosiAmount = toDecimal(gosiLine?.amount || 0);
             totalGosi = add(totalGosi, gosiAmount);
 
-            // ✅ إضافة المكافآت المعتمدة (retroPay) للمعاينة
-            const approvedBonuses = await this.prisma.retroPay.findMany({
-                where: {
-                    employeeId: employee.id,
-                    companyId,
-                    status: 'APPROVED',
-                    paymentMonth: period.month,
-                    paymentYear: period.year,
-                } as any
-            });
-
-            let totalBonusAmount: Decimal = ZERO;
-            for (const bonus of approvedBonuses) {
-                const bonusAmount = toDecimal(bonus.totalAmount);
-                totalBonusAmount = add(totalBonusAmount, bonusAmount);
-
-                // إضافة للـ earnings
-                earnings.push({
-                    name: bonus.reason || 'مكافأة',
-                    code: `BONUS_${bonus.id}`,
-                    amount: toNumber(bonusAmount),
-                });
-
-                // إضافة للـ payslipLines
-                payslipLines.push({
-                    id: `bonus-${bonus.id}`,
-                    component: {
-                        nameAr: bonus.reason || 'مكافأة',
-                        code: 'BONUS',
-                        type: 'ALLOWANCE',
-                    },
-                    sourceType: 'ADJUSTMENT',
-                    descriptionAr: bonus.reason || 'مكافأة برنامج',
-                    sign: 'EARNING',
-                    amount: toNumber(bonusAmount),
-                    units: null,
-                    rate: null,
-                });
-            }
-
             // ✅ Using Decimal for calculations
             // ملاحظة: التسويات (adjustments) يتم إضافتها تلقائياً في `payroll-calculation.service.ts`
             // وكذلك السلف (LOAN_DED) - لذلك لا نضيفها هنا مرة أخرى لتجنب التكرار
             // calculation.totalDeductions تحتوي على كل الخصومات بعد تطبيق الحد الأقصى (50%)
-            const finalGross = add(toDecimal(calculation.grossSalary), totalBonusAmount);
+            const finalGross = toDecimal(calculation.grossSalary);
             const finalDeductions = toDecimal(calculation.totalDeductions); // ✅ Already capped at 50%
             const finalNet = sub(finalGross, finalDeductions);
 
@@ -896,9 +837,6 @@ export class PayrollRunsService {
                 advanceDetails,
                 adjustments: [],
                 excluded: false,
-                // ✅ NEW: payslipLines for unified preview format
-                lines: payslipLines,
-                calculationTrace: calculation.calculationTrace || [],
             });
         }
 
