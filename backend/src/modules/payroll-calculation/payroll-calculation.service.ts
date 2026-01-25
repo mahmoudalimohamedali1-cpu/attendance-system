@@ -1928,8 +1928,8 @@ export class PayrollCalculationService {
         let totalDeductions = round(policyLines.filter(l => l.sign === 'DEDUCTION' && !l.isEmployerContribution).reduce((s, l) => add(s, toDecimal(l.amount)), ZERO));
 
         // ✅ الحد الأقصى للخصومات من الإعدادات (افتراضي 50% حسب نظام العمل السعودي المادة 91)
-        // ✅ FIX: السقف يُحسب على الراتب الأساسي (baseSalary) وليس الإجمالي (grossSalary)
-        const deductionCapResult = applyDeductionCap(baseSalary, totalDeductions, settings.maxDeductionPercent || 50);
+        // ✅ FIX: السقف يُحسب على راتب العقد الكامل (totalSalary) وليس الراتب الأساسي فقط
+        const deductionCapResult = applyDeductionCap(totalSalary, totalDeductions, settings.maxDeductionPercent || 50);
         let deductionsExceedLimit = deductionCapResult.wasCapped;
         let excessDeductionAmount = deductionCapResult.excessAmount;
 
