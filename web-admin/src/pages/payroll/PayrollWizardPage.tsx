@@ -1841,166 +1841,113 @@ export const PayrollWizardPage = () => {
                                                                         <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
                                                                             <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                                                                                 <Box sx={{ p: 2, bgcolor: 'grey.50', borderBottom: '1px solid', borderColor: 'divider' }}>
-                                                                                    {/* ✅ Unified Payslip-Style Table */}
-                                                                                    <Typography variant="subtitle2" color="primary" gutterBottom>
-                                                                                        مكونات الراتب التفصيلية:
-                                                                                    </Typography>
-                                                                                    <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                                                                                        <Table size="small">
-                                                                                            <TableHead>
-                                                                                                <TableRow sx={{ bgcolor: 'grey.100' }}>
-                                                                                                    <TableCell sx={{ fontWeight: 'bold' }}>المكوّن</TableCell>
-                                                                                                    <TableCell sx={{ fontWeight: 'bold' }}>المصدر</TableCell>
-                                                                                                    <TableCell sx={{ fontWeight: 'bold' }}>الوصف</TableCell>
-                                                                                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>الوحدات</TableCell>
-                                                                                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>المعدل</TableCell>
-                                                                                                    <TableCell align="left" sx={{ fontWeight: 'bold' }}>القيمة</TableCell>
-                                                                                                </TableRow>
-                                                                                            </TableHead>
-                                                                                            <TableBody>
-                                                                                                {(() => {
-                                                                                                    // ✅ Merge backend lines with wizard adjustments
-                                                                                                    const backendLines = (emp as any).lines || [];
-                                                                                                    const adjustmentLines = empAdjustments.map((adj, adjIdx) => ({
-                                                                                                        id: `adj-${emp.id}-${adjIdx}`,
-                                                                                                        component: {
-                                                                                                            nameAr: adj.type === 'bonus' ? `مكافأة: ${adj.reason}` : `خصم: ${adj.reason}`,
-                                                                                                            code: adj.type === 'bonus' ? 'MANUAL_BONUS' : 'MANUAL_DED',
-                                                                                                            type: adj.type === 'bonus' ? 'ALLOWANCE' : 'DEDUCTION',
-                                                                                                        },
-                                                                                                        sourceType: 'ADJUSTMENT',
-                                                                                                        descriptionAr: adj.reason,
-                                                                                                        sign: adj.type === 'bonus' ? 'EARNING' : 'DEDUCTION',
-                                                                                                        amount: adj.amount,
-                                                                                                        units: null,
-                                                                                                        rate: null,
-                                                                                                        isWizardAdjustment: true,
-                                                                                                    }));
-                                                                                                    const allLines = [...backendLines, ...adjustmentLines];
-
-                                                                                                    return allLines.length > 0 ? (
-                                                                                                        allLines.map((line: any, lineIdx: number) => {
-                                                                                                            const getSourceBadge = (sourceType: string) => {
-                                                                                                                const badges: Record<string, { label: string; color: string }> = {
-                                                                                                                    'STRUCTURE': { label: 'هيكل', color: 'grey.200' },
-                                                                                                                    'POLICY': { label: 'سياسات', color: 'primary.100' },
-                                                                                                                    'STATUTORY': { label: 'تأمينات', color: 'info.100' },
-                                                                                                                    'MANUAL': { label: 'يدوي', color: 'warning.100' },
-                                                                                                                    'ADJUSTMENT': { label: 'تعديل', color: 'secondary.100' },
-                                                                                                                    'SMART': { label: 'ذكاء اصطناعي', color: 'success.100' },
-                                                                                                                };
-                                                                                                                return badges[sourceType] || { label: sourceType, color: 'grey.200' };
-                                                                                                            };
-                                                                                                            const badge = getSourceBadge(line.sourceType || 'STRUCTURE');
-                                                                                                            const isDeduction = line.sign === 'DEDUCTION';
-
-                                                                                                            return (
-                                                                                                                <TableRow key={lineIdx} hover>
-                                                                                                                    <TableCell>
-                                                                                                                        <Typography variant="body2" fontWeight="medium">
-                                                                                                                            {line.component?.nameAr || '-'}
-                                                                                                                        </Typography>
-                                                                                                                    </TableCell>
-                                                                                                                    <TableCell>
-                                                                                                                        <Box
-                                                                                                                            component="span"
-                                                                                                                            sx={{
-                                                                                                                                px: 1, py: 0.5, borderRadius: 1, fontSize: '0.7rem',
-                                                                                                                                bgcolor: badge.color,
-                                                                                                                            }}
-                                                                                                                        >
-                                                                                                                            {badge.label}
-                                                                                                                        </Box>
-                                                                                                                    </TableCell>
-                                                                                                                    <TableCell>
-                                                                                                                        <Typography variant="caption" color="text.secondary">
-                                                                                                                            {line.descriptionAr || '-'}
-                                                                                                                        </Typography>
-                                                                                                                    </TableCell>
-                                                                                                                    <TableCell align="center">
-                                                                                                                        {line.units ? `${parseFloat(line.units).toFixed(2)}` : '-'}
-                                                                                                                    </TableCell>
-                                                                                                                    <TableCell align="center">
-                                                                                                                        {line.rate ? `x${parseFloat(line.rate).toFixed(2)}` : '-'}
-                                                                                                                    </TableCell>
-                                                                                                                    <TableCell align="left">
-                                                                                                                        <Typography
-                                                                                                                            variant="body2"
-                                                                                                                            fontWeight="bold"
-                                                                                                                            color={isDeduction ? 'error.main' : 'success.main'}
-                                                                                                                        >
-                                                                                                                            {isDeduction ? '-' : '+'} {formatMoney(line.amount)}
-                                                                                                                        </Typography>
-                                                                                                                    </TableCell>
-                                                                                                                </TableRow>
-                                                                                                            );
-                                                                                                        })
-                                                                                                    ) : (
-                                                                                                        <TableRow>
-                                                                                                            <TableCell colSpan={6} align="center">
-                                                                                                                <Typography color="text.secondary">لا توجد بيانات تفصيلية</Typography>
-                                                                                                            </TableCell>
-                                                                                                        </TableRow>
-                                                                                                    )
-                                                                                                })()}
-                                                                                            </TableBody>
-                                                                                        </Table>
-                                                                                    </TableContainer>
-
-                                                                                    {/* Summary Box */}
-                                                                                    <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1 }}>
-                                                                                        <Box display="flex" justifyContent="space-between" mb={1}>
-                                                                                            <Typography>إجمالي الاستحقاقات:</Typography>
-                                                                                            <Typography color="success.main" fontWeight="bold">{formatMoney(emp.gross)}</Typography>
-                                                                                        </Box>
-                                                                                        <Box display="flex" justifyContent="space-between" mb={1}>
-                                                                                            <Typography>إجمالي الاستقطاعات:</Typography>
-                                                                                            <Typography color="error.main" fontWeight="bold">{formatMoney(emp.deductions)}</Typography>
-                                                                                        </Box>
-                                                                                        <Divider sx={{ my: 1 }} />
-                                                                                        <Box display="flex" justifyContent="space-between">
-                                                                                            <Typography fontWeight="bold">صافي الراتب:</Typography>
-                                                                                            <Typography fontWeight="bold" color="primary" fontSize="1.1rem">{formatMoney(adjustedNet)}</Typography>
-                                                                                        </Box>
-                                                                                    </Box>
-
-                                                                                    {/* Calculation Trace */}
-                                                                                    {(emp as any).calculationTrace && Array.isArray((emp as any).calculationTrace) && (emp as any).calculationTrace.length > 0 && (
-                                                                                        <Box sx={{ mt: 2 }}>
-                                                                                            <Typography
-                                                                                                variant="subtitle2"
-                                                                                                color="text.secondary"
-                                                                                                gutterBottom
-                                                                                                sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1 }}
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    const el = document.getElementById(`trace-${emp.id}`);
-                                                                                                    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-                                                                                                }}
-                                                                                            >
-                                                                                                📊 عرض خطوات الحساب ({(emp as any).calculationTrace.length} خطوة)
+                                                                                    <Grid container spacing={2}>
+                                                                                        {/* Earnings */}
+                                                                                        <Grid item xs={12} md={4}>
+                                                                                            <Typography variant="subtitle2" fontWeight="bold" color="success.main" gutterBottom>
+                                                                                                💰 المستحقات
                                                                                             </Typography>
-                                                                                            <Box id={`trace-${emp.id}`} sx={{ display: 'none', bgcolor: 'grey.50', p: 2, borderRadius: 1, maxHeight: 200, overflow: 'auto' }}>
-                                                                                                {(emp as any).calculationTrace.map((step: any, stepIdx: number) => (
-                                                                                                    <Box key={stepIdx} sx={{ mb: 1.5, pb: 1, borderBottom: '1px dashed #ddd' }}>
-                                                                                                        <Typography variant="body2" fontWeight="bold" color="primary">
-                                                                                                            {stepIdx + 1}. {step.step || step.description}
-                                                                                                        </Typography>
-                                                                                                        {step.formula && (
-                                                                                                            <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace', bgcolor: 'grey.200', p: 0.5, borderRadius: 0.5, mt: 0.5 }}>
-                                                                                                                {step.formula}
-                                                                                                            </Typography>
-                                                                                                        )}
-                                                                                                        {step.result !== undefined && (
-                                                                                                            <Typography variant="body2" fontWeight="bold" color="success.main">
-                                                                                                                = {typeof step.result === 'number' ? step.result.toLocaleString() : step.result}
-                                                                                                            </Typography>
-                                                                                                        )}
+                                                                                            {emp.earnings && emp.earnings.length > 0 ? (
+                                                                                                emp.earnings.filter(e => e.amount > 0).map((e, i) => (
+                                                                                                    <Box key={i} display="flex" justifyContent="space-between">
+                                                                                                        <Typography variant="body2">{e.name}</Typography>
+                                                                                                        <Typography variant="body2" fontWeight={500}>{formatMoney(e.amount)}</Typography>
                                                                                                     </Box>
-                                                                                                ))}
+                                                                                                ))
+                                                                                            ) : (
+                                                                                                <Typography variant="body2" color="text.secondary">الراتب الأساسي: {formatMoney(emp.baseSalary)}</Typography>
+                                                                                            )}
+                                                                                            {empAdjustments.filter(a => a.type === 'bonus').map((adj, i) => (
+                                                                                                <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'success.main' }}>
+                                                                                                    <Typography variant="body2">+ {adj.reason}</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
+                                                                                                </Box>
+                                                                                            ))}
+                                                                                            <Divider sx={{ my: 0.5 }} />
+                                                                                            <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'success.50', p: 0.5, borderRadius: 1 }}>
+                                                                                                <Typography variant="body2" fontWeight="bold">المجموع</Typography>
+                                                                                                <Typography variant="body2" fontWeight="bold" color="success.main">{formatMoney(emp.gross)}</Typography>
                                                                                             </Box>
-                                                                                        </Box>
-                                                                                    )}
+                                                                                        </Grid>
+                                                                                        {/* Deductions */}
+                                                                                        <Grid item xs={12} md={4}>
+                                                                                            <Typography variant="subtitle2" fontWeight="bold" color="error.main" gutterBottom>
+                                                                                                📉 الخصومات
+                                                                                            </Typography>
+                                                                                            {emp.deductionItems && emp.deductionItems.length > 0 ? (
+                                                                                                emp.deductionItems.filter(d => d.amount > 0).map((d, i) => (
+                                                                                                    <Box key={i} display="flex" justifyContent="space-between">
+                                                                                                        <Typography variant="body2">{d.name}</Typography>
+                                                                                                        <Typography variant="body2" fontWeight={500}>{formatMoney(d.amount)}</Typography>
+                                                                                                    </Box>
+                                                                                                ))
+                                                                                            ) : (
+                                                                                                <>
+                                                                                                    {emp.gosi > 0 && (
+                                                                                                        <Box display="flex" justifyContent="space-between">
+                                                                                                            <Typography variant="body2">GOSI (موظف)</Typography>
+                                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosi)}</Typography>
+                                                                                                        </Box>
+                                                                                                    )}
+                                                                                                    {emp.advances > 0 && (
+                                                                                                        <Box display="flex" justifyContent="space-between">
+                                                                                                            <Typography variant="body2">سلف</Typography>
+                                                                                                            <Typography variant="body2" fontWeight={500}>{formatMoney(emp.advances)}</Typography>
+                                                                                                        </Box>
+                                                                                                    )}
+                                                                                                    {emp.deductions === 0 && emp.gosi === 0 && emp.advances === 0 && (
+                                                                                                        <Typography variant="body2" color="text.secondary">لا توجد خصومات</Typography>
+                                                                                                    )}
+                                                                                                </>
+                                                                                            )}
+                                                                                            {empAdjustments.filter(a => a.type === 'deduction').map((adj, i) => (
+                                                                                                <Box key={i} display="flex" justifyContent="space-between" sx={{ color: 'error.main' }}>
+                                                                                                    <Typography variant="body2">- {adj.reason}</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(adj.amount)}</Typography>
+                                                                                                </Box>
+                                                                                            ))}
+                                                                                            {emp.deductions > 0 && (
+                                                                                                <>
+                                                                                                    <Divider sx={{ my: 0.5 }} />
+                                                                                                    <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'error.50', p: 0.5, borderRadius: 1 }}>
+                                                                                                        <Typography variant="body2" fontWeight="bold">المجموع</Typography>
+                                                                                                        <Typography variant="body2" fontWeight="bold" color="error.main">{formatMoney(emp.deductions)}</Typography>
+                                                                                                    </Box>
+                                                                                                </>
+                                                                                            )}
+                                                                                        </Grid>
+                                                                                        {/* Summary */}
+                                                                                        <Grid item xs={12} md={4}>
+                                                                                            <Typography variant="subtitle2" fontWeight="bold" color="info.main" gutterBottom>
+                                                                                                📊 الملخص
+                                                                                            </Typography>
+                                                                                            <Box display="flex" justifyContent="space-between">
+                                                                                                <Typography variant="body2">راتب العقد</Typography>
+                                                                                                <Typography variant="body2" fontWeight={500}>{formatMoney(emp.baseSalary)}</Typography>
+                                                                                            </Box>
+                                                                                            <Box display="flex" justifyContent="space-between">
+                                                                                                <Typography variant="body2">المسمى الوظيفي</Typography>
+                                                                                                <Typography variant="body2" fontWeight={500}>{emp.jobTitle || 'غير محدد'}</Typography>
+                                                                                            </Box>
+                                                                                            {emp.isSaudi && (
+                                                                                                <Box display="flex" justifyContent="space-between">
+                                                                                                    <Typography variant="body2">الجنسية</Typography>
+                                                                                                    <Chip label="سعودي 🇸🇦" size="small" color="success" />
+                                                                                                </Box>
+                                                                                            )}
+                                                                                            {emp.gosiEmployer > 0 && (
+                                                                                                <Box display="flex" justifyContent="space-between">
+                                                                                                    <Typography variant="body2">GOSI (صاحب العمل)</Typography>
+                                                                                                    <Typography variant="body2" fontWeight={500}>{formatMoney(emp.gosiEmployer)}</Typography>
+                                                                                                </Box>
+                                                                                            )}
+                                                                                            <Divider sx={{ my: 1 }} />
+                                                                                            <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'info.50', p: 1, borderRadius: 1 }}>
+                                                                                                <Typography variant="body1" fontWeight="bold">صافي الراتب</Typography>
+                                                                                                <Typography variant="body1" fontWeight="bold" color="info.main">{formatMoney(adjustedNet)}</Typography>
+                                                                                            </Box>
+                                                                                        </Grid>
+                                                                                    </Grid>
                                                                                 </Box>
                                                                             </Collapse>
                                                                         </TableCell>
