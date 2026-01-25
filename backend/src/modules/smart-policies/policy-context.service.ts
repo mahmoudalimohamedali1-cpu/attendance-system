@@ -1471,7 +1471,7 @@ export class PolicyContextService {
             // الحصول على آخر تقييم
             const lastReview = await (this.prisma as any).performanceReview?.findFirst?.({
                 where: { employeeId: employeeId },
-                orderBy: { reviewDate: 'desc' },
+                orderBy: { createdAt: 'desc' }, // 🔧 FIX: reviewDate doesn't exist, using createdAt
             });
 
             return {

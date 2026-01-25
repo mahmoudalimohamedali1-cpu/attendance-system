@@ -10,6 +10,7 @@ export class RetroPayService {
     async create(dto: CreateRetroPayDto, createdById: string) {
         const employee = await this.prisma.user.findUnique({ where: { id: dto.employeeId } });
         if (!employee) throw new NotFoundException('الموظف غير موجود');
+        if (!employee.companyId) throw new BadRequestException('الموظف غير مرتبط بشركة');
 
         const effectiveFrom = new Date(dto.effectiveFrom);
         const effectiveTo = new Date(dto.effectiveTo);
@@ -27,6 +28,7 @@ export class RetroPayService {
 
         return this.prisma.retroPay.create({
             data: {
+                companyId: employee.companyId, // 🔧 FIX: ربط الفروقات بالشركة تلقائياً
                 employeeId: dto.employeeId,
                 reason: dto.reason,
                 effectiveFrom,
