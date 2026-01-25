@@ -547,6 +547,7 @@ export class PayrollCalculationService {
         year?: number,
         month?: number,
     ): Promise<EmployeePayrollCalculation> {
+        this.logger.log(`🚀 START PAYROLL CALCULATION: employeeId=${employeeId}, period=${startDate.toISOString()} to ${endDate.toISOString()}`);
         const trace: CalculationTraceItem[] = [];
 
         // Derive year/month if not provided (for legacy compatibility in some logs/metadata)
