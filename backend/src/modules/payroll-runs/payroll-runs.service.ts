@@ -233,7 +233,7 @@ export class PayrollRunsService {
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         } else if (pl.componentCode === 'LOAN_DED' || pl.componentId?.startsWith('LOAN-')) {
                             // 🔧 FIX: Use valid component ID for loan/advance deductions
-                            sourceType = (PayslipLineSource as any).LOAN || 'LOAN';
+                            sourceType = PayslipLineSource.ADJUSTMENT; // LOAN not in enum, using ADJUSTMENT
                             componentIdToUse = loanComp.id; // Use LOAN_DED component
                         }
 
@@ -269,7 +269,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjAddId, // تعديل إضافة
                             amount: round(adjAmount),
-                            sourceType: 'MANUAL' as any,
+                            sourceType: PayslipLineSource.MANUAL,
                             sign: 'EARNING',
                             descriptionAr: `مكافأة يدوية: ${adj.reason}`,
                             sourceRef: 'WIZARD_ADJUSTMENT',
@@ -280,7 +280,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId, // تعديل خصم
                             amount: round(adjAmount),
-                            sourceType: 'MANUAL' as any,
+                            sourceType: PayslipLineSource.MANUAL,
                             sign: 'DEDUCTION',
                             descriptionAr: `خصم يدوي: ${adj.reason}`,
                             sourceRef: 'WIZARD_ADJUSTMENT',
@@ -303,7 +303,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjAddId,
                             amount: round(toDecimal(approvedAdjustments.totalAdditions)),
-                            sourceType: 'ADJUSTMENT' as any,
+                            sourceType: PayslipLineSource.ADJUSTMENT,
                             sign: 'EARNING',
                             descriptionAr: `تسويات معتمدة (إلغاء خصم/إضافة يدوية)`,
                             sourceRef: 'PAYROLL_ADJUSTMENTS',
@@ -316,7 +316,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId,
                             amount: round(toDecimal(approvedAdjustments.totalDeductions)),
-                            sourceType: 'ADJUSTMENT' as any,
+                            sourceType: PayslipLineSource.ADJUSTMENT,
                             sign: 'DEDUCTION',
                             descriptionAr: `تسويات معتمدة (خصم يدوي)`,
                             sourceRef: 'PAYROLL_ADJUSTMENTS',
@@ -354,7 +354,7 @@ export class PayrollRunsService {
                     payslipLines.push({
                         componentId: adjAddId,
                         amount: round(bonusAmount),
-                        sourceType: 'ADJUSTMENT' as PayslipLineSource, // RetroPay/Bonus
+                        sourceType: PayslipLineSource.ADJUSTMENT, // RetroPay/Bonus
                         sign: 'EARNING',
                         descriptionAr: bonus.reason || 'مكافأة برنامج',
                         sourceRef: `RETRO_PAY_${bonus.id}`,
@@ -450,7 +450,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId, // سداد ديون
                             amount: round(debtDeductionAmount),
-                            sourceType: 'ADJUSTMENT' as PayslipLineSource, // Debt Repayment
+                            sourceType: PayslipLineSource.ADJUSTMENT, // Debt Repayment
                             sign: 'DEDUCTION',
                             descriptionAr: `سداد ديون سابقة (${debtResult.transactions.length} دين)`,
                             sourceRef: 'DEBT_LEDGER',
