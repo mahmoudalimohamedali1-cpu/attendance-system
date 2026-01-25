@@ -780,6 +780,7 @@ export class PayrollRunsService {
                 baseSalary: toNumber(toDecimal(assignment.baseSalary)),
                 gross: toNumber(finalGross),
                 deductions: toNumber(finalDeductions),
+                deferredDeductions: calculation.deferredDeductions || 0, // ✅ الخصومات المرحلة
                 gosi: toNumber(gosiAmount),
                 advances: toNumber(employeeAdvanceAmount),
                 net: toNumber(finalNet),
