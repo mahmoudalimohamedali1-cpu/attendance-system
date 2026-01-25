@@ -219,6 +219,14 @@ export class PayrollRunsService {
 
                 const primaryCostCenterId = getPrimaryCostCenterId();
 
+                // ✅ استخراج بيانات المستحقات والخصومات للحفظ (نفس المعاينة)
+                const earningsData = (calculation.policyLines || [])
+                    .filter(pl => pl.sign === 'EARNING')
+                    .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
+                const deductionsData = (calculation.policyLines || [])
+                    .filter(pl => pl.sign === 'DEDUCTION')
+                    .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
+
                 // 1. إضافة الخطوط المحسوبة (من الهيكل، السياسات، والتأمينات، والعمولات، والتسويات المسجلة)
                 if (calculation.policyLines) {
                     for (const pl of calculation.policyLines) {
@@ -282,6 +290,8 @@ export class PayrollRunsService {
                             sourceRef: 'WIZARD_ADJUSTMENT',
                             costCenterId: primaryCostCenterId,
                         });
+                        // ✅ إضافة للبيانات المحفوظة
+                        earningsData.push({ name: `مكافأة يدوية: ${adj.reason}`, code: 'WIZ_ADD', amount: adj.amount });
                     } else {
                         wizardDeduction = add(wizardDeduction, adjAmount);
                         payslipLines.push({
@@ -293,6 +303,8 @@ export class PayrollRunsService {
                             sourceRef: 'WIZARD_ADJUSTMENT',
                             costCenterId: primaryCostCenterId,
                         });
+                        // ✅ إضافة للبيانات المحفوظة
+                        deductionsData.push({ name: `خصم يدوي: ${adj.reason}`, code: 'WIZ_DED', amount: adj.amount });
                     }
                 }
 
@@ -525,6 +537,9 @@ export class PayrollRunsService {
                         netSalary: max(ZERO, linesNet), // ✅ Recalculated, min 0
                         status: PayrollStatus.DRAFT,
                         calculationTrace: calculation.calculationTrace as any,
+                        // ✅ حفظ بيانات المعاينة لعرضها في تفاصيل القسيمة
+                        earningsJson: earningsData as any,
+                        deductionsJson: deductionsData as any,
                         lines: {
                             create: validatedPayslipLines
                         }

@@ -2485,6 +2485,10 @@ model Payslip {
   lines            PayslipLine[]
   calculationTrace Json?         @map("calculation_trace")
 
+  // ✅ بيانات المعاينة المحفوظة - لعرض نفس البنود في تفاصيل القسيمة
+  earningsJson   Json? @map("earnings_json") // [{name, code, amount}]
+  deductionsJson Json? @map("deductions_json") // [{name, code, amount}]
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

@@ -688,22 +688,28 @@ export const PayrollRunDetailsPage = () => {
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3 }}>
                     {selectedPayslip && (() => {
-                        // ✅ فلترة البنود - إخفاء البنود الداخلية اللي مش بتظهر في المعاينة
-                        const excludedSources = ['DEBT_REPAYMENT', 'DEFERRED_DEDUCTION', 'ADJUSTMENT'];
-                        const excludedDescriptions = ['سداد ديون', 'خصم مؤجل', 'فرق دين'];
+                        // ✅ استخدام بيانات المعاينة المحفوظة إذا وجدت، وإلا نستخدم lines
+                        let earnings: { name: string; code: string; amount: number }[] = [];
+                        let deductions: { name: string; code: string; amount: number }[] = [];
 
-                        const filteredLines = (selectedPayslip.lines || []).filter((l: any) => {
-                            // إخفاء البنود الداخلية
-                            if (excludedSources.includes(l.sourceType)) return false;
-                            if (l.descriptionAr && excludedDescriptions.some(d => l.descriptionAr.includes(d))) return false;
-                            if (l.component?.code?.includes('DEBT')) return false;
-                            if (l.component?.code?.includes('DEFERRED')) return false;
-                            return true;
-                        });
+                        if (selectedPayslip.earningsJson && Array.isArray(selectedPayslip.earningsJson)) {
+                            earnings = selectedPayslip.earningsJson;
+                        } else {
+                            // Fallback للقسائم القديمة
+                            earnings = (selectedPayslip.lines || [])
+                                .filter((l: any) => l.sign === 'EARNING' || l.component?.type === 'EARNING')
+                                .map((l: any) => ({ name: l.component?.nameAr || l.descriptionAr || 'بند', code: l.component?.code || '', amount: parseFloat(l.amount) }));
+                        }
 
-                        // تصنيف البنود حسب النوع
-                        const earnings = filteredLines.filter((l: any) => l.sign === 'EARNING' || l.component?.type === 'EARNING');
-                        const deductions = filteredLines.filter((l: any) => l.sign === 'DEDUCTION' || l.component?.type === 'DEDUCTION');
+                        if (selectedPayslip.deductionsJson && Array.isArray(selectedPayslip.deductionsJson)) {
+                            deductions = selectedPayslip.deductionsJson;
+                        } else {
+                            // Fallback للقسائم القديمة
+                            deductions = (selectedPayslip.lines || [])
+                                .filter((l: any) => l.sign === 'DEDUCTION' || l.component?.type === 'DEDUCTION')
+                                .filter((l: any) => !['DEBT_REPAYMENT', 'DEFERRED_DEDUCTION', 'ADJUSTMENT'].includes(l.sourceType))
+                                .map((l: any) => ({ name: l.component?.nameAr || l.descriptionAr || 'خصم', code: l.component?.code || '', amount: parseFloat(l.amount) }));
+                        }
 
                         return (
                             <Grid container spacing={3}>
@@ -718,16 +724,16 @@ export const PayrollRunDetailsPage = () => {
                                         <TableContainer>
                                             <Table size="small">
                                                 <TableBody>
-                                                    {earnings.length > 0 ? earnings.map((line: any, idx: number) => (
+                                                    {earnings.length > 0 ? earnings.map((item: any, idx: number) => (
                                                         <TableRow key={idx} hover>
                                                             <TableCell sx={{ py: 1 }}>
                                                                 <Typography variant="body2">
-                                                                    {line.component?.nameAr || line.descriptionAr || 'بند'}
+                                                                    {item.name || 'بند'}
                                                                 </Typography>
                                                             </TableCell>
                                                             <TableCell align="left" sx={{ py: 1 }}>
                                                                 <Typography variant="body2" fontWeight="bold" color="success.main">
-                                                                    {parseFloat(line.amount).toLocaleString()} ر.س
+                                                                    {(typeof item.amount === 'number' ? item.amount : parseFloat(item.amount)).toLocaleString()} ر.س
                                                                 </Typography>
                                                             </TableCell>
                                                         </TableRow>
@@ -765,16 +771,16 @@ export const PayrollRunDetailsPage = () => {
                                         <TableContainer>
                                             <Table size="small">
                                                 <TableBody>
-                                                    {deductions.length > 0 ? deductions.map((line: any, idx: number) => (
+                                                    {deductions.length > 0 ? deductions.map((item: any, idx: number) => (
                                                         <TableRow key={idx} hover>
                                                             <TableCell sx={{ py: 1 }}>
                                                                 <Typography variant="body2">
-                                                                    {line.component?.nameAr || line.descriptionAr || 'خصم'}
+                                                                    {item.name || 'خصم'}
                                                                 </Typography>
                                                             </TableCell>
                                                             <TableCell align="left" sx={{ py: 1 }}>
                                                                 <Typography variant="body2" fontWeight="bold" color="error.main">
-                                                                    {parseFloat(line.amount).toLocaleString()} ر.س
+                                                                    {(typeof item.amount === 'number' ? item.amount : parseFloat(item.amount)).toLocaleString()} ر.س
                                                                 </Typography>
                                                             </TableCell>
                                                         </TableRow>
