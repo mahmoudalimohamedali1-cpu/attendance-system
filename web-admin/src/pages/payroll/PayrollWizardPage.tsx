@@ -118,6 +118,7 @@ interface EmployeePreview {
     baseSalary: number;
     gross: number;
     deductions: number;
+    deferredDeductions?: number; // الخصومات المرحلة للشهر القادم
     gosi: number;
     gosiEmployer: number;
     advances: number;
@@ -1914,6 +1915,13 @@ export const PayrollWizardPage = () => {
                                                                                                         <Typography variant="body2" fontWeight="bold" color="error.main">{formatMoney(emp.deductions)}</Typography>
                                                                                                     </Box>
                                                                                                 </>
+                                                                                            )}
+                                                                                            {/* ✅ عرض الخصومات المرحلة إذا وجدت */}
+                                                                                            {emp.deferredDeductions && emp.deferredDeductions > 0 && (
+                                                                                                <Box display="flex" justifyContent="space-between" sx={{ bgcolor: 'warning.100', p: 0.5, borderRadius: 1, mt: 0.5, border: '1px solid', borderColor: 'warning.main' }}>
+                                                                                                    <Typography variant="body2" fontWeight="bold" color="warning.dark">⏳ خصومات مرحلة</Typography>
+                                                                                                    <Typography variant="body2" fontWeight="bold" color="warning.dark">{formatMoney(emp.deferredDeductions)}</Typography>
+                                                                                                </Box>
                                                                                             )}
                                                                                         </Grid>
                                                                                         {/* Summary */}
