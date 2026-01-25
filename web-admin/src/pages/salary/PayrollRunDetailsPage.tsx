@@ -667,180 +667,228 @@ export const PayrollRunDetailsPage = () => {
                 )}
             </Paper>
 
-            <Dialog open={!!selectedPayslip} onClose={() => setSelectedPayslip(null)} maxWidth="md" fullWidth>
-                <DialogTitle>تفاصيل قسيمة الراتب</DialogTitle>
-                <DialogContent dividers>
-                    {selectedPayslip && (
+            <Dialog open={!!selectedPayslip} onClose={() => setSelectedPayslip(null)} maxWidth="lg" fullWidth>
+                <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box display="flex" alignItems="center" gap={2}>
+                        <Avatar sx={{ bgcolor: 'white', color: 'primary.main' }}>
+                            {selectedPayslip?.employee?.firstName?.[0]}
+                        </Avatar>
                         <Box>
-                            {/* Employee Info */}
-                            <Box display="flex" justifyContent="space-between" mb={2}>
-                                <Typography fontWeight="bold">الموظف:</Typography>
-                                <Typography>{selectedPayslip.employee.firstName} {selectedPayslip.employee.lastName}</Typography>
-                            </Box>
-                            <Box display="flex" justifyContent="space-between" mb={2}>
-                                <Typography fontWeight="bold">الراتب الأساسي:</Typography>
-                                <Typography>{parseFloat(selectedPayslip.baseSalary).toLocaleString()} ريال</Typography>
-                            </Box>
-
-                            <Divider sx={{ my: 2 }} />
-
-                            {/* Enhanced Payslip Lines */}
-                            <Typography variant="subtitle2" color="primary" gutterBottom>مكونات الراتب التفصيلية:</Typography>
-
-                            <TableContainer sx={{ mb: 2 }}>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow sx={{ bgcolor: 'grey.50' }}>
-                                            <TableCell>المكوّن</TableCell>
-                                            <TableCell>المصدر</TableCell>
-                                            <TableCell>الوصف</TableCell>
-                                            <TableCell align="center">الوحدات</TableCell>
-                                            <TableCell align="center">المعدل</TableCell>
-                                            <TableCell align="left">القيمة</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {selectedPayslip.lines.map((line: any) => {
-                                            const getSourceBadge = (sourceType: string) => {
-                                                const badges: Record<string, { label: string; color: 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning' }> = {
-                                                    'STRUCTURE': { label: 'هيكل', color: 'default' },
-                                                    'POLICY': { label: 'سياسات', color: 'primary' },
-                                                    'STATUTORY': { label: 'تأمينات', color: 'info' },
-                                                    'MANUAL': { label: 'يدوي', color: 'warning' },
-                                                    'ADJUSTMENT': { label: 'تعديل', color: 'secondary' },
-                                                    'SMART': { label: 'ذكاء اصطناعي', color: 'success' },
-                                                };
-                                                return badges[sourceType] || { label: sourceType, color: 'default' };
-                                            };
-
-                                            const badge = getSourceBadge(line.sourceType || 'STRUCTURE');
-                                            const isDeduction = line.sign === 'DEDUCTION' || line.component?.type === 'DEDUCTION';
-
-                                            return (
-                                                <TableRow key={line.id} hover>
-                                                    <TableCell>
-                                                        <Typography variant="body2" fontWeight="medium">
-                                                            {line.component?.nameAr || line.descriptionAr || '-'}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Box
-                                                            component="span"
-                                                            sx={{
-                                                                px: 1,
-                                                                py: 0.5,
-                                                                borderRadius: 1,
-                                                                fontSize: '0.7rem',
-                                                                bgcolor: badge.color === 'default' ? 'grey.200' :
-                                                                    badge.color === 'primary' ? 'primary.100' :
-                                                                        badge.color === 'info' ? 'info.100' :
-                                                                            badge.color === 'warning' ? 'warning.100' :
-                                                                                badge.color === 'secondary' ? 'secondary.100' : 'grey.200',
-                                                                color: badge.color === 'default' ? 'grey.700' :
-                                                                    badge.color === 'primary' ? 'primary.main' :
-                                                                        badge.color === 'info' ? 'info.main' :
-                                                                            badge.color === 'warning' ? 'warning.main' :
-                                                                                badge.color === 'secondary' ? 'secondary.main' : 'grey.700',
-                                                            }}
-                                                        >
-                                                            {badge.label}
-                                                        </Box>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {line.descriptionAr || '-'}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell align="center">
-                                                        {line.units ? `${parseFloat(line.units).toFixed(2)}` : '-'}
-                                                    </TableCell>
-                                                    <TableCell align="center">
-                                                        {line.rate ? `x${parseFloat(line.rate).toFixed(2)}` : '-'}
-                                                    </TableCell>
-                                                    <TableCell align="left">
-                                                        <Typography
-                                                            variant="body2"
-                                                            fontWeight="bold"
-                                                            color={isDeduction ? 'error.main' : 'success.main'}
-                                                        >
-                                                            {isDeduction ? '-' : '+'} {parseFloat(line.amount).toLocaleString()} ريال
-                                                        </Typography>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-
-                            {/* Summary */}
-                            <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 2 }}>
-                                <Box display="flex" justifyContent="space-between" mb={1}>
-                                    <Typography>إجمالي الاستحقاقات:</Typography>
-                                    <Typography color="success.main" fontWeight="bold">
-                                        {parseFloat(selectedPayslip.grossSalary).toLocaleString()} ريال
-                                    </Typography>
-                                </Box>
-                                <Box display="flex" justifyContent="space-between" mb={1}>
-                                    <Typography>إجمالي الاستقطاعات:</Typography>
-                                    <Typography color="error.main" fontWeight="bold">
-                                        {parseFloat(selectedPayslip.totalDeductions).toLocaleString()} ريال
-                                    </Typography>
-                                </Box>
-                                <Divider sx={{ my: 1 }} />
-                                <Box display="flex" justifyContent="space-between">
-                                    <Typography fontWeight="bold">صافي الراتب:</Typography>
-                                    <Typography fontWeight="bold" color="primary" fontSize="1.1rem">
-                                        {parseFloat(selectedPayslip.netSalary).toLocaleString()} ريال
-                                    </Typography>
-                                </Box>
-                            </Box>
-
-                            {/* Calculation Trace Accordion */}
-                            {selectedPayslip.calculationTrace && Array.isArray(selectedPayslip.calculationTrace) && selectedPayslip.calculationTrace.length > 0 && (
-                                <Box sx={{ mt: 2 }}>
-                                    <Typography
-                                        variant="subtitle2"
-                                        color="text.secondary"
-                                        gutterBottom
-                                        sx={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1 }}
-                                        onClick={() => {
-                                            const el = document.getElementById('trace-content');
-                                            if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-                                        }}
-                                    >
-                                        📊 عرض خطوات الحساب ({selectedPayslip.calculationTrace.length} خطوة)
-                                    </Typography>
-                                    <Box id="trace-content" sx={{ display: 'none', bgcolor: 'grey.50', p: 2, borderRadius: 1, maxHeight: 300, overflow: 'auto' }}>
-                                        {selectedPayslip.calculationTrace.map((step: any, idx: number) => (
-                                            <Box key={idx} sx={{ mb: 2, pb: 1, borderBottom: '1px dashed #ddd' }}>
-                                                <Typography variant="body2" fontWeight="bold" color="primary">
-                                                    {idx + 1}. {step.step || step.description || 'خطوة'}
-                                                </Typography>
-                                                {step.description && (
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        {step.description}
-                                                    </Typography>
-                                                )}
-                                                {step.formula && (
-                                                    <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace', bgcolor: 'grey.200', p: 0.5, borderRadius: 0.5, mt: 0.5 }}>
-                                                        {step.formula}
-                                                    </Typography>
-                                                )}
-                                                {step.result !== undefined && (
-                                                    <Typography variant="body2" fontWeight="bold" color="success.main">
-                                                        = {typeof step.result === 'number' ? step.result.toLocaleString() : step.result}
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                        ))}
-                                    </Box>
-                                </Box>
-                            )}
+                            <Typography variant="h6">
+                                {selectedPayslip?.employee?.firstName} {selectedPayslip?.employee?.lastName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                                {selectedPayslip?.employee?.employeeCode}
+                            </Typography>
                         </Box>
-                    )}
+                    </Box>
+                    <IconButton onClick={() => setSelectedPayslip(null)} sx={{ color: 'white' }}>
+                        <Close />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 3 }}>
+                    {selectedPayslip && (() => {
+                        // ✅ فلترة البنود - إخفاء البنود الداخلية اللي مش بتظهر في المعاينة
+                        const excludedSources = ['DEBT_REPAYMENT', 'DEFERRED_DEDUCTION', 'ADJUSTMENT'];
+                        const excludedDescriptions = ['سداد ديون', 'خصم مؤجل', 'فرق دين'];
+
+                        const filteredLines = (selectedPayslip.lines || []).filter((l: any) => {
+                            // إخفاء البنود الداخلية
+                            if (excludedSources.includes(l.sourceType)) return false;
+                            if (l.descriptionAr && excludedDescriptions.some(d => l.descriptionAr.includes(d))) return false;
+                            if (l.component?.code?.includes('DEBT')) return false;
+                            if (l.component?.code?.includes('DEFERRED')) return false;
+                            return true;
+                        });
+
+                        // تصنيف البنود حسب النوع
+                        const earnings = filteredLines.filter((l: any) => l.sign === 'EARNING' || l.component?.type === 'EARNING');
+                        const deductions = filteredLines.filter((l: any) => l.sign === 'DEDUCTION' || l.component?.type === 'DEDUCTION');
+
+                        return (
+                            <Grid container spacing={3}>
+                                {/* 💰 المستحقات */}
+                                <Grid item xs={12} md={6}>
+                                    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'success.light', borderRadius: 2, overflow: 'hidden' }}>
+                                        <Box sx={{ bgcolor: 'success.50', p: 1.5, borderBottom: '1px solid', borderColor: 'success.light' }}>
+                                            <Typography variant="subtitle1" fontWeight="bold" color="success.dark">
+                                                💰 المستحقات
+                                            </Typography>
+                                        </Box>
+                                        <TableContainer>
+                                            <Table size="small">
+                                                <TableBody>
+                                                    {earnings.length > 0 ? earnings.map((line: any, idx: number) => (
+                                                        <TableRow key={idx} hover>
+                                                            <TableCell sx={{ py: 1 }}>
+                                                                <Typography variant="body2">
+                                                                    {line.component?.nameAr || line.descriptionAr || 'بند'}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell align="left" sx={{ py: 1 }}>
+                                                                <Typography variant="body2" fontWeight="bold" color="success.main">
+                                                                    {parseFloat(line.amount).toLocaleString()} ر.س
+                                                                </Typography>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )) : (
+                                                        <TableRow>
+                                                            <TableCell colSpan={2}>
+                                                                <Typography variant="body2" color="text.secondary" textAlign="center">
+                                                                    لا توجد مستحقات
+                                                                </Typography>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                        <Box sx={{ bgcolor: 'success.100', p: 1.5, borderTop: '1px solid', borderColor: 'success.light' }}>
+                                            <Box display="flex" justifyContent="space-between">
+                                                <Typography variant="body2" fontWeight="bold">المجموع</Typography>
+                                                <Typography variant="body1" fontWeight="bold" color="success.dark">
+                                                    {parseFloat(selectedPayslip.grossSalary).toLocaleString()} ر.س
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+
+                                {/* 📉 الخصومات */}
+                                <Grid item xs={12} md={6}>
+                                    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'error.light', borderRadius: 2, overflow: 'hidden' }}>
+                                        <Box sx={{ bgcolor: 'error.50', p: 1.5, borderBottom: '1px solid', borderColor: 'error.light' }}>
+                                            <Typography variant="subtitle1" fontWeight="bold" color="error.dark">
+                                                📉 الخصومات
+                                            </Typography>
+                                        </Box>
+                                        <TableContainer>
+                                            <Table size="small">
+                                                <TableBody>
+                                                    {deductions.length > 0 ? deductions.map((line: any, idx: number) => (
+                                                        <TableRow key={idx} hover>
+                                                            <TableCell sx={{ py: 1 }}>
+                                                                <Typography variant="body2">
+                                                                    {line.component?.nameAr || line.descriptionAr || 'خصم'}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell align="left" sx={{ py: 1 }}>
+                                                                <Typography variant="body2" fontWeight="bold" color="error.main">
+                                                                    {parseFloat(line.amount).toLocaleString()} ر.س
+                                                                </Typography>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )) : (
+                                                        <TableRow>
+                                                            <TableCell colSpan={2}>
+                                                                <Typography variant="body2" color="text.secondary" textAlign="center">
+                                                                    لا توجد خصومات
+                                                                </Typography>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                        <Box sx={{ bgcolor: 'error.100', p: 1.5, borderTop: '1px solid', borderColor: 'error.light' }}>
+                                            <Box display="flex" justifyContent="space-between">
+                                                <Typography variant="body2" fontWeight="bold">المجموع</Typography>
+                                                <Typography variant="body1" fontWeight="bold" color="error.dark">
+                                                    {parseFloat(selectedPayslip.totalDeductions).toLocaleString()} ر.س
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+
+                                {/* 📊 الملخص */}
+                                <Grid item xs={12}>
+                                    <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'primary.light', borderRadius: 2, overflow: 'hidden' }}>
+                                        <Box sx={{ bgcolor: 'primary.50', p: 1.5, borderBottom: '1px solid', borderColor: 'primary.light' }}>
+                                            <Typography variant="subtitle1" fontWeight="bold" color="primary.dark">
+                                                📊 الملخص
+                                            </Typography>
+                                        </Box>
+                                        <Box p={2}>
+                                            <Grid container spacing={2}>
+                                                <Grid item xs={6} md={3}>
+                                                    <Typography variant="caption" color="text.secondary">راتب العقد</Typography>
+                                                    <Typography variant="h6" fontWeight="bold">
+                                                        {parseFloat(selectedPayslip.baseSalary).toLocaleString()} ر.س
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6} md={3}>
+                                                    <Typography variant="caption" color="text.secondary">المسمى الوظيفي</Typography>
+                                                    <Typography variant="body1" fontWeight="bold">
+                                                        {selectedPayslip.employee?.jobTitle?.titleAr || 'غير محدد'}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6} md={3}>
+                                                    <Typography variant="caption" color="text.secondary">الجنسية</Typography>
+                                                    <Typography variant="body1" fontWeight="bold">
+                                                        {selectedPayslip.employee?.isSaudi ? 'سعودي 🇸🇦' : 'غير سعودي'}
+                                                    </Typography>
+                                                </Grid>
+                                                <Grid item xs={6} md={3}>
+                                                    <Box sx={{ bgcolor: 'primary.main', color: 'white', p: 2, borderRadius: 2, textAlign: 'center' }}>
+                                                        <Typography variant="caption">صافي الراتب</Typography>
+                                                        <Typography variant="h5" fontWeight="bold">
+                                                            {parseFloat(selectedPayslip.netSalary).toLocaleString()} ر.س
+                                                        </Typography>
+                                                    </Box>
+                                                </Grid>
+                                            </Grid>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+
+                                {/* خطوات الحساب */}
+                                {selectedPayslip.calculationTrace && Array.isArray(selectedPayslip.calculationTrace) && selectedPayslip.calculationTrace.length > 0 && (
+                                    <Grid item xs={12}>
+                                        <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'grey.300', borderRadius: 2 }}>
+                                            <Box
+                                                sx={{ p: 1.5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1 }}
+                                                onClick={() => {
+                                                    const el = document.getElementById('trace-content-new');
+                                                    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+                                                }}
+                                            >
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    📊 عرض خطوات الحساب ({selectedPayslip.calculationTrace.length} خطوة) ▼
+                                                </Typography>
+                                            </Box>
+                                            <Box id="trace-content-new" sx={{ display: 'none', p: 2, bgcolor: 'grey.50', maxHeight: 300, overflow: 'auto' }}>
+                                                {selectedPayslip.calculationTrace.map((step: any, idx: number) => (
+                                                    <Box key={idx} sx={{ mb: 2, pb: 1, borderBottom: '1px dashed #ddd' }}>
+                                                        <Typography variant="body2" fontWeight="bold" color="primary">
+                                                            {idx + 1}. {step.step || step.description || 'خطوة'}
+                                                        </Typography>
+                                                        {step.description && (
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {step.description}
+                                                            </Typography>
+                                                        )}
+                                                        {step.formula && (
+                                                            <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace', bgcolor: 'grey.200', p: 0.5, borderRadius: 0.5, mt: 0.5 }}>
+                                                                {step.formula}
+                                                            </Typography>
+                                                        )}
+                                                        {step.result !== undefined && (
+                                                            <Typography variant="body2" fontWeight="bold" color="success.main">
+                                                                = {typeof step.result === 'number' ? step.result.toLocaleString() : step.result}
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        </Paper>
+                                    </Grid>
+                                )}
+                            </Grid>
+                        );
+                    })()}
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={{ p: 2 }}>
                     <Button onClick={() => setSelectedPayslip(null)}>إغلاق</Button>
                     {selectedPayslip && (
                         <Button
