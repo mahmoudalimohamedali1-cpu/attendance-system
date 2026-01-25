@@ -236,7 +236,7 @@ export class PayrollRunsService {
                         } else if (pl.componentCode === 'RETRO_PAY' || pl.componentCode?.startsWith('RETRO_')) {
                             sourceType = PayslipLineSource.ADJUSTMENT; // BONUS_PROGRAM mapped to ADJUSTMENT
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
-                        } else if (pl.componentCode === 'DISC_ADJ') {
+                        } else if (pl.componentCode === 'DISC_ADJ' || pl.componentId?.startsWith('ADJ-') || pl.componentId?.startsWith('DISC-')) {
                             sourceType = PayslipLineSource.ADJUSTMENT;
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         }
