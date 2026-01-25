@@ -1697,43 +1697,48 @@ export class PayrollCalculationService {
         }
 
         // ✅ Fetch RetroPay (Commissions, Bonuses, Differences)
-        const retroPaySql = `
-            SELECT id, reason, notes, total_amount as "totalAmount", difference 
-            FROM retro_pays 
-            WHERE employee_id = '${employeeId}'
-              AND company_id = '${companyId}'
-              AND status IN ('APPROVED', 'PAID')
-              AND (
-                (payment_year = ${effectiveYear} AND payment_month = ${effectiveMonth})
-                OR 
-                (payment_month IS NULL AND effective_from <= '${endDate.toISOString().split('T')[0]}' 
-                 AND (effective_to IS NULL OR effective_to >= '${startDate.toISOString().split('T')[0]}'))
-              )
-        `;
+        try {
+            const retroPaySql = `
+                SELECT id, reason, notes, total_amount as "totalAmount", difference 
+                FROM retro_pays 
+                WHERE employee_id = '${employeeId}'
+                  AND (company_id = '${companyId}' OR company_id IS NULL)
+                  AND status::text IN ('APPROVED', 'PAID')
+                  AND (
+                    (payment_year = ${effectiveYear} AND payment_month = ${effectiveMonth})
+                    OR 
+                    (payment_month IS NULL AND effective_from <= '${endDate.toISOString().split('T')[0]}'::date 
+                     AND (effective_to IS NULL OR effective_to >= '${startDate.toISOString().split('T')[0]}'::date))
+                  )
+            `;
 
-        const retroPays = await this.prisma.$queryRawUnsafe<any[]>(retroPaySql);
-        this.logger.log(`📊 RETRO PAY: Found ${retroPays.length} entries for employee ${employeeId}`);
+            const retroPays = await this.prisma.$queryRawUnsafe<any[]>(retroPaySql);
+            this.logger.log(`📊 RETRO PAY: Found ${retroPays.length} entries for employee ${employeeId}`);
 
-        for (const retro of retroPays) {
-            const retroAmount = Number(retro.totalAmount) || Number(retro.difference) || 0;
-            if (retroAmount !== 0) {
-                policyLines.push({
-                    componentId: `RETRO-${retro.id}`,
-                    componentCode: `RETRO_${retro.id.substring(0, 8)}`, // Unique code for frontend display
-                    componentName: retro.reason || 'مكافأة/عمولة/فروقات',
-                    sign: retroAmount > 0 ? 'EARNING' : 'DEDUCTION',
-                    amount: Math.abs(retroAmount),
-                    descriptionAr: retro.notes || retro.reason || 'فرق راتب/مكافأة',
-                    source: {
-                        policyId: retro.id,
-                        policyCode: 'RETRO_PAY',
-                        ruleId: 'RETRO',
-                        ruleCode: 'RETRO',
-                    },
-                    gosiEligible: false,
-                });
-                this.logger.log(`✅ RETRO PAY ADDED: ${retro.reason} - ${retroAmount} SAR`);
+            for (const retro of retroPays) {
+                const retroAmount = Number(retro.totalAmount) || Number(retro.difference) || 0;
+                if (retroAmount !== 0) {
+                    policyLines.push({
+                        componentId: `RETRO-${retro.id}`,
+                        componentCode: `RETRO_${retro.id.substring(0, 8)}`, // Unique code for frontend display
+                        componentName: retro.reason || 'مكافأة/عمولة/فروقات',
+                        sign: retroAmount > 0 ? 'EARNING' : 'DEDUCTION',
+                        amount: Math.abs(retroAmount),
+                        descriptionAr: retro.notes || retro.reason || 'فرق راتب/مكافأة',
+                        source: {
+                            policyId: retro.id,
+                            policyCode: 'RETRO_PAY',
+                            ruleId: 'RETRO',
+                            ruleCode: 'RETRO',
+                        },
+                        gosiEligible: false,
+                    });
+                    this.logger.log(`✅ RETRO PAY ADDED: ${retro.reason} - ${retroAmount} SAR`);
+                }
             }
+        } catch (retroError: any) {
+            this.logger.error(`❌ Failed to fetch RetroPay for employee ${employeeId}: ${retroError.message}`);
+            // Continue without RetroPay - don't break the entire calculation
         }
 
 
