@@ -339,6 +339,7 @@ export interface EmployeePayrollCalculation {
     grossSalary: number;
     totalDeductions: number;
     netSalary: number;
+    deferredDeductions?: number; // ✅ الخصومات المرحلة للشهر القادم (تجاوز سقف 50%)
 
     // تتبع الحساب (للشفافية)
     calculationTrace: CalculationTraceItem[];

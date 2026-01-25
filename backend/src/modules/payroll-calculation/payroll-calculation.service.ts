@@ -2001,6 +2001,7 @@ export class PayrollCalculationService {
             grossSalary: toNumber(grossSalary),
             totalDeductions: toNumber(totalDeductions),
             netSalary: toNumber(netSalary),
+            deferredDeductions: toNumber(excessDeductionAmount), // ✅ الخصومات المرحلة للشهر القادم
             calculationTrace: trace,
             policyLines,
         };
