@@ -458,9 +458,10 @@ export class PayrollRunsService {
                     .filter(l => l.sign === 'DEDUCTION')
                     .reduce((sum, l) => add(sum, toDecimal(l.amount)), ZERO);
 
-                // ✅ Apply deduction cap (Saudi Labor Law Article 91 - max 50%)
+                // ✅ Apply deduction cap (Saudi Labor Law Article 91 - max 50% of BASE SALARY)
                 const maxDeductionPercent = 50; // TODO: get from settings
-                const capResult = applyDeductionCap(linesGross, originalDeductions, maxDeductionPercent);
+                // ✅ FIX: السقف يُحسب على الراتب الأساسي وليس الإجمالي
+                const capResult = applyDeductionCap(toDecimal(baseSalary), originalDeductions, maxDeductionPercent);
                 let linesDeductions = originalDeductions;
                 let excessDeductionAmount = ZERO;
 
