@@ -56,6 +56,8 @@ export class PayrollCalculationController {
         @Query('startDate') startDate?: string,
         @Query('endDate') endDate?: string,
     ) {
+        console.log(`[PAYROLL_CTRL] Preview Request: employeeId=${employeeId}, year=${year}, month=${month}, dates=${startDate} to ${endDate}`);
+
         // 🔥 Enforce Scope-based Permissions
         const access = await this.permissionsService.canAccessEmployee(
             userId,
