@@ -29,6 +29,7 @@ import {
     max,
     ZERO,
     applyDeductionCap,
+    calculateNetSalary,
     percent,
 } from '../../common/utils/decimal.util';
 
@@ -218,10 +219,9 @@ export class PayrollRunsService {
 
                 const primaryCostCenterId = getPrimaryCostCenterId();
 
-                // 1. إضافة الخطوط المحسوبة (من الهيكل، السياسات، والتأمينات)
+                // 1. إضافة الخطوط المحسوبة (من الهيكل، السياسات، والتأمينات، والعمولات، والتسويات المسجلة)
                 if (calculation.policyLines) {
                     for (const pl of calculation.policyLines) {
-                        // تحديد مصدر السطر بناءً على نوع المكوّن
                         let sourceType = PayslipLineSource.STRUCTURE;
                         let componentIdToUse = pl.componentId;
 
@@ -229,12 +229,16 @@ export class PayrollRunsService {
                             sourceType = (PayslipLineSource as any).STATUTORY || 'STATUTORY';
                         } else if (pl.componentCode === 'SMART' || pl.componentId?.startsWith('SMART-')) {
                             sourceType = (PayslipLineSource as any).SMART || 'SMART';
-                            // 🔧 FIX: Use valid component IDs for SMART policies
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         } else if (pl.componentCode === 'LOAN_DED' || pl.componentId?.startsWith('LOAN-')) {
-                            // 🔧 FIX: Use valid component ID for loan/advance deductions
                             sourceType = (PayslipLineSource as any).LOAN || 'LOAN';
-                            componentIdToUse = loanComp.id; // Use LOAN_DED component
+                            componentIdToUse = loanComp.id;
+                        } else if (pl.componentCode === 'RETRO_PAY') {
+                            sourceType = 'BONUS_PROGRAM' as any;
+                            componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
+                        } else if (pl.componentCode === 'DISC_ADJ') {
+                            sourceType = 'ADJUSTMENT' as any;
+                            componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         }
 
                         payslipLines.push({
@@ -243,31 +247,34 @@ export class PayrollRunsService {
                             sourceType,
                             sign: pl.sign,
                             descriptionAr: pl.descriptionAr || undefined,
-                            sourceRef: pl.source ? `${pl.source.policyId}:${pl.source.ruleId}` : undefined,
-                            costCenterId: primaryCostCenterId, // ربط بمركز التكلفة
-                            // 🔧 إضافة الوحدات والمعدل للعرض التفصيلي
+                            sourceRef: pl.source ? (pl.source.policyId ? `${pl.source.policyId}:${pl.source.ruleId}` : pl.componentId) : undefined,
+                            costCenterId: primaryCostCenterId,
                             units: pl.units ? new Decimal(pl.units) : null,
                             rate: pl.rate ? new Decimal(pl.rate) : null,
                         });
+
+                        // ✅ تحديث حالة المكافأة (RetroPay) لـ PAID إذا كانت موجودة في الخطوط
+                        if (pl.componentCode === 'RETRO_PAY' && pl.componentId?.startsWith('RETRO-')) {
+                            const retroId = pl.componentId.replace('RETRO-', '');
+                            await tx.retroPay.update({
+                                where: { id: retroId },
+                                data: { status: 'PAID', paidAt: new Date() }
+                            });
+                        }
                     }
                 }
 
-
-                // NOTE: السلف تم حسابها بالفعل في payroll-calculation.service.ts وهي مضمنة في policyLines
-                // لا نضيفها مرة أخرى هنا لتجنب الخصم المزدوج
-
-                // ✅ إضافة التعديلات اليدوية (مكافآت/خصومات) من الواجهة
-                // Using Decimal for all financial calculations
-                let adjustmentBonus: Decimal = ZERO;
-                let adjustmentDeduction: Decimal = ZERO;
+                // ✅ إضافة التعديلات اليدوية (مكافآت/خصومات) من الـ Wizard فقط (التي لم تحفظ في الـ DB بعد)
+                let wizardBonus: Decimal = ZERO;
+                let wizardDeduction: Decimal = ZERO;
                 const employeeAdjustments = adjustmentsMap.get(employee.id) || [];
 
                 for (const adj of employeeAdjustments) {
                     const adjAmount = toDecimal(adj.amount);
                     if (adj.type === 'bonus') {
-                        adjustmentBonus = add(adjustmentBonus, adjAmount);
+                        wizardBonus = add(wizardBonus, adjAmount);
                         payslipLines.push({
-                            componentId: adjAddId, // تعديل إضافة
+                            componentId: adjAddId,
                             amount: round(adjAmount),
                             sourceType: 'MANUAL' as any,
                             sign: 'EARNING',
@@ -276,9 +283,9 @@ export class PayrollRunsService {
                             costCenterId: primaryCostCenterId,
                         });
                     } else {
-                        adjustmentDeduction = add(adjustmentDeduction, adjAmount);
+                        wizardDeduction = add(wizardDeduction, adjAmount);
                         payslipLines.push({
-                            componentId: adjDedId, // تعديل خصم
+                            componentId: adjDedId,
                             amount: round(adjAmount),
                             sourceType: 'MANUAL' as any,
                             sign: 'DEDUCTION',
@@ -289,101 +296,9 @@ export class PayrollRunsService {
                     }
                 }
 
-                // ✅ تطبيق التسويات المعتمدة من قاعدة البيانات (PayrollAdjustments)
-                // ⚡ البحث باستخدام periodId للموظف لأنها قد لا تكون مربوطة بـ runId بعد
-                const approvedAdjustments = await this.adjustmentsService.getApprovedAdjustmentsTotal(
-                    employee.id,
-                    period.id // استخدام periodId بدلاً من runId
-                );
-
-                if (approvedAdjustments.netAdjustment !== 0) {
-                    // إضافة الإضافات المعتمدة
-                    if (approvedAdjustments.totalAdditions > 0) {
-                        adjustmentBonus = add(adjustmentBonus, toDecimal(approvedAdjustments.totalAdditions));
-                        payslipLines.push({
-                            componentId: adjAddId,
-                            amount: round(toDecimal(approvedAdjustments.totalAdditions)),
-                            sourceType: 'ADJUSTMENT' as any,
-                            sign: 'EARNING',
-                            descriptionAr: `تسويات معتمدة (إلغاء خصم/إضافة يدوية)`,
-                            sourceRef: 'PAYROLL_ADJUSTMENTS',
-                            costCenterId: primaryCostCenterId,
-                        });
-                    }
-                    // إضافة الخصومات المعتمدة
-                    if (approvedAdjustments.totalDeductions > 0) {
-                        adjustmentDeduction = add(adjustmentDeduction, toDecimal(approvedAdjustments.totalDeductions));
-                        payslipLines.push({
-                            componentId: adjDedId,
-                            amount: round(toDecimal(approvedAdjustments.totalDeductions)),
-                            sourceType: 'ADJUSTMENT' as any,
-                            sign: 'DEDUCTION',
-                            descriptionAr: `تسويات معتمدة (خصم يدوي)`,
-                            sourceRef: 'PAYROLL_ADJUSTMENTS',
-                            costCenterId: primaryCostCenterId,
-                        });
-                    }
-
-                    calculation.calculationTrace.push({
-                        step: 'APPROVED_ADJUSTMENTS',
-                        description: 'تطبيق التسويات المعتمدة',
-                        formula: `Additions: ${approvedAdjustments.totalAdditions} | Deductions: ${approvedAdjustments.totalDeductions}`,
-                        result: approvedAdjustments.netAdjustment,
-                    });
-
-                    this.logger.log(`Applied adjustments for employee ${employee.id}: +${approvedAdjustments.totalAdditions} -${approvedAdjustments.totalDeductions}`);
-                }
-
-                // ✅ إضافة مكافآت برامج المكافآت (retroPay) المعتمدة
-                const approvedBonuses = await tx.retroPay.findMany({
-                    where: {
-                        employeeId: employee.id,
-                        companyId,
-                        status: 'APPROVED',
-                        effectiveFrom: { lte: period.endDate },
-                        effectiveTo: { gte: period.startDate },
-                    }
-                });
-
-                let totalBonusFromPrograms: Decimal = ZERO;
-                for (const bonus of approvedBonuses) {
-                    const bonusAmount = toDecimal(bonus.totalAmount);
-                    totalBonusFromPrograms = add(totalBonusFromPrograms, bonusAmount);
-
-                    adjustmentBonus = add(adjustmentBonus, bonusAmount);
-                    payslipLines.push({
-                        componentId: adjAddId,
-                        amount: round(bonusAmount),
-                        sourceType: 'BONUS_PROGRAM' as any,
-                        sign: 'EARNING',
-                        descriptionAr: bonus.reason || 'مكافأة برنامج',
-                        sourceRef: `RETRO_PAY_${bonus.id}`,
-                        costCenterId: primaryCostCenterId,
-                    });
-
-                    // تحديث حالة المكافأة لـ PAID
-                    await tx.retroPay.update({
-                        where: { id: bonus.id },
-                        data: { status: 'PAID', paidAt: new Date() }
-                    });
-                }
-
-                if (isPositive(totalBonusFromPrograms)) {
-                    calculation.calculationTrace.push({
-                        step: 'BONUS_PROGRAM_APPLIED',
-                        description: 'تطبيق مكافآت برامج المكافآت',
-                        formula: `إجمالي ${approvedBonuses.length} مكافأة = ${toFixed(totalBonusFromPrograms)} ريال`,
-                        result: toNumber(totalBonusFromPrograms),
-                    });
-                    this.logger.log(`✅ Applied ${approvedBonuses.length} bonus(es) for employee ${employee.id}: ${toFixed(totalBonusFromPrograms)} SAR`);
-                }
-
-                // ✅ تسجيل دفعات السلف تلقائياً (السطور موجودة بالفعل في policyLines من payroll-calculation)
-                // ⚠️ ملاحظة: خصم السلف محسوب في calculation.totalDeductions من LOAN_DED - لا نضيفه مرة أخرى
+                // ✅ تسجيل دفعات السلف تلقائياً (السطور موجودة بالفعل في policyLines)
                 const employeeAdvances = (employee as any).advanceRequests || [];
-
                 for (const advance of employeeAdvances) {
-                    // جلب الدفعات السابقة لحساب المتبقي
                     const previousPayments = await tx.loanPayment.findMany({
                         where: { advanceId: advance.id },
                         select: { amount: true }
@@ -394,40 +309,35 @@ export class PayrollRunsService {
                     const totalPaid = previousPayments.reduce((sum, p) => sum + p.amount.toNumber(), 0);
                     const remainingBalance = approvedAmount - totalPaid;
 
-                    if (remainingBalance <= 0) continue; // السلفة مسددة بالكامل
-
-                    // ✅ خصم الأقل: القسط الشهري أو المتبقي (للشهر الأخير)
-                    const deductionAmount = Math.min(monthlyDeduction, remainingBalance);
-
-                    // ✅ تسجيل الدفعة في LoanPayment
-                    await tx.loanPayment.create({
-                        data: {
-                            advanceId: advance.id,
-                            amount: deductionAmount,
-                            paymentDate: new Date(),
-                            paymentType: 'SALARY_DEDUCTION',
-                            notes: `خصم تلقائي من مسير الرواتب - فترة ${period.month}/${period.year}`,
-                            createdById: userId,
-                        }
-                    });
-
-                    // تحديث حالة السلفة إذا تم السداد بالكامل
-                    const newRemainingBalance = remainingBalance - deductionAmount;
-                    if (newRemainingBalance <= 0) {
-                        await tx.advanceRequest.update({
-                            where: { id: advance.id },
-                            data: { status: 'PAID' }
+                    if (remainingBalance > 0) {
+                        const deductionAmount = Math.min(monthlyDeduction, remainingBalance);
+                        await tx.loanPayment.create({
+                            data: {
+                                advanceId: advance.id,
+                                amount: deductionAmount,
+                                paymentDate: new Date(),
+                                paymentType: 'SALARY_DEDUCTION',
+                                notes: `خصم تلقائي - فترة ${period.month}/${period.year}`,
+                                createdById: userId,
+                            }
                         });
-                        this.logger.log(`✅ Advance ${advance.id} fully paid!`);
-                    }
 
-                    this.logger.log(`📝 Recorded payment ${deductionAmount} SAR for advance ${advance.id} (remaining: ${newRemainingBalance})`);
+                        if (remainingBalance - deductionAmount <= 0) {
+                            await tx.advanceRequest.update({
+                                where: { id: advance.id },
+                                data: { status: 'PAID' }
+                            });
+                        }
+                    }
                 }
 
                 // ✅ Using Decimal for final calculations
-                const finalGross = round(add(toDecimal(calculation.grossSalary), adjustmentBonus));
-                let finalDeductions = round(add(toDecimal(calculation.totalDeductions), adjustmentDeduction));
-                let finalNet = sub(finalGross, finalDeductions);
+                const finalGross = round(add(toDecimal(calculation.grossSalary), wizardBonus));
+                let finalDeductions = round(add(toDecimal(calculation.totalDeductions), wizardDeduction));
+
+                // ✅ حساب صافي الراتب باستخدام الأداة لضمان عدم السلبية وتطبيق الحد الأقصى
+                const netSalaryResult = calculateNetSalary(finalGross, finalDeductions);
+                let finalNet = netSalaryResult.netSalary;
 
                 // ✅ خصم الديون السابقة من الراتب (إن وجدت)
                 let debtDeductionAmount: Decimal = ZERO;
@@ -772,7 +682,6 @@ export class PayrollRunsService {
 
             // ✅ إضافة السلف للمعاينة - Display only, NOT added to deductions
             // ✅ ملاحظة: السلف تم حسابها بالفعل في payroll-calculation.service.ts كـ LOAN_DED
-            // وهي مضمنة في calculation.totalDeductions الذي تم تطبيق الحد الأقصى للخصومات (50%) عليه
             let employeeAdvanceAmount: Decimal = ZERO;
             const advanceDetails: { id: string; amount: number }[] = [];
 
@@ -789,59 +698,8 @@ export class PayrollRunsService {
             const gosiAmount = toDecimal(gosiLine?.amount || 0);
             totalGosi = add(totalGosi, gosiAmount);
 
-            // ✅ 1. إضافة المكافآت والعمولات والفروقات المعتمدة (RetroPay)
-            const approvedRetroPay = await this.prisma.retroPay.findMany({
-                where: {
-                    employeeId: employee.id,
-                    companyId,
-                    status: 'APPROVED',
-                    paymentMonth: period.month,
-                    paymentYear: period.year,
-                } as any
-            });
-
-            let totalRetroAmount: Decimal = ZERO;
-            for (const retro of approvedRetroPay) {
-                const amount = toDecimal(retro.totalAmount);
-                totalRetroAmount = add(totalRetroAmount, amount);
-
-                if (isPositive(amount)) {
-                    earnings.push({
-                        name: retro.reason || 'مكافأة/عمولة',
-                        code: `RETRO_${retro.id}`,
-                        amount: toNumber(amount),
-                    });
-                } else if (isNegative(amount)) {
-                    deductionItems.push({
-                        name: retro.reason || 'خصم فرق',
-                        code: `RETRO_DED_${retro.id}`,
-                        amount: toNumber(abs(amount)),
-                    });
-                }
-            }
-
-            // ✅ 2. إضافة التسويات المعتمدة من مدير الرواتب (PayrollAdjustment)
-            const approvedAdjustments = await this.adjustmentsService.getApprovedAdjustmentsTotal(
-                employee.id,
-                period.id
-            );
-
-            if (approvedAdjustments.totalAdditions > 0) {
-                earnings.push({
-                    name: 'تسويات معتمدة (إضافات)',
-                    code: 'ADJ_ADD_APPROVED',
-                    amount: approvedAdjustments.totalAdditions,
-                });
-            }
-            if (approvedAdjustments.totalDeductions > 0) {
-                deductionItems.push({
-                    name: 'تسويات معتمدة (خصومات)',
-                    code: 'ADJ_DED_APPROVED',
-                    amount: approvedAdjustments.totalDeductions,
-                });
-            }
-
-            // ✅ 3. إضافة التعديلات اليدوية المكتوبة في الـ Wizard (dto.adjustments)
+            // ✅ إضافة التعديلات اليدوية المكتوبة في الـ Wizard فقط (dto.adjustments)
+            // ملاحظة: العمولات والمكافآت والتسويات المسجلة في الـ DB تم جلبها بالفعل في calculation.policyLines
             let wizardBonus: Decimal = ZERO;
             let wizardDeduction: Decimal = ZERO;
             const wizardEmployeeAdjustments = (dto.adjustments || []).find(a => a.employeeId === employee.id)?.items || [];
@@ -851,36 +709,30 @@ export class PayrollRunsService {
                 if (adj.type === 'bonus') {
                     wizardBonus = add(wizardBonus, adjAmount);
                     earnings.push({
-                        name: `مكافأة: ${adj.reason}`,
+                        name: `مكافأة يدوية: ${adj.reason}`,
                         code: 'WIZ_ADD',
                         amount: adj.amount,
                     });
                 } else {
                     wizardDeduction = add(wizardDeduction, adjAmount);
                     deductionItems.push({
-                        name: `خصم: ${adj.reason}`,
+                        name: `خصم يدوي: ${adj.reason}`,
                         code: 'WIZ_DED',
                         amount: adj.amount,
                     });
                 }
             }
 
-            // ✅ Using Decimal for calculations
-            // Final Gross Calculation: Policy Gross + RetroPay + Approved Additions
-            // Note: We EXCLUDE wizardBonus from finalGross to let the frontend add its local adjustments (prevent double counting)
-            const finalGross = add(
-                toDecimal(calculation.grossSalary),
-                add(totalRetroAmount, toDecimal(approvedAdjustments.totalAdditions))
-            );
+            // ✅ Using Decimal for final calculations
+            // الراتب الإجمالي النهائي = إجمالي المحرك + إضافات الـ Wizard
+            const finalGross = add(toDecimal(calculation.grossSalary), wizardBonus);
 
-            // Final Deductions Calculation: Policy Deductions + Approved Deductions
-            // Note: We EXCLUDE wizardDeduction from finalDeductions to let the frontend handle its local adjustments
-            const finalDeductions = add(
-                toDecimal(calculation.totalDeductions),
-                toDecimal(approvedAdjustments.totalDeductions)
-            );
+            // إجمالي الخصومات النهائي = خصومات المحرك + خصم الـ Wizard
+            const finalDeductions = add(toDecimal(calculation.totalDeductions), wizardDeduction);
 
-            const finalNet = sub(finalGross, finalDeductions);
+            // ✅ حساب صافي الراتب باستخدام الأداة لضمان عدم وجود رصيد سالب وتطبيق الحد الأقصى
+            const netResult = calculateNetSalary(finalGross, finalDeductions);
+            const finalNet = netResult.netSalary;
 
             totalGross = add(totalGross, finalGross);
             totalDeductions = add(totalDeductions, finalDeductions);
@@ -912,7 +764,6 @@ export class PayrollRunsService {
                 isSaudi: employee.isSaudi || false,
                 baseSalary: toNumber(toDecimal(assignment.baseSalary)),
                 gross: toNumber(finalGross),
-                totalRetroAmount: toNumber(totalRetroAmount),
                 deductions: toNumber(finalDeductions),
                 gosi: toNumber(gosiAmount),
                 advances: toNumber(employeeAdvanceAmount),
