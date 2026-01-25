@@ -770,7 +770,7 @@ export class PayrollRunsService {
                 .filter(pl => pl.sign === 'DEDUCTION')
                 .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
 
-            // إضافة السلف للمعاينة - Display only, NOT added to deductions
+            // ✅ إضافة السلف للمعاينة - Display only, NOT added to deductions
             // ✅ ملاحظة: السلف تم حسابها بالفعل في payroll-calculation.service.ts كـ LOAN_DED
             // وهي مضمنة في calculation.totalDeductions الذي تم تطبيق الحد الأقصى للخصومات (50%) عليه
             let employeeAdvanceAmount: Decimal = ZERO;
@@ -781,7 +781,6 @@ export class PayrollRunsService {
             for (const loanLine of loanLines) {
                 const amount = toDecimal(loanLine.amount);
                 employeeAdvanceAmount = add(employeeAdvanceAmount, amount);
-                // Extract loan ID from componentId (format: LOAN-{id})
                 const loanId = loanLine.componentId?.replace('LOAN-', '') || '';
                 advanceDetails.push({ id: loanId, amount: toNumber(amount) });
             }
@@ -790,12 +789,97 @@ export class PayrollRunsService {
             const gosiAmount = toDecimal(gosiLine?.amount || 0);
             totalGosi = add(totalGosi, gosiAmount);
 
+            // ✅ 1. إضافة المكافآت والعمولات والفروقات المعتمدة (RetroPay)
+            const approvedRetroPay = await this.prisma.retroPay.findMany({
+                where: {
+                    employeeId: employee.id,
+                    companyId,
+                    status: 'APPROVED',
+                    paymentMonth: period.month,
+                    paymentYear: period.year,
+                } as any
+            });
+
+            let totalRetroAmount: Decimal = ZERO;
+            for (const retro of approvedRetroPay) {
+                const amount = toDecimal(retro.totalAmount);
+                totalRetroAmount = add(totalRetroAmount, amount);
+
+                if (isPositive(amount)) {
+                    earnings.push({
+                        name: retro.reason || 'مكافأة/عمولة',
+                        code: `RETRO_${retro.id}`,
+                        amount: toNumber(amount),
+                    });
+                } else if (isNegative(amount)) {
+                    deductionItems.push({
+                        name: retro.reason || 'خصم فرق',
+                        code: `RETRO_DED_${retro.id}`,
+                        amount: toNumber(abs(amount)),
+                    });
+                }
+            }
+
+            // ✅ 2. إضافة التسويات المعتمدة من مدير الرواتب (PayrollAdjustment)
+            const approvedAdjustments = await this.adjustmentsService.getApprovedAdjustmentsTotal(
+                employee.id,
+                period.id
+            );
+
+            if (approvedAdjustments.totalAdditions > 0) {
+                earnings.push({
+                    name: 'تسويات معتمدة (إضافات)',
+                    code: 'ADJ_ADD_APPROVED',
+                    amount: approvedAdjustments.totalAdditions,
+                });
+            }
+            if (approvedAdjustments.totalDeductions > 0) {
+                deductionItems.push({
+                    name: 'تسويات معتمدة (خصومات)',
+                    code: 'ADJ_DED_APPROVED',
+                    amount: approvedAdjustments.totalDeductions,
+                });
+            }
+
+            // ✅ 3. إضافة التعديلات اليدوية المكتوبة في الـ Wizard (dto.adjustments)
+            let wizardBonus: Decimal = ZERO;
+            let wizardDeduction: Decimal = ZERO;
+            const wizardEmployeeAdjustments = (dto.adjustments || []).find(a => a.employeeId === employee.id)?.items || [];
+
+            for (const adj of wizardEmployeeAdjustments) {
+                const adjAmount = toDecimal(adj.amount);
+                if (adj.type === 'bonus') {
+                    wizardBonus = add(wizardBonus, adjAmount);
+                    earnings.push({
+                        name: `مكافأة: ${adj.reason}`,
+                        code: 'WIZ_ADD',
+                        amount: adj.amount,
+                    });
+                } else {
+                    wizardDeduction = add(wizardDeduction, adjAmount);
+                    deductionItems.push({
+                        name: `خصم: ${adj.reason}`,
+                        code: 'WIZ_DED',
+                        amount: adj.amount,
+                    });
+                }
+            }
+
             // ✅ Using Decimal for calculations
-            // ملاحظة: التسويات (adjustments) يتم إضافتها تلقائياً في `payroll-calculation.service.ts`
-            // وكذلك السلف (LOAN_DED) - لذلك لا نضيفها هنا مرة أخرى لتجنب التكرار
-            // calculation.totalDeductions تحتوي على كل الخصومات بعد تطبيق الحد الأقصى (50%)
-            const finalGross = toDecimal(calculation.grossSalary);
-            const finalDeductions = toDecimal(calculation.totalDeductions); // ✅ Already capped at 50%
+            // Final Gross Calculation: Policy Gross + RetroPay + Approved Additions
+            // Note: We EXCLUDE wizardBonus from finalGross to let the frontend add its local adjustments (prevent double counting)
+            const finalGross = add(
+                toDecimal(calculation.grossSalary),
+                add(totalRetroAmount, toDecimal(approvedAdjustments.totalAdditions))
+            );
+
+            // Final Deductions Calculation: Policy Deductions + Approved Deductions
+            // Note: We EXCLUDE wizardDeduction from finalDeductions to let the frontend handle its local adjustments
+            const finalDeductions = add(
+                toDecimal(calculation.totalDeductions),
+                toDecimal(approvedAdjustments.totalDeductions)
+            );
+
             const finalNet = sub(finalGross, finalDeductions);
 
             totalGross = add(totalGross, finalGross);
@@ -828,6 +912,7 @@ export class PayrollRunsService {
                 isSaudi: employee.isSaudi || false,
                 baseSalary: toNumber(toDecimal(assignment.baseSalary)),
                 gross: toNumber(finalGross),
+                totalRetroAmount: toNumber(totalRetroAmount),
                 deductions: toNumber(finalDeductions),
                 gosi: toNumber(gosiAmount),
                 advances: toNumber(employeeAdvanceAmount),
@@ -835,7 +920,7 @@ export class PayrollRunsService {
                 earnings,
                 deductionItems,
                 advanceDetails,
-                adjustments: [],
+                adjustments: wizardEmployeeAdjustments,
                 excluded: false,
             });
         }
