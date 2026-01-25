@@ -402,18 +402,32 @@ export class PayrollRunsService {
                         result: toNumber(negativeBalanceAmount),
                     });
 
-                    // ✅ إنشاء سجل دين جديد للموظف
-                    await this.employeeDebtService.createDebt({
-                        companyId,
-                        employeeId: employee.id,
-                        amount: negativeBalanceAmount,
-                        sourceType: DebtSourceType.PAYROLL_NEGATIVE_BALANCE,
-                        sourceId: run.id,
-                        periodId: dto.periodId,
-                        reason: `رصيد سالب من مسير الرواتب - الفترة ${period.month}/${period.year}`,
+                    // ✅ FIX: التحقق من عدم وجود دين سابق لنفس الموظف/المسير قبل الإنشاء
+                    const existingDebt = await tx.employeeDebtLedger.findFirst({
+                        where: {
+                            employeeId: employee.id,
+                            companyId,
+                            sourceId: run.id,
+                            sourceType: DebtSourceType.PAYROLL_NEGATIVE_BALANCE,
+                            status: { in: ['ACTIVE', 'PARTIALLY_PAID'] as any[] }
+                        }
                     });
 
-                    this.logger.log(`Created debt record for employee ${employee.id}: ${toFixed(negativeBalanceAmount)} SAR`);
+                    if (!existingDebt) {
+                        // ✅ إنشاء سجل دين جديد للموظف فقط إذا لم يكن موجوداً
+                        await this.employeeDebtService.createDebt({
+                            companyId,
+                            employeeId: employee.id,
+                            amount: negativeBalanceAmount,
+                            sourceType: DebtSourceType.PAYROLL_NEGATIVE_BALANCE,
+                            sourceId: run.id,
+                            periodId: dto.periodId,
+                            reason: `رصيد سالب من مسير الرواتب - الفترة ${period.month}/${period.year}`,
+                        });
+                        this.logger.log(`Created debt record for employee ${employee.id}: ${toFixed(negativeBalanceAmount)} SAR`);
+                    } else {
+                        this.logger.log(`Debt already exists for employee ${employee.id} in run ${run.id}, skipping creation`);
+                    }
                 }
 
                 // 🔧 FIX: Validate componentIds before creating payslip to prevent foreign key errors
