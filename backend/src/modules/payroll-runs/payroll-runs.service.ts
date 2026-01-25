@@ -354,7 +354,7 @@ export class PayrollRunsService {
                     payslipLines.push({
                         componentId: adjAddId,
                         amount: round(bonusAmount),
-                        sourceType: 'BONUS_PROGRAM' as any,
+                        sourceType: 'ADJUSTMENT' as PayslipLineSource, // RetroPay/Bonus
                         sign: 'EARNING',
                         descriptionAr: bonus.reason || 'مكافأة برنامج',
                         sourceRef: `RETRO_PAY_${bonus.id}`,
@@ -450,7 +450,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId, // سداد ديون
                             amount: round(debtDeductionAmount),
-                            sourceType: 'DEBT_REPAYMENT' as any,
+                            sourceType: 'ADJUSTMENT' as PayslipLineSource, // Debt Repayment
                             sign: 'DEDUCTION',
                             descriptionAr: `سداد ديون سابقة (${debtResult.transactions.length} دين)`,
                             sourceRef: 'DEBT_LEDGER',
