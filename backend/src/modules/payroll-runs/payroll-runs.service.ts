@@ -222,22 +222,22 @@ export class PayrollRunsService {
                 // 1. إضافة الخطوط المحسوبة (من الهيكل، السياسات، والتأمينات، والعمولات، والتسويات المسجلة)
                 if (calculation.policyLines) {
                     for (const pl of calculation.policyLines) {
-                        let sourceType = PayslipLineSource.STRUCTURE;
+                        let sourceType: PayslipLineSource = PayslipLineSource.STRUCTURE;
                         let componentIdToUse = pl.componentId;
 
                         if (pl.componentId === 'GOSI-STATUTORY') {
-                            sourceType = (PayslipLineSource as any).STATUTORY || 'STATUTORY';
+                            sourceType = PayslipLineSource.STATUTORY;
                         } else if (pl.componentCode === 'SMART' || pl.componentId?.startsWith('SMART-')) {
-                            sourceType = (PayslipLineSource as any).SMART || 'SMART';
+                            sourceType = PayslipLineSource.SMART;
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         } else if (pl.componentCode === 'LOAN_DED' || pl.componentId?.startsWith('LOAN-')) {
-                            sourceType = (PayslipLineSource as any).LOAN || 'LOAN';
+                            sourceType = PayslipLineSource.POLICY; // LOAN mapped to POLICY
                             componentIdToUse = loanComp.id;
                         } else if (pl.componentCode === 'RETRO_PAY' || pl.componentCode?.startsWith('RETRO_')) {
-                            sourceType = 'BONUS_PROGRAM' as any;
+                            sourceType = PayslipLineSource.ADJUSTMENT; // BONUS_PROGRAM mapped to ADJUSTMENT
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         } else if (pl.componentCode === 'DISC_ADJ') {
-                            sourceType = 'ADJUSTMENT' as any;
+                            sourceType = PayslipLineSource.ADJUSTMENT;
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         }
 
