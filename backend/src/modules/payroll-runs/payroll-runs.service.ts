@@ -276,7 +276,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjAddId,
                             amount: round(adjAmount),
-                            sourceType: 'MANUAL' as any,
+                            sourceType: PayslipLineSource.MANUAL,
                             sign: 'EARNING',
                             descriptionAr: `مكافأة يدوية: ${adj.reason}`,
                             sourceRef: 'WIZARD_ADJUSTMENT',
@@ -287,7 +287,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId,
                             amount: round(adjAmount),
-                            sourceType: 'MANUAL' as any,
+                            sourceType: PayslipLineSource.MANUAL,
                             sign: 'DEDUCTION',
                             descriptionAr: `خصم يدوي: ${adj.reason}`,
                             sourceRef: 'WIZARD_ADJUSTMENT',
@@ -360,7 +360,7 @@ export class PayrollRunsService {
                         payslipLines.push({
                             componentId: adjDedId, // سداد ديون
                             amount: round(debtDeductionAmount),
-                            sourceType: 'DEBT_REPAYMENT' as any,
+                            sourceType: PayslipLineSource.ADJUSTMENT, // DEBT_REPAYMENT mapped to ADJUSTMENT
                             sign: 'DEDUCTION',
                             descriptionAr: `سداد ديون سابقة (${debtResult.transactions.length} دين)`,
                             sourceRef: 'DEBT_LEDGER',
