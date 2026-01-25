@@ -809,11 +809,51 @@ export class PayrollRunsService {
             const gosiAmount = toDecimal(gosiLine?.amount || 0);
             totalGosi = add(totalGosi, gosiAmount);
 
+            // ✅ إضافة المكافآت المعتمدة (retroPay) للمعاينة
+            const approvedBonuses = await this.prisma.retroPay.findMany({
+                where: {
+                    employeeId: employee.id,
+                    companyId,
+                    status: 'APPROVED',
+                    paymentMonth: period.month,
+                    paymentYear: period.year,
+                } as any
+            });
+
+            let totalBonusAmount: Decimal = ZERO;
+            for (const bonus of approvedBonuses) {
+                const bonusAmount = toDecimal(bonus.totalAmount);
+                totalBonusAmount = add(totalBonusAmount, bonusAmount);
+
+                // إضافة للـ earnings
+                earnings.push({
+                    name: bonus.reason || 'مكافأة',
+                    code: `BONUS_${bonus.id}`,
+                    amount: toNumber(bonusAmount),
+                });
+
+                // إضافة للـ payslipLines
+                payslipLines.push({
+                    id: `bonus-${bonus.id}`,
+                    component: {
+                        nameAr: bonus.reason || 'مكافأة',
+                        code: 'BONUS',
+                        type: 'ALLOWANCE',
+                    },
+                    sourceType: 'ADJUSTMENT',
+                    descriptionAr: bonus.reason || 'مكافأة برنامج',
+                    sign: 'EARNING',
+                    amount: toNumber(bonusAmount),
+                    units: null,
+                    rate: null,
+                });
+            }
+
             // ✅ Using Decimal for calculations
             // ملاحظة: التسويات (adjustments) يتم إضافتها تلقائياً في `payroll-calculation.service.ts`
             // وكذلك السلف (LOAN_DED) - لذلك لا نضيفها هنا مرة أخرى لتجنب التكرار
             // calculation.totalDeductions تحتوي على كل الخصومات بعد تطبيق الحد الأقصى (50%)
-            const finalGross = toDecimal(calculation.grossSalary);
+            const finalGross = add(toDecimal(calculation.grossSalary), totalBonusAmount);
             const finalDeductions = toDecimal(calculation.totalDeductions); // ✅ Already capped at 50%
             const finalNet = sub(finalGross, finalDeductions);
 
