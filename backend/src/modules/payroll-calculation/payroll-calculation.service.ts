@@ -1425,66 +1425,88 @@ export class PayrollCalculationService {
             }
         });
 
-        if (payrollPeriod) {
-            const disciplinaryAdjustments = await (this.prisma as any).payrollAdjustment.findMany({
-                where: {
-                    employeeId,
-                    companyId,
-                    payrollPeriodId: payrollPeriod.id,
-                    status: { in: ['PENDING', 'POSTED', 'APPLIED'] }
-                }
-            });
+        // Also find any active payroll run for this period
+        const activePayrollRun = payrollPeriod ? await this.prisma.payrollRun.findFirst({
+            where: {
+                periodId: payrollPeriod.id,
+                companyId,
+                status: { notIn: ['CANCELLED', 'ARCHIVED'] as any[] }
+            }
+        }) : null;
 
-            for (const adj of disciplinaryAdjustments) {
-                let adjAmount = Number(adj.value);
-                let appliedValue = Number(adj.value);
-                let descriptionExtra = '';
+        // Query adjustments by both payrollPeriodId AND payrollRunId
+        const adjustmentWhereClause = {
+            employeeId,
+            companyId,
+            status: { in: ['PENDING', 'POSTED', 'APPLIED', 'APPROVED'] },
+            OR: [
+                ...(payrollPeriod ? [{ payrollPeriodId: payrollPeriod.id }] : []),
+                ...(activePayrollRun ? [{ payrollRunId: activePayrollRun.id }] : [])
+            ]
+        };
 
-                // If unit is DAYS or HOURS, compute amount based on rates
+        const allAdjustments = adjustmentWhereClause.OR.length > 0
+            ? await (this.prisma as any).payrollAdjustment.findMany({ where: adjustmentWhereClause })
+            : [];
+
+        this.logger.log(`📋 Found ${allAdjustments.length} adjustments for employee ${employeeId}`);
+
+        for (const adj of allAdjustments) {
+            let adjAmount = 0;
+            let sign: 'EARNING' | 'DEDUCTION' = 'DEDUCTION';
+            let componentName = adj.description || adj.reason || 'تسوية';
+
+            // Handle different adjustment types
+            if (adj.adjustmentType === 'WAIVE_DEDUCTION' || adj.adjustmentType === 'CONVERT_TO_LEAVE') {
+                // إلغاء خصم أو تحويل لإجازة = إضافة للموظف
+                adjAmount = Number(adj.originalAmount || 0) - Number(adj.adjustedAmount || 0);
+                sign = 'EARNING';
+                componentName = adj.adjustmentType === 'WAIVE_DEDUCTION'
+                    ? `تخفيض خصم: ${adj.reason || ''}`
+                    : `تحويل لإجازة: ${adj.leaveDaysDeducted || 0} يوم`;
+            } else if (adj.adjustmentType === 'MANUAL_ADDITION') {
+                // إضافة يدوية
+                adjAmount = Number(adj.adjustedAmount || adj.value || 0);
+                sign = 'EARNING';
+                componentName = `إضافة: ${adj.reason || ''}`;
+            } else if (adj.adjustmentType === 'MANUAL_DEDUCTION' || adj.adjustmentType === 'DEDUCTION' || adj.adjustmentType === 'SUSPENSION_UNPAID') {
+                // خصم يدوي أو جزاء
+                let appliedValue = Number(adj.value || adj.adjustedAmount || 0);
+
+                // Handle DAYS/HOURS unit conversion
                 if (adj.unit === 'DAYS') {
-                    if (adj.effectiveDate) {
-                        const adjEffectiveDate = new Date(adj.effectiveDate);
-                        const periodStartDate = new Date(payrollPeriod.startDate);
-                        const periodEndDate = new Date(payrollPeriod.endDate);
-
-                        // Calculate cap: days remaining from max(effectiveDate, periodStart) to periodEnd
-                        const capStart = adjEffectiveDate > periodStartDate ? adjEffectiveDate : periodStartDate;
-
-                        if (capStart > periodEndDate) {
-                            appliedValue = 0;
-                            descriptionExtra = ' (خارج الفترة الحالية)';
-                        } else {
-                            const daysRemaining = Math.max(0, Math.floor((periodEndDate.getTime() - capStart.getTime()) / (24 * 60 * 60 * 1000)) + 1);
-                            if (daysRemaining < appliedValue) {
-                                appliedValue = daysRemaining;
-                                descriptionExtra = ` (مخفض من ${Number(adj.value)} أيام بسبب تاريخ الاستحقاق)`;
-                                this.logger.log(`Penalty capped for case ${adj.caseId}: ${Number(adj.value)} -> ${appliedValue} days`);
-                            }
-                        }
-                    }
-                    // ✅ Using Decimal for calculations
                     adjAmount = toNumber(mul(appliedValue, dailyRateGeneral));
                 } else if (adj.unit === 'HOURS') {
-                    adjAmount = toNumber(mul(Number(adj.value), hourlyRateGeneral));
+                    adjAmount = toNumber(mul(appliedValue, hourlyRateGeneral));
+                } else {
+                    adjAmount = appliedValue;
                 }
+                sign = 'DEDUCTION';
+                componentName = adj.description || `خصم: ${adj.reason || ''}`;
+            } else {
+                // Fallback for other types
+                adjAmount = Number(adj.adjustedAmount || adj.value || 0);
+                sign = adjAmount >= 0 ? 'EARNING' : 'DEDUCTION';
+                adjAmount = Math.abs(adjAmount);
+            }
 
-                if (appliedValue <= 0 && adj.unit === 'DAYS' && adj.effectiveDate) continue;
-
+            if (adjAmount > 0) {
                 policyLines.push({
-                    componentId: `DISC-${adj.id}`,
+                    componentId: `ADJ-${adj.id}`,
                     componentCode: 'DISC_ADJ',
-                    componentName: adj.description || 'تسوية جزاء إداري',
-                    sign: (adj.adjustmentType === 'DEDUCTION' || adj.adjustmentType === 'SUSPENSION_UNPAID' || adj.adjustmentType === 'MANUAL_DEDUCTION') ? 'DEDUCTION' : 'EARNING',
+                    componentName,
+                    sign,
                     amount: Math.round(adjAmount * 100) / 100,
-                    descriptionAr: (adj.description || 'جزاء إداري') + descriptionExtra,
+                    descriptionAr: componentName,
                     source: {
-                        policyId: adj.caseId,
-                        policyCode: 'DISCIPLINARY',
+                        policyId: adj.id,
+                        policyCode: 'ADJUSTMENT',
                         ruleId: adj.id,
                         ruleCode: adj.adjustmentType,
                     },
                     gosiEligible: false,
                 });
+                this.logger.log(`✅ ADJUSTMENT ADDED: ${componentName} - ${adjAmount} SAR (${sign})`);
             }
         }
 
