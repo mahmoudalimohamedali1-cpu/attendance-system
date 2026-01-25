@@ -538,7 +538,6 @@ export class PayrollCalculationService {
         };
     }
 
-
     async calculateForEmployee(
         employeeId: string,
         companyId: string,
@@ -547,7 +546,7 @@ export class PayrollCalculationService {
         year?: number,
         month?: number,
     ): Promise<EmployeePayrollCalculation> {
-        this.logger.log(`🚀 START PAYROLL CALCULATION: employeeId=${employeeId}, period=${startDate.toISOString()} to ${endDate.toISOString()}`);
+        console.error(`🚀 START PAYROLL CALCULATION: employeeId=${employeeId}, period=${startDate.toISOString()} to ${endDate.toISOString()}`);
         const trace: CalculationTraceItem[] = [];
 
         // Derive year/month if not provided (for legacy compatibility in some logs/metadata)
@@ -1697,9 +1696,8 @@ export class PayrollCalculationService {
             }
         }
 
-        // --- Retroactive Pay (Backpay) ---
-        // 🆕 استخدام شهر الصرف (paymentMonth/paymentYear) أو الفترة (effectiveFrom/effectiveTo) للتوافقية
-        this.logger.log(`🔍 RETRO PAY: Checking for employee=${employeeId}, month=${effectiveMonth}, year=${effectiveYear}`);
+        console.error(`🔍 RETRO PAY: Checking for employee=${employeeId}, month=${effectiveMonth}, year=${effectiveYear}`);
+        console.error(`DEBUG SQL: SELECT id FROM retro_pays WHERE employee_id='${employeeId}' AND status='APPROVED' AND payment_year=${effectiveYear} AND payment_month=${effectiveMonth}`);
 
         const retroPaySql = `
             SELECT id, reason, notes, total_amount, difference 
@@ -1715,7 +1713,10 @@ export class PayrollCalculationService {
         `;
 
         const retroPays = await this.prisma.$queryRawUnsafe<any[]>(retroPaySql);
-        this.logger.log(`📊 RETRO PAY: Found ${retroPays.length} entries`);
+        console.error(`📊 RETRO PAY: Found ${retroPays.length} entries for employee ${employeeId}`);
+        if (retroPays.length > 0) {
+            console.error(`DATA: ${JSON.stringify(retroPays)}`);
+        }
 
         const retroIdsToUpdate: string[] = [];
         for (const retro of retroPays) {

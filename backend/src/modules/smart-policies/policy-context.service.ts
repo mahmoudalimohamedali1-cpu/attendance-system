@@ -1428,7 +1428,7 @@ export class PolicyContextService {
             // جرب جلب من PerformanceGoal أو SalesTarget
             const performanceGoal = await (this.prisma as any).performanceGoal?.findFirst?.({
                 where: {
-                    userId: employeeId,
+                    employeeId: employeeId,
                     periodStart: { lte: endDate },
                     periodEnd: { gte: startDate },
                 },
@@ -1441,7 +1441,7 @@ export class PolicyContextService {
                 // جرب من SalesTarget
                 const salesTarget = await (this.prisma as any).salesTarget?.findFirst?.({
                     where: {
-                        userId: employeeId,
+                        employeeId: employeeId,
                         month: month,
                         year: year,
                     },
@@ -1470,7 +1470,7 @@ export class PolicyContextService {
 
             // الحصول على آخر تقييم
             const lastReview = await (this.prisma as any).performanceReview?.findFirst?.({
-                where: { userId: employeeId },
+                where: { employeeId: employeeId },
                 orderBy: { reviewDate: 'desc' },
             });
 
