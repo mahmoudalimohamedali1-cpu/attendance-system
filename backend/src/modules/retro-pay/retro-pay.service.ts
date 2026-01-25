@@ -26,6 +26,7 @@ export class RetroPayService {
 
         // 🆕 تحديد طريقة التوزيع
         const distributionMode = dto.distributionMode || DistributionMode.SINGLE;
+        console.error(`🔧 CREATE RETRO PAY: mode=${distributionMode}, installments=${JSON.stringify(dto.installments || [])}, total=${totalAmount}`);
 
         // === SINGLE: دفعة واحدة (السلوك الافتراضي) ===
         if (distributionMode === DistributionMode.SINGLE) {
