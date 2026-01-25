@@ -242,10 +242,10 @@ export class PayrollRunsService {
                             amount: new Decimal(pl.amount.toFixed(2)),
                             sourceType,
                             sign: pl.sign,
-                            descriptionAr: pl.descriptionAr || undefined,
+                            // ✅ حفظ اسم المكون في descriptionAr لضمان ظهوره دائماً
+                            descriptionAr: pl.descriptionAr || pl.componentName || pl.componentCode || undefined,
                             sourceRef: pl.source ? `${pl.source.policyId}:${pl.source.ruleId}` : undefined,
-                            costCenterId: primaryCostCenterId, // ربط بمركز التكلفة
-                            // 🔧 إضافة الوحدات والمعدل للعرض التفصيلي
+                            costCenterId: primaryCostCenterId,
                             units: pl.units ? new Decimal(pl.units) : null,
                             rate: pl.rate ? new Decimal(pl.rate) : null,
                         });
@@ -335,14 +335,15 @@ export class PayrollRunsService {
                 }
 
                 // ✅ إضافة مكافآت برامج المكافآت (retroPay) المعتمدة
+                // 🔧 FIX: فلترة بـ paymentMonth و paymentYear بدل effectiveFrom/effectiveTo
                 const approvedBonuses = await tx.retroPay.findMany({
                     where: {
                         employeeId: employee.id,
                         companyId,
                         status: 'APPROVED',
-                        effectiveFrom: { lte: period.endDate },
-                        effectiveTo: { gte: period.startDate },
-                    }
+                        paymentMonth: period.month,
+                        paymentYear: period.year,
+                    } as any
                 });
 
                 let totalBonusFromPrograms: Decimal = ZERO;
@@ -770,6 +771,24 @@ export class PayrollRunsService {
                 .filter(pl => pl.sign === 'DEDUCTION')
                 .map(pl => ({ name: pl.componentName, code: pl.componentCode, amount: pl.amount }));
 
+            // ✅ NEW: payslipLines with full details for unified preview/payslip format
+            const payslipLines = (calculation.policyLines || []).map(pl => ({
+                id: `preview-${employee.id}-${pl.componentCode || 'line'}-${Math.random().toString(36).substr(2, 9)}`,
+                component: {
+                    nameAr: pl.componentName || pl.componentCode || 'بند راتب',
+                    code: pl.componentCode,
+                    type: pl.sign === 'EARNING' ? 'ALLOWANCE' : 'DEDUCTION',
+                },
+                sourceType: pl.componentCode === 'GOSI' ? 'STATUTORY' :
+                    pl.source ? 'POLICY' :
+                        pl.componentCode?.startsWith('SMART') ? 'SMART' : 'STRUCTURE',
+                descriptionAr: pl.descriptionAr || (pl.sign === 'EARNING' ? 'من هيكل الراتب' : 'خصم'),
+                sign: pl.sign,
+                amount: pl.amount,
+                units: pl.units || null,
+                rate: pl.rate || null,
+            }));
+
             // إضافة السلف للمعاينة - Display only, NOT added to deductions
             // ✅ ملاحظة: السلف تم حسابها بالفعل في payroll-calculation.service.ts كـ LOAN_DED
             // وهي مضمنة في calculation.totalDeductions الذي تم تطبيق الحد الأقصى للخصومات (50%) عليه
@@ -837,6 +856,9 @@ export class PayrollRunsService {
                 advanceDetails,
                 adjustments: [],
                 excluded: false,
+                // ✅ NEW: payslipLines for unified preview format
+                lines: payslipLines,
+                calculationTrace: calculation.calculationTrace || [],
             });
         }
 

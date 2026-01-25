@@ -720,7 +720,7 @@ export const PayrollRunDetailsPage = () => {
                                                 <TableRow key={line.id} hover>
                                                     <TableCell>
                                                         <Typography variant="body2" fontWeight="medium">
-                                                            {line.component?.nameAr || '-'}
+                                                            {line.component?.nameAr || line.descriptionAr || '-'}
                                                         </Typography>
                                                     </TableCell>
                                                     <TableCell>
