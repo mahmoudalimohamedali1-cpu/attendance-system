@@ -1431,7 +1431,7 @@ export class PayrollCalculationService {
                     employeeId,
                     companyId,
                     payrollPeriodId: payrollPeriod.id,
-                    status: { in: ['PENDING', 'APPROVED', 'POSTED', 'APPLIED'] }
+                    status: { in: ['PENDING', 'POSTED', 'APPLIED'] }
                 }
             });
 
@@ -1702,7 +1702,7 @@ export class PayrollCalculationService {
             FROM retro_pays 
             WHERE employee_id = '${employeeId}'
               AND company_id = '${companyId}'
-              AND status IN ('APPROVED', 'POSTED', 'APPLIED')
+              AND status IN ('APPROVED', 'PAID')
               AND (
                 (payment_year = ${effectiveYear} AND payment_month = ${effectiveMonth})
                 OR 
