@@ -1741,14 +1741,19 @@ export class PayrollCalculationService {
             }
         }
 
-        // تحديث حالة الفروقات لتجنب التطبيق المزدوج
+
+        /* 
+        // ⚠️ ملاحظة: تم تعطيل التحديث التلقائي للحالة هنا لأن هذا الكود يعمل أيضاً في "المعاينة" (Preview)
+        // مما يؤدي لتغيير الحالة لـ PAID بمجرد المعاينة ويختفي من المسير الفعلي.
+        // يجب أن يتم التحديث عند "اعتماد" أو "ترحيل" المسير فقط.
         if (retroIdsToUpdate.length > 0) {
             await this.prisma.$executeRawUnsafe(`
                 UPDATE retro_pays SET status = 'PAID', paid_at = NOW() 
                 WHERE id IN (${retroIdsToUpdate.map(id => `'${id}'`).join(',')})
             `);
-            this.logger.log(`🔒 RETRO PAY: Marked ${retroIdsToUpdate.length} entries as PAID`);
+            this.logger.log(`🔒 RETRO PAY: Marked ${retroIdsToUpdate.length} entries as potential PAID (Logged only)`);
         }
+        */
 
         // --- End of Service (EOS) Settlement ---
         if (terminationDate &&
