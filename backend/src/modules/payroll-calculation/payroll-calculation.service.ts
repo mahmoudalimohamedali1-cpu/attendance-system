@@ -1431,7 +1431,7 @@ export class PayrollCalculationService {
                     employeeId,
                     companyId,
                     payrollPeriodId: payrollPeriod.id,
-                    status: { in: ['PENDING', 'POSTED'] }
+                    status: { in: ['PENDING', 'APPROVED', 'POSTED', 'APPLIED'] }
                 }
             });
 
@@ -1696,40 +1696,34 @@ export class PayrollCalculationService {
             }
         }
 
-        console.error(`🔍 RETRO PAY: Checking for employee=${employeeId}, month=${effectiveMonth}, year=${effectiveYear}`);
-        console.error(`DEBUG SQL: SELECT id FROM retro_pays WHERE employee_id='${employeeId}' AND status='APPROVED' AND payment_year=${effectiveYear} AND payment_month=${effectiveMonth}`);
-
+        // ✅ Fetch RetroPay (Commissions, Bonuses, Differences)
         const retroPaySql = `
-            SELECT id, reason, notes, total_amount, difference 
+            SELECT id, reason, notes, total_amount as "totalAmount", difference 
             FROM retro_pays 
             WHERE employee_id = '${employeeId}'
               AND company_id = '${companyId}'
-              AND status = 'APPROVED'
+              AND status IN ('APPROVED', 'POSTED', 'APPLIED')
               AND (
                 (payment_year = ${effectiveYear} AND payment_month = ${effectiveMonth})
                 OR 
-                (payment_month IS NULL AND effective_from <= '${policyPeriodEnd.toISOString().split('T')[0]}')
+                (payment_month IS NULL AND effective_from <= '${endDate.toISOString().split('T')[0]}' 
+                 AND (effective_to IS NULL OR effective_to >= '${startDate.toISOString().split('T')[0]}'))
               )
         `;
 
         const retroPays = await this.prisma.$queryRawUnsafe<any[]>(retroPaySql);
-        console.error(`📊 RETRO PAY: Found ${retroPays.length} entries for employee ${employeeId}`);
-        if (retroPays.length > 0) {
-            console.error(`DATA: ${JSON.stringify(retroPays)}`);
-        }
+        this.logger.log(`📊 RETRO PAY: Found ${retroPays.length} entries for employee ${employeeId}`);
 
-        const retroIdsToUpdate: string[] = [];
         for (const retro of retroPays) {
-            const retroAmount = Number(retro.total_amount) || Number(retro.difference) || 0;
-            this.logger.log(`💵 RETRO PAY: Processing ${retro.reason} = ${retroAmount} SAR`);
+            const retroAmount = Number(retro.totalAmount) || Number(retro.difference) || 0;
             if (retroAmount !== 0) {
                 policyLines.push({
                     componentId: `RETRO-${retro.id}`,
-                    componentCode: 'RETRO_PAY',
-                    componentName: retro.reason || 'فروقات رواتب',
+                    componentCode: `RETRO_${retro.id.substring(0, 8)}`, // Unique code for frontend display
+                    componentName: retro.reason || 'مكافأة/عمولة/فروقات',
                     sign: retroAmount > 0 ? 'EARNING' : 'DEDUCTION',
                     amount: Math.abs(retroAmount),
-                    descriptionAr: retro.notes || retro.reason || 'فرق راتب',
+                    descriptionAr: retro.notes || retro.reason || 'فرق راتب/مكافأة',
                     source: {
                         policyId: retro.id,
                         policyCode: 'RETRO_PAY',
@@ -1738,7 +1732,6 @@ export class PayrollCalculationService {
                     },
                     gosiEligible: false,
                 });
-                retroIdsToUpdate.push(retro.id);
                 this.logger.log(`✅ RETRO PAY ADDED: ${retro.reason} - ${retroAmount} SAR`);
             }
         }

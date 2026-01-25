@@ -233,7 +233,7 @@ export class PayrollRunsService {
                         } else if (pl.componentCode === 'LOAN_DED' || pl.componentId?.startsWith('LOAN-')) {
                             sourceType = (PayslipLineSource as any).LOAN || 'LOAN';
                             componentIdToUse = loanComp.id;
-                        } else if (pl.componentCode === 'RETRO_PAY') {
+                        } else if (pl.componentCode === 'RETRO_PAY' || pl.componentCode?.startsWith('RETRO_')) {
                             sourceType = 'BONUS_PROGRAM' as any;
                             componentIdToUse = pl.sign === 'EARNING' ? adjAddId : adjDedId;
                         } else if (pl.componentCode === 'DISC_ADJ') {
