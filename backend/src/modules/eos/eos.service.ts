@@ -458,8 +458,8 @@ export class EosService {
             newStatus = 'HR_APPROVED';
             updateData = {
                 status: newStatus,
-                hrApprovedById: approvedById,
-                hrApprovedAt: new Date(),
+                hr_approved_by_id: approvedById,
+                hr_approved_at: new Date(),
             };
         } else if (currentStatus === 'HR_APPROVED') {
             // Second approval by GM/Admin
@@ -469,8 +469,8 @@ export class EosService {
             newStatus = 'APPROVED';
             updateData = {
                 status: newStatus,
-                gmApprovedById: approvedById,
-                gmApprovedAt: new Date(),
+                gm_approved_by_id: approvedById,
+                gm_approved_at: new Date(),
                 approvedById,
                 approvedAt: new Date(),
             };
