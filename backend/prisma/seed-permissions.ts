@@ -57,6 +57,13 @@ const enterprisePermissions = [
     { code: 'RETRO_PAY_CREATE', name: 'إنشاء فارق', nameEn: 'Create Retro Pay', category: 'الفروقات' },
     { code: 'RETRO_PAY_APPROVE', name: 'اعتماد الفروقات', nameEn: 'Approve Retro Pay', category: 'الفروقات' },
 
+    // === نهاية الخدمة (EoS) ===
+    { code: 'EOS_VIEW', name: 'عرض إنهاء الخدمات', nameEn: 'View EoS', category: 'نهاية الخدمة' },
+    { code: 'EOS_CREATE', name: 'إنشاء طلب إنهاء خدمات', nameEn: 'Create EoS Request', category: 'نهاية الخدمة' },
+    { code: 'EOS_APPROVE_HR', name: 'موافقة HR على الإنهاء', nameEn: 'Approve EoS - HR', category: 'نهاية الخدمة' },
+    { code: 'EOS_APPROVE_GM', name: 'موافقة المدير العام', nameEn: 'Approve EoS - GM', category: 'نهاية الخدمة' },
+    { code: 'EOS_CANCEL', name: 'إلغاء طلب إنهاء', nameEn: 'Cancel EoS Request', category: 'نهاية الخدمة' },
+
     // === التقارير ===
     { code: 'REPORT_PAYROLL', name: 'تقرير الرواتب', nameEn: 'Payroll Report', category: 'التقارير' },
     { code: 'REPORT_ATTENDANCE', name: 'تقرير الحضور', nameEn: 'Attendance Report', category: 'التقارير' },
