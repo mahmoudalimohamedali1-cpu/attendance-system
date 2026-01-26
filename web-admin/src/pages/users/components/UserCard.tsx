@@ -14,7 +14,7 @@ interface UserCardProps {
         role: string;
         jobTitle?: string;
         department?: string;
-        status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+        status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'TERMINATED';
         hireDate?: string;
     };
     onView?: (id: string) => void;
@@ -41,6 +41,7 @@ const statusConfig = {
     ACTIVE: { label: 'نشط', color: '#22c55e', bg: '#dcfce7' },
     INACTIVE: { label: 'غير نشط', color: '#94a3b8', bg: '#f1f5f9' },
     SUSPENDED: { label: 'موقوف', color: '#ef4444', bg: '#fee2e2' },
+    TERMINATED: { label: '🚫 تم إنهاء خدماته', color: '#b91c1c', bg: '#fecaca' },
 };
 
 /**
@@ -89,6 +90,12 @@ export const UserCard: React.FC<UserCardProps> = ({
                     from: { opacity: 0, transform: 'translateY(20px)' },
                     to: { opacity: 1, transform: 'translateY(0)' },
                 },
+                // 🔴 Red border and opacity for terminated employees
+                ...(user.status === 'TERMINATED' && {
+                    border: '2px solid #ef4444',
+                    opacity: 0.85,
+                    background: 'linear-gradient(135deg, #fef2f2 0%, #fff 100%)',
+                }),
             }}
             onClick={() => onView?.(user.id)}
         >

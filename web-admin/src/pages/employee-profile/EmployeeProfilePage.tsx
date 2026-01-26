@@ -775,19 +775,39 @@ export const EmployeeProfilePage = () => {
 
             {/* Main Content */}
             <Box sx={{ flex: 1, p: 4, overflow: 'auto' }}>
-                {/* Header */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
                     <Typography variant="h4" fontWeight="bold" color={theme.white}>
                         {tabs[activeTab].label}
                     </Typography>
-                    <Chip
-                        label={p.status === 'ACTIVE' ? 'نشط' : 'غير نشط'}
-                        sx={{
-                            bgcolor: p.status === 'ACTIVE' ? theme.teal : theme.red,
-                            color: theme.white,
-                            fontWeight: 600,
-                        }}
-                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {/* Status Chip */}
+                        <Chip
+                            label={
+                                p.status === 'ACTIVE' ? 'نشط' :
+                                    p.status === 'TERMINATED' ? '🚫 تم إنهاء خدماته' :
+                                        p.status === 'SUSPENDED' ? 'موقوف' : 'غير نشط'
+                            }
+                            sx={{
+                                bgcolor: p.status === 'ACTIVE' ? theme.teal :
+                                    p.status === 'TERMINATED' ? '#b91c1c' :
+                                        p.status === 'SUSPENDED' ? theme.red : '#9E9E9E',
+                                color: theme.white,
+                                fontWeight: 600,
+                                fontSize: p.status === 'TERMINATED' ? '0.9rem' : 'inherit',
+                            }}
+                        />
+                        {/* Display hire and termination dates for terminated employees */}
+                        {p.status === 'TERMINATED' && (
+                            <Chip
+                                label={`📅 التعيين: ${formatDate(p.hireDate)} → التصفية: ${formatDate(p.terminations?.[0]?.approvedAt || p.updatedAt)}`}
+                                sx={{
+                                    bgcolor: '#fecaca',
+                                    color: '#7f1d1d',
+                                    fontWeight: 500,
+                                }}
+                            />
+                        )}
+                    </Box>
                 </Box>
 
                 {/* Content Area */}
