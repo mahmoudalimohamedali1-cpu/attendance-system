@@ -190,31 +190,35 @@ export class EosService {
         let totalSalary = baseSalary;
 
         if (employee.salaryAssignments[0]) {
-            const assignment = await (this.prisma as any).salaryAssignment.findUnique({
-                where: { id: employee.salaryAssignments[0].id },
-                include: {
-                    structure: {
-                        include: {
-                            lines: {
-                                include: { component: true }
+            try {
+                const assignment = await (this.prisma as any).salaryAssignment?.findUnique?.({
+                    where: { id: employee.salaryAssignments[0].id },
+                    include: {
+                        structure: {
+                            include: {
+                                lines: {
+                                    include: { component: true }
+                                }
                             }
                         }
                     }
-                }
-            });
+                });
 
-            if (assignment?.structure?.lines) {
-                for (const line of assignment.structure.lines) {
-                    const code = line.component?.code?.toUpperCase();
-                    const lineAmount = Number(line.amount) || (Number(line.percentage) / 100 * Number(assignment.baseSalary || 0));
+                if (assignment?.structure?.lines) {
+                    for (const line of assignment.structure.lines) {
+                        const code = line.component?.code?.toUpperCase();
+                        const lineAmount = Number(line.amount) || (Number(line.percentage) / 100 * Number(assignment.baseSalary || 0));
 
-                    // بدل السكن
-                    if (code === 'HOUSING' || code === 'HOUSING_ALLOWANCE' || code === 'HRA') {
-                        housingAllowance = lineAmount;
+                        // بدل السكن
+                        if (code === 'HOUSING' || code === 'HOUSING_ALLOWANCE' || code === 'HRA') {
+                            housingAllowance = lineAmount;
+                        }
+                        // إجمالي الراتب
+                        totalSalary += lineAmount;
                     }
-                    // إجمالي الراتب
-                    totalSalary += lineAmount;
                 }
+            } catch {
+                // إذا فشل الاستعلام، نستخدم الراتب الأساسي فقط
             }
         }
 
