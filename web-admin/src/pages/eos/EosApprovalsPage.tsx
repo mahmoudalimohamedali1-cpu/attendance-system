@@ -12,18 +12,15 @@ import { api } from '@/services/api.service';
 // API functions
 const fetchTerminations = async (status?: string) => {
     const params = status ? `?status=${status}` : '';
-    const response = await api.get(`/eos/terminations${params}`);
-    return (response as any).data;
+    return await api.get(`/eos/terminations${params}`);
 };
 
 const approveTermination = async (id: string) => {
-    const response = await api.patch(`/eos/terminations/${id}/approve`);
-    return (response as any).data;
+    return await api.patch(`/eos/terminations/${id}/approve`);
 };
 
 const cancelTermination = async (id: string) => {
-    const response = await api.patch(`/eos/terminations/${id}/cancel`);
-    return (response as any).data;
+    return await api.patch(`/eos/terminations/${id}/cancel`);
 };
 
 // Format currency
@@ -74,7 +71,7 @@ const EosApprovalsPage: React.FC = () => {
     // Fetch terminations
     const { data: terminations = [], isLoading, error } = useQuery({
         queryKey: ['eos-terminations'],
-        queryFn: () => fetchTerminations(),
+        queryFn: async () => await fetchTerminations() as any[],
     });
 
     // Approve mutation
