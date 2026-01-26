@@ -267,6 +267,37 @@ export const EosCalculatorPage = () => {
                                                 <TableCell>الراتب الأساسي</TableCell>
                                                 <TableCell>{formatCurrency(result.baseSalary)}</TableCell>
                                             </TableRow>
+                                            {/* 🆕 البدلات الثابتة */}
+                                            {(result as any).housingAllowance > 0 && (
+                                                <TableRow>
+                                                    <TableCell sx={{ pr: 4 }}>+ بدل السكن</TableCell>
+                                                    <TableCell>{formatCurrency((result as any).housingAllowance)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {(result as any).transportationAllowance > 0 && (
+                                                <TableRow>
+                                                    <TableCell sx={{ pr: 4 }}>+ بدل المواصلات</TableCell>
+                                                    <TableCell>{formatCurrency((result as any).transportationAllowance)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {(result as any).phoneAllowance > 0 && (
+                                                <TableRow>
+                                                    <TableCell sx={{ pr: 4 }}>+ بدل الهاتف</TableCell>
+                                                    <TableCell>{formatCurrency((result as any).phoneAllowance)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {(result as any).otherFixedAllowances > 0 && (
+                                                <TableRow>
+                                                    <TableCell sx={{ pr: 4 }}>+ بدلات ثابتة أخرى</TableCell>
+                                                    <TableCell>{formatCurrency((result as any).otherFixedAllowances)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {(result as any).totalSalary > result.baseSalary && (
+                                                <TableRow sx={{ bgcolor: 'primary.light' }}>
+                                                    <TableCell><strong>إجمالي الراتب</strong></TableCell>
+                                                    <TableCell><strong>{formatCurrency((result as any).totalSalary)}</strong></TableCell>
+                                                </TableRow>
+                                            )}
                                         </TableBody>
                                     </Table>
 

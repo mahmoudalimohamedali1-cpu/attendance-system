@@ -45,6 +45,14 @@ export interface EosBreakdown {
     totalDaysOfService: number;
 
     baseSalary: number;
+
+    // 🆕 البدلات الثابتة
+    housingAllowance: number;
+    transportationAllowance: number;
+    phoneAllowance: number;
+    otherFixedAllowances: number;
+    totalSalary: number;
+
     reason: EosReason;
 
     // حساب المكافأة
@@ -64,11 +72,21 @@ export interface EosBreakdown {
     // الخصومات التفصيلية
     outstandingLoans: number;       // السلف المستحقة
     unreturnedCustodyValue: number; // قيمة العهد غير المرجعة
+    custodyItems: CustodyItemBreakdown[]; // 🆕 قائمة العهد للتحكم
     outstandingDebts: number;       // ديون أخرى
     unpaidPenalties: number;        // الجزاءات غير المسددة
     totalDeductions: number;        // إجمالي الخصومات
 
     // المبلغ النهائي
     netSettlement: number;
+}
+
+// 🆕 تفاصيل العهدة
+export interface CustodyItemBreakdown {
+    id: string;
+    name: string;
+    code: string;
+    value: number;
+    returned: boolean;
 }
 

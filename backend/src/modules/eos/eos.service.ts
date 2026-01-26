@@ -187,6 +187,9 @@ export class EosService {
 
         // حساب بدل السكن (إن وجد) من هيكل الراتب
         let housingAllowance = 0;
+        let transportationAllowance = 0;
+        let phoneAllowance = 0;
+        let otherFixedAllowances = 0;
         let totalSalary = baseSalary;
 
         if (employee.salaryAssignments[0]) {
@@ -206,13 +209,26 @@ export class EosService {
 
                 if (assignment?.structure?.lines) {
                     for (const line of assignment.structure.lines) {
-                        const code = line.component?.code?.toUpperCase();
+                        const code = line.component?.code?.toUpperCase() || '';
                         const lineAmount = Number(line.amount) || (Number(line.percentage) / 100 * Number(assignment.baseSalary || 0));
 
                         // بدل السكن
                         if (code === 'HOUSING' || code === 'HOUSING_ALLOWANCE' || code === 'HRA') {
                             housingAllowance = lineAmount;
                         }
+                        // بدل المواصلات
+                        else if (code === 'TRANSPORT' || code === 'TRANSPORTATION' || code === 'TRAVEL' || code === 'TRA') {
+                            transportationAllowance = lineAmount;
+                        }
+                        // بدل الهاتف
+                        else if (code === 'PHONE' || code === 'MOBILE' || code === 'COMMUNICATION') {
+                            phoneAllowance = lineAmount;
+                        }
+                        // بدلات ثابتة أخرى
+                        else if (line.component?.componentType === 'ALLOWANCE' && !line.component?.isVariable) {
+                            otherFixedAllowances += lineAmount;
+                        }
+
                         // إجمالي الراتب
                         totalSalary += lineAmount;
                     }
@@ -258,17 +274,26 @@ export class EosService {
         // 🆕 حساب العهد غير المرجعة (Unreturned Custody)
         // ========================================
         let unreturnedCustodyValue = 0;
+        let custodyItems: { id: string; name: string; code: string; value: number; returned: boolean }[] = [];
         try {
             const unreturnedCustody = await (this.prisma as any).custodyAssignment?.findMany?.({
                 where: {
                     employeeId: userId,
-                    status: { in: ['ASSIGNED', 'PENDING'] }, // لم يتم إرجاعها
+                    status: { in: ['ASSIGNED', 'PENDING', 'APPROVED', 'DELIVERED'] },
                     actualReturn: null,
                 },
                 include: { custodyItem: true },
             }) || [];
             for (const custody of unreturnedCustody) {
-                unreturnedCustodyValue += Number(custody.custodyItem?.purchasePrice) || 0;
+                const itemValue = Number(custody.custodyItem?.purchasePrice) || 0;
+                unreturnedCustodyValue += itemValue;
+                custodyItems.push({
+                    id: custody.id,
+                    name: custody.custodyItem?.name || 'عهدة غير معروفة',
+                    code: custody.custodyItem?.code || '',
+                    value: itemValue,
+                    returned: false,
+                });
             }
         } catch {
             // جدول العهد غير موجود - تجاهل
@@ -332,6 +357,12 @@ export class EosService {
             daysOfService: days,
             totalDaysOfService: totalDays,
             baseSalary,
+            // 🆕 البدلات الثابتة
+            housingAllowance: Math.round(housingAllowance * 100) / 100,
+            transportationAllowance: Math.round(transportationAllowance * 100) / 100,
+            phoneAllowance: Math.round(phoneAllowance * 100) / 100,
+            otherFixedAllowances: Math.round(otherFixedAllowances * 100) / 100,
+            totalSalary: Math.round(totalSalary * 100) / 100,
             reason: dto.reason,
             eosForFirst5Years: Math.round(eosForFirst5Years * 100) / 100,
             eosForRemaining: Math.round(eosForRemaining * 100) / 100,
@@ -344,6 +375,7 @@ export class EosService {
             // 🆕 الخصومات التفصيلية
             outstandingLoans: Math.round(outstandingLoans * 100) / 100,
             unreturnedCustodyValue: Math.round(unreturnedCustodyValue * 100) / 100,
+            custodyItems, // 🆕 قائمة العهد للتحكم فيها من الواجهة
             outstandingDebts: Math.round(outstandingDebts * 100) / 100,
             unpaidPenalties: Math.round(unpaidPenalties * 100) / 100,
             totalDeductions: Math.round(totalDeductions * 100) / 100,
