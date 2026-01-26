@@ -386,13 +386,6 @@ export class PayrollRunsService {
                             result: toNumber(debtDeductionAmount),
                         });
 
-                        // ✅ إضافة للبيانات المحفوظة لعرضها في التفاصيل
-                        deductionsData.push({
-                            name: `سداد ديون سابقة (${debtResult.transactions.length} دين)`,
-                            code: 'DEBT_DED',
-                            amount: toNumber(debtDeductionAmount)
-                        });
-
                         this.logger.log(`Deducted ${toFixed(debtDeductionAmount)} SAR from employee ${employee.id} for debt repayment`);
                     }
                 }
@@ -516,13 +509,6 @@ export class PayrollRunsService {
                             description: `خصم مؤجل للشهر القادم`,
                             formula: `المبلغ الزائد ${toFixed(excessDeductionAmount)} سيُخصم من الراتب القادم`,
                             result: toNumber(excessDeductionAmount),
-                        });
-
-                        // ✅ إضافة للبيانات المحفوظة لعرضها في التفاصيل
-                        deductionsData.push({
-                            name: `خصومات مؤجلة للشهر القادم (تجاوز سقف ${maxDeductionPercent}%)`,
-                            code: 'DEFERRED_DED',
-                            amount: toNumber(excessDeductionAmount)
                         });
 
                         this.logger.log(`💰 Created debt record for employee ${employee.id}: ${toFixed(excessDeductionAmount)} SAR (deduction excess)`);
