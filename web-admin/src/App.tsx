@@ -27,6 +27,7 @@ const SalaryPage = lazy(() => import('./pages/salary/SalaryPage').then(m => ({ d
 const PayrollRunNewPage = lazy(() => import('./pages/salary/PayrollRunNewPage').then(m => ({ default: m.PayrollRunNewPage })));
 const PayrollRunDetailsPage = lazy(() => import('./pages/salary/PayrollRunDetailsPage').then(m => ({ default: m.PayrollRunDetailsPage })));
 const EosCalculatorPage = lazy(() => import('./pages/eos/EosCalculatorPage').then(m => ({ default: m.EosCalculatorPage })));
+const EosApprovalsPage = lazy(() => import('./pages/eos/EosApprovalsPage'));
 const RetroPayPage = lazy(() => import('./pages/retro-pay/RetroPayPage').then(m => ({ default: m.RetroPayPage })));
 const PoliciesPage = lazy(() => import('./pages/policies/PoliciesPage').then(m => ({ default: m.PoliciesPage })));
 const AuditLogsPage = lazy(() => import('./pages/audit/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
@@ -260,6 +261,11 @@ function App() {
           <Route path="eos" element={
             <Suspense fallback={<PageLoader />}>
               <EosCalculatorPage />
+            </Suspense>
+          } />
+          <Route path="eos/approvals" element={
+            <Suspense fallback={<PageLoader />}>
+              <EosApprovalsPage />
             </Suspense>
           } />
           <Route path="retro-pay" element={
