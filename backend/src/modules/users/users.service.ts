@@ -132,7 +132,12 @@ export class UsersService {
     }
 
     if (role) where.role = role;
-    if (status) where.status = status;
+    if (status) {
+      where.status = status;
+    } else {
+      // ✅ Exclude TERMINATED employees by default
+      where.status = { not: 'TERMINATED' };
+    }
     if (branchId) where.branchId = branchId;
     if (departmentId) where.departmentId = departmentId;
 
@@ -406,7 +411,11 @@ export class UsersService {
 
   async getEmployeesByManager(managerId: string, companyId: string) {
     return this.prisma.user.findMany({
-      where: { managerId, companyId },
+      where: {
+        managerId,
+        companyId,
+        status: { not: 'TERMINATED' }, // ✅ Exclude terminated
+      },
       select: {
         id: true,
         firstName: true,
