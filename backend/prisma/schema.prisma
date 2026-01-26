@@ -132,9 +132,10 @@ model Company {
   posts Post[]
 
   // Calendar Events (أحداث التقويم)
-  events             Event[]
-  muqeemTransactions MuqeemTransaction[]
-  muqeemConfig       MuqeemConfig?
+  events               Event[]
+  muqeemTransactions   MuqeemTransaction[]
+  muqeemConfig         MuqeemConfig?
+  employeeTerminations EmployeeTermination[]
 
   @@map("companies")
 }
@@ -335,6 +336,7 @@ enum UserStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  TERMINATED // منتهي الخدمة
 }
 
 enum ContractType {
@@ -609,6 +611,11 @@ model User {
   payrollAdjustments        PayrollAdjustment[]
   muqeemTransactions        MuqeemTransaction[] @relation("MuqeemUserTransactions")
   muqeemTransactionsCreated MuqeemTransaction[] @relation("MuqeemCreatedTransactions")
+
+  // نهاية الخدمة (EoS)
+  employeeTerminations EmployeeTermination[] @relation("EmployeeTerminations")
+  terminationsCreated  EmployeeTermination[] @relation("TerminationCreator")
+  terminationsApproved EmployeeTermination[] @relation("TerminationApprover")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -2489,8 +2496,9 @@ model Payslip {
   earningsJson   Json? @map("earnings_json") // [{name, code, amount}]
   deductionsJson Json? @map("deductions_json") // [{name, code, amount}]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  employeeTerminations EmployeeTermination[]
 
   @@map("payslips")
 }
@@ -7459,4 +7467,65 @@ model MuqeemConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("muqeem_configs")
+}
+
+// ==================== نهاية الخدمة (End of Service) ====================
+
+enum TerminationReason {
+  RESIGNATION // استقالة
+  TERMINATION // إنهاء خدمات من الشركة
+  END_OF_CONTRACT // انتهاء العقد
+  RETIREMENT // تقاعد
+  DEATH // وفاة
+}
+
+enum TerminationStatus {
+  PENDING // في انتظار التأكيد
+  APPROVED // تم التأكيد
+  PAID // تم الصرف
+  CANCELLED // ملغي
+}
+
+model EmployeeTermination {
+  id         String @id @default(uuid())
+  employeeId String @map("employee_id")
+  companyId  String @map("company_id")
+
+  reason         TerminationReason
+  lastWorkingDay DateTime          @map("last_working_day")
+
+  // المبالغ المحسوبة
+  baseSalary       Decimal @map("base_salary") @db.Decimal(18, 2)
+  yearsOfService   Decimal @map("years_of_service") @db.Decimal(10, 4)
+  totalEos         Decimal @map("total_eos") @db.Decimal(18, 2)
+  adjustedEos      Decimal @map("adjusted_eos") @db.Decimal(18, 2)
+  leavePayout      Decimal @map("leave_payout") @db.Decimal(18, 2)
+  remainingLeave   Int     @default(0) @map("remaining_leave")
+  outstandingLoans Decimal @map("outstanding_loans") @db.Decimal(18, 2)
+  netSettlement    Decimal @map("net_settlement") @db.Decimal(18, 2)
+
+  // حالة المعالجة
+  status    TerminationStatus @default(PENDING)
+  payslipId String?           @map("payslip_id")
+
+  // تفاصيل إضافية
+  notes           String?
+  calculationJson Json?   @map("calculation_json")
+
+  createdById  String    @map("created_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  approvedById String?   @map("approved_by_id")
+  approvedAt   DateTime? @map("approved_at")
+  paidAt       DateTime? @map("paid_at")
+
+  employee   User     @relation("EmployeeTerminations", fields: [employeeId], references: [id])
+  company    Company  @relation(fields: [companyId], references: [id])
+  createdBy  User     @relation("TerminationCreator", fields: [createdById], references: [id])
+  approvedBy User?    @relation("TerminationApprover", fields: [approvedById], references: [id])
+  payslip    Payslip? @relation(fields: [payslipId], references: [id])
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([status])
+  @@map("employee_terminations")
 }

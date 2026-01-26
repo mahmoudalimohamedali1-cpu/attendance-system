@@ -27,6 +27,11 @@ export class CalculateEosDto {
     @IsNumber()
     @IsOptional()
     overrideRemainingLeaveDays?: number;
+
+    @ApiPropertyOptional({ description: 'ملاحظات إضافية' })
+    @IsString()
+    @IsOptional()
+    notes?: string;
 }
 
 export interface EosBreakdown {

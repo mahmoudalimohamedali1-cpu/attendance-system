@@ -96,6 +96,24 @@ export const EosCalculatorPage = () => {
         onError: (err: any) => alert(err.response?.data?.message || 'حدث خطأ'),
     });
 
+    // 🔴 تأكيد إنهاء الخدمات
+    const terminateMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedUser) throw new Error('اختر موظف');
+            const payload: any = { reason, lastWorkingDay };
+            if (overrideRemainingLeaveDays !== null) {
+                payload.overrideRemainingLeaveDays = overrideRemainingLeaveDays;
+            }
+            return api.post(`/eos/terminate/${selectedUser.id}`, payload);
+        },
+        onSuccess: () => {
+            alert('✅ تم إنشاء طلب إنهاء الخدمات بنجاح! يجب الموافقة عليه من مدير HR.');
+            setResult(null);
+            setSelectedUser(null);
+        },
+        onError: (err: any) => alert(err.response?.data?.message || 'حدث خطأ'),
+    });
+
     // Reset override when employee changes
     useEffect(() => {
         setOverrideRemainingLeaveDays(null);
@@ -331,6 +349,24 @@ export const EosCalculatorPage = () => {
                                         <Typography variant="h6">صافي التسوية النهائية</Typography>
                                         <Typography variant="h4" fontWeight="bold">{formatCurrency(result.netSettlement)}</Typography>
                                     </Box>
+
+                                    {/* 🔴 زر تأكيد إنهاء الخدمات */}
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        fullWidth
+                                        size="large"
+                                        sx={{ mt: 3 }}
+                                        startIcon={<WorkOff />}
+                                        onClick={() => {
+                                            if (window.confirm(`هل أنت متأكد من إنهاء خدمات الموظف "${result.employeeName}"؟\n\nصافي التسوية: ${formatCurrency(result.netSettlement)}`)) {
+                                                terminateMutation.mutate();
+                                            }
+                                        }}
+                                        disabled={terminateMutation.isPending}
+                                    >
+                                        {terminateMutation.isPending ? <CircularProgress size={24} color="inherit" /> : '🔴 تأكيد إنهاء الخدمات'}
+                                    </Button>
                                 </Box>
                             </CardContent>
                         </Card>

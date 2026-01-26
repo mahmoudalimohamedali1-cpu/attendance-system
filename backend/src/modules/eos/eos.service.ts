@@ -272,5 +272,186 @@ export class EosService {
             netSettlement: Math.round(netSettlement * 100) / 100,
         };
     }
-}
 
+    /**
+     * تأكيد إنهاء خدمات موظف وإنشاء سجل التسوية
+     */
+    async terminateEmployee(userId: string, dto: CalculateEosDto, createdById: string, companyId: string) {
+        // 1. حساب التسوية
+        const calculation = await this.calculateEos(userId, dto);
+
+        // 2. إنشاء سجل التسوية
+        const termination = await this.prisma.employeeTermination.create({
+            data: {
+                employeeId: userId,
+                companyId,
+                reason: dto.reason as any,
+                lastWorkingDay: new Date(dto.lastWorkingDay),
+                baseSalary: calculation.baseSalary,
+                yearsOfService: calculation.yearsOfService + (calculation.monthsOfService / 12) + (calculation.daysOfService / 365),
+                totalEos: calculation.totalEos,
+                adjustedEos: calculation.adjustedEos,
+                leavePayout: calculation.leavePayout,
+                remainingLeave: calculation.remainingLeaveDays,
+                outstandingLoans: calculation.outstandingLoans,
+                netSettlement: calculation.netSettlement,
+                status: 'PENDING',
+                createdById,
+                calculationJson: calculation as any,
+                notes: dto.notes,
+            },
+            include: {
+                employee: { select: { firstName: true, lastName: true, employeeCode: true } },
+            },
+        });
+
+        return {
+            termination,
+            calculation,
+            message: 'تم إنشاء طلب إنهاء الخدمات بنجاح',
+        };
+    }
+
+    /**
+     * الموافقة على طلب إنهاء الخدمات وتغيير حالة الموظف
+     */
+    async approveTermination(terminationId: string, approvedById: string, companyId: string) {
+        const termination = await this.prisma.employeeTermination.findFirst({
+            where: { id: terminationId, companyId, status: 'PENDING' },
+            include: { employee: true },
+        });
+
+        if (!termination) {
+            throw new NotFoundException('طلب التسوية غير موجود أو تمت معالجته مسبقاً');
+        }
+
+        // Update termination status and employee status in transaction
+        const result = await this.prisma.$transaction(async (tx) => {
+            // 1. تحديث حالة التسوية
+            const updated = await tx.employeeTermination.update({
+                where: { id: terminationId },
+                data: {
+                    status: 'APPROVED',
+                    approvedById,
+                    approvedAt: new Date(),
+                },
+                include: {
+                    employee: { select: { firstName: true, lastName: true, employeeCode: true } },
+                },
+            });
+
+            // 2. تغيير حالة الموظف إلى TERMINATED
+            await tx.user.update({
+                where: { id: termination.employeeId },
+                data: { status: 'TERMINATED' },
+            });
+
+            return updated;
+        });
+
+        return {
+            termination: result,
+            message: 'تم اعتماد إنهاء الخدمات وتغيير حالة الموظف إلى منتهي الخدمة',
+        };
+    }
+
+    /**
+     * تحديث حالة التسوية إلى مدفوع بعد صرفها في مسير الرواتب
+     */
+    async markAsPaid(terminationId: string, payslipId: string) {
+        return this.prisma.employeeTermination.update({
+            where: { id: terminationId },
+            data: {
+                status: 'PAID',
+                payslipId,
+                paidAt: new Date(),
+            },
+        });
+    }
+
+    /**
+     * جلب قائمة طلبات إنهاء الخدمات
+     */
+    async getTerminations(companyId: string, status?: string) {
+        const where: any = { companyId };
+        if (status) {
+            where.status = status;
+        }
+
+        return this.prisma.employeeTermination.findMany({
+            where,
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        email: true,
+                    },
+                },
+                createdBy: { select: { firstName: true, lastName: true } },
+                approvedBy: { select: { firstName: true, lastName: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    /**
+     * جلب تسوية محددة
+     */
+    async getTerminationById(id: string, companyId: string) {
+        const termination = await this.prisma.employeeTermination.findFirst({
+            where: { id, companyId },
+            include: {
+                employee: true,
+                createdBy: { select: { firstName: true, lastName: true } },
+                approvedBy: { select: { firstName: true, lastName: true } },
+                payslip: true,
+            },
+        });
+
+        if (!termination) {
+            throw new NotFoundException('التسوية غير موجودة');
+        }
+
+        return termination;
+    }
+
+    /**
+     * إلغاء طلب إنهاء الخدمات
+     */
+    async cancelTermination(terminationId: string, companyId: string) {
+        const termination = await this.prisma.employeeTermination.findFirst({
+            where: { id: terminationId, companyId, status: 'PENDING' },
+        });
+
+        if (!termination) {
+            throw new NotFoundException('الطلب غير موجود أو لا يمكن إلغاؤه');
+        }
+
+        return this.prisma.employeeTermination.update({
+            where: { id: terminationId },
+            data: { status: 'CANCELLED' },
+        });
+    }
+
+    /**
+     * جلب التسويات المعتمدة للفترة (لإضافتها للـ payroll)
+     */
+    async getApprovedTerminationsForPeriod(companyId: string, periodStartDate: Date, periodEndDate: Date) {
+        return this.prisma.employeeTermination.findMany({
+            where: {
+                companyId,
+                status: 'APPROVED',
+                lastWorkingDay: {
+                    gte: periodStartDate,
+                    lte: periodEndDate,
+                },
+            },
+            include: {
+                employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+            },
+        });
+    }
+}
