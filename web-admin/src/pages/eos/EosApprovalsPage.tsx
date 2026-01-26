@@ -46,14 +46,15 @@ const formatDate = (date: string) => {
 
 // Status chip
 const StatusChip = ({ status }: { status: string }) => {
-    const configs: Record<string, { label: string; color: 'warning' | 'success' | 'info' | 'error' }> = {
-        PENDING: { label: 'في انتظار الموافقة', color: 'warning' },
-        APPROVED: { label: 'تمت الموافقة', color: 'success' },
-        PAID: { label: 'تم الصرف', color: 'info' },
+    const configs: Record<string, { label: string; color: 'warning' | 'success' | 'info' | 'error' | 'secondary' }> = {
+        PENDING: { label: 'بانتظار موافقة HR', color: 'warning' },
+        HR_APPROVED: { label: 'بانتظار المدير العام', color: 'info' },
+        APPROVED: { label: 'تمت الموافقة النهائية', color: 'success' },
+        PAID: { label: 'تم الصرف', color: 'success' },
         CANCELLED: { label: 'ملغى', color: 'error' },
     };
     const config = configs[status] || { label: status, color: 'warning' };
-    return <Chip label={config.label} color={config.color} size="small" />;
+    return <Chip label={config.label} color={config.color as any} size="small" />;
 };
 
 // Reason labels

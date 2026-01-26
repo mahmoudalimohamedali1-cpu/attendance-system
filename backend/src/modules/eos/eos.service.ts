@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CalculateEosDto, EosBreakdown, EosReason } from './dto/calculate-eos.dto';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -423,11 +423,17 @@ export class EosService {
     }
 
     /**
-     * الموافقة على طلب إنهاء الخدمات وتغيير حالة الموظف
+     * الموافقة على طلب إنهاء الخدمات
+     * المستوى 1: HR يوافق (PENDING → HR_APPROVED)
+     * المستوى 2: المدير العام يوافق (HR_APPROVED → APPROVED)
      */
     async approveTermination(terminationId: string, approvedById: string, companyId: string) {
         const termination = await this.prisma.employeeTermination.findFirst({
-            where: { id: terminationId, companyId, status: 'PENDING' },
+            where: {
+                id: terminationId,
+                companyId,
+                status: { in: ['PENDING', 'HR_APPROVED'] as any }
+            },
             include: { employee: true },
         });
 
@@ -435,34 +441,82 @@ export class EosService {
             throw new NotFoundException('طلب التسوية غير موجود أو تمت معالجته مسبقاً');
         }
 
-        // Update termination status and employee status in transaction
-        const result = await this.prisma.$transaction(async (tx) => {
-            // 1. تحديث حالة التسوية
-            const updated = await tx.employeeTermination.update({
+        // Get approver info
+        const approver = await this.prisma.user.findUnique({
+            where: { id: approvedById },
+            select: { role: true, firstName: true, lastName: true },
+        });
+
+        const currentStatus = (termination as any).status;
+
+        // Determine new status based on current status and approver role
+        let newStatus: string;
+        let updateData: any = {};
+
+        if (currentStatus === 'PENDING') {
+            // First approval by HR
+            newStatus = 'HR_APPROVED';
+            updateData = {
+                status: newStatus,
+                hrApprovedById: approvedById,
+                hrApprovedAt: new Date(),
+            };
+        } else if (currentStatus === 'HR_APPROVED') {
+            // Second approval by GM/Admin
+            if (approver?.role !== 'ADMIN') {
+                throw new ForbiddenException('يجب أن يوافق المدير العام على هذا الطلب');
+            }
+            newStatus = 'APPROVED';
+            updateData = {
+                status: newStatus,
+                gmApprovedById: approvedById,
+                gmApprovedAt: new Date(),
+                approvedById,
+                approvedAt: new Date(),
+            };
+        } else {
+            throw new BadRequestException('حالة الطلب غير صالحة للموافقة');
+        }
+
+        // If final approval, also update employee status
+        if (newStatus === 'APPROVED') {
+            const result = await this.prisma.$transaction(async (tx) => {
+                const updated = await tx.employeeTermination.update({
+                    where: { id: terminationId },
+                    data: updateData,
+                    include: {
+                        employee: { select: { firstName: true, lastName: true, employeeCode: true } },
+                    },
+                });
+
+                // تغيير حالة الموظف إلى TERMINATED
+                await tx.user.update({
+                    where: { id: termination.employeeId },
+                    data: { status: 'TERMINATED' },
+                });
+
+                return updated;
+            });
+
+            return {
+                termination: result,
+                message: '✅ تم اعتماد إنهاء الخدمات نهائياً من المدير العام وتغيير حالة الموظف إلى منتهي الخدمة',
+            };
+        } else {
+            // HR approval only
+            const updated = await this.prisma.employeeTermination.update({
                 where: { id: terminationId },
-                data: {
-                    status: 'APPROVED',
-                    approvedById,
-                    approvedAt: new Date(),
-                },
+                data: updateData,
                 include: {
                     employee: { select: { firstName: true, lastName: true, employeeCode: true } },
                 },
             });
 
-            // 2. تغيير حالة الموظف إلى TERMINATED
-            await tx.user.update({
-                where: { id: termination.employeeId },
-                data: { status: 'TERMINATED' },
-            });
-
-            return updated;
-        });
-
-        return {
-            termination: result,
-            message: 'تم اعتماد إنهاء الخدمات وتغيير حالة الموظف إلى منتهي الخدمة',
-        };
+            return {
+                termination: updated,
+                message: '✅ تمت موافقة HR بنجاح. الطلب الآن بانتظار موافقة المدير العام.',
+            };
+        }
     }
 
     /**
