@@ -255,9 +255,72 @@ export class EosService {
         }
 
         // ========================================
+        // 🆕 حساب العهد غير المرجعة (Unreturned Custody)
+        // ========================================
+        let unreturnedCustodyValue = 0;
+        try {
+            const unreturnedCustody = await (this.prisma as any).custodyAssignment?.findMany?.({
+                where: {
+                    employeeId: userId,
+                    status: { in: ['ASSIGNED', 'PENDING'] }, // لم يتم إرجاعها
+                    actualReturn: null,
+                },
+                include: { custodyItem: true },
+            }) || [];
+            for (const custody of unreturnedCustody) {
+                unreturnedCustodyValue += Number(custody.custodyItem?.value) || 0;
+            }
+        } catch {
+            // جدول العهد غير موجود - تجاهل
+        }
+
+        // ========================================
+        // 🆕 حساب الديون من EmployeeDebtLedger
+        // ========================================
+        let outstandingDebts = 0;
+        try {
+            const activeDebts = await (this.prisma as any).employeeDebtLedger?.findMany?.({
+                where: {
+                    employeeId: userId,
+                    status: 'ACTIVE',
+                },
+            }) || [];
+            for (const debt of activeDebts) {
+                outstandingDebts += Number(debt.remainingBalance) || 0;
+            }
+        } catch {
+            // جدول الديون غير موجود - تجاهل
+        }
+
+        // ========================================
+        // 🆕 حساب الجزاءات غير المسددة (Unpaid Deductions)
+        // ========================================
+        let unpaidPenalties = 0;
+        try {
+            const disciplinaryCases = await (this.prisma as any).disciplinaryCase?.findMany?.({
+                where: {
+                    employeeId: userId,
+                    status: 'DECISION_ISSUED',
+                    decisionType: { in: ['SALARY_DEDUCTION', 'SALARY_SUSPENSION'] },
+                },
+            }) || [];
+            for (const caseItem of disciplinaryCases) {
+                // إذا كان خصم من الراتب
+                unpaidPenalties += Number(caseItem.deductionAmount) || 0;
+            }
+        } catch {
+            // جدول الجزاءات غير موجود - تجاهل
+        }
+
+        // ========================================
+        // إجمالي الخصومات
+        // ========================================
+        const totalDeductions = outstandingLoans + unreturnedCustodyValue + outstandingDebts + unpaidPenalties;
+
+        // ========================================
         // المبلغ النهائي
         // ========================================
-        const netSettlement = adjustedEos + leavePayout - outstandingLoans;
+        const netSettlement = adjustedEos + leavePayout - totalDeductions;
 
         return {
             employeeId: employee.id,
@@ -278,7 +341,12 @@ export class EosService {
             remainingLeaveDays,
             remainingLeaveDaysOverridden,
             leavePayout: Math.round(leavePayout * 100) / 100,
+            // 🆕 الخصومات التفصيلية
             outstandingLoans: Math.round(outstandingLoans * 100) / 100,
+            unreturnedCustodyValue: Math.round(unreturnedCustodyValue * 100) / 100,
+            outstandingDebts: Math.round(outstandingDebts * 100) / 100,
+            unpaidPenalties: Math.round(unpaidPenalties * 100) / 100,
+            totalDeductions: Math.round(totalDeductions * 100) / 100,
             netSettlement: Math.round(netSettlement * 100) / 100,
         };
     }

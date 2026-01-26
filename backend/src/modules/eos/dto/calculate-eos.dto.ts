@@ -61,8 +61,12 @@ export interface EosBreakdown {
     remainingLeaveDaysOverridden: boolean;
     leavePayout: number;
 
-    // خصم السلف
-    outstandingLoans: number;
+    // الخصومات التفصيلية
+    outstandingLoans: number;       // السلف المستحقة
+    unreturnedCustodyValue: number; // قيمة العهد غير المرجعة
+    outstandingDebts: number;       // ديون أخرى
+    unpaidPenalties: number;        // الجزاءات غير المسددة
+    totalDeductions: number;        // إجمالي الخصومات
 
     // المبلغ النهائي
     netSettlement: number;
