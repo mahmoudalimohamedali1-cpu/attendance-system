@@ -577,7 +577,14 @@ export class PayrollRunsService {
             const runWithPayslips = await tx.payrollRun.findUnique({
                 where: { id: run.id },
                 include: {
-                    payslips: { select: { id: true } },
+                    payslips: {
+                        select: {
+                            id: true,
+                            grossSalary: true,
+                            totalDeductions: true,
+                            netSalary: true
+                        }
+                    },
                     period: true
                 }
             });
