@@ -141,6 +141,7 @@ const payrollGroup: MenuGroup = {
     { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises' },
     { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay' },
     { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos' },
+    { text: 'موافقات الإنهاء', icon: <Security />, path: '/eos/approvals' },
     { text: 'الحسابات البنكية', icon: <MonetizationOn />, path: '/bank-accounts' },
     { text: 'مراكز التكلفة', icon: <AccountTree />, path: '/cost-centers' },
     { text: 'مركز الاستثناءات', icon: <Security />, path: '/exceptions' },
