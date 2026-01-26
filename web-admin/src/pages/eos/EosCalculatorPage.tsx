@@ -337,10 +337,38 @@ export const EosCalculatorPage = () => {
                                                 </TableCell>
                                                 <TableCell>{formatCurrency(result.leavePayout)}</TableCell>
                                             </TableRow>
-                                            <TableRow sx={{ bgcolor: 'error.light' }}>
-                                                <TableCell>- سلف مستحقة</TableCell>
-                                                <TableCell>{formatCurrency(result.outstandingLoans)}</TableCell>
-                                            </TableRow>
+                                            {/* الخصومات */}
+                                            {result.outstandingLoans > 0 && (
+                                                <TableRow sx={{ bgcolor: 'error.light' }}>
+                                                    <TableCell>- سلف مستحقة</TableCell>
+                                                    <TableCell>{formatCurrency(result.outstandingLoans)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {(result as any).unreturnedCustodyValue > 0 && (
+                                                <TableRow sx={{ bgcolor: 'error.light' }}>
+                                                    <TableCell>- عهد غير مرجعة</TableCell>
+                                                    <TableCell>{formatCurrency((result as any).unreturnedCustodyValue)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {(result as any).outstandingDebts > 0 && (
+                                                <TableRow sx={{ bgcolor: 'error.light' }}>
+                                                    <TableCell>- ديون أخرى</TableCell>
+                                                    <TableCell>{formatCurrency((result as any).outstandingDebts)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {(result as any).unpaidPenalties > 0 && (
+                                                <TableRow sx={{ bgcolor: 'error.light' }}>
+                                                    <TableCell>- جزاءات غير مسددة</TableCell>
+                                                    <TableCell>{formatCurrency((result as any).unpaidPenalties)}</TableCell>
+                                                </TableRow>
+                                            )}
+                                            {/* إجمالي الخصومات */}
+                                            {(result as any).totalDeductions > 0 && (
+                                                <TableRow sx={{ bgcolor: 'error.main', color: 'white' }}>
+                                                    <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>إجمالي الخصومات</TableCell>
+                                                    <TableCell sx={{ fontWeight: 'bold', color: 'white' }}>{formatCurrency((result as any).totalDeductions)}</TableCell>
+                                                </TableRow>
+                                            )}
                                         </TableBody>
                                     </Table>
 
