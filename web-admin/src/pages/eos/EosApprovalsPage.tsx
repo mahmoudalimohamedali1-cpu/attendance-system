@@ -236,7 +236,7 @@ const EosApprovalsPage: React.FC = () => {
                             <Box display="flex" justifyContent="space-between">
                                 <Box>
                                     <Typography variant="subtitle2" color="text.secondary">تاريخ التعيين</Typography>
-                                    <Typography>{formatDate(selectedTermination.hireDate)}</Typography>
+                                    <Typography>{selectedTermination.employee?.hireDate ? formatDate(selectedTermination.employee.hireDate) : '-'}</Typography>
                                 </Box>
                                 <Box>
                                     <Typography variant="subtitle2" color="text.secondary">آخر يوم عمل</Typography>
