@@ -231,7 +231,7 @@ export const PayrollRunDetailsPage = () => {
     // 🔧 Export Excel with authentication
     const handleExportExcel = async () => {
         try {
-            const response = await api.get(`/payroll-runs/${id}/excel`, { responseType: 'blob' }) as Blob;
+            const response = await api.getBlob(`/payroll-runs/${id}/excel`);
             const url = window.URL.createObjectURL(response);
             const link = document.createElement('a');
             link.href = url;

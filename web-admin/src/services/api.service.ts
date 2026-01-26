@@ -129,6 +129,12 @@ class ApiService {
     return response.data;
   }
 
+  // 🔧 للتحميلات (Excel, PDF) - يرجع blob مع authentication
+  async getBlob(url: string): Promise<Blob> {
+    const response = await this.client.get(url, { responseType: 'blob' });
+    return response.data;
+  }
+
   async post<T = unknown>(url: string, data?: unknown, config?: object): Promise<T> {
     const response = await this.client.post<T>(url, data, config);
     return response.data;
