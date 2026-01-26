@@ -268,7 +268,7 @@ export class EosService {
                 include: { custodyItem: true },
             }) || [];
             for (const custody of unreturnedCustody) {
-                unreturnedCustodyValue += Number(custody.custodyItem?.value) || 0;
+                unreturnedCustodyValue += Number(custody.custodyItem?.purchasePrice) || 0;
             }
         } catch {
             // جدول العهد غير موجود - تجاهل
