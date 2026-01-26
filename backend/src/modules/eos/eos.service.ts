@@ -552,6 +552,7 @@ export class EosService {
                         lastName: true,
                         employeeCode: true,
                         email: true,
+                        hireDate: true,
                     },
                 },
                 createdBy: { select: { firstName: true, lastName: true } },
