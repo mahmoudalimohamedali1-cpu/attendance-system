@@ -71,9 +71,15 @@ export class EosService {
                 : (employee.salary ? Number(employee.salary) : 0));
 
         // ✅ جلب إعدادات الرواتب لتحديد طريقة حساب نهاية الخدمة
-        const payrollSettings = await (this.prisma as any).payrollSettings.findUnique({
-            where: { companyId: employee.companyId },
-        });
+        let payrollSettings: any = null;
+        try {
+            payrollSettings = await (this.prisma as any).payrollSettings?.findUnique?.({
+                where: { companyId: employee.companyId },
+            });
+        } catch {
+            // إذا لم يكن الجدول موجوداً، نستخدم الإعدادات الافتراضية
+            payrollSettings = null;
+        }
 
         const eosCalculationMethod = payrollSettings?.eosCalculationMethod || 'SAUDI_LABOR_LAW';
 
