@@ -414,18 +414,17 @@ export class PayrollRunsService {
                         result: toNumber(negativeBalanceAmount),
                     });
 
-                    // ✅ FIX: التحقق من عدم وجود دين سابق لنفس الموظف/المسير قبل الإنشاء
-                    const existingDebt = await tx.employeeDebtLedger.findFirst({
+                    // ✅ FIX: التحقق من عدم وجود دين سابق لنفس الموظف/الفترة قبل الإنشاء
+                    const existingNegativeDebt = await tx.employeeDebtLedger.findFirst({
                         where: {
                             employeeId: employee.id,
                             companyId,
-                            sourceId: run.id,
+                            periodId: dto.periodId, // 🔧 استخدام periodId بدلاً من run.id لمنع التكرار
                             sourceType: DebtSourceType.PAYROLL_NEGATIVE_BALANCE,
-                            status: { in: ['ACTIVE', 'PARTIALLY_PAID'] as any[] }
                         }
                     });
 
-                    if (!existingDebt) {
+                    if (!existingNegativeDebt) {
                         // ✅ إنشاء سجل دين جديد للموظف فقط إذا لم يكن موجوداً
                         await this.employeeDebtService.createDebt({
                             companyId,
@@ -438,7 +437,7 @@ export class PayrollRunsService {
                         });
                         this.logger.log(`Created debt record for employee ${employee.id}: ${toFixed(negativeBalanceAmount)} SAR`);
                     } else {
-                        this.logger.log(`Debt already exists for employee ${employee.id} in run ${run.id}, skipping creation`);
+                        this.logger.log(`Debt already exists for employee ${employee.id} in period ${dto.periodId}, skipping creation`);
                     }
                 }
 
@@ -494,24 +493,38 @@ export class PayrollRunsService {
 
                     // ✅ Record excess deduction as employee debt for carryforward to next month
                     if (isPositive(excessDeductionAmount)) {
-                        await this.employeeDebtService.createDebt({
-                            companyId,
-                            employeeId: employee.id,
-                            amount: excessDeductionAmount,
-                            sourceType: DebtSourceType.OTHER, // Deduction excess carryforward
-                            sourceId: run.id,
-                            periodId: dto.periodId,
-                            reason: `خصومات مؤجلة للشهر القادم (تجاوز سقف ${maxDeductionPercent}% من الراتب)`,
+                        // 🔧 FIX: التحقق من عدم وجود دين سابق لنفس الموظف/الفترة قبل الإنشاء
+                        const existingExcessDebt = await tx.employeeDebtLedger.findFirst({
+                            where: {
+                                employeeId: employee.id,
+                                companyId,
+                                periodId: dto.periodId,
+                                reason: { contains: 'خصومات مؤجلة' },
+                            }
                         });
 
-                        calculation.calculationTrace.push({
-                            step: 'DEFERRED_DEDUCTION_CARRYFORWARD',
-                            description: `خصم مؤجل للشهر القادم`,
-                            formula: `المبلغ الزائد ${toFixed(excessDeductionAmount)} سيُخصم من الراتب القادم`,
-                            result: toNumber(excessDeductionAmount),
-                        });
+                        if (!existingExcessDebt) {
+                            await this.employeeDebtService.createDebt({
+                                companyId,
+                                employeeId: employee.id,
+                                amount: excessDeductionAmount,
+                                sourceType: DebtSourceType.OTHER, // Deduction excess carryforward
+                                sourceId: run.id,
+                                periodId: dto.periodId,
+                                reason: `خصومات مؤجلة للشهر القادم (تجاوز سقف ${maxDeductionPercent}% من الراتب)`,
+                            });
 
-                        this.logger.log(`💰 Created debt record for employee ${employee.id}: ${toFixed(excessDeductionAmount)} SAR (deduction excess)`);
+                            calculation.calculationTrace.push({
+                                step: 'DEFERRED_DEDUCTION_CARRYFORWARD',
+                                description: `خصم مؤجل للشهر القادم`,
+                                formula: `المبلغ الزائد ${toFixed(excessDeductionAmount)} سيُخصم من الراتب القادم`,
+                                result: toNumber(excessDeductionAmount),
+                            });
+
+                            this.logger.log(`💰 Created debt record for employee ${employee.id}: ${toFixed(excessDeductionAmount)} SAR (deduction excess)`);
+                        } else {
+                            this.logger.log(`Excess deduction debt already exists for employee ${employee.id} in period ${dto.periodId}, skipping`);
+                        }
                     }
                 }
 
