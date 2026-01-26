@@ -518,6 +518,13 @@ export class PayrollRunsService {
                             result: toNumber(excessDeductionAmount),
                         });
 
+                        // ✅ إضافة للبيانات المحفوظة لعرضها في التفاصيل
+                        deductionsData.push({
+                            name: `خصومات مؤجلة للشهر القادم (تجاوز سقف ${maxDeductionPercent}%)`,
+                            code: 'DEFERRED_DED',
+                            amount: toNumber(excessDeductionAmount)
+                        });
+
                         this.logger.log(`💰 Created debt record for employee ${employee.id}: ${toFixed(excessDeductionAmount)} SAR (deduction excess)`);
                     }
                 }
