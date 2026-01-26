@@ -386,6 +386,13 @@ export class PayrollRunsService {
                             result: toNumber(debtDeductionAmount),
                         });
 
+                        // ✅ إضافة للبيانات المحفوظة لعرضها في التفاصيل
+                        deductionsData.push({
+                            name: `سداد ديون سابقة (${debtResult.transactions.length} دين)`,
+                            code: 'DEBT_DED',
+                            amount: toNumber(debtDeductionAmount)
+                        });
+
                         this.logger.log(`Deducted ${toFixed(debtDeductionAmount)} SAR from employee ${employee.id} for debt repayment`);
                     }
                 }
