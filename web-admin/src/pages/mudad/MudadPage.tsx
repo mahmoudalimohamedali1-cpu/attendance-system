@@ -251,7 +251,7 @@ export default function MudadPage() {
 
     // Create submission mutation
     const createMutation = useMutation({
-        mutationFn: async (data: { payrollRunId: string; month: number; year: number }) => {
+        mutationFn: async (data: { payrollRunId: string }) => {
             return api.post('/mudad', data);
         },
         onSuccess: () => {
@@ -825,12 +825,9 @@ export default function MudadPage() {
                         variant="contained"
                         disabled={!selectedRunId || createMutation.isPending}
                         onClick={() => {
-                            const selectedRun = payrollRuns?.find(r => r.id === selectedRunId);
-                            if (selectedRun && selectedRun.period) {
+                            if (selectedRunId) {
                                 createMutation.mutate({
-                                    payrollRunId: selectedRun.id,
-                                    month: selectedRun.period.month,
-                                    year: selectedRun.period.year,
+                                    payrollRunId: selectedRunId,
                                 });
                             }
                         }}

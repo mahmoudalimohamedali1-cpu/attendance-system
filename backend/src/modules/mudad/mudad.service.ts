@@ -46,8 +46,10 @@ export class MudadService {
         });
 
         if (!run) throw new NotFoundException('مسيرة الرواتب غير موجودة');
-        if (run.status !== 'LOCKED' && run.status !== 'PAID') {
-            throw new BadRequestException('يجب إقفال مسيرة الرواتب قبل التقديم لمُدد');
+        // Allow approved runs (HR_APPROVED, FINANCE_APPROVED, LOCKED, PAID)
+        const allowedStatuses = ['HR_APPROVED', 'FINANCE_APPROVED', 'LOCKED', 'PAID'];
+        if (!allowedStatuses.includes(run.status)) {
+            throw new BadRequestException('يجب اعتماد مسيرة الرواتب قبل التقديم لمُدد');
         }
 
         // التحقق من صحة البيانات قبل التقديم لمُدد
