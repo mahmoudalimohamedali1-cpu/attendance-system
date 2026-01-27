@@ -73,9 +73,14 @@ import { wpsExportService, MudadValidationResult } from '@/services/wps.service'
 // PayrollRun type for selection
 interface PayrollRun {
     id: string;
-    month: number;
-    year: number;
     status: string;
+    period?: {
+        month: number;
+        year: number;
+    };
+    _count?: {
+        payslips: number;
+    };
 }
 
 // Types
@@ -221,12 +226,16 @@ export default function MudadPage() {
         enabled: !!selectedSubmission && logsDrawerOpen,
     });
 
-    // Fetch payroll runs for create dialog
+    // Fetch payroll runs for create dialog (get approved/locked runs)
     const { data: payrollRuns } = useQuery<PayrollRun[]>({
         queryKey: ['payroll-runs-for-mudad'],
         queryFn: async () => {
-            const response = await api.get('/payroll-runs?status=LOCKED');
-            return (response as any)?.data || response || [];
+            const response = await api.get('/payroll-runs');
+            const runs = (response as any)?.data || response || [];
+            // Filter to approved/locked runs only
+            return runs.filter((r: PayrollRun) =>
+                ['HR_APPROVED', 'FINANCE_APPROVED', 'LOCKED', 'PAID'].includes(r.status)
+            );
         },
     });
 
@@ -780,11 +789,19 @@ export default function MudadPage() {
                             label="دورة الرواتب"
                         >
                             {payrollRuns?.length === 0 && (
-                                <MenuItem disabled>لا توجد دورات رواتب مغلقة</MenuItem>
+                                <MenuItem disabled>لا توجد دورات رواتب معتمدة</MenuItem>
                             )}
                             {payrollRuns?.map((run) => (
                                 <MenuItem key={run.id} value={run.id}>
-                                    {getMonthName(run.month)} {run.year} - {run.status === 'LOCKED' ? '🔒 مغلقة' : run.status}
+                                    {run.period ?
+                                        `${getMonthName(run.period.month)} ${run.period.year}` :
+                                        'فترة غير محددة'
+                                    }
+                                    {' - '}
+                                    {run.status === 'LOCKED' ? '🔒 مغلقة' :
+                                        run.status === 'PAID' ? '✅ مدفوعة' :
+                                            run.status === 'FINANCE_APPROVED' ? '✅ معتمدة' : run.status}
+                                    {run._count?.payslips ? ` (👥 ${run._count.payslips})` : ''}
                                 </MenuItem>
                             ))}
                         </Select>
@@ -809,11 +826,11 @@ export default function MudadPage() {
                         disabled={!selectedRunId || createMutation.isPending}
                         onClick={() => {
                             const selectedRun = payrollRuns?.find(r => r.id === selectedRunId);
-                            if (selectedRun) {
+                            if (selectedRun && selectedRun.period) {
                                 createMutation.mutate({
                                     payrollRunId: selectedRun.id,
-                                    month: selectedRun.month,
-                                    year: selectedRun.year,
+                                    month: selectedRun.period.month,
+                                    year: selectedRun.period.year,
                                 });
                             }
                         }}
