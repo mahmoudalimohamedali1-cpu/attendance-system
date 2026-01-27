@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Paper,
@@ -502,12 +503,20 @@ export default function ExceptionsCenterPage() {
                                             </TableCell>
                                             <TableCell align="center">
                                                 {exc.actionUrl && (
-                                                    <Tooltip title="فتح صفحة الإصلاح">
+                                                    <Tooltip title="فتح صفحة الموظف للإصلاح">
                                                         <IconButton
                                                             size="small"
                                                             color="primary"
-                                                            href={exc.actionUrl}
-                                                            target="_blank"
+                                                            onClick={() => {
+                                                                // Navigate within the app
+                                                                const url = exc.actionUrl || '';
+                                                                if (url.startsWith('/users/')) {
+                                                                    // Extract employee ID and navigate to employee page
+                                                                    window.location.href = url;
+                                                                } else {
+                                                                    window.location.href = url;
+                                                                }
+                                                            }}
                                                         >
                                                             <OpenIcon fontSize="small" />
                                                         </IconButton>
