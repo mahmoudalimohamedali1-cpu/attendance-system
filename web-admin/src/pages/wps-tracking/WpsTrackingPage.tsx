@@ -275,7 +275,11 @@ export default function WpsTrackingPage() {
                                 <TableCell>الصيغة</TableCell>
                                 <TableCell>الحالة</TableCell>
                                 <TableCell>تاريخ التوليد</TableCell>
-                                <TableCell>Hash</TableCell>
+                                <TableCell>
+                                    <Tooltip title="بصمة رقمية للملف - تتغير لو تم تعديل الملف">
+                                        <span style={{ cursor: 'help' }}>التوقيع الرقمي 🔐</span>
+                                    </Tooltip>
+                                </TableCell>
                                 <TableCell align="center">الإجراءات</TableCell>
                             </TableRow>
                         </TableHead>
@@ -321,7 +325,7 @@ export default function WpsTrackingPage() {
                                     </TableCell>
                                     <TableCell>
                                         {submission.fileHashSha256 ? (
-                                            <Tooltip title="اضغط لنسخ التوقيع الرقمي">
+                                            <Tooltip title="بصمة فريدة للملف - اضغط لنسخها. استخدمها للتحقق من أن الملف لم يُعدَّل">
                                                 <Chip
                                                     label={submission.fileHashSha256.substring(0, 10) + '...'}
                                                     size="small"
@@ -446,7 +450,12 @@ export default function WpsTrackingPage() {
                                 </Grid>
                                 {selectedSubmission.fileHashSha256 && (
                                     <Grid item xs={12}>
-                                        <Typography variant="caption" color="text.secondary">SHA-256 Hash</Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            التوقيع الرقمي (بصمة الملف)
+                                        </Typography>
+                                        <Typography variant="caption" display="block" color="info.main" sx={{ mb: 0.5 }}>
+                                            💡 بصمة فريدة للملف - إذا تغيرت، فالملف تم تعديله
+                                        </Typography>
                                         <Typography
                                             variant="body2"
                                             sx={{
@@ -455,8 +464,12 @@ export default function WpsTrackingPage() {
                                                 p: 1,
                                                 borderRadius: 1,
                                                 wordBreak: 'break-all',
-                                                fontSize: '0.75rem'
+                                                fontSize: '0.75rem',
+                                                cursor: 'pointer',
+                                                '&:hover': { bgcolor: 'grey.200' }
                                             }}
+                                            onClick={() => handleCopyHash(selectedSubmission.fileHashSha256!)}
+                                            title="اضغط للنسخ"
                                         >
                                             {selectedSubmission.fileHashSha256}
                                         </Typography>
