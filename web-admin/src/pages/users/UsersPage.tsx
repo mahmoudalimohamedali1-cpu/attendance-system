@@ -569,7 +569,15 @@ export const UsersPage = () => {
                   </TableHead>
                   <TableBody>
                     {users.map((user) => (
-                      <TableRow key={user.id} hover>
+                      <TableRow
+                        key={user.id}
+                        hover
+                        sx={user.status === 'TERMINATED' ? {
+                          bgcolor: '#fef2f2',
+                          '&:hover': { bgcolor: '#fecaca !important' },
+                          '& td': { borderColor: '#fca5a5' },
+                        } : {}}
+                      >
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Avatar sx={{ bgcolor: 'primary.main' }}>
