@@ -39,6 +39,7 @@ import {
   Delete,
   PersonAdd,
   CheckCircle,
+  Cancel,
   Visibility,
   FileDownload,
   Face,
@@ -609,11 +610,28 @@ export const UsersPage = () => {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            icon={<CheckCircle />}
-                            label="نشط"
-                            color="success"
+                            icon={
+                              user.status === 'ACTIVE' ? <CheckCircle /> :
+                                user.status === 'TERMINATED' ? <Cancel /> :
+                                  user.status === 'SUSPENDED' ? <Cancel /> : undefined
+                            }
+                            label={
+                              user.status === 'ACTIVE' ? 'نشط' :
+                                user.status === 'TERMINATED' ? '🚫 تم إنهاء خدماته' :
+                                  user.status === 'SUSPENDED' ? 'موقوف' : 'غير نشط'
+                            }
+                            color={
+                              user.status === 'ACTIVE' ? 'success' :
+                                user.status === 'TERMINATED' ? 'error' :
+                                  user.status === 'SUSPENDED' ? 'warning' : 'default'
+                            }
                             size="small"
-                            variant="outlined"
+                            variant={user.status === 'TERMINATED' ? 'filled' : 'outlined'}
+                            sx={user.status === 'TERMINATED' ? {
+                              bgcolor: '#b91c1c',
+                              color: 'white',
+                              fontWeight: 'bold',
+                            } : {}}
                           />
                         </TableCell>
                         <TableCell align="center">
