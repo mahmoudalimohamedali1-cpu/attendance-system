@@ -132,12 +132,8 @@ export class UsersService {
     }
 
     if (role) where.role = role;
-    if (status) {
-      where.status = status;
-    } else {
-      // ✅ Exclude TERMINATED employees by default
-      where.status = { not: 'TERMINATED' };
-    }
+    if (status) where.status = status;
+    // ✅ TERMINATED employees now appear in list (styled in red on frontend)
     if (branchId) where.branchId = branchId;
     if (departmentId) where.departmentId = departmentId;
 
