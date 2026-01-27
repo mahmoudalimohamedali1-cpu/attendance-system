@@ -30,6 +30,7 @@ export interface ExceptionsSummary {
 export interface QuickStats {
     missingBank: number;
     missingSalary: number;
+    missingContract?: number;
     expiringContracts: number;
     totalIssues: number;
 }

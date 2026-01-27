@@ -66,6 +66,22 @@ export default function ExceptionsCenterPage() {
         try {
             const result = await exceptionsService.validateEmployees();
             setSummary(result);
+
+            // ✅ تحديث الإحصائيات من نتائج الفحص
+            if (result && result.byType) {
+                const missingBank = result.byType.find(t => t.type === 'MISSING_BANK')?.count || 0;
+                const missingSalary = result.byType.find(t => t.type === 'MISSING_SALARY')?.count || 0;
+                const missingContract = result.byType.find(t => t.type === 'MISSING_CONTRACT')?.count || 0;
+                const expiringContracts = result.byType.find(t => t.type === 'EXPIRED_CONTRACT')?.count || 0;
+
+                setStats({
+                    missingBank,
+                    missingSalary,
+                    missingContract,
+                    expiringContracts,
+                    totalIssues: result.errorCount + result.warningCount,
+                });
+            }
         } catch (err: any) {
             setError(err.response?.data?.message || 'حدث خطأ في الفحص');
         } finally {
@@ -132,36 +148,44 @@ export default function ExceptionsCenterPage() {
 
             {/* Quick Stats */}
             {stats && (
-                <Grid container spacing={3} sx={{ mb: 3 }}>
-                    <Grid item xs={12} sm={6} md={3}>
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={6} sm={4} md={2.4}>
                         <StatCard
                             title="بدون حساب بنكي"
                             value={stats.missingBank}
-                            icon={<BankIcon sx={{ fontSize: 40 }} />}
+                            icon={<BankIcon sx={{ fontSize: 32 }} />}
                             color={stats.missingBank > 0 ? 'error.main' : 'success.main'}
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid item xs={6} sm={4} md={2.4}>
                         <StatCard
                             title="بدون هيكل راتب"
                             value={stats.missingSalary}
-                            icon={<SalaryIcon sx={{ fontSize: 40 }} />}
+                            icon={<SalaryIcon sx={{ fontSize: 32 }} />}
                             color={stats.missingSalary > 0 ? 'error.main' : 'success.main'}
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid item xs={6} sm={4} md={2.4}>
+                        <StatCard
+                            title="بدون عقد نشط"
+                            value={stats.missingContract || 0}
+                            icon={<ContractIcon sx={{ fontSize: 32 }} />}
+                            color={(stats.missingContract || 0) > 0 ? 'warning.main' : 'success.main'}
+                        />
+                    </Grid>
+                    <Grid item xs={6} sm={4} md={2.4}>
                         <StatCard
                             title="عقود تنتهي قريباً"
                             value={stats.expiringContracts}
-                            icon={<ContractIcon sx={{ fontSize: 40 }} />}
+                            icon={<ContractIcon sx={{ fontSize: 32 }} />}
                             color={stats.expiringContracts > 0 ? 'warning.main' : 'success.main'}
                         />
                     </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid item xs={6} sm={4} md={2.4}>
                         <StatCard
                             title="إجمالي المشاكل"
                             value={stats.totalIssues}
-                            icon={<PeopleIcon sx={{ fontSize: 40 }} />}
+                            icon={<PeopleIcon sx={{ fontSize: 32 }} />}
                             color={stats.totalIssues > 0 ? 'error.main' : 'success.main'}
                         />
                     </Grid>
