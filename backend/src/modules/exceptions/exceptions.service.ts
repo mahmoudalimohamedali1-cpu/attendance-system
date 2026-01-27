@@ -204,7 +204,7 @@ export class ExceptionsService {
                     category: 'WPS',
                     severity: 'ERROR',
                     message: 'لا يوجد حساب بنكي - مطلوب لـ WPS',
-                    actionUrl: `/users/${emp.id}?tab=bank`,
+                    actionUrl: `/employee-profile/${emp.id}?tab=bank`,
                 });
             } else {
                 const bank = emp.bankAccounts[0];
@@ -218,7 +218,7 @@ export class ExceptionsService {
                         severity: 'ERROR',
                         message: `IBAN غير صحيح: ${bank.iban || 'فارغ'}`,
                         details: { iban: bank.iban },
-                        actionUrl: `/users/${emp.id}?tab=bank`,
+                        actionUrl: `/employee-profile/${emp.id}?tab=bank`,
                     });
                 }
 
@@ -262,7 +262,7 @@ export class ExceptionsService {
                     category: 'CONTRACT',
                     severity: 'ERROR',
                     message: 'لا يوجد عقد نشط',
-                    actionUrl: `/users/${emp.id}?tab=contract`,
+                    actionUrl: `/employee-profile/${emp.id}?tab=contract`,
                 });
             } else {
                 const contract = emp.contracts[0];
@@ -274,7 +274,7 @@ export class ExceptionsService {
                         category: 'CONTRACT',
                         severity: 'WARNING',
                         message: 'تواريخ العقد غير مكتملة',
-                        actionUrl: `/users/${emp.id}?tab=contract`,
+                        actionUrl: `/employee-profile/${emp.id}?tab=contract`,
                     });
                 } else if (contract.endDate < now) {
                     exceptions.push({
@@ -284,7 +284,7 @@ export class ExceptionsService {
                         severity: 'ERROR',
                         message: `العقد انتهى في ${contract.endDate.toISOString().slice(0, 10)}`,
                         details: { endDate: contract.endDate },
-                        actionUrl: `/users/${emp.id}?tab=contract`,
+                        actionUrl: `/employee-profile/${emp.id}?tab=contract`,
                     });
                 } else if (contract.endDate <= in30Days) {
                     exceptions.push({
@@ -294,7 +294,7 @@ export class ExceptionsService {
                         severity: 'WARNING',
                         message: `العقد ينتهي في ${contract.endDate.toISOString().slice(0, 10)}`,
                         details: { endDate: contract.endDate },
-                        actionUrl: `/users/${emp.id}?tab=contract`,
+                        actionUrl: `/employee-profile/${emp.id}?tab=contract`,
                     });
                 } else if (contract.endDate <= in60Days) {
                     exceptions.push({
@@ -319,7 +319,7 @@ export class ExceptionsService {
                     category: 'IDENTITY',
                     severity: 'ERROR',
                     message: 'لا يوجد رقم هوية/إقامة - مطلوب لـ WPS و GOSI',
-                    actionUrl: `/users/${emp.id}`,
+                    actionUrl: `/employee-profile/${emp.id}`,
                 });
             }
 
@@ -336,7 +336,7 @@ export class ExceptionsService {
                             severity: 'ERROR',
                             message: `الإقامة منتهية منذ ${iqamaDate.toISOString().slice(0, 10)}`,
                             details: { iqamaExpiry: iqamaDate },
-                            actionUrl: `/users/${emp.id}`,
+                            actionUrl: `/employee-profile/${emp.id}`,
                         });
                     } else if (iqamaDate <= in30Days) {
                         exceptions.push({
@@ -346,7 +346,7 @@ export class ExceptionsService {
                             severity: 'WARNING',
                             message: `الإقامة تنتهي في ${iqamaDate.toISOString().slice(0, 10)}`,
                             details: { iqamaExpiry: iqamaDate },
-                            actionUrl: `/users/${emp.id}`,
+                            actionUrl: `/employee-profile/${emp.id}`,
                         });
                     } else if (iqamaDate <= in60Days) {
                         exceptions.push({
@@ -372,7 +372,7 @@ export class ExceptionsService {
                     category: 'SALARY',
                     severity: 'ERROR',
                     message: 'لا يوجد هيكل راتب معين',
-                    actionUrl: `/users/${emp.id}?tab=salary`,
+                    actionUrl: `/employee-profile/${emp.id}?tab=salary`,
                 });
             } else {
                 const assignment = emp.salaryAssignments[0] as any;
@@ -414,7 +414,7 @@ export class ExceptionsService {
                     category: 'GOSI',
                     severity: 'WARNING',
                     message: 'رقم التأمينات (GOSI) غير مسجل',
-                    actionUrl: `/users/${emp.id}`,
+                    actionUrl: `/employee-profile/${emp.id}`,
                 });
             }
         }
