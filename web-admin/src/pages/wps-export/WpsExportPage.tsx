@@ -136,9 +136,9 @@ export default function WpsExportPage() {
             const response = await api.get('/payroll-runs') as PayrollRun[] | { data: PayrollRun[] };
             const runs = Array.isArray(response) ? response : (response as any).data || [];
 
-            // Filter to approved/locked runs that can be exported
+            // Filter to runs that can be exported (include DRAFT for preview, but only approved ones can actually export)
             const exportableRuns = runs.filter((r: PayrollRun) =>
-                ['HR_APPROVED', 'FINANCE_APPROVED', 'LOCKED', 'PAID'].includes(r.status)
+                ['DRAFT', 'HR_APPROVED', 'FINANCE_APPROVED', 'LOCKED', 'PAID'].includes(r.status)
             );
 
             setPayrollRuns(exportableRuns);
@@ -268,6 +268,7 @@ export default function WpsExportPage() {
 
     const getStatusLabel = (status: string) => {
         const labels: Record<string, { label: string; color: 'success' | 'warning' | 'info' | 'error' }> = {
+            'DRAFT': { label: 'مسودة', color: 'warning' },
             'HR_APPROVED': { label: 'معتمد HR', color: 'info' },
             'FINANCE_APPROVED': { label: 'معتمد المالية', color: 'success' },
             'LOCKED': { label: 'مقفل', color: 'success' },
@@ -435,11 +436,18 @@ export default function WpsExportPage() {
                             <>
                                 {/* Validation Status */}
                                 <Box display="flex" alignItems="center" gap={2} mb={3}>
-                                    {validation.isReady ? (
+                                    {validation.isReady && summary && summary.recordCount > 0 ? (
                                         <Chip
                                             icon={<CheckIcon />}
                                             label="جاهز للتصدير"
                                             color="success"
+                                            size="medium"
+                                        />
+                                    ) : summary?.recordCount === 0 ? (
+                                        <Chip
+                                            icon={<WarningIcon />}
+                                            label="لا يوجد موظفين للتصدير"
+                                            color="error"
                                             size="medium"
                                         />
                                     ) : (
