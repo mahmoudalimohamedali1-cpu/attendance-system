@@ -38,7 +38,7 @@ import {
     Send as SendIcon,
     Done as DoneIcon,
 } from '@mui/icons-material';
-import { api } from '@/services/api.service';
+import { api, API_URL } from '@/services/api.service';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -146,6 +146,34 @@ export default function WpsTrackingPage() {
         setDialogOpen(true);
     };
 
+    const handleDownload = async (submission: WpsSubmission) => {
+        const token = localStorage.getItem('access_token');
+        const endpoint = submission.fileFormat === 'SARIE' ? 'sarie' : 'csv';
+        const url = `${API_URL}/wps-export/${submission.payrollRunId}/${endpoint}`;
+
+        try {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error('Download failed');
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = submission.filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(downloadUrl);
+            document.body.removeChild(a);
+        } catch (err) {
+            console.error('Download error:', err);
+        }
+    };
+
+    const handleCopyHash = (hash: string) => {
+        navigator.clipboard.writeText(hash);
+    };
+
     return (
         <Box p={3}>
             {/* Header */}
@@ -248,7 +276,7 @@ export default function WpsTrackingPage() {
                                 <TableCell>الحالة</TableCell>
                                 <TableCell>تاريخ التوليد</TableCell>
                                 <TableCell>Hash</TableCell>
-                                <TableCell align="center">عرض</TableCell>
+                                <TableCell align="center">الإجراءات</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -293,24 +321,44 @@ export default function WpsTrackingPage() {
                                     </TableCell>
                                     <TableCell>
                                         {submission.fileHashSha256 ? (
-                                            <Tooltip title={submission.fileHashSha256}>
+                                            <Tooltip title="اضغط لنسخ التوقيع الرقمي">
                                                 <Chip
                                                     label={submission.fileHashSha256.substring(0, 10) + '...'}
                                                     size="small"
                                                     variant="outlined"
                                                     icon={<Lock fontSize="small" />}
+                                                    onClick={() => handleCopyHash(submission.fileHashSha256!)}
+                                                    sx={{ cursor: 'pointer' }}
                                                 />
                                             </Tooltip>
                                         ) : '-'}
                                     </TableCell>
                                     <TableCell align="center">
-                                        <IconButton
-                                            size="small"
-                                            color="primary"
-                                            onClick={() => handleViewDetails(submission)}
-                                        >
-                                            <Visibility />
-                                        </IconButton>
+                                        <Box display="flex" gap={0.5} justifyContent="center">
+                                            <Tooltip title="تنزيل الملف">
+                                                <IconButton
+                                                    size="small"
+                                                    color="success"
+                                                    onClick={() => handleDownload(submission)}
+                                                >
+                                                    <CloudDownload />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="عرض التفاصيل">
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => handleViewDetails(submission)}
+                                                >
+                                                    <Visibility />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
+                                        {submission.employeeCount === 0 && (
+                                            <Typography variant="caption" color="error" display="block">
+                                                ملف فارغ!
+                                            </Typography>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -435,6 +483,17 @@ export default function WpsTrackingPage() {
                             </Grid>
                         </DialogContent>
                         <DialogActions>
+                            <Button
+                                variant="contained"
+                                color="success"
+                                startIcon={<CloudDownload />}
+                                onClick={() => {
+                                    handleDownload(selectedSubmission);
+                                    setDialogOpen(false);
+                                }}
+                            >
+                                تنزيل الملف
+                            </Button>
                             <Button onClick={() => setDialogOpen(false)}>إغلاق</Button>
                         </DialogActions>
                     </>
