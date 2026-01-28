@@ -442,18 +442,35 @@ export default function PolicyWizardPage() {
     const handleSave = async (asDraft: boolean = false) => {
         setSaving(true);
         try {
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            // Build the policy text from wizard data
+            const policyText = generatePreview();
 
-            setSnackbar({
-                open: true,
-                message: asDraft ? 'تم حفظ المسودة بنجاح! 📝' : 'تم إنشاء السياسة بنجاح! 🎉',
-                severity: 'success',
+            // Create the policy via API
+            const result = await smartPoliciesService.create({
+                originalText: policyText,
+                name: data.name || 'سياسة جديدة',
+                effectiveFrom: data.effectiveFrom || undefined,
+                effectiveTo: data.effectiveTo || undefined,
             });
-        } catch (error) {
+
+            if (result.success) {
+                setSnackbar({
+                    open: true,
+                    message: asDraft ? 'تم حفظ المسودة بنجاح! 📝' : 'تم إنشاء السياسة بنجاح! 🎉',
+                    severity: 'success',
+                });
+                // Navigate to the policy list or details page
+                setTimeout(() => {
+                    window.location.href = '/smart-policies';
+                }, 1500);
+            } else {
+                throw new Error('فشل في إنشاء السياسة');
+            }
+        } catch (error: any) {
+            console.error('Policy creation error:', error);
             setSnackbar({
                 open: true,
-                message: 'حدث خطأ في الحفظ',
+                message: error?.message || 'حدث خطأ في الحفظ',
                 severity: 'error',
             });
         } finally {
