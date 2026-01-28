@@ -140,7 +140,7 @@ export class AIPolicyBuilderService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly aiService: AiService,
-    ) {}
+    ) { }
 
     /**
      * 🎯 بناء سياسة من وصف نصي
@@ -451,12 +451,12 @@ export class AIPolicyBuilderService {
             ],
             'CONSTRUCTION': [
                 'بدل موقع 10% من الراتب للعمل خارج المدينة',
-                'مكافأة سلامة 300 ريال شهرياً بدون حوادث',
+                'مكافأة 200 ريال شهرياً للالتزام بمواعيد الحضور',
                 'بدل سكن إضافي للمشاريع البعيدة',
             ],
             'EDUCATION': [
                 'مكافأة 500 ريال للمعلم المتميز شهرياً',
-                'بدل تطوير مهني 2000 ريال سنوياً',
+                'مكافأة 1000 ريال لإكمال المنهج قبل الموعد',
                 'خصم 100 ريال لكل حصة متغيب عنها',
             ],
         };
@@ -514,7 +514,7 @@ export class AIPolicyBuilderService {
             context.existingPolicies.map(p => p.parsedPolicy?.trigger?.event)
         );
 
-        const allTypes = ['ATTENDANCE', 'LEAVE', 'PERFORMANCE', 'ANNIVERSARY', 'CUSTODY'];
+        const allTypes = ['ATTENDANCE', 'LEAVE', 'PERFORMANCE', 'ANNIVERSARY', 'CUSTODY', 'PAYROLL'];
         const missingTypes = allTypes.filter(t => !existingTypes.has(t));
 
         const gapPolicies: Record<string, string> = {
@@ -699,7 +699,7 @@ export class AIPolicyBuilderService {
 
         for (const action of policy.actions) {
             const value = Number(action.value) || 0;
-            
+
             if (['BONUS', 'ALLOWANCE'].includes(action.type)) {
                 cost += value * affectedEmployees;
             } else if (action.type === 'DEDUCTION') {
@@ -715,7 +715,7 @@ export class AIPolicyBuilderService {
 
         // عدد الشروط
         if (policy.conditions.length > 5) riskScore += 2;
-        
+
         // قيمة الإجراءات
         for (const action of policy.actions) {
             const value = Number(action.value) || 0;
@@ -753,7 +753,7 @@ export class AIPolicyBuilderService {
 
     private calculateSimilarity(policy1: ParsedPolicyStructure, policy2: any): number {
         if (!policy2) return 0;
-        
+
         let similarity = 0;
 
         // مقارنة الـ trigger

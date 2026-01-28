@@ -549,11 +549,11 @@ export default function SmartPoliciesPage() {
                             startIcon={<SparkleIcon />}
                             onClick={() => setExtendDialogOpen(true)}
                             sx={{
-                                borderColor: '#9C27B0',
-                                color: '#9C27B0',
+                                borderColor: '#1976d2',
+                                color: '#1976d2',
                                 '&:hover': {
-                                    borderColor: '#7B1FA2',
-                                    bgcolor: 'rgba(156, 39, 176, 0.04)',
+                                    borderColor: '#1565c0',
+                                    bgcolor: 'rgba(25, 118, 210, 0.04)',
                                 },
                             }}
                         >
@@ -771,9 +771,9 @@ export default function SmartPoliciesPage() {
                                                     color="success"
                                                 />
                                             }
-                                            label={policy.isActive ? 'مفعّلة' : 'غير مفعّلة'}
+                                            label={policy.isActive ? '🟢 نشطة' : '⚪ متوقفة'}
                                         />
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        <Box sx={{ display: 'flex', gap: 0.5 }}>
                                             {/* Submit for Approval - only for DRAFT */}
                                             {policy.status === 'DRAFT' && (
                                                 <Tooltip title="إرسال للموافقة">
@@ -809,48 +809,19 @@ export default function SmartPoliciesPage() {
                                                     </Tooltip>
                                                 </>
                                             )}
-                                            <Tooltip title="محاكاة">
-                                                <IconButton
-                                                    color="secondary"
-                                                    size="small"
-                                                    onClick={() => handleOpenSimulation(policy)}
-                                                >
-                                                    <TestIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="تاريخ الإصدارات">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() => handleOpenVersionHistory(policy)}
-                                                >
-                                                    <HistoryIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="اكتشاف التعارضات">
-                                                <IconButton
-                                                    size="small"
-                                                    color="warning"
-                                                    onClick={() => handleOpenConflicts(policy)}
-                                                >
-                                                    <WarningIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="سجل التدقيق">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() => handleOpenAuditLog(policy)}
-                                                >
-                                                    <AuditIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
+                                            {/* التفاصيل */}
                                             <Tooltip title="التفاصيل">
                                                 <IconButton size="small" onClick={() => handleViewDetails(policy)}>
                                                     <InfoIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
-                                            <Tooltip title="حذف">
-                                                <IconButton color="error" size="small" onClick={() => handleDelete(policy.id)}>
-                                                    <DeleteIcon fontSize="small" />
+                                            {/* قائمة المزيد */}
+                                            <Tooltip title="المزيد">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={(e) => setMenuAnchor({ el: e.currentTarget, policy })}
+                                                >
+                                                    <MoreVertIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
                                         </Box>
@@ -862,6 +833,40 @@ export default function SmartPoliciesPage() {
                 </Grid>
             )}
 
+
+            {/* 🆕 قائمة الإجراءات المنسدلة */}
+            <Menu
+                anchorEl={menuAnchor.el}
+                open={Boolean(menuAnchor.el)}
+                onClose={() => setMenuAnchor({ el: null, policy: null })}
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+                <MenuItem onClick={() => { handleOpenSimulation(menuAnchor.policy!); setMenuAnchor({ el: null, policy: null }); }}>
+                    <ListItemIcon><TestIcon fontSize="small" /></ListItemIcon>
+                    <ListItemText>محاكاة</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { handleOpenVersionHistory(menuAnchor.policy!); setMenuAnchor({ el: null, policy: null }); }}>
+                    <ListItemIcon><HistoryIcon fontSize="small" /></ListItemIcon>
+                    <ListItemText>تاريخ الإصدارات</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { handleOpenConflicts(menuAnchor.policy!); setMenuAnchor({ el: null, policy: null }); }}>
+                    <ListItemIcon><WarningIcon fontSize="small" color="warning" /></ListItemIcon>
+                    <ListItemText>اكتشاف التعارضات</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { handleOpenAuditLog(menuAnchor.policy!); setMenuAnchor({ el: null, policy: null }); }}>
+                    <ListItemIcon><AuditIcon fontSize="small" /></ListItemIcon>
+                    <ListItemText>سجل التدقيق</ListItemText>
+                </MenuItem>
+                <Divider />
+                <MenuItem
+                    onClick={() => { handleDelete(menuAnchor.policy!.id); setMenuAnchor({ el: null, policy: null }); }}
+                    sx={{ color: 'error.main' }}
+                >
+                    <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
+                    <ListItemText>حذف</ListItemText>
+                </MenuItem>
+            </Menu>
 
             {/* حوار إنشاء سياسة جديدة */}
             <Dialog
@@ -1175,7 +1180,7 @@ export default function SmartPoliciesPage() {
                                             startIcon={testing ? <CircularProgress size={20} color="inherit" /> : <TestIcon />}
                                             onClick={() => handleTestPolicy(selectedPolicy)}
                                             disabled={testing}
-                                            sx={{ background: 'linear-gradient(45deg, #9C27B0 30%, #E040FB 90%)' }}
+                                            sx={{ background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)' }}
                                         >
                                             {testing ? 'جاري الاختبار...' : 'اختبر السياسة'}
                                         </Button>

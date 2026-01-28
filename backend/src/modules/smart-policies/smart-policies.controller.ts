@@ -1606,6 +1606,20 @@ export class SmartPoliciesController {
     }
 
     /**
+     * 🧠 تحليل النص الطبيعي وتحويله لبيانات معالجة
+     */
+    @Post('wizard/:sessionId/ai-parse')
+    @ApiOperation({ summary: 'تحليل النص الطبيعي وتحويله لبيانات معالج' })
+    async wizardAiParse(
+        @Param('sessionId') sessionId: string,
+        @Body() body: { text: string },
+    ) {
+        const parsedData = await this.service.analyzePolicy(body.text);
+        // تحديث الجلسة بالبيانات المستخرجة سيتم لاحقاً في الـ service
+        return { success: true, data: parsedData };
+    }
+
+    /**
      * 📋 جلب جلسة المعالج
      */
     @Get('wizard/:sessionId')

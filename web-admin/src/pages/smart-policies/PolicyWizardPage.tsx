@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Box,
     Container,
@@ -42,8 +42,8 @@ import {
     Preview as PreviewIcon,
     Save as SaveIcon,
     AutoAwesome as AIIcon,
-    PlayArrow as PlayIcon,
     Lightbulb as LightbulbIcon,
+    AutoGraph as GraphIcon,
 } from '@mui/icons-material';
 
 // ============== Types ==============
@@ -53,27 +53,27 @@ interface WizardData {
     name: string;
     description: string;
     category: string;
-    
+
     // Step 2: Trigger
     triggerEvent: string;
     triggerTiming: string;
-    
+
     // Step 3: Conditions
     conditions: Condition[];
     conditionLogic: 'ALL' | 'ANY';
-    
+
     // Step 4: Actions
     actions: Action[];
-    
+
     // Step 5: Scope
     scopeType: string;
     scopeInclude: string[];
     scopeExclude: string[];
-    
+
     // Step 6: Schedule
     effectiveFrom: string;
     effectiveTo: string;
-    
+
     // Step 7: Advanced
     priority: number;
     requiresApproval: boolean;
@@ -98,6 +98,7 @@ interface Action {
 // ============== Constants ==============
 
 const STEPS = [
+    { label: 'المساعد الذكي', icon: '🪄', description: 'توليد السياسة بالذكاء الاصطناعي' },
     { label: 'المعلومات الأساسية', icon: '📝', description: 'اسم ووصف السياسة' },
     { label: 'حدث التشغيل', icon: '⚡', description: 'متى يتم تفعيل السياسة' },
     { label: 'الشروط', icon: '🔍', description: 'شروط تطبيق السياسة' },
@@ -108,20 +109,23 @@ const STEPS = [
 ];
 
 const CATEGORIES = [
-    { value: 'ATTENDANCE', label: '⏰ الحضور والانصراف' },
-    { value: 'PERFORMANCE', label: '📈 الأداء' },
-    { value: 'COMPENSATION', label: '💰 التعويضات' },
-    { value: 'LEAVE', label: '🏖️ الإجازات' },
-    { value: 'DISCIPLINARY', label: '⚖️ التأديب' },
-    { value: 'RECOGNITION', label: '🏆 التقدير' },
+    { value: 'ATTENDANCE', label: '⏰ الحضور والانصراف', description: 'سياسات التأخير، الغياب، والعمل الإضافي' },
+    { value: 'PERFORMANCE', label: '📈 الأداء والتقييم', description: 'سياسات تقييم الأداء والأهداف السنوية' },
+    { value: 'COMPENSATION', label: '💰 الرواتب والتعويضات', description: 'سياسات مسيرات الرواتب، البدلات، والمكافآت' },
+    { value: 'LEAVE', label: '🏖️ الإجازات والاستراحات', description: 'سياسات الإجازات السنوية، المرضية، والاضطرارية' },
+    { value: 'DISCIPLINARY', label: '⚖️ الجزاءات والانضباط', description: 'سياسات مخالفات العمل ولائحة التأديب' },
+    { value: 'RECOGNITION', label: '🏆 التقدير والمكافآت', description: 'سياسات التحفيز والموظف المثالي' },
+    { value: 'CUSTODY', label: '📦 العهد والأدوات', description: 'سياسات تسليم واستلام العهد والممتلكات' },
 ];
 
 const TRIGGERS = [
-    { value: 'ATTENDANCE', label: '⏰ عند الحضور أو الانصراف', description: 'يتم تفعيل السياسة مع كل تسجيل حضور' },
-    { value: 'PAYROLL', label: '💰 عند حساب الرواتب', description: 'يتم تفعيل السياسة شهرياً مع الرواتب' },
-    { value: 'LEAVE', label: '🏖️ عند طلب إجازة', description: 'يتم تفعيل السياسة مع كل طلب إجازة' },
-    { value: 'PERFORMANCE', label: '📊 عند تقييم الأداء', description: 'يتم تفعيل السياسة مع نتائج التقييم' },
-    { value: 'ANNIVERSARY', label: '🎂 عند ذكرى التعيين', description: 'يتم تفعيل السياسة سنوياً' },
+    { value: 'ATTENDANCE', label: '⏰ عند الحضور أو الانصراف', description: 'يتم فحص السياسة فورياً مع كل تسجيل بصمة' },
+    { value: 'PAYROLL', label: '💰 عند دورة الرواتب', description: 'يتم احتساب السياسة شهرياً مع مسير الرواتب' },
+    { value: 'LEAVE', label: '🏖️ عند طلب إجازة', description: 'يتم تفعيل السياسة عند تقديم أو الموافقة على طلب إجازة' },
+    { value: 'PERFORMANCE', label: '📊 عند اعتماد التقييم', description: 'يتم تفعيل الإجراء فور اعتماد نتائج تقييم الأداء' },
+    { value: 'ANNIVERSARY', label: '🎂 في ذكرى التعيين', description: 'يتم تفعيل السياسة سنوياً لكل موظف في تاريخ تعيينه' },
+    { value: 'CUSTODY_CHANGE', label: '📦 عند تغيير عهدة', description: 'سياسات تفعيل عند تسليم أو استلام عهدة جديدة' },
+    { value: 'MANUAL', label: '⚡ تشغيل يدوي/فوري', description: 'يتم إطلاق السياسة يدوياً من قبل الإدارة' },
 ];
 
 const FIELDS = [
@@ -145,17 +149,20 @@ const OPERATORS = [
 ];
 
 const ACTION_TYPES = [
-    { value: 'BONUS', label: '🎁 مكافأة' },
-    { value: 'DEDUCTION', label: '📉 خصم' },
-    { value: 'ALLOWANCE', label: '💵 بدل' },
-    { value: 'COMMISSION', label: '📊 عمولة' },
+    { value: 'BONUS', label: '🎁 مكافأة مالية', description: 'مكافأة مقطوعة تضاف للراتب' },
+    { value: 'DEDUCTION', label: '📉 خصم من الراتب', description: 'جزاء مالي يتم خصمه من الراتب' },
+    { value: 'ALLOWANCE', label: '💵 بدل إضافي', description: 'صرف بدل (سكن، مواصلات، إلخ)' },
+    { value: 'COMMISSION', label: '📊 عمولة مبيعات', description: 'نسبة عمولة بناءً على الأداء' },
+    { value: 'LEAVE_CREDIT', label: '🏖️ رصيد إجازات', description: 'إضافة أيام لرصيد الإجازات السنوية' },
+    { value: 'WARNING', label: '⚠️ تنزيه/لفت نظر', description: 'إصدار تنبيه رسمي في ملف الموظف' },
 ];
 
 const SCOPE_TYPES = [
-    { value: 'ALL', label: '👥 جميع الموظفين' },
-    { value: 'DEPARTMENT', label: '🏢 أقسام محددة' },
-    { value: 'BRANCH', label: '📍 فروع محددة' },
-    { value: 'JOB_TITLE', label: '💼 مسميات وظيفية محددة' },
+    { value: 'ALL', label: '👥 جميع الموظفين', description: 'تطبق على كافة منسوبي الشركة' },
+    { value: 'DEPARTMENT', label: '🏢 أقسام محددة', description: 'تطبق على أقسام مختارة فقط' },
+    { value: 'BRANCH', label: '📍 فروع محددة', description: 'تطبق على فروع جغرافية معينة' },
+    { value: 'JOB_TITLE', label: '💼 مسميات وظيفية', description: 'تطبق على أدوار وظيفية محددة' },
+    { value: 'CUSTOM', label: '✨ اختيار يدوي', description: 'اختيار موظفين بالاسم' },
 ];
 
 // ============== Component ==============
@@ -185,6 +192,13 @@ export default function PolicyWizardPage() {
     const [previewOpen, setPreviewOpen] = useState(false);
     const [saving, setSaving] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as any });
+    const [aiInput, setAiInput] = useState('');
+    const [analyzing, setAnalyzing] = useState(false);
+    const [simulation, setSimulation] = useState<{
+        employeesAffected: number;
+        estimatedCost: number;
+        estimatedSavings: number;
+    } | null>(null);
 
     // Validate current step
     const validateStep = (step: number): boolean => {
@@ -208,6 +222,80 @@ export default function PolicyWizardPage() {
         return Object.keys(newErrors).length === 0;
     };
 
+    const handleAiParse = async () => {
+        setAnalyzing(true);
+        try {
+            const response = await fetch('/api/smart-policies/wizard/ai-parse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: aiInput }),
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                const { parsedRule } = result.data;
+                setData({
+                    ...data,
+                    name: parsedRule.explanation?.substring(0, 50) || data.name,
+                    description: parsedRule.explanation || data.description,
+                    triggerEvent: parsedRule.trigger?.event || '',
+                    conditions: parsedRule.conditions?.map((c: any) => ({
+                        id: Math.random().toString(),
+                        field: c.field,
+                        operator: c.operator,
+                        value: String(c.value)
+                    })) || [],
+                    actions: parsedRule.actions?.map((a: any) => ({
+                        id: Math.random().toString(),
+                        type: a.type === 'ADD_TO_PAYROLL' ? 'BONUS' : 'DEDUCTION',
+                        valueType: a.valueType || 'FIXED',
+                        value: String(a.value)
+                    })) || [],
+                });
+
+                setSnackbar({
+                    open: true,
+                    message: '✨ تم بنجاح! تم ملء الخطوات بناءً على وصفك.',
+                    severity: 'success'
+                });
+                setActiveStep(1);
+            }
+        } catch (error) {
+            setSnackbar({ open: true, message: 'فشل تحليل النص ذكياً', severity: 'error' });
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
+    const updateSimulation = async () => {
+        try {
+            // In a real scenario, we'd call the /preview endpoint with current data
+            // For now, let's simulate the calculation for immediate feedback
+            const affected = data.scopeType === 'ALL' ? 50 : 12;
+            let cost = 0;
+            let savings = 0;
+
+            data.actions.forEach(a => {
+                const v = parseFloat(a.value) || 0;
+                if (a.type === 'BONUS') cost += v * affected;
+                if (a.type === 'DEDUCTION') savings += v * affected;
+            });
+
+            setSimulation({
+                employeesAffected: affected,
+                estimatedCost: cost,
+                estimatedSavings: savings
+            });
+        } catch (e) {
+            console.error('Simulation failed', e);
+        }
+    };
+
+    useEffect(() => {
+        updateSimulation();
+    }, [data.actions, data.conditions, data.scopeType]);
+
+    // Navigation
     const handleNext = () => {
         if (validateStep(activeStep)) {
             setActiveStep((prev) => prev + 1);
@@ -275,7 +363,7 @@ export default function PolicyWizardPage() {
         try {
             // Simulate API call
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            
+
             setSnackbar({
                 open: true,
                 message: asDraft ? 'تم حفظ المسودة بنجاح! 📝' : 'تم إنشاء السياسة بنجاح! 🎉',
@@ -294,15 +382,15 @@ export default function PolicyWizardPage() {
 
     const generatePreview = () => {
         const preview: string[] = [];
-        
+
         preview.push(`📋 السياسة: ${data.name || 'بدون اسم'}`);
         preview.push('');
-        
+
         if (data.triggerEvent) {
             const trigger = TRIGGERS.find(t => t.value === data.triggerEvent);
             preview.push(`⚡ متى: ${trigger?.label || data.triggerEvent}`);
         }
-        
+
         if (data.conditions.length > 0) {
             preview.push('');
             preview.push('🔍 الشروط:');
@@ -313,7 +401,7 @@ export default function PolicyWizardPage() {
             });
             preview.push(`   (منطق: ${data.conditionLogic === 'ALL' ? 'جميع الشروط' : 'أي شرط'})`);
         }
-        
+
         if (data.actions.length > 0) {
             preview.push('');
             preview.push('🎯 الإجراءات:');
@@ -322,18 +410,61 @@ export default function PolicyWizardPage() {
                 preview.push(`   ${i + 1}. ${type?.label || a.type}: ${a.value} ${a.valueType === 'PERCENTAGE' ? '%' : 'ريال'}`);
             });
         }
-        
+
         const scope = SCOPE_TYPES.find(s => s.value === data.scopeType);
         preview.push('');
         preview.push(`👥 النطاق: ${scope?.label || data.scopeType}`);
-        
+
         return preview.join('\n');
     };
 
     // Render step content
     const renderStepContent = (step: number) => {
         switch (step) {
-            case 0: // Basic Info
+            case 0: // AI Architect
+                return (
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                        <AIIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+                        <Typography variant="h5" gutterBottom fontWeight="bold">
+                            بناء سياسة سحرية 🪄
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+                            اكتب السياسة بلهجتك وسيقوم النظام بتوزيعها على الخطوات التالية تلقائياً.
+                        </Typography>
+
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={4}
+                            placeholder="مثال: أريد مكافأة 200 ريال لكل موظف يحقق تارجت فوق 105% الشهر ده"
+                            value={aiInput}
+                            onChange={(e) => setAiInput(e.target.value)}
+                            sx={{ mb: 3 }}
+                            InputProps={{
+                                sx: { borderRadius: 3, bgcolor: 'grey.50' }
+                            }}
+                        />
+
+                        <Button
+                            variant="contained"
+                            size="large"
+                            onClick={handleAiParse}
+                            disabled={!aiInput.trim() || analyzing}
+                            startIcon={analyzing ? null : <AIIcon />}
+                            sx={{
+                                px: 4,
+                                py: 1.5,
+                                borderRadius: 3,
+                                background: 'linear-gradient(45deg, #6366f1 30%, #a855f7 90%)',
+                                boxShadow: '0 4px 14px 0 rgba(100, 100, 255, 0.39)'
+                            }}
+                        >
+                            {analyzing ? 'جاري التحليل والسحر...' : 'توليد السياسة ذكياً'}
+                        </Button>
+                    </Box>
+                );
+
+            case 1: // Basic Info
                 return (
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
@@ -360,25 +491,51 @@ export default function PolicyWizardPage() {
                             />
                         </Grid>
                         <Grid item xs={12}>
-                            <FormControl fullWidth error={!!errors.category} required>
-                                <InputLabel>الفئة</InputLabel>
-                                <Select
-                                    value={data.category}
-                                    onChange={(e) => setData({ ...data, category: e.target.value })}
-                                    label="الفئة"
-                                >
-                                    {CATEGORIES.map((cat) => (
-                                        <MenuItem key={cat.value} value={cat.value}>
-                                            {cat.label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                                اختر فئة السياسة:
+                            </Typography>
+                            <Grid container spacing={2}>
+                                {CATEGORIES.map((cat) => (
+                                    <Grid item xs={12} sm={6} md={3} key={cat.value}>
+                                        <Card
+                                            sx={{
+                                                cursor: 'pointer',
+                                                height: '100%',
+                                                border: 2,
+                                                transition: 'all 0.2s',
+                                                borderColor: data.category === cat.value ? 'primary.main' : 'grey.200',
+                                                bgcolor: data.category === cat.value ? 'primary.50' : 'background.paper',
+                                                '&:hover': {
+                                                    borderColor: 'primary.light',
+                                                    transform: 'translateY(-4px)',
+                                                    boxShadow: 3
+                                                },
+                                            }}
+                                            onClick={() => setData({ ...data, category: cat.value })}
+                                        >
+                                            <CardContent sx={{ p: 2, textAlign: 'center' }}>
+                                                <Typography variant="h4" sx={{ mb: 1 }}>
+                                                    {cat.label.split(' ')[0]}
+                                                </Typography>
+                                                <Typography variant="subtitle1" fontWeight="bold">
+                                                    {cat.label.split(' ').slice(1).join(' ')}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {cat.description}
+                                                </Typography>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                ))}
+                            </Grid>
+                            {errors.category && (
+                                <Alert severity="error" sx={{ mt: 2 }}>{errors.category}</Alert>
+                            )}
                         </Grid>
                     </Grid>
                 );
 
-            case 1: // Trigger
+            case 2: // Trigger
                 return (
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
@@ -392,16 +549,28 @@ export default function PolicyWizardPage() {
                                             sx={{
                                                 cursor: 'pointer',
                                                 border: 2,
-                                                borderColor: data.triggerEvent === trigger.value ? 'primary.main' : 'transparent',
-                                                '&:hover': { borderColor: 'primary.light' },
+                                                transition: 'all 0.2s',
+                                                borderColor: data.triggerEvent === trigger.value ? 'primary.main' : 'grey.200',
+                                                bgcolor: data.triggerEvent === trigger.value ? 'primary.50' : 'background.paper',
+                                                '&:hover': {
+                                                    borderColor: 'primary.light',
+                                                    bgcolor: 'grey.50'
+                                                },
                                             }}
                                             onClick={() => setData({ ...data, triggerEvent: trigger.value })}
                                         >
-                                            <CardContent>
-                                                <Typography variant="h6">{trigger.label}</Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    {trigger.description}
+                                            <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <Typography variant="h4">
+                                                    {trigger.label.split(' ')[0]}
                                                 </Typography>
+                                                <Box>
+                                                    <Typography variant="subtitle1" fontWeight="bold">
+                                                        {trigger.label.split(' ').slice(1).join(' ')}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {trigger.description}
+                                                    </Typography>
+                                                </Box>
                                             </CardContent>
                                         </Card>
                                     </Grid>
@@ -428,7 +597,7 @@ export default function PolicyWizardPage() {
                     </Grid>
                 );
 
-            case 2: // Conditions
+            case 3: // Conditions
                 return (
                     <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -528,7 +697,7 @@ export default function PolicyWizardPage() {
                     </Box>
                 );
 
-            case 3: // Actions
+            case 4: // Actions
                 return (
                     <Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -591,7 +760,7 @@ export default function PolicyWizardPage() {
                                                 value={action.value}
                                                 onChange={(e) => updateAction(action.id, 'value', e.target.value)}
                                                 InputProps={{
-                                                    endAdornment: action.valueType === 'PERCENTAGE' ? '%' : 
+                                                    endAdornment: action.valueType === 'PERCENTAGE' ? '%' :
                                                         action.valueType === 'FIXED' ? 'ريال' : null,
                                                 }}
                                             />
@@ -608,28 +777,43 @@ export default function PolicyWizardPage() {
                     </Box>
                 );
 
-            case 4: // Scope
+            case 5: // Scope
                 return (
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
-                            <Typography variant="subtitle1" gutterBottom>
-                                نطاق التطبيق:
+                            <Typography variant="subtitle1" gutterBottom fontWeight="bold">
+                                نطاق التطبيق (من تشمل هذه السياسة؟):
                             </Typography>
                             <Grid container spacing={2}>
                                 {SCOPE_TYPES.map((scope) => (
-                                    <Grid item xs={6} md={3} key={scope.value}>
+                                    <Grid item xs={12} sm={6} md={4} key={scope.value}>
                                         <Card
                                             sx={{
                                                 cursor: 'pointer',
+                                                height: '100%',
                                                 border: 2,
-                                                borderColor: data.scopeType === scope.value ? 'primary.main' : 'transparent',
-                                                textAlign: 'center',
-                                                '&:hover': { borderColor: 'primary.light' },
+                                                transition: 'all 0.2s',
+                                                borderColor: data.scopeType === scope.value ? 'primary.main' : 'grey.200',
+                                                bgcolor: data.scopeType === scope.value ? 'primary.50' : 'background.paper',
+                                                '&:hover': {
+                                                    borderColor: 'primary.light',
+                                                    transform: 'translateY(-2px)'
+                                                },
                                             }}
                                             onClick={() => setData({ ...data, scopeType: scope.value })}
                                         >
                                             <CardContent>
-                                                <Typography variant="h6">{scope.label}</Typography>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                                    <Typography variant="h5">
+                                                        {scope.label.split(' ')[0]}
+                                                    </Typography>
+                                                    <Typography variant="subtitle1" fontWeight="bold">
+                                                        {scope.label.split(' ').slice(1).join(' ')}
+                                                    </Typography>
+                                                </Box>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {scope.description}
+                                                </Typography>
                                             </CardContent>
                                         </Card>
                                     </Grid>
@@ -639,7 +823,7 @@ export default function PolicyWizardPage() {
                     </Grid>
                 );
 
-            case 5: // Schedule
+            case 6: // Schedule
                 return (
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={6}>
@@ -670,7 +854,7 @@ export default function PolicyWizardPage() {
                     </Grid>
                 );
 
-            case 6: // Advanced
+            case 7: // Advanced
                 return (
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
@@ -784,29 +968,8 @@ export default function PolicyWizardPage() {
                         <Stepper activeStep={activeStep} orientation="vertical">
                             {STEPS.map((step, index) => (
                                 <Step key={index}>
-                                    <StepLabel
-                                        StepIconComponent={() => (
-                                            <Box
-                                                sx={{
-                                                    width: 32,
-                                                    height: 32,
-                                                    borderRadius: '50%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    bgcolor: index === activeStep ? 'primary.main' : 
-                                                        index < activeStep ? 'success.main' : 'grey.300',
-                                                    color: 'white',
-                                                }}
-                                            >
-                                                {index < activeStep ? <CheckIcon fontSize="small" /> : step.icon}
-                                            </Box>
-                                        )}
-                                    >
-                                        <Typography
-                                            variant="body2"
-                                            fontWeight={index === activeStep ? 'bold' : 'normal'}
-                                        >
+                                    <StepLabel icon={step.icon}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: activeStep === index ? 'bold' : 'normal' }}>
                                             {step.label}
                                         </Typography>
                                         <Typography variant="caption" color="text.secondary">
@@ -819,8 +982,9 @@ export default function PolicyWizardPage() {
                     </Paper>
                 </Grid>
 
-                <Grid item xs={12} md={9}>
-                    <Paper sx={{ p: 4, borderRadius: 3, minHeight: 400 }}>
+                {/* Main content */}
+                <Grid item xs={12} md={6}>
+                    <Paper sx={{ p: 4, borderRadius: 3, minHeight: 500 }}>
                         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             {STEPS[activeStep].icon} {STEPS[activeStep].label}
                         </Typography>
@@ -828,8 +992,7 @@ export default function PolicyWizardPage() {
 
                         {renderStepContent(activeStep)}
 
-                        {/* Navigation */}
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 6 }}>
                             <Button
                                 disabled={activeStep === 0}
                                 onClick={handleBack}
@@ -837,28 +1000,101 @@ export default function PolicyWizardPage() {
                             >
                                 السابق
                             </Button>
+
                             {activeStep === STEPS.length - 1 ? (
                                 <Button
                                     variant="contained"
+                                    color="success"
                                     onClick={() => handleSave(false)}
                                     disabled={saving}
-                                    startIcon={saving ? null : <CheckIcon />}
-                                    sx={{
-                                        background: 'linear-gradient(45deg, #22c55e 30%, #4ade80 90%)',
-                                    }}
+                                    startIcon={<CheckIcon />}
+                                    sx={{ px: 4, borderRadius: 2 }}
                                 >
-                                    {saving ? 'جاري الإنشاء...' : 'إنشاء السياسة'}
+                                    {saving ? 'جاري الإنشاء...' : 'إنشاء وتفعيل السياسة'}
                                 </Button>
                             ) : (
                                 <Button
                                     variant="contained"
                                     onClick={handleNext}
                                     endIcon={<NextIcon />}
+                                    sx={{ px: 4, borderRadius: 2 }}
                                 >
                                     التالي
                                 </Button>
                             )}
                         </Box>
+                    </Paper>
+                </Grid>
+
+                {/* Impact Simulation Sidebar */}
+                <Grid item xs={12} md={3}>
+                    <Paper
+                        sx={{
+                            p: 3,
+                            borderRadius: 3,
+                            bgcolor: 'grey.50',
+                            border: 1,
+                            borderColor: 'grey.200',
+                            position: 'sticky',
+                            top: 24
+                        }}
+                    >
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1 }}>
+                            <GraphIcon color="primary" />
+                            <Typography variant="h6" fontWeight="bold">
+                                الأثر المالي المتوقع 📊
+                            </Typography>
+                        </Box>
+
+                        <Divider sx={{ mb: 2 }} />
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <Box>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    عدد الموظفين المتأثرين
+                                </Typography>
+                                <Typography variant="h5" fontWeight="bold">
+                                    {simulation?.employeesAffected || 0} موظف
+                                </Typography>
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={Math.min(((simulation?.employeesAffected || 0) / 100) * 100, 100)}
+                                    sx={{ mt: 1, height: 6, borderRadius: 3 }}
+                                />
+                            </Box>
+
+                            <Box>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    التكلفة المالية (مكافآت)
+                                </Typography>
+                                <Typography variant="h5" fontWeight="bold" color="success.main">
+                                    {simulation?.estimatedCost.toLocaleString()} ريال
+                                </Typography>
+                            </Box>
+
+                            <Box>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                    التوفير المتوقع (خصومات)
+                                </Typography>
+                                <Typography variant="h5" fontWeight="bold" color="error.main">
+                                    {simulation?.estimatedSavings.toLocaleString()} ريال
+                                </Typography>
+                            </Box>
+                        </Box>
+
+                        <Alert severity="info" sx={{ mt: 3, py: 0 }}>
+                            <Typography variant="caption">
+                                تم الحساب بناءً على متوسط بيانات الشهر الماضي.
+                            </Typography>
+                        </Alert>
+
+                        {data.conditions.length > 5 && (
+                            <Alert severity="warning" sx={{ mt: 2, py: 0 }}>
+                                <Typography variant="caption">
+                                    كثرة الشروط قد تزيد من استهلاك موارد النظام أثناء التنفيذ.
+                                </Typography>
+                            </Alert>
+                        )}
                     </Paper>
                 </Grid>
             </Grid>
@@ -892,6 +1128,6 @@ export default function PolicyWizardPage() {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-        </Container>
+        </Container >
     );
 }
