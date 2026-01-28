@@ -42,8 +42,11 @@ const enterprisePermissions = [
     { code: 'CONTRACT_VIEW', name: 'عرض العقود', nameEn: 'View Contracts', category: 'العقود' },
     { code: 'CONTRACT_CREATE', name: 'إنشاء عقد', nameEn: 'Create Contract', category: 'العقود' },
     { code: 'CONTRACT_EDIT', name: 'تعديل عقد', nameEn: 'Edit Contract', category: 'العقود' },
+    { code: 'CONTRACT_SEND', name: 'إرسال عقد للموظف', nameEn: 'Send Contract to Employee', category: 'العقود' },
+    { code: 'CONTRACT_EMPLOYER_SIGN', name: 'توقيع صاحب العمل', nameEn: 'Employer Sign Contract', category: 'العقود' },
     { code: 'CONTRACT_TERMINATE', name: 'إنهاء عقد', nameEn: 'Terminate Contract', category: 'العقود' },
     { code: 'CONTRACT_RENEW', name: 'تجديد عقد', nameEn: 'Renew Contract', category: 'العقود' },
+    { code: 'CONTRACT_QIWA_UPDATE', name: 'تحديث حالة قوى', nameEn: 'Update Qiwa Status', category: 'العقود' },
 
     // === السلف ===
     { code: 'ADVANCE_VIEW', name: 'عرض السلف', nameEn: 'View Advances', category: 'السلف' },
