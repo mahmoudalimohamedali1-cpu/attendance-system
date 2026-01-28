@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
     CreateContractDto,
     UpdateContractDto,
@@ -18,7 +19,9 @@ export class ContractsService {
     constructor(
         private prisma: PrismaService,
         private auditService: AuditService,
+        private notificationsService: NotificationsService,
     ) { }
+
 
     async findAll(companyId: string, filters?: { status?: string; qiwaStatus?: string }) {
         const where: any = { user: { companyId } };
@@ -246,6 +249,15 @@ export class ContractsService {
             `إرسال العقد للموظف للتوقيع: ${contract.contractNumber}`,
         );
 
+        // إرسال إشعار للموظف
+        await this.notificationsService.sendNotification(
+            contract.userId,
+            'GENERAL',
+            '📝 عقد جديد بانتظار توقيعك',
+            `تم إرسال عقد عمل جديد لك للمراجعة والتوقيع. رقم العقد: ${contract.contractNumber}`,
+            { contractId: id, actionUrl: '/my-contracts' },
+        );
+
         return updated;
     }
 
@@ -260,6 +272,12 @@ export class ContractsService {
         if (contract.status !== 'PENDING_EMPLOYEE') {
             throw new BadRequestException('العقد ليس بانتظار توقيع الموظف');
         }
+
+        // جلب بيانات الموظف
+        const employee = await this.prisma.user.findUnique({
+            where: { id: employeeId },
+            select: { firstName: true, lastName: true },
+        });
 
         const updated = await this.prisma.contract.update({
             where: { id },
@@ -279,6 +297,22 @@ export class ContractsService {
             { employeeSignature: true },
             `توقيع الموظف على العقد: ${contract.contractNumber}`,
         );
+
+        // إشعار HR/Admin بأن الموظف وقع العقد
+        const hrUsers = await this.prisma.user.findMany({
+            where: { companyId, role: 'ADMIN', status: 'ACTIVE' },
+            select: { id: true },
+        });
+
+        for (const hrUser of hrUsers) {
+            await this.notificationsService.sendNotification(
+                hrUser.id,
+                'GENERAL',
+                '✅ موظف وقّع على عقده',
+                `وقّع الموظف ${employee?.firstName || ''} ${employee?.lastName || 'موظف'} على العقد رقم ${contract.contractNumber}. العقد جاهز لتوقيع صاحب العمل.`,
+                { contractId: id, actionUrl: '/contracts' },
+            );
+        }
 
         return updated;
     }
