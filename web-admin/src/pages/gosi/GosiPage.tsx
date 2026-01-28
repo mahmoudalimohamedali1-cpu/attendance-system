@@ -443,7 +443,7 @@ export default function GosiPage() {
                                         <Card sx={{ textAlign: 'center', bgcolor: 'info.50' }}>
                                             <CardContent>
                                                 <Typography variant="h5" fontWeight="bold" color="info.main">
-                                                    {formatCurrency(gosiReport.totalContributionBase)}
+                                                    {formatCurrency(gosiReport.totalContributionBase ?? 0)}
                                                 </Typography>
                                                 <Typography variant="body2" color="text.secondary">إجمالي الوعاء</Typography>
                                             </CardContent>
@@ -453,7 +453,7 @@ export default function GosiPage() {
                                         <Card sx={{ textAlign: 'center', bgcolor: 'warning.50' }}>
                                             <CardContent>
                                                 <Typography variant="h5" fontWeight="bold" color="warning.main">
-                                                    {formatCurrency(gosiReport.totalEmployeeShare)}
+                                                    {formatCurrency(gosiReport.totalEmployeeShare ?? 0)}
                                                 </Typography>
                                                 <Typography variant="body2" color="text.secondary">حصة الموظفين</Typography>
                                             </CardContent>
@@ -463,7 +463,7 @@ export default function GosiPage() {
                                         <Card sx={{ textAlign: 'center', bgcolor: 'success.50' }}>
                                             <CardContent>
                                                 <Typography variant="h5" fontWeight="bold" color="success.main">
-                                                    {formatCurrency(gosiReport.totalEmployerShare)}
+                                                    {formatCurrency(gosiReport.totalEmployerShare ?? 0)}
                                                 </Typography>
                                                 <Typography variant="body2" color="text.secondary">حصة صاحب العمل</Typography>
                                             </CardContent>
