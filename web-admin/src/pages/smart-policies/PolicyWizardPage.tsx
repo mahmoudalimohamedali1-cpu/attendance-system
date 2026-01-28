@@ -210,6 +210,7 @@ export default function PolicyWizardPage() {
     const [employees, setEmployees] = useState<User[]>([]);
     const [departments, setDepartments] = useState<DepartmentInfo[]>([]);
     const [branches, setBranches] = useState<BranchInfo[]>([]);
+    const [jobTitles, setJobTitles] = useState<{ title: string; count: number }[]>([]);
     const [loadingScope, setLoadingScope] = useState(false);
 
     // Fetch scope data on mount
@@ -225,6 +226,18 @@ export default function PolicyWizardPage() {
                 setEmployees(emps);
                 setDepartments(depts);
                 setBranches(brns);
+
+                // Extract unique job titles from employees
+                const titleCounts: Record<string, number> = {};
+                emps.forEach((emp: any) => {
+                    const title = emp.jobTitle || emp.role || 'غير محدد';
+                    titleCounts[title] = (titleCounts[title] || 0) + 1;
+                });
+                const titles = Object.entries(titleCounts).map(([title, count]) => ({
+                    title,
+                    count
+                }));
+                setJobTitles(titles);
             } catch (error) {
                 console.error('Failed to fetch scope data:', error);
             } finally {
@@ -308,16 +321,45 @@ export default function PolicyWizardPage() {
 
     const updateSimulation = async () => {
         try {
-            // In a real scenario, we'd call the /preview endpoint with current data
-            // For now, let's simulate the calculation for immediate feedback
-            const affected = data.scopeType === 'ALL' ? 50 : 12;
+            // Calculate affected employees based on scope
+            let affected = 0;
+
+            if (data.scopeType === 'ALL') {
+                affected = employees.length || 50; // Use actual count or fallback
+            } else if (data.scopeType === 'DEPARTMENT' && data.scopeInclude.length > 0) {
+                // Count employees in selected departments
+                affected = departments
+                    .filter(d => data.scopeInclude.includes(d.id))
+                    .reduce((sum, d) => sum + (d._count?.users || 0), 0);
+            } else if (data.scopeType === 'BRANCH' && data.scopeInclude.length > 0) {
+                // Count employees in selected branches
+                affected = branches
+                    .filter(b => data.scopeInclude.includes(b.id))
+                    .reduce((sum, b) => sum + (b._count?.users || 0), 0);
+            } else if (data.scopeType === 'JOB_TITLE' && data.scopeInclude.length > 0) {
+                // Count employees with selected job titles
+                affected = jobTitles
+                    .filter(j => data.scopeInclude.includes(j.title))
+                    .reduce((sum, j) => sum + j.count, 0);
+            } else if (data.scopeType === 'CUSTOM' && data.scopeInclude.length > 0) {
+                // Direct employee selection
+                affected = data.scopeInclude.length;
+            } else {
+                // Default: no selection yet
+                affected = 0;
+            }
+
             let cost = 0;
             let savings = 0;
 
             data.actions.forEach(a => {
                 const v = parseFloat(a.value) || 0;
-                if (a.type === 'BONUS') cost += v * affected;
-                if (a.type === 'DEDUCTION') savings += v * affected;
+                if (a.type === 'BONUS' || a.type === 'ALLOWANCE' || a.type === 'COMMISSION') {
+                    cost += v * (affected || 1);
+                }
+                if (a.type === 'DEDUCTION') {
+                    savings += v * (affected || 1);
+                }
             });
 
             setSimulation({
@@ -332,7 +374,7 @@ export default function PolicyWizardPage() {
 
     useEffect(() => {
         updateSimulation();
-    }, [data.actions, data.conditions, data.scopeType]);
+    }, [data.actions, data.conditions, data.scopeType, data.scopeInclude, employees.length, departments, branches, jobTitles]);
 
     // Navigation
     const handleNext = () => {
@@ -913,6 +955,36 @@ export default function PolicyWizardPage() {
                                             <ListItemText
                                                 primary={option.name}
                                                 secondary={`${option._count?.users || 0} موظف`}
+                                            />
+                                        </li>
+                                    )}
+                                />
+                            </Grid>
+                        )}
+
+                        {/* Job Title Selection */}
+                        {data.scopeType === 'JOB_TITLE' && (
+                            <Grid item xs={12}>
+                                <Autocomplete
+                                    multiple
+                                    options={jobTitles}
+                                    getOptionLabel={(option) => option.title}
+                                    value={jobTitles.filter(j => data.scopeInclude.includes(j.title))}
+                                    onChange={(_, newValue) => setData({ ...data, scopeInclude: newValue.map(v => v.title) })}
+                                    loading={loadingScope}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="اختر المسميات الوظيفية"
+                                            placeholder="ابحث عن مسمى وظيفي..."
+                                        />
+                                    )}
+                                    renderOption={(props, option, { selected }) => (
+                                        <li {...props}>
+                                            <Checkbox checked={selected} sx={{ mr: 1 }} />
+                                            <ListItemText
+                                                primary={option.title}
+                                                secondary={`${option.count} موظف`}
                                             />
                                         </li>
                                     )}
