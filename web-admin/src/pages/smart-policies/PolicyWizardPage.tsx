@@ -239,16 +239,26 @@ export default function PolicyWizardPage() {
         const newErrors: Record<string, string> = {};
 
         switch (step) {
-            case 0: // Basic Info
+            case 0: // AI Assistant - no validation needed
+                break;
+            case 1: // Basic Info
                 if (!data.name.trim()) newErrors.name = 'اسم السياسة مطلوب';
                 if (data.name.length < 5) newErrors.name = 'الاسم يجب أن يكون 5 أحرف على الأقل';
                 if (!data.category) newErrors.category = 'الفئة مطلوبة';
                 break;
-            case 1: // Trigger
+            case 2: // Trigger
                 if (!data.triggerEvent) newErrors.triggerEvent = 'حدث التشغيل مطلوب';
                 break;
-            case 3: // Actions
+            case 3: // Conditions - optional, no validation needed
+                break;
+            case 4: // Actions
                 if (data.actions.length === 0) newErrors.actions = 'أضف إجراء واحد على الأقل';
+                break;
+            case 5: // Scope - optional
+                break;
+            case 6: // Schedule - optional
+                break;
+            case 7: // Advanced - optional
                 break;
         }
 
