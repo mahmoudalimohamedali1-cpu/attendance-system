@@ -62,6 +62,7 @@ const CustodyAssign = lazy(() => import('@/pages/custody/CustodyAssign'));
 const CustodyItemForm = lazy(() => import('@/pages/custody/CustodyItemForm'));
 const CustodyItemDetail = lazy(() => import('@/pages/custody/CustodyItemDetail'));
 const MyPayslipsPage = lazy(() => import('./pages/my-payslips/MyPayslipsPage'));
+const MyContractsPage = lazy(() => import('./pages/my-contracts/MyContractsPage'));
 const PayrollSettingsPage = lazy(() => import('./pages/payroll-settings/PayrollSettingsPage'));
 const SmartPoliciesPage = lazy(() => import('./pages/smart-policies/SmartPoliciesPage'));
 const SmartDashboardPage = lazy(() => import('./pages/smart-policies/SmartDashboardPage'));
@@ -426,6 +427,11 @@ function App() {
           <Route path="my-payslips" element={
             <Suspense fallback={<PageLoader />}>
               <MyPayslipsPage />
+            </Suspense>
+          } />
+          <Route path="my-contracts" element={
+            <Suspense fallback={<PageLoader />}>
+              <MyContractsPage />
             </Suspense>
           } />
           <Route path="payroll-settings" element={

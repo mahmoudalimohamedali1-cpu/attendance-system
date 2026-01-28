@@ -84,6 +84,7 @@ interface MenuGroup {
 const allMenuItems: MenuItem[] = [
   // Employee Self-Service (visible to all users)
   { text: 'كشوفات راتبي', icon: <ReceiptIcon />, path: '/my-payslips' },
+  { text: 'عقودي', icon: <Description />, path: '/my-contracts' },
 
   // Dashboard Group
   { text: 'نظرة عامة', icon: <Dashboard />, path: '/dashboard' },

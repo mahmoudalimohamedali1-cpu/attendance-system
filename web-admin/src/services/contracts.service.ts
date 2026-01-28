@@ -238,10 +238,21 @@ class ContractsService {
         return (response as any).data || response;
     }
 
+    async employeeSign(id: string): Promise<Contract> {
+        const response = await api.post(`${this.basePath}/${id}/employee-sign`, {}) as { data: Contract } | Contract;
+        return (response as any).data || response;
+    }
+
+    async rejectContract(id: string, rejectionReason: string): Promise<Contract> {
+        const response = await api.post(`${this.basePath}/${id}/employee-reject`, { rejectionReason }) as { data: Contract } | Contract;
+        return (response as any).data || response;
+    }
+
     async employerSign(id: string): Promise<Contract> {
         const response = await api.post(`${this.basePath}/${id}/employer-sign`, {}) as { data: Contract } | Contract;
         return (response as any).data || response;
     }
+
 
     // ===== قوى =====
     async updateQiwaStatus(id: string, data: { qiwaContractId?: string; qiwaStatus: QiwaAuthStatus; rejectReason?: string }): Promise<Contract> {
