@@ -1929,5 +1929,13 @@ export class SmartPoliciesController {
             body.year,
         );
         return { success: true, data: result };
+        /**
+         * 🧙 تحليل النص ذكياً للمعالج (Wizard)
+         */
+        @Post('wizard/ai-parse')
+        @ApiOperation({ summary: 'تحليل نص السياسة للمعالج ملء الخطوات تلقائياً' })
+        async wizardAiParse(@Body() body: { text: string }) {
+            const parsedRule = await this.service.analyzePolicy(body.text);
+            return { success: true, data: { parsedRule } };
+        }
     }
-}

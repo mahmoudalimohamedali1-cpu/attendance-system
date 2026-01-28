@@ -125,33 +125,19 @@ class SmartPoliciesService {
     async analyzePolicy(text: string): Promise<{
         success: boolean;
         parsedRule: ParsedPolicyRule;
-        feasibility?: {
-            isExecutable: boolean;
-            availableFields: Array<{
-                field: string;
-                source: string;
-                dataType: string;
-                exists: boolean;
-                hasData: boolean;
-            }>;
-            missingFields: Array<{
-                field: string;
-                reason: string;
-                suggestion: string;
-                priority: 'HIGH' | 'MEDIUM' | 'LOW';
-            }>;
-            summary: {
-                totalConditions: number;
-                satisfiedConditions: number;
-                missingConditions: number;
-                executionReadiness: 'READY' | 'PARTIAL' | 'NOT_READY';
-                confidenceScore: number;
-            };
-            recommendations: string[];
-            warnings: string[];
-        };
+        feasibility?: any;
     }> {
         return await api.post(`${this.baseUrl}/analyze`, { text });
+    }
+
+    /**
+     * 🧙 تحليل النص ذكياً للمعالج (Wizard)
+     */
+    async wizardAiParse(text: string): Promise<{
+        success: boolean;
+        data: { parsedRule: ParsedPolicyRule };
+    }> {
+        return await api.post(`${this.baseUrl}/wizard/ai-parse`, { text });
     }
 
 

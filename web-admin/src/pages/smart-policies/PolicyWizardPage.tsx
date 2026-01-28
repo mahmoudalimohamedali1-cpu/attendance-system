@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { smartPoliciesService } from '@/services/smart-policies.service';
 import {
     Box,
     Container,
@@ -225,12 +226,7 @@ export default function PolicyWizardPage() {
     const handleAiParse = async () => {
         setAnalyzing(true);
         try {
-            const response = await fetch('/api/smart-policies/wizard/ai-parse', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: aiInput }),
-            });
-            const result = await response.json();
+            const result = await smartPoliciesService.wizardAiParse(aiInput);
 
             if (result.success) {
                 const { parsedRule } = result.data;
