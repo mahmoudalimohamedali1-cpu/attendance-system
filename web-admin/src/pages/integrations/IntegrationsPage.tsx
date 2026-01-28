@@ -259,6 +259,7 @@ function IntegrationsTab() {
     const [teamsData, setTeamsData] = useState({ webhookUrl: '', channelName: '' });
     const [jiraData, setJiraData] = useState({ jiraUrl: '', email: '', apiToken: '' });
     const [trelloData, setTrelloData] = useState({ apiKey: '', token: '' });
+    const [githubData, setGithubData] = useState({ accessToken: '' });
 
     const { data, isLoading, error } = useQuery({
         queryKey: ['integrations'],
@@ -303,13 +304,21 @@ function IntegrationsTab() {
         onError: () => setSnackbar({ open: true, message: 'فشل ربط Trello', severity: 'error' }),
     });
 
+    const connectGitHubMutation = useMutation({
+        mutationFn: integrationsApi.connectGitHub,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['integrations'] });
+            setConnectDialog(null);
+            setSnackbar({ open: true, message: 'تم ربط GitHub', severity: 'success' });
+        },
+        onError: () => setSnackbar({ open: true, message: 'فشل ربط GitHub', severity: 'error' }),
+    });
+
     // Default integrations list
     const defaultIntegrations: AvailableIntegration[] = [
         { type: 'odoo', name: 'Odoo ERP', icon: '🟣', description: 'مزامنة الموظفين والحضور والإجازات والرواتب', isConnected: false },
-        { type: 'slack', name: 'Slack', icon: '💬', description: 'إشعارات فورية وأوامر المهام', isConnected: false },
         { type: 'teams', name: 'Microsoft Teams', icon: '🟦', description: 'بطاقات تكيفية وإشعارات', isConnected: false },
-        { type: 'github', name: 'GitHub', icon: '🐙', description: 'ربط المهام بالـ Issues', isConnected: false },
-        { type: 'gitlab', name: 'GitLab', icon: '🦊', description: 'ربط المهام بالـ Issues', isConnected: false },
+        { type: 'github', name: 'GitHub', icon: '🐙', description: 'ربط المستودعات والإشعارات', isConnected: false },
         { type: 'jira', name: 'Jira', icon: '📊', description: 'استيراد وتصدير المهام', isConnected: false },
         { type: 'trello', name: 'Trello', icon: '📋', description: 'استيراد اللوحات والبطاقات', isConnected: false },
     ];
@@ -473,7 +482,39 @@ function IntegrationsTab() {
                 </DialogActions>
             </Dialog>
 
+            {/* GitHub Connect Dialog */}
+            <Dialog open={connectDialog === 'github'} onClose={() => setConnectDialog(null)} maxWidth="sm" fullWidth>
+                <DialogTitle>🐙 ربط GitHub</DialogTitle>
+                <DialogContent>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        أنشئ Personal Access Token من <a href="https://github.com/settings/tokens/new?scopes=repo,read:user" target="_blank" rel="noreferrer">GitHub Settings</a>
+                        <br />
+                        تأكد من تحديد الصلاحيات: <b>repo</b> و <b>read:user</b>
+                    </Alert>
+                    <TextField
+                        fullWidth
+                        label="Personal Access Token"
+                        type="password"
+                        placeholder="ghp_xxxxxxxxxxxx"
+                        value={githubData.accessToken}
+                        onChange={(e) => setGithubData({ accessToken: e.target.value })}
+                        sx={{ mt: 2 }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConnectDialog(null)}>إلغاء</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => connectGitHubMutation.mutate(githubData)}
+                        disabled={!githubData.accessToken || connectGitHubMutation.isPending}
+                    >
+                        {connectGitHubMutation.isPending ? 'جاري الربط...' : 'ربط'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+
                 <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
             </Snackbar>
         </Box>

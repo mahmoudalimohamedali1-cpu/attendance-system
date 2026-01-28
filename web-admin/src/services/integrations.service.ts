@@ -98,7 +98,14 @@ export const integrationsApi = {
     importFromTrello: (data: { boardId: string }) =>
         api.post<{ success: boolean; boardName: string; imported: number; total: number }>('/integrations/trello/import', data),
 
+
     // GitHub
+    connectGitHub: (data: { accessToken: string }) =>
+        api.post<{ success: boolean; user: string; avatarUrl: string }>('/integrations/github/connect', data),
+
+    getGitHubRepositories: () =>
+        api.get<{ id: number; name: string; fullName: string; url: string; description: string; private: boolean; updatedAt: string }[]>('/integrations/github/repositories'),
+
     linkGitHubIssue: (data: { taskId: string; issueUrl: string }) =>
         api.post('/integrations/github/link-issue', data),
 

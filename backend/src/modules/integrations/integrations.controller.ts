@@ -34,10 +34,8 @@ export class IntegrationsController {
         });
 
         const available = [
-            { type: 'slack', name: 'Slack', icon: '💬', description: 'إشعارات فورية وأوامر المهام' },
             { type: 'teams', name: 'Microsoft Teams', icon: '🟦', description: 'بطاقات تكيفية وإشعارات' },
-            { type: 'github', name: 'GitHub', icon: '🐙', description: 'ربط المهام بالـ Issues' },
-            { type: 'gitlab', name: 'GitLab', icon: '🦊', description: 'ربط المهام بالـ Issues' },
+            { type: 'github', name: 'GitHub', icon: '🐙', description: 'ربط المستودعات والإشعارات' },
             { type: 'jira', name: 'Jira', icon: '📊', description: 'استيراد وتصدير المهام' },
             { type: 'trello', name: 'Trello', icon: '📋', description: 'استيراد اللوحات والبطاقات' },
             { type: 'ODOO', name: 'Odoo ERP', icon: '🟣', description: 'مزامنة الموظفين والحضور' },
@@ -62,6 +60,20 @@ export class IntegrationsController {
     @ApiOperation({ summary: '🔗 ربط Teams' })
     async connectTeams(@Request() req: any, @Body() body: { webhookUrl: string; channelName?: string }) {
         return this.teamsService.connectWebhook(req.user.companyId, req.user.id, body.webhookUrl, body.channelName);
+    }
+
+    @Post('github/connect')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '🔗 ربط GitHub' })
+    async connectGitHub(@Request() req: any, @Body() body: { accessToken: string }) {
+        return this.githubService.connect(req.user.companyId, req.user.id, body);
+    }
+
+    @Get('github/repositories')
+    @Roles('ADMIN')
+    @ApiOperation({ summary: '📋 مستودعات GitHub' })
+    async getGitHubRepositories(@Request() req: any) {
+        return this.githubService.getRepositories(req.user.companyId);
     }
 
     @Post('github/link-issue')
