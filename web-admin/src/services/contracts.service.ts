@@ -248,6 +248,11 @@ class ContractsService {
         return (response as any).data || response;
     }
 
+    async getMyContracts(): Promise<Contract[]> {
+        const response = await api.get(`${this.basePath}/my`) as { data: Contract[] } | Contract[];
+        return (response as any).data || response;
+    }
+
     async employerSign(id: string): Promise<Contract> {
         const response = await api.post(`${this.basePath}/${id}/employer-sign`, {}) as { data: Contract } | Contract;
         return (response as any).data || response;

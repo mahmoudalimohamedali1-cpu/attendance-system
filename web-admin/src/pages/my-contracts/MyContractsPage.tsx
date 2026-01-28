@@ -66,8 +66,8 @@ export default function MyContractsPage() {
     const fetchContracts = async () => {
         setLoading(true);
         try {
-            // جلب كل العقود الخاصة بي
-            const allContracts = await contractsService.getAll();
+            // جلب كل العقود الخاصة بي فقط
+            const allContracts = await contractsService.getMyContracts();
 
             // فلترة العقود بانتظار توقيعي
             const pending = allContracts.filter(c => c.status === 'PENDING_EMPLOYEE');

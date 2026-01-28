@@ -48,10 +48,20 @@ export class ContractsController {
         return this.contractsService.getExpiring(companyId, days ? parseInt(days) : 30);
     }
 
+
     @Get('pending-employer')
     @ApiOperation({ summary: 'العقود بانتظار توقيع صاحب العمل' })
     getPendingForEmployer(@CurrentUser('companyId') companyId: string) {
         return this.contractsService.getPendingForEmployer(companyId);
+    }
+
+    @Get('my')
+    @ApiOperation({ summary: 'جلب عقودي (للموظف الحالي)' })
+    getMyContracts(
+        @CurrentUser('id') employeeId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.contractsService.findByEmployee(employeeId, companyId);
     }
 
     @Get('pending-employee')
