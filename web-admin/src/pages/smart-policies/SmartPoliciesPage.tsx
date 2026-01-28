@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Container,
@@ -24,7 +24,15 @@ import {
     Fade,
     Collapse,
     Snackbar,
+    Tabs,
+    Tab,
+    Menu,
+    MenuItem,
+    ListItemIcon,
+    ListItemText,
+    alpha,
 } from '@mui/material';
+
 import {
     Add as AddIcon,
     Psychology as AiIcon,
@@ -47,7 +55,9 @@ import {
     Timeline as TimelineIcon,
     Warning as WarningIcon,
     Assignment as AuditIcon,
+    MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
+
 import { smartPoliciesService, SmartPolicy, ParsedPolicyRule, SmartPolicyStatus } from '../../services/smart-policies.service';
 
 // ترجمة الـ trigger events
@@ -85,6 +95,11 @@ export default function SmartPoliciesPage() {
     const [policies, setPolicies] = useState<SmartPolicy[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, paused: 0 });
+
+    // 🆕 Tab Filter & Action Menu
+    const [activeTab, setActiveTab] = useState<'ALL' | SmartPolicyStatus>('ALL');
+    const [menuAnchor, setMenuAnchor] = useState<{ el: HTMLElement | null; policy: SmartPolicy | null }>({ el: null, policy: null });
+
 
     // حوار إنشاء سياسة جديدة
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -499,7 +514,14 @@ export default function SmartPoliciesPage() {
         }
     };
 
+    // 🆕 Filtered policies based on active tab
+    const filteredPolicies = useMemo(() => {
+        if (activeTab === 'ALL') return policies;
+        return policies.filter(p => p.status === activeTab);
+    }, [policies, activeTab]);
+
     return (
+
         <Container maxWidth="xl" sx={{ py: 3 }}>
             {/* العنوان والإحصائيات */}
             <Box sx={{ mb: 4 }}>
@@ -580,15 +602,59 @@ export default function SmartPoliciesPage() {
                 </Grid>
             </Box>
 
-            {/* قائمة السياسات */}
+            {/* 🆕 Tabs للفلترة */}
+            <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(_, newValue) => setActiveTab(newValue)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{
+                        '& .MuiTab-root': {
+                            fontWeight: 600,
+                            minHeight: 56,
+                        },
+                    }}
+                >
+                    <Tab
+                        value="ALL"
+                        label={`📋 الكل (${stats.total})`}
+                        sx={{ '&.Mui-selected': { bgcolor: alpha('#2196F3', 0.1) } }}
+                    />
+                    <Tab
+                        value="ACTIVE"
+                        label={`✅ مفعّلة (${stats.active})`}
+                        sx={{ '&.Mui-selected': { bgcolor: alpha('#4caf50', 0.1) } }}
+                    />
+                    <Tab
+                        value="DRAFT"
+                        label={`📝 مسودة (${stats.draft})`}
+                        sx={{ '&.Mui-selected': { bgcolor: alpha('#9e9e9e', 0.1) } }}
+                    />
+                    <Tab
+                        value="PENDING"
+                        label={`⏳ بانتظار الموافقة (${policies.filter(p => p.status === 'PENDING').length})`}
+                        sx={{ '&.Mui-selected': { bgcolor: alpha('#ff9800', 0.1) } }}
+                    />
+                    <Tab
+                        value="PAUSED"
+                        label={`⏸️ موقوفة (${stats.paused})`}
+                        sx={{ '&.Mui-selected': { bgcolor: alpha('#f44336', 0.1) } }}
+                    />
+                </Tabs>
+            </Paper>
+
+            {/* قائمة السياسات المفلترة */}
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
                     <CircularProgress />
                 </Box>
-            ) : policies.length === 0 ? (
+            ) : filteredPolicies.length === 0 ? (
                 <Paper sx={{ p: 5, textAlign: 'center', borderRadius: 3 }}>
                     <AiIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
-                    <Typography variant="h5" gutterBottom>لا توجد سياسات ذكية بعد</Typography>
+                    <Typography variant="h5" gutterBottom>
+                        {activeTab === 'ALL' ? 'لا توجد سياسات ذكية بعد' : `لا توجد سياسات ${statusLabels[activeTab as SmartPolicyStatus]?.label || ''}`}
+                    </Typography>
                     <Typography color="text.secondary" sx={{ mb: 3 }}>
                         ابدأ بإنشاء أول سياسة ذكية واكتبها بالعربي والـ AI هيفهمها!
                     </Typography>
@@ -603,22 +669,19 @@ export default function SmartPoliciesPage() {
                 </Paper>
             ) : (
                 <Grid container spacing={3}>
-                    {policies.map((policy) => (
+                    {filteredPolicies.map((policy) => (
                         <Grid item xs={12} md={6} lg={4} key={policy.id}>
-                            <Card
-                                sx={{
-                                    height: '100%',
-                                    borderRadius: 3,
-                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                    '&:hover': {
-                                        transform: 'translateY(-4px)',
-                                        boxShadow: 6,
-                                    },
-                                    border: policy.isActive ? '2px solid' : 'none',
-                                    borderColor: 'success.main',
-                                }}
-                            >
+                            <Card sx={{
+                                height: '100%',
+                                borderRadius: 3,
+                                transition: 'all 0.3s ease',
+                                '&:hover': { transform: 'translateY(-4px)', boxShadow: 8 },
+                                border: policy.isActive ? '2px solid' : 'none',
+                                borderColor: policy.isActive ? 'success.main' : 'transparent',
+                                background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(245,247,250,1) 100%)',
+                            }}>
                                 <CardContent>
+
                                     {/* العنوان والحالة */}
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                                         <Box sx={{ flex: 1 }}>
@@ -708,7 +771,7 @@ export default function SmartPoliciesPage() {
                                                     color="success"
                                                 />
                                             }
-                                            label={policy.isActive ? 'مفعّلة' : 'موقوفة'}
+                                            label={policy.isActive ? 'مفعّلة' : 'غير مفعّلة'}
                                         />
                                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                             {/* Submit for Approval - only for DRAFT */}
@@ -799,6 +862,7 @@ export default function SmartPoliciesPage() {
                 </Grid>
             )}
 
+
             {/* حوار إنشاء سياسة جديدة */}
             <Dialog
                 open={createDialogOpen}
@@ -841,7 +905,8 @@ export default function SmartPoliciesPage() {
                             size="large"
                             sx={{
                                 mb: 3,
-                                background: 'linear-gradient(45deg, #9C27B0 30%, #E040FB 90%)',
+                                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                                boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
                             }}
                         >
                             {analyzing ? 'جاري التحليل...' : '🪄 تحليل بالذكاء الاصطناعي'}
