@@ -800,7 +800,8 @@ export default function MudadPage() {
                                     {' - '}
                                     {run.status === 'LOCKED' ? '🔒 مغلقة' :
                                         run.status === 'PAID' ? '✅ مدفوعة' :
-                                            run.status === 'FINANCE_APPROVED' ? '✅ معتمدة' : run.status}
+                                            run.status === 'FINANCE_APPROVED' ? '💰 معتمدة مالياً' :
+                                                run.status === 'HR_APPROVED' ? '👤 معتمدة HR' : run.status}
                                     {run._count?.payslips ? ` (👥 ${run._count.payslips})` : ''}
                                 </MenuItem>
                             ))}
