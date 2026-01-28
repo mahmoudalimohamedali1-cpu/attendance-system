@@ -132,12 +132,14 @@ class SmartPoliciesService {
 
     /**
      * 🧙 تحليل النص ذكياً للمعالج (Wizard)
+     * يستخدم نفس endpoint التحليل الأساسي
      */
     async wizardAiParse(text: string): Promise<{
         success: boolean;
         data: { parsedRule: ParsedPolicyRule };
     }> {
-        return await api.post(`${this.baseUrl}/wizard/ai-parse`, { text });
+        const result = await api.post(`${this.baseUrl}/analyze`, { text });
+        return { success: true, data: { parsedRule: result.parsedRule } };
     }
 
 
