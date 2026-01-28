@@ -138,13 +138,14 @@ export default function SaudizationPage() {
                 api.get('/saudization/alerts'),
                 api.get('/saudization/recommendations'),
             ]);
-            setStats(statsRes.data);
-            setTrend(Array.isArray(trendRes.data) ? trendRes.data : []);
-            setAlerts(Array.isArray(alertsRes.data) ? alertsRes.data : []);
-            setRecommendations(Array.isArray(recsRes.data) ? recsRes.data : []);
+            // API returns data directly, not wrapped in .data property
+            setStats(statsRes as unknown as SaudizationStats);
+            setTrend(Array.isArray(trendRes) ? trendRes : []);
+            setAlerts(Array.isArray(alertsRes) ? alertsRes : []);
+            setRecommendations(Array.isArray(recsRes) ? recsRes : []);
         } catch (err: any) {
             console.error('Error fetching saudization data:', err);
-            setError(err?.response?.data?.message || 'فشل في تحميل البيانات');
+            setError(err?.response?.data?.message || err?.message || 'فشل في تحميل البيانات');
         } finally {
             setLoading(false);
         }
