@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ContractsService } from './contracts.service';
 import {
@@ -17,13 +17,16 @@ import {
 
 @ApiTags('Contracts - العقود')
 @Controller('contracts')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ContractsController {
     constructor(private contractsService: ContractsService) { }
 
+    // ===== Admin/HR Endpoints =====
+
     @Get()
-    @Roles('ADMIN', 'HR', 'MANAGER')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_VIEW')
     @ApiOperation({ summary: 'جلب كل العقود' })
     @ApiQuery({ name: 'status', required: false, description: 'فلترة حسب الحالة' })
     @ApiQuery({ name: 'qiwaStatus', required: false, description: 'فلترة حسب حالة قوى' })
@@ -36,14 +39,16 @@ export class ContractsController {
     }
 
     @Get('stats')
-    @Roles('ADMIN', 'HR', 'MANAGER')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_VIEW')
     @ApiOperation({ summary: 'إحصائيات العقود' })
     getStats(@CurrentUser('companyId') companyId: string) {
         return this.contractsService.getStats(companyId);
     }
 
     @Get('expiring')
-    @Roles('ADMIN', 'HR', 'MANAGER')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_VIEW')
     @ApiOperation({ summary: 'جلب العقود المنتهية قريباً' })
     @ApiQuery({ name: 'days', required: false, description: 'عدد الأيام (افتراضي 30)' })
     getExpiring(
@@ -53,14 +58,26 @@ export class ContractsController {
         return this.contractsService.getExpiring(companyId, days ? parseInt(days) : 30);
     }
 
-
-
     @Get('pending-employer')
-    @Roles('ADMIN', 'HR', 'MANAGER')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_VIEW')
     @ApiOperation({ summary: 'العقود بانتظار توقيع صاحب العمل' })
     getPendingForEmployer(@CurrentUser('companyId') companyId: string) {
         return this.contractsService.getPendingForEmployer(companyId);
     }
+
+    @Get('employee/:userId')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_VIEW')
+    @ApiOperation({ summary: 'جلب عقود موظف معين' })
+    findByEmployee(
+        @Param('userId') userId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.contractsService.findByEmployee(userId, companyId);
+    }
+
+    // ===== Employee Self-Service Endpoints (No Permission Required) =====
 
     @Get('my')
     @ApiOperation({ summary: 'جلب عقودي (للموظف الحالي)' })
@@ -80,16 +97,6 @@ export class ContractsController {
         return this.contractsService.getPendingForEmployee(employeeId, companyId);
     }
 
-    @Get('employee/:userId')
-    @Roles('ADMIN', 'HR', 'MANAGER')
-    @ApiOperation({ summary: 'جلب عقود موظف معين' })
-    findByEmployee(
-        @Param('userId') userId: string,
-        @CurrentUser('companyId') companyId: string,
-    ) {
-        return this.contractsService.findByEmployee(userId, companyId);
-    }
-
     @Get(':id')
     @ApiOperation({ summary: 'جلب عقد معين' })
     findOne(
@@ -97,42 +104,6 @@ export class ContractsController {
         @CurrentUser('companyId') companyId: string,
     ) {
         return this.contractsService.findOne(id, companyId);
-    }
-
-    @Post()
-    @Roles('ADMIN', 'HR')
-    @ApiOperation({ summary: 'إنشاء عقد جديد' })
-    create(
-        @Body() dto: CreateContractDto,
-        @CurrentUser('companyId') companyId: string,
-        @CurrentUser('id') userId: string,
-    ) {
-        return this.contractsService.create(dto, companyId, userId);
-    }
-
-    @Patch(':id')
-    @Roles('ADMIN', 'HR')
-    @ApiOperation({ summary: 'تحديث عقد' })
-    update(
-        @Param('id') id: string,
-        @Body() dto: UpdateContractDto,
-        @CurrentUser('companyId') companyId: string,
-        @CurrentUser('id') userId: string,
-    ) {
-        return this.contractsService.update(id, dto, companyId, userId);
-    }
-
-    // ===== سير عمل التوقيع =====
-
-    @Post(':id/send-to-employee')
-    @Roles('ADMIN', 'HR')
-    @ApiOperation({ summary: 'إرسال العقد للموظف للتوقيع' })
-    sendToEmployee(
-        @Param('id') id: string,
-        @CurrentUser('companyId') companyId: string,
-        @CurrentUser('id') userId: string,
-    ) {
-        return this.contractsService.sendToEmployee(id, companyId, userId);
     }
 
     @Post(':id/employee-sign')
@@ -157,8 +128,48 @@ export class ContractsController {
         return this.contractsService.employeeReject(id, companyId, employeeId, dto);
     }
 
+    // ===== Admin/HR Actions =====
+
+    @Post()
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_CREATE')
+    @ApiOperation({ summary: 'إنشاء عقد جديد' })
+    create(
+        @Body() dto: CreateContractDto,
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('id') userId: string,
+    ) {
+        return this.contractsService.create(dto, companyId, userId);
+    }
+
+    @Patch(':id')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_EDIT')
+    @ApiOperation({ summary: 'تحديث عقد' })
+    update(
+        @Param('id') id: string,
+        @Body() dto: UpdateContractDto,
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('id') userId: string,
+    ) {
+        return this.contractsService.update(id, dto, companyId, userId);
+    }
+
+    @Post(':id/send-to-employee')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_SEND')
+    @ApiOperation({ summary: 'إرسال العقد للموظف للتوقيع' })
+    sendToEmployee(
+        @Param('id') id: string,
+        @CurrentUser('companyId') companyId: string,
+        @CurrentUser('id') userId: string,
+    ) {
+        return this.contractsService.sendToEmployee(id, companyId, userId);
+    }
+
     @Post(':id/employer-sign')
-    @Roles('ADMIN', 'HR')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_EMPLOYER_SIGN')
     @ApiOperation({ summary: 'توقيع صاحب العمل على العقد' })
     employerSign(
         @Param('id') id: string,
@@ -172,7 +183,8 @@ export class ContractsController {
     // ===== تكامل قوى =====
 
     @Patch(':id/qiwa-status')
-    @Roles('ADMIN', 'HR')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_QIWA_UPDATE')
     @ApiOperation({ summary: 'تحديث حالة العقد في قوى' })
     updateQiwaStatus(
         @Param('id') id: string,
@@ -186,7 +198,8 @@ export class ContractsController {
     // ===== إدارة العقد =====
 
     @Post(':id/terminate')
-    @Roles('ADMIN', 'HR')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_TERMINATE')
     @ApiOperation({ summary: 'إنهاء عقد' })
     terminate(
         @Param('id') id: string,
@@ -198,7 +211,8 @@ export class ContractsController {
     }
 
     @Post(':id/renew')
-    @Roles('ADMIN', 'HR')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_RENEW')
     @ApiOperation({ summary: 'تجديد عقد' })
     renew(
         @Param('id') id: string,
@@ -210,7 +224,8 @@ export class ContractsController {
     }
 
     @Delete(':id')
-    @Roles('ADMIN', 'HR')
+    @UseGuards(PermissionGuard)
+    @RequirePermission('CONTRACT_EDIT')
     @ApiOperation({ summary: 'حذف عقد (مسودة فقط)' })
     delete(
         @Param('id') id: string,
