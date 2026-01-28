@@ -106,6 +106,14 @@ const enterprisePermissions = [
     // === قوى (Qiwa) ===
     { code: 'QIWA_EXPORT', name: 'تصدير بيانات قوى', nameEn: 'Export Qiwa Data', category: 'قوى' },
 
+    // === مقيم (Muqeem) ===
+    { code: 'MUQEEM_VIEW', name: 'عرض خدمات مقيم', nameEn: 'View Muqeem Services', category: 'مقيم' },
+    { code: 'MUQEEM_EXECUTE', name: 'تنفيذ عمليات مقيم', nameEn: 'Execute Muqeem Operations', category: 'مقيم' },
+    { code: 'MUQEEM_CONFIG', name: 'إعدادات مقيم', nameEn: 'Muqeem Configuration', category: 'مقيم' },
+    { code: 'MUQEEM_IQAMA', name: 'خدمات الإقامة', nameEn: 'Iqama Services', category: 'مقيم' },
+    { code: 'MUQEEM_VISA', name: 'خدمات التأشيرات', nameEn: 'Visa Services', category: 'مقيم' },
+    { code: 'MUQEEM_PASSPORT', name: 'خدمات الجوازات', nameEn: 'Passport Services', category: 'مقيم' },
+
     // === التدقيق ===
     { code: 'AUDIT_VIEW', name: 'عرض سجل التدقيق', nameEn: 'View Audit Log', category: 'التدقيق' },
     { code: 'AUDIT_EXPORT', name: 'تصدير سجل التدقيق', nameEn: 'Export Audit Log', category: 'التدقيق' },

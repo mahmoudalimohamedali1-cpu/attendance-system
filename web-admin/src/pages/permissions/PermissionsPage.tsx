@@ -91,6 +91,7 @@ const categoryLabels: Record<string, string> = {
     'العهد': 'العهد',
     'الجزاءات': 'الجزاءات',
     'التواصل الاجتماعي': 'التواصل الاجتماعي',
+    'مقيم': 'مقيم',
 };
 
 export const PermissionsPage: React.FC = () => {

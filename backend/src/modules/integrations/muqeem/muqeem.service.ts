@@ -141,6 +141,7 @@ export class MuqeemService {
                 passportNumber: true,
                 passportExpiryDate: true,
                 jobTitle: true,
+                nationality: true,
             },
             orderBy: { firstName: 'asc' },
         });
