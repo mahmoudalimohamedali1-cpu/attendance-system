@@ -107,6 +107,7 @@ const allMenuItems: MenuItem[] = [
   { text: 'الخطابات', icon: <Description />, path: '/letters', requiredPermission: ['LETTERS_VIEW', 'LETTERS_APPROVE', 'LETTERS_APPROVE_MANAGER', 'LETTERS_APPROVE_HR'] },
   { text: 'الجزاءات والتحقيقات', icon: <Security />, path: '/disciplinary', requiredPermission: ['DISC_MANAGER_CREATE', 'DISC_HR_REVIEW', 'DISC_HR_DECISION', 'DISC_HR_FINALIZE', 'DISC_EMPLOYEE_RESPONSE'] },
   { text: 'العهد والأصول', icon: <Business />, path: '/custody', requiredRole: 'ADMIN', requiredPermission: ['CUSTODY_VIEW', 'CUSTODY_ASSIGN', 'CUSTODY_APPROVE', 'CUSTODY_MANAGE_ITEMS', 'CUSTODY_MANAGE_CATEGORIES'] },
+  { text: 'إدارة العقود', icon: <Description />, path: '/contracts', requiredPermission: ['CONTRACT_VIEW', 'CONTRACT_CREATE', 'CONTRACT_EDIT'] },
 
   // Financial
   { text: 'السلف', icon: <MonetizationOn />, path: '/advances', requiredPermission: ['ADVANCES_VIEW', 'ADVANCES_APPROVE_MANAGER', 'ADVANCES_APPROVE_HR'] },
@@ -160,7 +161,7 @@ const complianceGroup: MenuGroup = {
     { text: 'التأمينات GOSI', icon: <Business />, path: '/gosi' },
     { text: 'تكامل قوى', icon: <Business />, path: '/qiwa' },
     { text: '🇸🇦 السعودة ونطاقات', icon: <Business />, path: '/saudization' },
-    { text: 'عقود قوى', icon: <Description />, path: '/contracts' },
+    { text: 'عقود قوى', icon: <Description />, path: '/contracts', requiredPermission: ['CONTRACT_VIEW'] },
     { text: '🇸🇦 منصة مقيم', icon: <LinkIcon />, path: '/muqeem' },
     { text: 'إعدادات مقيم', icon: <Settings />, path: '/settings/muqeem' },
     { text: 'سجل الإرسالات', icon: <Security />, path: '/audit/submissions' },
