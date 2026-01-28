@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { smartPoliciesService } from '@/services/smart-policies.service';
+import { usersService, User } from '@/services/users.service';
+import { organizationService, DepartmentInfo, BranchInfo } from '@/services/organization.service';
 import {
     Box,
     Container,
@@ -32,6 +34,9 @@ import {
     DialogContent,
     DialogActions,
     Snackbar,
+    Autocomplete,
+    Checkbox,
+    ListItemText,
 } from '@mui/material';
 import {
     NavigateNext as NextIcon,
@@ -200,6 +205,34 @@ export default function PolicyWizardPage() {
         estimatedCost: number;
         estimatedSavings: number;
     } | null>(null);
+
+    // Scope selection data
+    const [employees, setEmployees] = useState<User[]>([]);
+    const [departments, setDepartments] = useState<DepartmentInfo[]>([]);
+    const [branches, setBranches] = useState<BranchInfo[]>([]);
+    const [loadingScope, setLoadingScope] = useState(false);
+
+    // Fetch scope data on mount
+    useEffect(() => {
+        const fetchScopeData = async () => {
+            setLoadingScope(true);
+            try {
+                const [emps, depts, brns] = await Promise.all([
+                    usersService.getEmployees(),
+                    organizationService.getDepartments(),
+                    organizationService.getBranches(),
+                ]);
+                setEmployees(emps);
+                setDepartments(depts);
+                setBranches(brns);
+            } catch (error) {
+                console.error('Failed to fetch scope data:', error);
+            } finally {
+                setLoadingScope(false);
+            }
+        };
+        fetchScopeData();
+    }, []);
 
     // Validate current step
     const validateStep = (step: number): boolean => {
@@ -796,7 +829,7 @@ export default function PolicyWizardPage() {
                                                     transform: 'translateY(-2px)'
                                                 },
                                             }}
-                                            onClick={() => setData({ ...data, scopeType: scope.value })}
+                                            onClick={() => setData({ ...data, scopeType: scope.value, scopeInclude: [] })}
                                         >
                                             <CardContent>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -816,6 +849,105 @@ export default function PolicyWizardPage() {
                                 ))}
                             </Grid>
                         </Grid>
+
+                        {/* Department Selection */}
+                        {data.scopeType === 'DEPARTMENT' && (
+                            <Grid item xs={12}>
+                                <Autocomplete
+                                    multiple
+                                    options={departments}
+                                    getOptionLabel={(option) => option.name}
+                                    value={departments.filter(d => data.scopeInclude.includes(d.id))}
+                                    onChange={(_, newValue) => setData({ ...data, scopeInclude: newValue.map(v => v.id) })}
+                                    loading={loadingScope}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="اختر الأقسام"
+                                            placeholder="ابحث عن قسم..."
+                                        />
+                                    )}
+                                    renderOption={(props, option, { selected }) => (
+                                        <li {...props}>
+                                            <Checkbox checked={selected} sx={{ mr: 1 }} />
+                                            <ListItemText
+                                                primary={option.name}
+                                                secondary={`${option._count?.users || 0} موظف`}
+                                            />
+                                        </li>
+                                    )}
+                                />
+                            </Grid>
+                        )}
+
+                        {/* Branch Selection */}
+                        {data.scopeType === 'BRANCH' && (
+                            <Grid item xs={12}>
+                                <Autocomplete
+                                    multiple
+                                    options={branches}
+                                    getOptionLabel={(option) => option.name}
+                                    value={branches.filter(b => data.scopeInclude.includes(b.id))}
+                                    onChange={(_, newValue) => setData({ ...data, scopeInclude: newValue.map(v => v.id) })}
+                                    loading={loadingScope}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="اختر الفروع"
+                                            placeholder="ابحث عن فرع..."
+                                        />
+                                    )}
+                                    renderOption={(props, option, { selected }) => (
+                                        <li {...props}>
+                                            <Checkbox checked={selected} sx={{ mr: 1 }} />
+                                            <ListItemText
+                                                primary={option.name}
+                                                secondary={`${option._count?.users || 0} موظف`}
+                                            />
+                                        </li>
+                                    )}
+                                />
+                            </Grid>
+                        )}
+
+                        {/* Employee Selection */}
+                        {data.scopeType === 'CUSTOM' && (
+                            <Grid item xs={12}>
+                                <Autocomplete
+                                    multiple
+                                    options={employees}
+                                    getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
+                                    value={employees.filter(e => data.scopeInclude.includes(e.id))}
+                                    onChange={(_, newValue) => setData({ ...data, scopeInclude: newValue.map(v => v.id) })}
+                                    loading={loadingScope}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="اختر الموظفين"
+                                            placeholder="ابحث عن موظف..."
+                                        />
+                                    )}
+                                    renderOption={(props, option, { selected }) => (
+                                        <li {...props}>
+                                            <Checkbox checked={selected} sx={{ mr: 1 }} />
+                                            <ListItemText
+                                                primary={`${option.firstName} ${option.lastName}`}
+                                                secondary={option.employeeCode || option.email}
+                                            />
+                                        </li>
+                                    )}
+                                />
+                            </Grid>
+                        )}
+
+                        {/* Show selected count */}
+                        {data.scopeType !== 'ALL' && data.scopeInclude.length > 0 && (
+                            <Grid item xs={12}>
+                                <Alert severity="info">
+                                    تم اختيار {data.scopeInclude.length} عنصر
+                                </Alert>
+                            </Grid>
+                        )}
                     </Grid>
                 );
 
