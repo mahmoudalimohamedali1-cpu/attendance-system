@@ -161,7 +161,6 @@ const complianceGroup: MenuGroup = {
     { text: 'التأمينات GOSI', icon: <Business />, path: '/gosi' },
     { text: 'تكامل قوى', icon: <Business />, path: '/qiwa' },
     { text: '🇸🇦 السعودة ونطاقات', icon: <Business />, path: '/saudization' },
-    { text: 'عقود قوى', icon: <Description />, path: '/contracts', requiredPermission: ['CONTRACT_VIEW'] },
     { text: '🇸🇦 منصة مقيم', icon: <LinkIcon />, path: '/muqeem' },
     { text: 'إعدادات مقيم', icon: <Settings />, path: '/settings/muqeem' },
     { text: 'سجل الإرسالات', icon: <Security />, path: '/audit/submissions' },
