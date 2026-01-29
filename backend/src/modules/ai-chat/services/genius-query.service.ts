@@ -46,6 +46,35 @@ export class GeniusQueryService {
                     return this.handleSalaryInfo(companyId);
                 case 'department_stats':
                     return this.handleDepartmentStats(companyId);
+                // === NEW QUERY TYPES ===
+                case 'performance_reviews':
+                    return this.handlePerformanceReviews(companyId);
+                case 'goals_progress':
+                    return this.handleGoalsProgress(companyId);
+                case 'policy_violations':
+                    return this.handlePolicyViolations(companyId);
+                case 'payroll_runs':
+                    return this.handlePayrollRuns(companyId);
+                case 'custody_status':
+                    return this.handleCustodyStatus(companyId);
+                case 'pending_approvals':
+                    return this.handlePendingApprovals(companyId);
+                case 'overtime_report':
+                    return this.handleOvertimeReport(companyId);
+                case 'top_performers':
+                    return this.handleTopPerformers(companyId);
+                case 'branch_comparison':
+                    return this.handleBranchComparison(companyId);
+                case 'expiring_documents':
+                    return this.handleExpiringDocuments(companyId);
+                case 'birthday_today':
+                    return this.handleBirthdayToday(companyId);
+                case 'employee_search':
+                    return this.handleEmployeeSearch(question, companyId);
+                case 'task_status':
+                    return this.handleTaskStatus(companyId);
+                case 'gosi_summary':
+                    return this.handleGosiSummary(companyId);
                 default:
                     return {
                         success: false,
@@ -68,14 +97,52 @@ export class GeniusQueryService {
     private classifyQuery(question: string): string {
         const q = question.toLowerCase();
 
+        // Employee queries
         if (/كم.*موظف|عدد.*موظف/.test(q)) return 'employee_count';
         if (/قائمة.*موظف|اعرض.*موظف|كل.*موظف/.test(q)) return 'employee_list';
+        if (/ابحث.*عن|بحث.*موظف|معلومات.*عن/.test(q)) return 'employee_search';
+
+        // Attendance queries
         if (/حضور.*اليوم|اليوم.*حضور/.test(q)) return 'attendance_today';
-        if (/متأخر|تاخر/.test(q)) return 'late_employees';
-        if (/غائب|غياب/.test(q)) return 'absent_employees';
-        if (/طلب.*اجاز|إجازات/.test(q)) return 'leave_requests';
-        if (/راتب|معاش/.test(q)) return 'salary_info';
-        if (/قسم|إدارة/.test(q)) return 'department_stats';
+        if (/متأخر|تاخر|التأخير/.test(q)) return 'late_employees';
+        if (/غائب|غياب|الغياب/.test(q)) return 'absent_employees';
+        if (/اوفر.*تايم|ساعات.*إضافية|عمل.*إضافي/.test(q)) return 'overtime_report';
+
+        // Leave queries
+        if (/طلب.*اجاز|إجازات|الإجازات/.test(q)) return 'leave_requests';
+
+        // Salary & Payroll queries
+        if (/راتب|معاش|رواتب/.test(q)) return 'salary_info';
+        if (/مسير.*رواتب|دورة.*رواتب|payroll/.test(q)) return 'payroll_runs';
+        if (/تأمين|gosi|التأمينات/.test(q)) return 'gosi_summary';
+
+        // Organization queries
+        if (/قسم|إدارة|الأقسام/.test(q)) return 'department_stats';
+        if (/فرع|فروع|مقارنة.*فروع/.test(q)) return 'branch_comparison';
+
+        // Performance queries
+        if (/تقييم|أداء|performance/.test(q)) return 'performance_reviews';
+        if (/هدف|أهداف|goals/.test(q)) return 'goals_progress';
+        if (/أفضل.*أداء|top.*performer|متميز/.test(q)) return 'top_performers';
+
+        // Policy queries
+        if (/مخالف|سياس|policy/.test(q)) return 'policy_violations';
+
+        // Custody queries
+        if (/عهد|custody|أصول/.test(q)) return 'custody_status';
+
+        // Task queries
+        if (/مهم|task|مهام/.test(q)) return 'task_status';
+
+        // Approval queries
+        if (/موافق.*معلق|انتظار.*موافق|pending/.test(q)) return 'pending_approvals';
+
+        // Document queries
+        if (/مستند.*منته|وثيق.*تنته|انتهاء/.test(q)) return 'expiring_documents';
+
+        // Special queries
+        if (/عيد.*ميلاد|birthday/.test(q)) return 'birthday_today';
+
         return 'general';
     }
 
@@ -327,6 +394,337 @@ export class GeniusQueryService {
 - سجلات حضور اليوم: ${todayAtt}
 - طلبات إجازة معلقة: ${pendingLeaves}
             `.trim(),
+            visualization: 'list'
+        };
+    }
+
+    // ============ NEW QUERY HANDLERS ============
+
+    private async handlePerformanceReviews(companyId: string): Promise<QueryResult> {
+        try {
+            const reviews = await this.prisma.performanceReview.findMany({
+                where: { employee: { companyId } },
+                include: { employee: { select: { firstName: true, lastName: true } } },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+            });
+
+            const statusCounts = { DRAFT: 0, PENDING: 0, COMPLETED: 0 };
+            reviews.forEach((r: any) => { if (statusCounts[r.status as keyof typeof statusCounts] !== undefined) statusCounts[r.status as keyof typeof statusCounts]++; });
+
+            return {
+                success: true,
+                data: reviews.map((r: any, i) => ({ '#': i + 1, الموظف: `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`, الدرجة: r.overallRating || r.rating || '-', الحالة: r.status })),
+                query: 'Performance reviews',
+                explanation: `📊 **تقييمات الأداء**\n\n✏️ مسودة: ${statusCounts.DRAFT}\n⏳ قيد التقييم: ${statusCounts.PENDING}\n✅ مكتمل: ${statusCounts.COMPLETED}`,
+                visualization: 'table'
+            };
+        } catch {
+            return { success: false, data: null, query: 'performance_reviews', explanation: '❌ تقييمات الأداء غير متاحة حالياً' };
+        }
+    }
+
+    private async handleGoalsProgress(companyId: string): Promise<QueryResult> {
+        try {
+            const goals = await this.prisma.goal.findMany({
+                where: { companyId },
+                include: { owner: { select: { firstName: true, lastName: true } } },
+                orderBy: { progress: 'desc' },
+                take: 20,
+            });
+
+            const avgProgress = goals.length > 0 ? Math.round(goals.reduce((a, g) => a + g.progress, 0) / goals.length) : 0;
+
+            return {
+                success: true,
+                data: goals.map((g: any, i) => ({ '#': i + 1, الهدف: g.title?.substring(0, 30), الموظف: `${g.owner?.firstName || ''} ${g.owner?.lastName || ''}`, التقدم: `${g.progress}%`, الحالة: g.status })),
+                query: 'Goals progress',
+                explanation: `🎯 **تقدم الأهداف**\n\n📈 متوسط التقدم: ${avgProgress}%\n📋 عدد الأهداف: ${goals.length}`,
+                visualization: 'table'
+            };
+        } catch {
+            return { success: false, data: null, query: 'goals_progress', explanation: '❌ بيانات الأهداف غير متاحة حالياً' };
+        }
+    }
+
+    private async handlePolicyViolations(companyId: string): Promise<QueryResult> {
+        try {
+            // Get late attendance as policy violations indicator
+            const today = new Date();
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+            const lateRecords = await this.prisma.attendance.findMany({
+                where: { user: { companyId }, date: { gte: monthStart }, status: 'LATE' },
+                include: { user: { select: { firstName: true, lastName: true } } },
+                orderBy: { lateMinutes: 'desc' },
+                take: 20,
+            });
+
+            return {
+                success: true,
+                data: lateRecords.map((r: any, i) => ({ '#': i + 1, الموظف: `${r.user?.firstName || ''} ${r.user?.lastName || ''}`, السبب: `تأخير ${r.lateMinutes || 0} دقيقة`, التاريخ: new Date(r.date).toLocaleDateString('ar-SA') })),
+                query: 'Policy violations',
+                explanation: `⚠️ **مخالفات التأخير هذا الشهر** (${lateRecords.length} مخالفة)`,
+                visualization: 'table'
+            };
+        } catch {
+            return { success: false, data: null, query: 'policy_violations', explanation: '❌ بيانات المخالفات غير متاحة حالياً' };
+        }
+    }
+
+    private async handlePayrollRuns(companyId: string): Promise<QueryResult> {
+        const runs = await this.prisma.payrollRun.findMany({
+            where: { companyId },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+        });
+
+        return {
+            success: true,
+            data: runs.map((r: any, i) => ({ '#': i + 1, الفترة: `${r.periodStart?.toLocaleDateString('ar-SA')} - ${r.periodEnd?.toLocaleDateString('ar-SA')}`, الحالة: r.status, الموظفين: r.totalEmployees || 0, الإجمالي: `${Number(r.totalNetSalary || 0).toLocaleString('ar-SA')} ر.س` })),
+            query: 'Payroll runs',
+            explanation: `💰 **مسيرات الرواتب** (${runs.length} مسير)`,
+            visualization: 'table'
+        };
+    }
+
+    private async handleCustodyStatus(companyId: string): Promise<QueryResult> {
+        try {
+            const custodies = await this.prisma.custodyItem.findMany({
+                where: { companyId },
+                take: 20,
+            });
+
+            const assigned = custodies.filter((c: any) => c.currentAssigneeId).length;
+            const available = custodies.filter((c: any) => !c.currentAssigneeId).length;
+
+            return {
+                success: true,
+                data: custodies.map((c: any, i) => ({ '#': i + 1, العهدة: c.name, النوع: c.status || '-', الكود: c.code || '-' })),
+                query: 'Custody status',
+                explanation: `📦 **حالة العهد**\n\n✅ مُسلَّمة: ${assigned}\n📋 متاحة: ${available}\n📊 الإجمالي: ${custodies.length}`,
+                visualization: 'table'
+            };
+        } catch {
+            return { success: false, data: null, query: 'custody_status', explanation: '❌ بيانات العهد غير متاحة حالياً' };
+        }
+    }
+
+    private async handlePendingApprovals(companyId: string): Promise<QueryResult> {
+        try {
+            const leaves = await this.prisma.leaveRequest.count({
+                where: { user: { companyId }, status: 'PENDING' }
+            });
+
+            return {
+                success: true,
+                data: { إجازات_معلقة: leaves },
+                query: 'Pending approvals',
+                explanation: `⏳ **الموافقات المعلقة**\n\n🏖️ إجازات: ${leaves}`,
+                visualization: 'list'
+            };
+        } catch {
+            return { success: false, data: null, query: 'pending_approvals', explanation: '❌ بيانات الموافقات غير متاحة' };
+        }
+    }
+
+    private async handleOvertimeReport(companyId: string): Promise<QueryResult> {
+        const thisMonth = new Date();
+        thisMonth.setDate(1);
+        thisMonth.setHours(0, 0, 0, 0);
+
+        const overtimes = await this.prisma.attendance.findMany({
+            where: { user: { companyId }, date: { gte: thisMonth }, overtimeMinutes: { gt: 0 } },
+            include: { user: { select: { firstName: true, lastName: true } } },
+            orderBy: { overtimeMinutes: 'desc' },
+            take: 15,
+        });
+
+        const totalHours = Math.round(overtimes.reduce((a, o) => a + (o.overtimeMinutes || 0), 0) / 60);
+
+        return {
+            success: true,
+            data: overtimes.map((o: any, i) => ({ '#': i + 1, الموظف: `${o.user.firstName} ${o.user.lastName}`, الساعات: `${Math.round((o.overtimeMinutes || 0) / 60)} ساعة` })),
+            query: 'Overtime report',
+            explanation: `⏰ **تقرير العمل الإضافي** (هذا الشهر)\n\n📊 إجمالي الساعات: ${totalHours} ساعة`,
+            visualization: 'table'
+        };
+    }
+
+    private async handleTopPerformers(companyId: string): Promise<QueryResult> {
+        try {
+            const reviews = await this.prisma.performanceReview.findMany({
+                where: { employee: { companyId }, status: 'COMPLETED', finalRating: { not: null } },
+                include: { employee: { select: { firstName: true, lastName: true, jobTitle: true } } },
+                orderBy: { finalRating: 'desc' },
+                take: 10,
+            });
+
+            return {
+                success: true,
+                data: reviews.map((r: any, i) => ({ '#': i + 1, الموظف: `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`, المسمى: r.employee?.jobTitle || '-', الدرجة: `${r.finalRating || r.managerRating || '-'}` })),
+                query: 'Top performers',
+                explanation: `🏆 **أفضل الموظفين أداءً** (${reviews.length} موظف)`,
+                visualization: 'table'
+            };
+        } catch {
+            return { success: false, data: null, query: 'top_performers', explanation: '❌ بيانات الأداء غير متاحة حالياً' };
+        }
+    }
+
+    private async handleBranchComparison(companyId: string): Promise<QueryResult> {
+        try {
+            const branches = await this.prisma.branch.findMany({
+                where: { companyId },
+                include: { _count: { select: { users: true } } },
+            });
+
+            const chartData = branches.map(b => ({ name: b.name, value: b._count.users }));
+
+            return {
+                success: true,
+                data: { chartData, table: branches.map(b => ({ الفرع: b.name, الموظفين: b._count.users })) },
+                query: 'Branch comparison',
+                explanation: `🏢 **مقارنة الفروع** (${branches.length} فرع)`,
+                visualization: 'chart',
+                chartType: 'bar'
+            };
+        } catch {
+            return { success: false, data: null, query: 'branch_comparison', explanation: '❌ بيانات الفروع غير متاحة' };
+        }
+    }
+
+    private async handleExpiringDocuments(companyId: string): Promise<QueryResult> {
+        try {
+            const thirtyDaysLater = new Date();
+            thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+            const today = new Date();
+
+            // Check passport and iqama expiry from User model
+            const employees = await this.prisma.user.findMany({
+                where: {
+                    companyId,
+                    status: 'ACTIVE',
+                    OR: [
+                        { passportExpiryDate: { lte: thirtyDaysLater, gte: today } },
+                        { iqamaExpiryDate: { lte: thirtyDaysLater, gte: today } },
+                    ]
+                },
+                select: { firstName: true, lastName: true, passportExpiryDate: true, iqamaExpiryDate: true },
+                take: 20,
+            });
+
+            const data = employees.map((e: any, i) => {
+                const docs: string[] = [];
+                if (e.passportExpiryDate && new Date(e.passportExpiryDate) <= thirtyDaysLater) docs.push('جواز السفر');
+                if (e.iqamaExpiryDate && new Date(e.iqamaExpiryDate) <= thirtyDaysLater) docs.push('الإقامة');
+                return { '#': i + 1, الموظف: `${e.firstName} ${e.lastName}`, المستند: docs.join(', ') || '-' };
+            });
+
+            return {
+                success: true,
+                data,
+                query: 'Expiring documents',
+                explanation: `📄 **مستندات تنتهي خلال 30 يوم** (${employees.length} موظف)`,
+                visualization: 'table'
+            };
+        } catch {
+            return { success: false, data: null, query: 'expiring_documents', explanation: '❌ بيانات المستندات غير متاحة حالياً' };
+        }
+    }
+
+    private async handleBirthdayToday(companyId: string): Promise<QueryResult> {
+        const today = new Date();
+        const employees = await this.prisma.user.findMany({
+            where: { companyId, status: 'ACTIVE' },
+            select: { firstName: true, lastName: true, dateOfBirth: true, department: { select: { name: true } } },
+        });
+
+        const birthdayToday = employees.filter(e => {
+            if (!e.dateOfBirth) return false;
+            const dob = new Date(e.dateOfBirth);
+            return dob.getDate() === today.getDate() && dob.getMonth() === today.getMonth();
+        });
+
+        return {
+            success: true,
+            data: birthdayToday.map((e, i) => ({ '#': i + 1, الاسم: `${e.firstName} ${e.lastName}`, القسم: e.department?.name || '-' })),
+            query: 'Birthday today',
+            explanation: birthdayToday.length > 0 ? `🎂 **أعياد الميلاد اليوم** (${birthdayToday.length} موظف)\n\nلا تنسَ تهنئتهم! 🎉` : `🎂 **لا يوجد أعياد ميلاد اليوم**`,
+            visualization: 'table'
+        };
+    }
+
+    private async handleEmployeeSearch(question: string, companyId: string): Promise<QueryResult> {
+        const nameMatch = question.match(/عن\s+([أ-ي\w]+)|بحث\s+([أ-ي\w]+)/);
+        const searchTerm = nameMatch?.[1] || nameMatch?.[2] || '';
+
+        if (!searchTerm) {
+            return { success: false, data: null, query: question, explanation: '❌ يرجى تحديد اسم الموظف للبحث' };
+        }
+
+        const employees = await this.prisma.user.findMany({
+            where: { companyId, OR: [{ firstName: { contains: searchTerm } }, { lastName: { contains: searchTerm } }] },
+            select: { firstName: true, lastName: true, email: true, phone: true, jobTitle: true, department: { select: { name: true } } },
+            take: 10,
+        });
+
+        return {
+            success: true,
+            data: employees.map((e, i) => ({ '#': i + 1, الاسم: `${e.firstName} ${e.lastName}`, المسمى: e.jobTitle || '-', القسم: e.department?.name || '-', الهاتف: e.phone || '-' })),
+            query: 'Employee search',
+            explanation: `🔍 **نتائج البحث عن "${searchTerm}"** (${employees.length} نتيجة)`,
+            visualization: 'table'
+        };
+    }
+
+    private async handleTaskStatus(companyId: string): Promise<QueryResult> {
+        const tasks = await this.prisma.task.findMany({
+            where: { companyId },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+        });
+
+        const statusCounts = { TODO: 0, IN_PROGRESS: 0, COMPLETED: 0 };
+        tasks.forEach(t => { if (statusCounts[t.status as keyof typeof statusCounts] !== undefined) statusCounts[t.status as keyof typeof statusCounts]++; });
+
+        const chartData = [
+            { name: 'قيد الانتظار', value: statusCounts.TODO },
+            { name: 'جاري التنفيذ', value: statusCounts.IN_PROGRESS },
+            { name: 'مكتمل', value: statusCounts.COMPLETED },
+        ];
+
+        return {
+            success: true,
+            data: { chartData, table: tasks.map((t, i) => ({ '#': i + 1, المهمة: t.title.substring(0, 30), الحالة: t.status, الأولوية: t.priority })) },
+            query: 'Task status',
+            explanation: `📋 **حالة المهام**\n\n⏳ انتظار: ${statusCounts.TODO}\n🔄 جاري: ${statusCounts.IN_PROGRESS}\n✅ مكتمل: ${statusCounts.COMPLETED}`,
+            visualization: 'chart',
+            chartType: 'pie'
+        };
+    }
+
+    private async handleGosiSummary(companyId: string): Promise<QueryResult> {
+        const employees = await this.prisma.user.findMany({
+            where: { companyId, status: 'ACTIVE', salary: { not: null } },
+            select: { salary: true },
+        });
+
+        const totalSalary = employees.reduce((a, e) => a + Number(e.salary || 0), 0);
+        const employeeShare = totalSalary * 0.1; // 10% employee
+        const companyShare = totalSalary * 0.12; // 12% company
+        const totalGosi = employeeShare + companyShare;
+
+        return {
+            success: true,
+            data: {
+                إجمالي_الرواتب: `${totalSalary.toLocaleString('ar-SA')} ر.س`,
+                حصة_الموظفين: `${Math.round(employeeShare).toLocaleString('ar-SA')} ر.س (10%)`,
+                حصة_الشركة: `${Math.round(companyShare).toLocaleString('ar-SA')} ر.س (12%)`,
+                إجمالي_التأمينات: `${Math.round(totalGosi).toLocaleString('ar-SA')} ر.س`,
+            },
+            query: 'GOSI summary',
+            explanation: `🏛️ **ملخص التأمينات الاجتماعية**`,
             visualization: 'list'
         };
     }
