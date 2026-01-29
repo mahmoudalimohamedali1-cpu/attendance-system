@@ -615,7 +615,8 @@ ${schemaContext}
                 const employees = await this.prisma.user.findMany({
                     where: {
                         companyId,
-                        status: 'ACTIVE',
+                        // لا نفلتر بالـ status ليظهر كل الموظفين
+                        role: { not: 'SUPER_ADMIN' }, // استثناء الـ Super Admin فقط
                         OR: searchTerm ? [
                             { firstName: { contains: searchTerm, mode: 'insensitive' } },
                             { lastName: { contains: searchTerm, mode: 'insensitive' } },
@@ -627,18 +628,21 @@ ${schemaContext}
                         firstName: true,
                         lastName: true,
                         jobTitle: true,
+                        status: true,
                         department: { select: { name: true } }
                     },
                     take: limit,
                     orderBy: { firstName: 'asc' }
                 });
 
+                this.logger.log(`[DQE] Found ${employees.length} employees for autocomplete`);
+
                 return {
                     type: 'employee',
                     items: employees.map(e => ({
                         id: e.id,
                         label: `${e.firstName} ${e.lastName}`,
-                        sublabel: e.jobTitle || e.department?.name || '',
+                        sublabel: e.jobTitle || e.department?.name || e.status || '',
                         value: `${e.firstName} ${e.lastName}`
                     }))
                 };
