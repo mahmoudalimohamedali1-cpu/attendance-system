@@ -146,21 +146,29 @@ const AiChatPage: React.FC = () => {
     }, []);
 
     // معالجة تغيير النص
-    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const newValue = e.target.value;
         const cursorPos = e.target.selectionStart || 0;
         setInput(newValue);
+
+        console.log('[AI Chat] Input changed:', { newValue, cursorPos });
 
         // كشف @ في النص
         const textBeforeCursor = newValue.substring(0, cursorPos);
         const atIndex = textBeforeCursor.lastIndexOf('@');
 
+        console.log('[AI Chat] @ detection:', { atIndex, textBeforeCursor });
+
         if (atIndex !== -1) {
             // تحقق أن @ ليست في منتصف كلمة
             const charBefore = atIndex > 0 ? textBeforeCursor[atIndex - 1] : ' ';
-            if (charBefore === ' ' || charBefore === '\n' || atIndex === 0) {
+            console.log('[AI Chat] charBefore @:', charBefore, 'charCode:', charBefore.charCodeAt(0));
+
+            if (charBefore === ' ' || charBefore === '\n' || charBefore === '\t' || atIndex === 0) {
                 const searchTerm = textBeforeCursor.substring(atIndex + 1);
                 const context = detectContext(textBeforeCursor.substring(0, atIndex));
+
+                console.log('[AI Chat] Opening mention dropdown:', { context, searchTerm });
 
                 setMentionContext(context);
                 setMentionSearchStart(atIndex);
@@ -443,7 +451,9 @@ const AiChatPage: React.FC = () => {
                         onChange={handleInputChange}
                         onKeyPress={handleKeyPress}
                         disabled={loading}
-                        inputRef={inputRef}
+                        InputProps={{
+                            inputRef: inputRef,
+                        }}
                         sx={{
                             '& .MuiOutlinedInput-root': {
                                 borderRadius: 3,
