@@ -354,6 +354,22 @@ const GeniusAiPage: React.FC = () => {
         }
     };
 
+    // Helper to safely render any value (handles objects, arrays, primitives)
+    const safeRenderValue = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') {
+            // If it has a 'name' property (common pattern), use that
+            if (value.name) return String(value.name);
+            // Otherwise stringify the object
+            try {
+                return JSON.stringify(value);
+            } catch {
+                return '[Object]';
+            }
+        }
+        return String(value);
+    };
+
     const renderTable = (data: any[]) => {
         if (!Array.isArray(data) || data.length === 0) return null;
         const headers = Object.keys(data[0]);
@@ -374,7 +390,7 @@ const GeniusAiPage: React.FC = () => {
                         {data.slice(0, 15).map((row, i) => (
                             <TableRow key={i} hover>
                                 {headers.map(header => (
-                                    <TableCell key={header}>{row[header]}</TableCell>
+                                    <TableCell key={header}>{safeRenderValue(row[header])}</TableCell>
                                 ))}
                             </TableRow>
                         ))}
@@ -433,11 +449,19 @@ const GeniusAiPage: React.FC = () => {
     const renderCard = (data: any) => {
         if (!data) return null;
 
+        // Safely extract display value
+        let displayValue: string | number = '';
+        if (typeof data === 'object') {
+            displayValue = data.count ?? data.value ?? data.total ?? data.name ?? JSON.stringify(data);
+        } else {
+            displayValue = data;
+        }
+
         return (
             <Card sx={{ mt: 2, bgcolor: '#667eea', color: 'white' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
                     <Typography variant="h2" sx={{ fontWeight: 'bold' }}>
-                        {data.count || data.value || JSON.stringify(data)}
+                        {String(displayValue)}
                     </Typography>
                 </CardContent>
             </Card>
