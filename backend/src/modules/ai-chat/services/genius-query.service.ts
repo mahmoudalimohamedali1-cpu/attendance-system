@@ -473,19 +473,33 @@ export class GeniusQueryService {
     }
 
     private async handlePayrollRuns(companyId: string): Promise<QueryResult> {
-        const runs = await this.prisma.payrollRun.findMany({
-            where: { companyId },
-            orderBy: { createdAt: 'desc' },
-            take: 10,
-        });
+        try {
+            const runs = await this.prisma.payrollRun.findMany({
+                where: { companyId },
+                include: {
+                    period: { select: { startDate: true, endDate: true, month: true, year: true } },
+                    _count: { select: { payslips: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 10,
+            });
 
-        return {
-            success: true,
-            data: runs.map((r: any, i) => ({ '#': i + 1, الفترة: `${r.periodStart?.toLocaleDateString('ar-SA')} - ${r.periodEnd?.toLocaleDateString('ar-SA')}`, الحالة: r.status, الموظفين: r.totalEmployees || 0, الإجمالي: `${Number(r.totalNetSalary || 0).toLocaleString('ar-SA')} ر.س` })),
-            query: 'Payroll runs',
-            explanation: `💰 **مسيرات الرواتب** (${runs.length} مسير)`,
-            visualization: 'table'
-        };
+            return {
+                success: true,
+                data: runs.map((r: any, i) => ({
+                    '#': i + 1,
+                    الفترة: r.period ? `${r.period.month}/${r.period.year}` : '-',
+                    الحالة: r.status,
+                    الموظفين: r._count?.payslips || 0,
+                    التاريخ: new Date(r.runDate).toLocaleDateString('ar-SA')
+                })),
+                query: 'Payroll runs',
+                explanation: `💰 **مسيرات الرواتب** (${runs.length} مسير)`,
+                visualization: 'table'
+            };
+        } catch {
+            return { success: false, data: null, query: 'payroll_runs', explanation: '❌ بيانات مسيرات الرواتب غير متاحة' };
+        }
     }
 
     private async handleCustodyStatus(companyId: string): Promise<QueryResult> {
@@ -679,29 +693,33 @@ export class GeniusQueryService {
     }
 
     private async handleTaskStatus(companyId: string): Promise<QueryResult> {
-        const tasks = await this.prisma.task.findMany({
-            where: { companyId },
-            orderBy: { createdAt: 'desc' },
-            take: 20,
-        });
+        try {
+            const tasks = await this.prisma.task.findMany({
+                where: { companyId },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+            });
 
-        const statusCounts = { TODO: 0, IN_PROGRESS: 0, COMPLETED: 0 };
-        tasks.forEach(t => { if (statusCounts[t.status as keyof typeof statusCounts] !== undefined) statusCounts[t.status as keyof typeof statusCounts]++; });
+            const statusCounts = { TODO: 0, IN_PROGRESS: 0, COMPLETED: 0 };
+            tasks.forEach(t => { if (statusCounts[t.status as keyof typeof statusCounts] !== undefined) statusCounts[t.status as keyof typeof statusCounts]++; });
 
-        const chartData = [
-            { name: 'قيد الانتظار', value: statusCounts.TODO },
-            { name: 'جاري التنفيذ', value: statusCounts.IN_PROGRESS },
-            { name: 'مكتمل', value: statusCounts.COMPLETED },
-        ];
+            const chartData = [
+                { name: 'قيد الانتظار', value: statusCounts.TODO },
+                { name: 'جاري التنفيذ', value: statusCounts.IN_PROGRESS },
+                { name: 'مكتمل', value: statusCounts.COMPLETED },
+            ];
 
-        return {
-            success: true,
-            data: { chartData, table: tasks.map((t, i) => ({ '#': i + 1, المهمة: t.title.substring(0, 30), الحالة: t.status, الأولوية: t.priority })) },
-            query: 'Task status',
-            explanation: `📋 **حالة المهام**\n\n⏳ انتظار: ${statusCounts.TODO}\n🔄 جاري: ${statusCounts.IN_PROGRESS}\n✅ مكتمل: ${statusCounts.COMPLETED}`,
-            visualization: 'chart',
-            chartType: 'pie'
-        };
+            return {
+                success: true,
+                data: { chartData, table: tasks.map((t, i) => ({ '#': i + 1, المهمة: t.title.substring(0, 30), الحالة: t.status, الأولوية: t.priority })) },
+                query: 'Task status',
+                explanation: `📋 **حالة المهام**\n\n⏳ انتظار: ${statusCounts.TODO}\n🔄 جاري: ${statusCounts.IN_PROGRESS}\n✅ مكتمل: ${statusCounts.COMPLETED}`,
+                visualization: 'chart',
+                chartType: 'pie'
+            };
+        } catch {
+            return { success: false, data: null, query: 'task_status', explanation: '❌ بيانات المهام غير متاحة حالياً' };
+        }
     }
 
     private async handleGosiSummary(companyId: string): Promise<QueryResult> {
