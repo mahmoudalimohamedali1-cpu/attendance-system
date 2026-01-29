@@ -611,7 +611,7 @@ export const LeavesPage = () => {
                 )}
 
                 {/* Search & Filter Bar */}
-                {(isManagerInbox || isHRInbox) && (
+                {!isBalanceDashboard && (
                   <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                     <TextField
                       placeholder="بحث باسم الموظف..."
