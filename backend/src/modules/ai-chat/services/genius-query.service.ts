@@ -75,6 +75,8 @@ export class GeniusQueryService {
                     return this.handleTaskStatus(companyId);
                 case 'gosi_summary':
                     return this.handleGosiSummary(companyId);
+                case 'employee_salary':
+                    return this.handleEmployeeSalary(question, companyId);
                 default:
                     return {
                         success: false,
@@ -111,7 +113,10 @@ export class GeniusQueryService {
         // Leave queries
         if (/طلب.*اجاز|إجازات|الإجازات/.test(q)) return 'leave_requests';
 
-        // Salary & Payroll queries
+        // Employee salary query (راتب + اسم) - MUST be before general salary_info
+        if (/راتب\s+[أ-ي\w]+|معاش\s+[أ-ي\w]+/.test(q)) return 'employee_salary';
+
+        // Salary & Payroll queries (general)
         if (/راتب|معاش|رواتب/.test(q)) return 'salary_info';
         if (/مسير.*رواتب|دورة.*رواتب|payroll/.test(q)) return 'payroll_runs';
         if (/تأمين|gosi|التأمينات/.test(q)) return 'gosi_summary';
@@ -764,5 +769,117 @@ export class GeniusQueryService {
         }
 
         return output.trim();
+    }
+
+    /**
+     * 💰 Handle employee salary query - REAL DATA FROM DATABASE
+     */
+    private async handleEmployeeSalary(question: string, companyId: string): Promise<QueryResult> {
+        // Extract employee name from question
+        const nameMatch = question.match(/راتب\s+([أ-ي\w]+(?:\s+[أ-ي\w]+)?)|معاش\s+([أ-ي\w]+(?:\s+[أ-ي\w]+)?)/);
+        const searchTerm = nameMatch?.[1] || nameMatch?.[2] || '';
+
+        if (!searchTerm || searchTerm.length < 2) {
+            return {
+                success: false,
+                data: null,
+                query: question,
+                explanation: '❌ يرجى تحديد اسم الموظف. مثال: "راتب أحمد" أو "راتب محمد طارق"'
+            };
+        }
+
+        this.logger.log(`[SALARY QUERY] Searching for employee: "${searchTerm}"`);
+
+        // Search for employee with salary data
+        const employees = await this.prisma.user.findMany({
+            where: {
+                companyId,
+                OR: [
+                    { firstName: { contains: searchTerm.split(' ')[0] } },
+                    { lastName: { contains: searchTerm.split(' ')[1] || searchTerm.split(' ')[0] } },
+                    { firstName: { contains: searchTerm } }
+                ]
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                salary: true,
+                jobTitle: true,
+                department: { select: { name: true } },
+                salaryAssignments: {
+                    where: { isActive: true },
+                    select: {
+                        baseSalary: true,
+                        effectiveDate: true,
+                        structure: { select: { name: true } }
+                    },
+                    orderBy: { effectiveDate: 'desc' },
+                    take: 1
+                }
+            },
+            take: 5
+        });
+
+        if (employees.length === 0) {
+            return {
+                success: false,
+                data: null,
+                query: question,
+                explanation: `❌ لم يتم العثور على موظف باسم "${searchTerm}"`
+            };
+        }
+
+        // Format salary data
+        const data = employees.map((e, i) => {
+            const totalSalary = e.salary ? Number(e.salary) : 0;
+            const assignment = e.salaryAssignments[0];
+            const baseSalary = assignment?.baseSalary ? Number(assignment.baseSalary) : 0;
+            const allowances = totalSalary - baseSalary;
+
+            return {
+                '#': i + 1,
+                'الاسم': `${e.firstName} ${e.lastName}`,
+                'المسمى': e.jobTitle || '-',
+                'القسم': e.department?.name || '-',
+                'الراتب الأساسي': baseSalary > 0 ? `${baseSalary.toLocaleString('ar-SA')} ريال` : '-',
+                'البدلات': allowances > 0 ? `${allowances.toLocaleString('ar-SA')} ريال` : '-',
+                'إجمالي الراتب': totalSalary > 0 ? `${totalSalary.toLocaleString('ar-SA')} ريال` : '-'
+            };
+        });
+
+        // If single result, show detailed card
+        if (employees.length === 1) {
+            const e = employees[0];
+            const totalSalary = e.salary ? Number(e.salary) : 0;
+            const assignment = e.salaryAssignments[0];
+            const baseSalary = assignment?.baseSalary ? Number(assignment.baseSalary) : 0;
+            const allowances = totalSalary - baseSalary;
+
+            return {
+                success: true,
+                data: data[0],
+                query: 'Employee salary',
+                explanation: `💰 **راتب ${e.firstName} ${e.lastName}**
+
+👤 **المسمى الوظيفي:** ${e.jobTitle || 'غير محدد'}
+🏢 **القسم:** ${e.department?.name || 'غير محدد'}
+
+💵 **الراتب الأساسي:** ${baseSalary > 0 ? baseSalary.toLocaleString('ar-SA') + ' ريال' : 'غير محدد'}
+🎁 **البدلات:** ${allowances > 0 ? allowances.toLocaleString('ar-SA') + ' ريال' : 'غير محددة'}
+💎 **إجمالي الراتب:** ${totalSalary > 0 ? totalSalary.toLocaleString('ar-SA') + ' ريال' : 'غير محدد'}
+
+${assignment?.structure?.name ? `📋 **هيكل الراتب:** ${assignment.structure.name}` : ''}`,
+                visualization: 'number'
+            };
+        }
+
+        return {
+            success: true,
+            data,
+            query: 'Employee salary search',
+            explanation: `💰 **نتائج البحث عن راتب "${searchTerm}"** (${employees.length} نتيجة)`,
+            visualization: 'table'
+        };
     }
 }
