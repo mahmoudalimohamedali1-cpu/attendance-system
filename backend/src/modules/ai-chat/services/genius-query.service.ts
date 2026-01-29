@@ -77,6 +77,8 @@ export class GeniusQueryService {
                     return this.handleGosiSummary(companyId);
                 case 'employee_salary':
                     return this.handleEmployeeSalary(question, companyId);
+                case 'monthly_comparison':
+                    return this.handleMonthlyComparison(companyId);
                 default:
                     return {
                         success: false,
@@ -147,6 +149,9 @@ export class GeniusQueryService {
 
         // Special queries
         if (/عيد.*ميلاد|birthday/.test(q)) return 'birthday_today';
+
+        // Monthly comparison queries
+        if (/مقارنه?.*شهري|شهريه?.*مقارن|مقارنة.*الشهر|الشهر.*الماضي/.test(q)) return 'monthly_comparison';
 
         return 'general';
     }
@@ -880,6 +885,78 @@ ${assignment?.structure?.name ? `📋 **هيكل الراتب:** ${assignment.st
             query: 'Employee salary search',
             explanation: `💰 **نتائج البحث عن راتب "${searchTerm}"** (${employees.length} نتيجة)`,
             visualization: 'table'
+        };
+    }
+
+    /**
+     * 📊 Handle monthly comparison - Current vs Previous month
+     */
+    private async handleMonthlyComparison(companyId: string): Promise<QueryResult> {
+        const now = new Date();
+        const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+        // Get current month stats
+        const [currentAttendance, previousAttendance, currentLeaves, previousLeaves] = await Promise.all([
+            this.prisma.attendance.count({
+                where: {
+                    user: { companyId },
+                    date: { gte: currentMonthStart }
+                }
+            }),
+            this.prisma.attendance.count({
+                where: {
+                    user: { companyId },
+                    date: { gte: previousMonthStart, lte: previousMonthEnd }
+                }
+            }),
+            this.prisma.leaveRequest.count({
+                where: {
+                    user: { companyId },
+                    status: 'APPROVED',
+                    startDate: { gte: currentMonthStart }
+                }
+            }),
+            this.prisma.leaveRequest.count({
+                where: {
+                    user: { companyId },
+                    status: 'APPROVED',
+                    startDate: { gte: previousMonthStart, lte: previousMonthEnd }
+                }
+            })
+        ]);
+
+        const attendanceChange = previousAttendance > 0
+            ? Math.round(((currentAttendance - previousAttendance) / previousAttendance) * 100)
+            : 0;
+        const leaveChange = previousLeaves > 0
+            ? Math.round(((currentLeaves - previousLeaves) / previousLeaves) * 100)
+            : 0;
+
+        const currentMonthName = now.toLocaleDateString('ar-SA', { month: 'long' });
+        const previousMonthName = new Date(previousMonthStart).toLocaleDateString('ar-SA', { month: 'long' });
+
+        return {
+            success: true,
+            data: [
+                { 'المؤشر': 'سجلات الحضور', [currentMonthName]: currentAttendance, [previousMonthName]: previousAttendance, 'التغيير': `${attendanceChange > 0 ? '+' : ''}${attendanceChange}%` },
+                { 'المؤشر': 'الإجازات المعتمدة', [currentMonthName]: currentLeaves, [previousMonthName]: previousLeaves, 'التغيير': `${leaveChange > 0 ? '+' : ''}${leaveChange}%` }
+            ],
+            query: 'Monthly comparison',
+            explanation: `📊 **مقارنة شهرية: ${currentMonthName} vs ${previousMonthName}**
+
+📈 **الحضور:**
+  • ${currentMonthName}: ${currentAttendance} سجل
+  • ${previousMonthName}: ${previousAttendance} سجل
+  • التغيير: ${attendanceChange > 0 ? '📈 +' : attendanceChange < 0 ? '📉 ' : ''}${attendanceChange}%
+
+🏖️ **الإجازات:**
+  • ${currentMonthName}: ${currentLeaves} إجازة
+  • ${previousMonthName}: ${previousLeaves} إجازة
+  • التغيير: ${leaveChange > 0 ? '📈 +' : leaveChange < 0 ? '📉 ' : ''}${leaveChange}%`,
+            visualization: 'table',
+            chartType: 'bar'
         };
     }
 }
