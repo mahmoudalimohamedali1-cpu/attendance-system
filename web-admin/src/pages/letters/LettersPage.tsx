@@ -239,16 +239,31 @@ export const LettersPage = () => {
   };
 
   const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'CERTIFICATION': return 'شهادة';
-      case 'SALARY_CERTIFICATE': return 'شهادة راتب';
-      case 'EXPERIENCE_CERTIFICATE': return 'شهادة خبرة';
-      case 'REQUEST': return 'طلب';
-      case 'COMPLAINT': return 'شكوى';
-      case 'RECOMMENDATION': return 'توصية';
-      default: return type;
-    }
+    const labels: Record<string, string> = {
+      // New types (12 أنواع جديدة)
+      SALARY_DEFINITION: 'خطاب تعريف راتب',
+      SERVICE_CONFIRMATION: 'خطاب تأكيد خدمة',
+      SALARY_ADJUSTMENT: 'خطاب تعديل راتب',
+      PROMOTION: 'خطاب ترقية',
+      TRANSFER_ASSIGNMENT: 'خطاب نقل / تكليف',
+      RESIGNATION: 'خطاب استقالة',
+      TERMINATION: 'خطاب إنهاء خدمة',
+      CLEARANCE: 'خطاب إخلاء طرف',
+      EXPERIENCE: 'خطاب خبرة',
+      SALARY_DEFINITION_DIRECTED: 'خطاب تعريف راتب (موجّه)',
+      NOC: 'خطاب عدم ممانعة',
+      DELEGATION: 'خطاب تفويض',
+      // Legacy types (للتوافق مع النظام القديم)
+      CERTIFICATION: 'شهادة',
+      SALARY_CERTIFICATE: 'شهادة راتب',
+      EXPERIENCE_CERTIFICATE: 'شهادة خبرة',
+      REQUEST: 'طلب',
+      COMPLAINT: 'شكوى',
+      RECOMMENDATION: 'توصية',
+    };
+    return labels[type] || type;
   };
+
 
   const getStatusLabel = (status: string) => {
     switch (status) {
