@@ -15,6 +15,7 @@ import {
     Divider,
     IconButton,
     Collapse,
+    Skeleton,
 } from '@mui/material';
 import {
     BeachAccess,
@@ -109,8 +110,49 @@ export const LeaveBalanceDashboard = () => {
 
     if (isLoading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" py={4}>
-                <CircularProgress />
+            <Box>
+                {/* Header Skeleton */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Box>
+                        <Skeleton variant="text" width={150} height={32} />
+                        <Skeleton variant="text" width={80} height={20} />
+                    </Box>
+                    <Skeleton variant="rounded" width={180} height={32} />
+                </Box>
+                {/* Summary Cards Skeleton */}
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                    {[1, 2, 3, 4].map((i) => (
+                        <Grid item xs={6} md={3} key={i}>
+                            <Paper sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
+                                <Skeleton variant="text" width={60} height={48} sx={{ mx: 'auto' }} />
+                                <Skeleton variant="text" width={100} height={20} sx={{ mx: 'auto' }} />
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
+                {/* Balance Cards Skeleton */}
+                <Grid container spacing={2}>
+                    {[1, 2, 3].map((i) => (
+                        <Grid item xs={12} md={6} lg={4} key={i}>
+                            <Card sx={{ height: '100%', borderLeft: 4, borderColor: 'grey.300' }}>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                                        <Skeleton variant="rounded" width={40} height={40} />
+                                        <Box sx={{ flex: 1 }}>
+                                            <Skeleton variant="text" width="60%" height={24} />
+                                            <Skeleton variant="text" width="40%" height={16} />
+                                        </Box>
+                                    </Box>
+                                    <Box sx={{ textAlign: 'center', my: 2 }}>
+                                        <Skeleton variant="text" width={60} height={56} sx={{ mx: 'auto' }} />
+                                        <Skeleton variant="text" width={120} height={20} sx={{ mx: 'auto' }} />
+                                    </Box>
+                                    <Skeleton variant="rounded" height={8} sx={{ mb: 2, borderRadius: 4 }} />
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
             </Box>
         );
     }
