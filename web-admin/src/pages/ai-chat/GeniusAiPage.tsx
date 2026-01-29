@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     Box,
     Paper,
@@ -25,6 +25,12 @@ import {
     Divider,
     Badge,
     Skeleton,
+    List,
+    ListItem,
+    ListItemText,
+    ListItemAvatar,
+    Popper,
+    ClickAwayListener,
 } from '@mui/material';
 import {
     Send as SendIcon,
@@ -46,6 +52,10 @@ import {
     BarChart as ChartIcon,
     Today as TodayIcon,
     ContentCopy as CopyIcon,
+    Business as DeptIcon,
+    Store as BranchIcon,
+    Task as TaskIcon,
+    Flag as GoalIcon,
 } from '@mui/icons-material';
 import { api } from '../../services/api.service';
 import { useQuery } from '@tanstack/react-query';
@@ -99,12 +109,44 @@ interface DashboardStat {
 
 const CHART_COLORS = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b', '#38f9d7'];
 
+// @ Mention Interfaces
+interface MentionItem {
+    id: string;
+    label: string;
+    sublabel: string;
+    value: string;
+}
+
+interface MentionResult {
+    success: boolean;
+    type: string;
+    items: MentionItem[];
+}
+
+// كلمات مفتاحية لكشف السياق
+const CONTEXT_KEYWORDS: Record<string, string[]> = {
+    'employee': ['موظف', 'الموظف', 'موظفين', 'راتب', 'بيانات', 'حضور'],
+    'department': ['قسم', 'القسم', 'اقسام'],
+    'branch': ['فرع', 'الفرع', 'فروع'],
+    'task': ['مهمة', 'المهمة', 'مهام'],
+    'goal': ['هدف', 'الهدف', 'اهداف'],
+};
+
 const GeniusAiPage: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [suggestions, setSuggestions] = useState<{ text: string; icon: string }[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // @ Mention State
+    const [mentionOpen, setMentionOpen] = useState(false);
+    const [mentionAnchor, setMentionAnchor] = useState<HTMLElement | null>(null);
+    const [mentionItems, setMentionItems] = useState<MentionItem[]>([]);
+    const [mentionLoading, setMentionLoading] = useState(false);
+    const [mentionContext, setMentionContext] = useState('');
+    const [mentionSearchStart, setMentionSearchStart] = useState(0);
 
     // Fetch dashboard data
     const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
@@ -129,6 +171,101 @@ const GeniusAiPage: React.FC = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // كشف السياق من النص الحالي
+    const detectContext = useCallback((text: string): string => {
+        for (const [context, keywords] of Object.entries(CONTEXT_KEYWORDS)) {
+            for (const keyword of keywords) {
+                if (text.includes(keyword)) {
+                    return context === 'employee' ? 'موظف' :
+                        context === 'department' ? 'قسم' :
+                            context === 'branch' ? 'فرع' :
+                                context === 'task' ? 'مهمة' :
+                                    context === 'goal' ? 'هدف' : 'موظف';
+                }
+            }
+        }
+        return 'موظف'; // Default to employee
+    }, []);
+
+    // جلب اقتراحات @ mentions
+    const fetchMentions = useCallback(async (context: string, searchTerm: string) => {
+        setMentionLoading(true);
+        try {
+            const response = await api.post<MentionResult>('/genius-ai/autocomplete', {
+                context,
+                searchTerm,
+                limit: 8
+            });
+            if (response.success && response.items) {
+                setMentionItems(response.items);
+            } else {
+                setMentionItems([]);
+            }
+        } catch (error) {
+            console.error('Failed to fetch mentions:', error);
+            setMentionItems([]);
+        } finally {
+            setMentionLoading(false);
+        }
+    }, []);
+
+    // معالجة تغيير النص
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const newValue = e.target.value;
+        const cursorPos = e.target.selectionStart || 0;
+        setInput(newValue);
+
+        // كشف @ في النص
+        const textBeforeCursor = newValue.substring(0, cursorPos);
+        const atIndex = textBeforeCursor.lastIndexOf('@');
+
+        if (atIndex !== -1) {
+            const charBefore = atIndex > 0 ? textBeforeCursor[atIndex - 1] : ' ';
+            if (charBefore === ' ' || charBefore === '\n' || charBefore === '\t' || atIndex === 0) {
+                const searchTerm = textBeforeCursor.substring(atIndex + 1);
+                const context = detectContext(textBeforeCursor.substring(0, atIndex));
+
+                setMentionContext(context);
+                setMentionSearchStart(atIndex);
+                setMentionOpen(true);
+                setMentionAnchor(inputRef.current);
+
+                fetchMentions(context, searchTerm);
+                return;
+            }
+        }
+
+        setMentionOpen(false);
+    }, [detectContext, fetchMentions]);
+
+    // اختيار mention
+    const handleSelectMention = useCallback((item: MentionItem) => {
+        const beforeMention = input.substring(0, mentionSearchStart);
+        const afterMention = input.substring(input.indexOf('@', mentionSearchStart) + 1);
+        const afterSearchTerm = afterMention.includes(' ')
+            ? afterMention.substring(afterMention.indexOf(' '))
+            : '';
+
+        const newValue = `${beforeMention}${item.value}${afterSearchTerm}`;
+        setInput(newValue);
+        setMentionOpen(false);
+        setMentionItems([]);
+
+        setTimeout(() => inputRef.current?.focus(), 0);
+    }, [input, mentionSearchStart]);
+
+    // Icon حسب النوع
+    const getMentionIcon = (context: string) => {
+        switch (context) {
+            case 'موظف': return <PersonIcon />;
+            case 'قسم': return <DeptIcon />;
+            case 'فرع': return <BranchIcon />;
+            case 'مهمة': return <TaskIcon />;
+            case 'هدف': return <GoalIcon />;
+            default: return <PersonIcon />;
+        }
+    };
 
     const sendMessage = async (text: string) => {
         if (!text.trim() || loading) return;
@@ -186,9 +323,13 @@ const GeniusAiPage: React.FC = () => {
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Enter' && !e.shiftKey && !mentionOpen) {
             e.preventDefault();
             sendMessage(input);
+        }
+        if (mentionOpen && e.key === 'Escape') {
+            e.preventDefault();
+            setMentionOpen(false);
         }
     };
 
@@ -643,17 +784,20 @@ const GeniusAiPage: React.FC = () => {
                 )}
 
                 {/* Input Area */}
-                <Paper elevation={3} sx={{ p: 2, borderRadius: 3 }}>
+                <Paper elevation={3} sx={{ p: 2, borderRadius: 3, position: 'relative' }}>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
                         <TextField
                             fullWidth
                             multiline
                             maxRows={3}
-                            placeholder="اسأل أي شيء... مثال: كم عدد الموظفين؟ أو حلل الحضور"
+                            placeholder="اسأل أي شيء... اكتب @ للإشارة لموظف أو قسم"
                             value={input}
-                            onChange={(e) => setInput(e.target.value)}
+                            onChange={handleInputChange}
                             onKeyPress={handleKeyPress}
                             disabled={loading}
+                            InputProps={{
+                                inputRef: inputRef,
+                            }}
                             sx={{
                                 '& .MuiOutlinedInput-root': { borderRadius: 3 },
                             }}
@@ -673,6 +817,68 @@ const GeniusAiPage: React.FC = () => {
                             <SendIcon />
                         </IconButton>
                     </Box>
+
+                    {/* @ Mention Dropdown */}
+                    <Popper
+                        open={mentionOpen}
+                        anchorEl={mentionAnchor}
+                        placement="top-start"
+                        style={{ zIndex: 1300 }}
+                    >
+                        <ClickAwayListener onClickAway={() => setMentionOpen(false)}>
+                            <Paper
+                                elevation={8}
+                                sx={{
+                                    width: 320,
+                                    maxHeight: 300,
+                                    overflow: 'auto',
+                                    mb: 1,
+                                    borderRadius: 2,
+                                }}
+                            >
+                                {mentionLoading ? (
+                                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                                        <CircularProgress size={24} />
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            جاري البحث...
+                                        </Typography>
+                                    </Box>
+                                ) : mentionItems.length === 0 ? (
+                                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            لا توجد نتائج
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    <List dense>
+                                        {mentionItems.map((item, index) => (
+                                            <ListItem
+                                                key={item.id || index}
+                                                button
+                                                onClick={() => handleSelectMention(item)}
+                                                sx={{
+                                                    '&:hover': {
+                                                        bgcolor: '#f0f4ff',
+                                                    },
+                                                }}
+                                            >
+                                                <ListItemAvatar>
+                                                    <Avatar sx={{ bgcolor: '#667eea', width: 32, height: 32 }}>
+                                                        {getMentionIcon(mentionContext)}
+                                                    </Avatar>
+                                                </ListItemAvatar>
+                                                <ListItemText
+                                                    primary={item.label}
+                                                    secondary={item.sublabel}
+                                                    primaryTypographyProps={{ fontWeight: 500 }}
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                )}
+                            </Paper>
+                        </ClickAwayListener>
+                    </Popper>
                 </Paper>
             </Box>
 
