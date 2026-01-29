@@ -4,6 +4,7 @@ import { AiService } from '../../ai/ai.service';
 import { GeniusContextService, SystemContext } from './genius-context.service';
 import { GeniusQueryService } from './genius-query.service';
 import { GeniusActionsService, ActionResult } from './genius-actions.service';
+import { LocalAiEngineService } from './local-ai-engine.service';
 
 /**
  * 🧠 GENIUS AI Chat Service
@@ -73,8 +74,11 @@ export class GeniusAiService {
         private readonly aiService: AiService,
         private readonly contextService: GeniusContextService,
         private readonly queryService: GeniusQueryService,
-        private readonly actionsService: GeniusActionsService
-    ) { }
+        private readonly actionsService: GeniusActionsService,
+        private readonly localAiEngine: LocalAiEngineService
+    ) {
+        this.logger.log('🧠 Genius AI Service initialized with Local AI Engine!');
+    }
 
     /**
      * 🎯 Main chat entry point
@@ -418,47 +422,54 @@ export class GeniusAiService {
     }
 
     /**
-     * 🤝 Handle greeting - NOW LLM DRIVEN
+     * 🤝 Handle greeting - LOCAL AI FIRST, then LLM fallback
      */
     private async handleGreeting(context: ConversationContext, systemContext: SystemContext | null): Promise<ChatResponse> {
-        if (!systemContext) {
-            systemContext = await this.contextService.getFullContext(context.companyId);
-        }
+        // Try Local AI Engine first
+        const localResult = await this.localAiEngine.processMessage('مرحبا', {
+            userName: context.userName,
+            userRole: context.userRole
+        });
 
-        const history = this.getHistory(context.userId);
-        const contextText = this.contextService.formatContextForAI(systemContext);
-
-        const systemPrompt = `أنت "جينيس" 🧠 - المساعد الذكي الودود.
-المستخدم لسه بيبدأ الكلام معاك، رد عليه بترحيب حار وودود جداً كأنك زميله في المكتب.
-
-🏢 الشركة: ${systemContext.company.name}
-👤 الشخص: ${context.userName}
-
-${contextText}
-
-قواعد الرد في السلام:
-1. ارحب بالمستخدم باسمه
-2. اسأله عن حاله بشكل طبيعي (مثلاً: "منور يا ${context.userName}! اخبارك ايه؟")
-3. اذكر معلومة واحدة بس "مهمة" من البيانات (مثلاً: "النهاردة الحضور ممتاز 90%")
-4. متدلقش كل البيانات (الجدول) مرة واحدة، خليها للوقت المناسب
-5. اسأله إزاي تقدر تساعده النهاردة
-6. استخدم إيموجي ودودة 👋😊`;
-
-        const prompt = `المستخدم سلم عليك وقالك: "مرحبا" أو ما يشبه ذلك.\nالمساعد:`;
-
-        try {
-            const aiResponse = await this.aiService.generateContent(prompt, systemPrompt);
+        if (localResult.confidence > 0.7) {
+            this.logger.log('[GENIUS] Greeting handled by Local AI Engine ✅');
             return {
-                message: aiResponse,
-                suggestions: this.getContextualSuggestions(context.userRole),
+                message: localResult.response,
+                suggestions: localResult.suggestions,
                 actions: [
                     { label: 'ملخص اليوم', command: 'ملخص اليوم', icon: 'today', color: 'primary' },
                     { label: 'تقرير الحضور', command: 'تقرير الحضور', icon: 'schedule', color: 'secondary' },
                     { label: 'طلبات الإجازات', command: 'طلبات الإجازات المعلقة', icon: 'beach', color: 'success' }
                 ]
             };
+        }
+
+        // Fallback to external LLM if available
+        if (!systemContext) {
+            systemContext = await this.contextService.getFullContext(context.companyId);
+        }
+
+        try {
+            const history = this.getHistory(context.userId);
+            const contextText = this.contextService.formatContextForAI(systemContext);
+
+            const systemPrompt = `أنت "جينيس" 🧠 - المساعد الذكي الودود.
+المستخدم لسه بيبدأ الكلام معاك، رد عليه بترحيب حار وودود.
+
+🏢 الشركة: ${systemContext.company.name}
+👤 الشخص: ${context.userName}
+
+${contextText}`;
+
+            const prompt = `المستخدم سلم عليك وقالك: "مرحبا"\nالمساعد:`;
+
+            const aiResponse = await this.aiService.generateContent(prompt, systemPrompt);
+            return {
+                message: aiResponse,
+                suggestions: this.getContextualSuggestions(context.userRole)
+            };
         } catch (error) {
-            // Fallback for Greeting
+            // Fallback to local response
             return {
                 message: `أهلاً بك يا ${context.userName}! 👋 كيف يمكنني مساعدتك اليوم؟`,
                 suggestions: this.getContextualSuggestions(context.userRole)
@@ -512,65 +523,66 @@ ${contextText}
     }
 
     /**
-     * 💬 Handle general conversation
+     * 💬 Handle general conversation - LOCAL AI FIRST, then LLM fallback
      */
     private async handleGeneral(message: string, context: ConversationContext, systemContext: SystemContext | null): Promise<ChatResponse> {
+        // Try Local AI Engine first
+        if (this.localAiEngine.canHandle(message)) {
+            const localResult = await this.localAiEngine.processMessage(message, {
+                userName: context.userName,
+                userRole: context.userRole
+            });
+
+            if (localResult.confidence > 0.5) {
+                this.logger.log(`[GENIUS] Handled by Local AI Engine (confidence: ${localResult.confidence.toFixed(2)}) ✅`);
+                return {
+                    message: localResult.response,
+                    suggestions: localResult.suggestions,
+                    visualization: localResult.visualization
+                };
+            }
+        }
+
+        // Fallback to external LLM if available
         if (!systemContext) {
             systemContext = await this.contextService.getFullContext(context.companyId);
         }
 
-        // Build AI prompt with context
-        const history = this.getHistory(context.userId);
-        const contextText = this.contextService.formatContextForAI(systemContext);
+        try {
+            const history = this.getHistory(context.userId);
+            const contextText = this.contextService.formatContextForAI(systemContext);
 
-        const systemPrompt = `أنت "جينيس" 🧠 - المساعد الذكي الودود لنظام الموارد البشرية.
-شخصيتك: ودود، متعاون، ذكي، وتحب المساعدة. تتكلم بالعربية بشكل طبيعي وغير رسمي.
-
+            const systemPrompt = `أنت "جينيس" 🧠 - المساعد الذكي لنظام الموارد البشرية.
 🏢 الشركة: ${systemContext.company.name}
-👤 تتكلم مع: ${context.userName} (${context.userRole === 'ADMIN' ? 'مدير' : context.userRole === 'HR' ? 'موارد بشرية' : 'موظف'})
+👤 المستخدم: ${context.userName}
 
 ${contextText}
 
-💬 أسلوب المحادثة:
-1. رد بشكل طبيعي مثل صديق مساعد، مش روبوت
-2. افتكر اللي قاله المستخدم قبل كدا واستخدمه في الرد
-3. اسأل أسئلة متابعة لو الموضوع محتاج توضيح
-4. لو قالك "كويس" أو "الحمد لله" رد عليه بشكل ودود
-5. استخدم الإيموجي بذكاء 😊
-6. لو متعرفش حاجة، اعترف وحاول تساعد بطريقة تانية
-7. كن proactive واقترح حاجات مفيدة
-8. لو في مشكلة، حاول تحلها أو تقترح حل
-9. تفاعل مع المشاعر - لو حد مضايق، اظهر تعاطف
-10. خلي الردود قصيرة ومفيدة، مش طويلة ومملة
+ارد بشكل طبيعي وودود. استخدم إيموجي بذكاء.`;
 
-أمثلة على الردود الطبيعية:
-- "الحمد لله" → "جميل! 😊 عايز أساعدك في حاجة؟"
-- "عامل ايه" → "تمام الحمد لله! جاهز أساعدك. تحب تشوف ملخص اليوم؟"
-- "شكراً" → "العفو! ده شغلي 💪 محتاج حاجة تانية؟"
-- "طيب" → "تمام! نكمل؟ عايز اعمل ايه دلوقتي؟"
+            const conversationContext = history.slice(-5).map(m =>
+                `${m.role === 'user' ? 'المستخدم' : 'المساعد'}: ${m.content}`
+            ).join('\n');
 
-تذكر: أنت مش بس أداة - أنت زميل ذكي بيساعد في الشغل!`;
+            const prompt = `${conversationContext}\nالمستخدم: ${message}\nالمساعد:`;
 
-        const conversationContext = history.slice(-5).map(m =>
-            `${m.role === 'user' ? 'المستخدم' : 'المساعد'}: ${m.content}`
-        ).join('\n');
-
-        const prompt = `${conversationContext}\nالمستخدم: ${message}\nالمساعد:`;
-
-        try {
             const aiResponse = await this.aiService.generateContent(prompt, systemPrompt);
-
             return {
                 message: aiResponse,
                 suggestions: this.getContextualSuggestions(context.userRole)
             };
         } catch (error) {
-            this.logger.error(`AI generation failed: ${error.message}`);
+            this.logger.warn(`[GENIUS] External LLM failed, using local fallback: ${error.message}`);
 
-            // Fallback response
+            // Use Local AI Engine as fallback
+            const localResult = await this.localAiEngine.processMessage(message, {
+                userName: context.userName,
+                userRole: context.userRole
+            });
+
             return {
-                message: `لم أفهم طلبك بوضوح. هل تريد:\n- استعلام عن بيانات معينة؟\n- تنفيذ إجراء؟\n- تحليل أو تقرير?`,
-                suggestions: ['مساعدة', 'ملخص اليوم', 'تقرير الحضور']
+                message: localResult.response,
+                suggestions: localResult.suggestions
             };
         }
     }

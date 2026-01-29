@@ -2,12 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
- * 🤖 AI Service - Google Gemini Flash Implementation
+ * 🤖 AI Service - Hybrid Local + Cloud Implementation
  * 
- * Using Gemini Flash for Arabic NLP policy parsing.
- * Much cheaper than OpenAI and better for Arabic text.
+ * PRIMARY: Local AI Engine (no external API needed)
+ * FALLBACK: Google Gemini (optional, if GEMINI_API_KEY is set)
  * 
- * Fallback to OpenAI if Gemini fails.
+ * Configure with environment variables:
+ * - USE_LOCAL_AI=true (default) - Use local engine first
+ * - GEMINI_API_KEY - Optional Gemini API key for fallback
  */
 
 @Injectable()
@@ -15,17 +17,30 @@ export class AiService {
     private readonly logger = new Logger(AiService.name);
     private genAI: GoogleGenerativeAI | null = null;
 
+    // 🔧 Configuration
+    private readonly useLocalAI: boolean;
+    private readonly hasGeminiKey: boolean;
+
     // 🔧 Track rate limit or quota errors
     private isRateLimited = false;
     private rateLimitResetTime: Date | null = null;
 
     constructor() {
+        // Check configuration
+        this.useLocalAI = process.env.USE_LOCAL_AI !== 'false'; // Default: true
+
         const geminiKey = process.env.GEMINI_API_KEY;
+        this.hasGeminiKey = !!geminiKey;
+
         if (geminiKey) {
             this.genAI = new GoogleGenerativeAI(geminiKey);
-            this.logger.log('Google Gemini AI initialized successfully ✅');
-        } else {
-            this.logger.warn('GEMINI_API_KEY not found - AI features will be disabled');
+            this.logger.log('Google Gemini AI initialized as fallback ✅');
+        }
+
+        if (this.useLocalAI) {
+            this.logger.log('🧠 Local AI Engine is PRIMARY - No external API dependency!');
+        } else if (!this.hasGeminiKey) {
+            this.logger.warn('⚠️ No AI configured - set USE_LOCAL_AI=true or GEMINI_API_KEY');
         }
     }
 

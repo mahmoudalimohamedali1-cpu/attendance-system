@@ -78,6 +78,7 @@ import { GeniusContextService } from './services/genius-context.service';
 import { GeniusQueryService } from './services/genius-query.service';
 import { GeniusActionsService } from './services/genius-actions.service';
 import { GeniusIntentService } from './services/genius-intent.service';
+import { LocalAiEngineService } from './services/local-ai-engine.service';
 
 /**
  * 🤖 AI Chat Module (V10 - Complete 200 Ideas)
@@ -177,6 +178,9 @@ import { GeniusIntentService } from './services/genius-intent.service';
         GeniusQueryService,
         GeniusActionsService,
         GeniusIntentService,
+
+        // 🧠 Local AI Engine (Self-Hosted - No External API)
+        LocalAiEngineService,
     ],
     exports: [
         // Export secure service for other modules
@@ -238,6 +242,7 @@ import { GeniusIntentService } from './services/genius-intent.service';
         GeniusQueryService,
         GeniusActionsService,
         GeniusIntentService,
+        LocalAiEngineService,
     ],
 })
 export class AiChatModule { }
