@@ -32,6 +32,11 @@ import {
   LinearProgress,
   Snackbar,
   Badge,
+  InputAdornment,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -55,6 +60,8 @@ import {
   AccountBalanceWallet,
   Add,
   BeachAccess,
+  Search,
+  FilterList,
 } from '@mui/icons-material';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -163,6 +170,10 @@ export const LeavesPage = () => {
     endDate: null as Date | null,
     reason: '',
   });
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState('ALL');
 
   // Tab mapping: 0=Balance Dashboard, 1=Manager Inbox, 2=HR Inbox, 3=PENDING, 4=MGR_APPROVED, 5=APPROVED, 6=REJECTED
   const isBalanceDashboard = tabValue === 0;
@@ -309,7 +320,24 @@ export const LeavesPage = () => {
 
   // Get current data based on active tab
   const isLoading = isManagerInbox ? managerLoading : isHRInbox ? hrLoading : regularLoading;
-  const leaves = isManagerInbox ? (managerInbox || []) : isHRInbox ? (hrInbox || []) : (data?.data || []);
+  const rawLeaves = isManagerInbox ? (managerInbox || []) : isHRInbox ? (hrInbox || []) : (data?.data || []);
+
+  // Apply search and filter
+  const leaves = rawLeaves.filter((leave) => {
+    // Search filter
+    if (searchQuery) {
+      const fullName = `${leave.user.firstName} ${leave.user.lastName}`.toLowerCase();
+      if (!fullName.includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+    }
+    // Type filter
+    if (leaveTypeFilter !== 'ALL' && leave.type !== leaveTypeFilter) {
+      return false;
+    }
+    return true;
+  });
+
   const total = isManagerInbox || isHRInbox ? leaves.length : (data?.pagination?.total || 0);
 
   // Calculate leave balance percentage
@@ -402,57 +430,62 @@ export const LeavesPage = () => {
                 </Tooltip>
                 {/* Quick actions for inbox views */}
                 {isManagerInbox && (
-                  <>
-                    <Tooltip title="موافقة">
-                      <IconButton
-                        size="small"
-                        color="success"
-                        onClick={() => managerDecisionMutation.mutate({ id: leave.id, decision: 'APPROVED' })}
-                      >
-                        <ThumbUp />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="رفض">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleOpenDialog(leave)}
-                      >
-                        <ThumbDown />
-                      </IconButton>
-                    </Tooltip>
-                  </>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      startIcon={<ThumbUp />}
+                      onClick={() => managerDecisionMutation.mutate({ id: leave.id, decision: 'APPROVED' })}
+                      sx={{ minWidth: 'auto', fontSize: '0.7rem', px: 1 }}
+                    >
+                      موافقة
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<ThumbDown />}
+                      onClick={() => handleOpenDialog(leave)}
+                      sx={{ minWidth: 'auto', fontSize: '0.7rem', px: 1 }}
+                    >
+                      رفض
+                    </Button>
+                  </Box>
                 )}
                 {isHRInbox && (
-                  <>
-                    <Tooltip title="موافقة نهائية">
-                      <IconButton
-                        size="small"
-                        color="success"
-                        onClick={() => hrDecisionMutation.mutate({ id: leave.id, decision: 'APPROVED' })}
-                      >
-                        <ThumbUp />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="رفض">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleOpenDialog(leave)}
-                      >
-                        <ThumbDown />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="تأجيل">
-                      <IconButton
-                        size="small"
-                        color="warning"
-                        onClick={() => hrDecisionMutation.mutate({ id: leave.id, decision: 'DELAYED' })}
-                      >
-                        <AccessTime />
-                      </IconButton>
-                    </Tooltip>
-                  </>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="success"
+                      startIcon={<ThumbUp />}
+                      onClick={() => hrDecisionMutation.mutate({ id: leave.id, decision: 'APPROVED' })}
+                      sx={{ minWidth: 'auto', fontSize: '0.7rem', px: 1 }}
+                    >
+                      موافقة
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<ThumbDown />}
+                      onClick={() => handleOpenDialog(leave)}
+                      sx={{ minWidth: 'auto', fontSize: '0.7rem', px: 1 }}
+                    >
+                      رفض
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="warning"
+                      startIcon={<AccessTime />}
+                      onClick={() => hrDecisionMutation.mutate({ id: leave.id, decision: 'DELAYED' })}
+                      sx={{ minWidth: 'auto', fontSize: '0.7rem', px: 1 }}
+                    >
+                      تأجيل
+                    </Button>
+                  </Box>
                 )}
               </TableCell>
             </TableRow>
@@ -575,6 +608,41 @@ export const LeavesPage = () => {
                   <Alert severity="info" sx={{ mb: 2 }}>
                     هذه الطلبات وافق عليها المدير وتنتظر موافقتك النهائية كـ HR.
                   </Alert>
+                )}
+
+                {/* Search & Filter Bar */}
+                {(isManagerInbox || isHRInbox) && (
+                  <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                    <TextField
+                      placeholder="بحث باسم الموظف..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      size="small"
+                      sx={{ minWidth: 250 }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Search color="action" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <InputLabel>نوع الإجازة</InputLabel>
+                      <Select
+                        value={leaveTypeFilter}
+                        label="نوع الإجازة"
+                        onChange={(e) => setLeaveTypeFilter(e.target.value)}
+                      >
+                        <MenuItem value="ALL">الكل</MenuItem>
+                        <MenuItem value="ANNUAL">سنوية</MenuItem>
+                        <MenuItem value="SICK">مرضية</MenuItem>
+                        <MenuItem value="EMERGENCY">طارئة</MenuItem>
+                        <MenuItem value="UNPAID">بدون راتب</MenuItem>
+                        <MenuItem value="PERMISSION">إذن</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
                 )}
 
                 {renderLeaveTable(leaves, isHRInbox)}
