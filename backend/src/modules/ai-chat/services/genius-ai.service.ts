@@ -197,7 +197,7 @@ export class GeniusAiService {
         }
 
         // Specific Queries (Explicitly asking for data)
-        if (/كم|أين|من|متى|ماذا|عرض|إحصائيات|تقرير|سجل|أرني|ارني|وريني/.test(m)) {
+        if (/كم|أين|من|متى|ماذا|عرض|إحصائيات|تقرير|سجل|أرني|ارني|وريني|راتب|رواتب|معاش|بيانات|معلومات|حضور/.test(m)) {
             return { type: 'query', subType: '', needsContext: true };
         }
 

@@ -585,11 +585,19 @@ ${schemaContext}
         const q = question.toLowerCase();
 
         // كلمات مفتاحية للاستعلامات
-        const queryKeywords = ['كم', 'عدد', 'اعرض', 'قائمة', 'كل', 'اظهر', 'من', 'ما'];
+        const queryKeywords = [
+            'كم', 'عدد', 'اعرض', 'قائمة', 'كل', 'اظهر', 'من', 'ما',
+            'راتب', 'رواتب', 'معاش', // استعلام الراتب
+            'بيانات', 'معلومات', // استعلام البيانات
+            'حضور', 'غياب', 'تأخير', // استعلام الحضور
+            'إجازة', 'اجازة', 'إجازات', // استعلام الإجازات
+        ];
         const hasQueryKeyword = queryKeywords.some(k => q.includes(k));
 
         // كلمات مفتاحية للجداول
         const hasTableKeyword = Object.keys(ARABIC_SCHEMA_MAP).some(k => q.includes(k));
+
+        this.logger.debug(`[DQE] canHandle: "${question}" => queryKeyword=${hasQueryKeyword}, tableKeyword=${hasTableKeyword}`);
 
         return hasQueryKeyword || hasTableKeyword;
     }
