@@ -350,7 +350,7 @@ export class GeniusAiService {
                 }),
                 this.prisma.goal.groupBy({
                     by: ['status'],
-                    where: { user: { companyId: context.companyId } },
+                    where: { companyId: context.companyId },
                     _count: true
                 })
             ]);
