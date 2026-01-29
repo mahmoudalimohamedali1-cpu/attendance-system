@@ -165,13 +165,13 @@ export class DynamicQueryEngineService {
         // فلترة بالقسم
         const deptMatch = q.match(/(?:في|فى)\s*قسم\s*([\u0600-\u06FF\w]+)/);
         if (deptMatch && model === 'user') {
-            where.department = { name: { contains: deptMatch[1] } };
+            where.department = { name: { contains: deptMatch[1], mode: 'insensitive' } };
         }
 
         // فلترة بالفرع
         const branchMatch = q.match(/(?:في|فى)\s*فرع\s*([\u0600-\u06FF\w]+)/);
         if (branchMatch && model === 'user') {
-            where.branch = { name: { contains: branchMatch[1] } };
+            where.branch = { name: { contains: branchMatch[1], mode: 'insensitive' } };
         }
 
         // فلترة بالراتب
