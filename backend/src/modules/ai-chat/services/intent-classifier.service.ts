@@ -25,6 +25,10 @@ export enum IntentType {
     EMPLOYEE_ACTION = 'employee_action',
     LEAVE_ACTION = 'leave_action',
     TASK_ACTION = 'task_action',
+    GOAL_ACTION = 'goal_action',
+    PERFORMANCE_ACTION = 'performance_action',
+    RECOGNITION_ACTION = 'recognition_action',
+    PAYROLL_ACTION = 'payroll_action',
     REPORT = 'report',
     GENERAL_CHAT = 'general_chat',
     UNKNOWN = 'unknown',
@@ -187,6 +191,74 @@ export class IntentClassifierService {
                 priority: 65,
             },
 
+            // Goal actions
+            {
+                pattern: /(اضف|أضف|انشئ|حدد)\s+(هدف)/,
+                intent: IntentType.GOAL_ACTION,
+                subIntent: 'create_goal',
+                priority: 65,
+            },
+            {
+                pattern: /(عدل|حدث|غير)\s+(هدف)/,
+                intent: IntentType.GOAL_ACTION,
+                subIntent: 'update_goal',
+                priority: 65,
+            },
+            {
+                pattern: /(تقدم|أهداف|هدف).*(\d+%|نسبة)/,
+                intent: IntentType.GOAL_ACTION,
+                subIntent: 'update_progress',
+                priority: 65,
+            },
+
+            // Performance review actions
+            {
+                pattern: /(انشئ|أضف)\s+(تقييم|تقييم أداء)/,
+                intent: IntentType.PERFORMANCE_ACTION,
+                subIntent: 'create_review',
+                priority: 65,
+            },
+            {
+                pattern: /(تقييم|أداء)\s+(ل|\u0644ـ)\s*\w+/,
+                intent: IntentType.PERFORMANCE_ACTION,
+                subIntent: 'create_review',
+                priority: 64,
+            },
+
+            // Recognition actions
+            {
+                pattern: /(ارسل|أرسل)\s+(تقدير|شكر)/,
+                intent: IntentType.RECOGNITION_ACTION,
+                subIntent: 'send_recognition',
+                priority: 65,
+            },
+            {
+                pattern: /(تقدير|شكر)\s+(ل|\u0644ـ)\s*\w+/,
+                intent: IntentType.RECOGNITION_ACTION,
+                subIntent: 'send_recognition',
+                priority: 64,
+            },
+
+            // Payroll actions
+            {
+                pattern: /(احسب|حساب)\s+(رواتب|الرواتب)/,
+                intent: IntentType.PAYROLL_ACTION,
+                subIntent: 'calculate_payroll',
+                priority: 65,
+            },
+            {
+                pattern: /(وافق)\s+(على)?\s*(رواتب|مسير)/,
+                intent: IntentType.PAYROLL_ACTION,
+                subIntent: 'approve_payroll',
+                priority: 65,
+            },
+            {
+                pattern: /(مسير|مسيرات)\s+(رواتب)/,
+                intent: IntentType.PAYROLL_ACTION,
+                subIntent: 'view_payroll',
+                priority: 60,
+            },
+
             // Reports
             {
                 pattern: /(تقرير|احصائيات|report|statistics)/i,
@@ -298,6 +370,14 @@ export class IntentClassifierService {
                 return 'هل يمكنك تحديد اسم الموظف بشكل أوضح؟';
             case IntentType.LEAVE_ACTION:
                 return 'ما نوع الإجازة والمدة المطلوبة؟';
+            case IntentType.GOAL_ACTION:
+                return 'ما هو عنوان الهدف؟ ولمن؟';
+            case IntentType.PERFORMANCE_ACTION:
+                return 'لأي موظف تريد إنشاء تقييم الأداء؟';
+            case IntentType.RECOGNITION_ACTION:
+                return 'لمن تريد إرسال التقدير؟ وما السبب؟';
+            case IntentType.PAYROLL_ACTION:
+                return 'لأي شهر وسنة تريد حساب الرواتب؟';
             default:
                 return 'هل يمكنك توضيح طلبك بشكل أكثر تفصيلاً؟';
         }

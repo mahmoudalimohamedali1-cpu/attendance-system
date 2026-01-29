@@ -30,8 +30,8 @@ export class GeniusIntentService {
 
 استخرج المعلومات بصيغة JSON فقط (بدون أي نص إضافي):
 {
-    "action": "create|update|delete|list|approve|reject|transfer|assign",
-    "entity": "employee|department|branch|task|custody|leave|bonus|deduction|notification",
+    "action": "create|update|delete|list|approve|reject|transfer|assign|send|calculate",
+    "entity": "employee|department|branch|task|custody|leave|bonus|deduction|notification|goal|review|recognition|payroll",
     "params": {
         // المعاملات المستخرجة حسب نوع الكيان
         // للموظف: firstName, lastName, department, branch, salary, jobTitle, email
@@ -41,18 +41,22 @@ export class GeniusIntentService {
         // للعهدة: name, serialNumber, assignee, value
         // للإجازة: employeeName, days, type, startDate
         // للمكافأة/الخصم: employeeName, amount, reason
+        // للهدف: title, employeeName, targetValue, dueDate, progress
+        // للتقييم: employeeName, cycleName
+        // للتقدير: employeeName, message, points
+        // للرواتب: month, year
     },
     "confidence": 0.0-1.0
 }
 
 أمثلة:
 - "أضف قسم HR في فرع الرياض" → {"action":"create","entity":"department","params":{"name":"HR","branchName":"الرياض"},"confidence":0.95}
-- "أضف موظف أحمد محمد في قسم IT براتب 8000" → {"action":"create","entity":"employee","params":{"firstName":"أحمد","lastName":"محمد","department":"IT","salary":8000},"confidence":0.95}
-- "سلم عهدة لابتوب لـ سارة" → {"action":"assign","entity":"custody","params":{"name":"لابتوب","assignee":"سارة"},"confidence":0.9}
-- "وافق على إجازة أحمد" → {"action":"approve","entity":"leave","params":{"employeeName":"أحمد"},"confidence":0.95}
-- "انقل محمد إلى قسم المبيعات" → {"action":"transfer","entity":"employee","params":{"employeeName":"محمد","newDepartment":"المبيعات"},"confidence":0.9}
-- "انقل قسم HR إلى فرع الرياض" → {"action":"transfer","entity":"department","params":{"name":"HR","branchName":"الرياض"},"confidence":0.95}
-- "حول القسم للفرع الجديد" → {"action":"transfer","entity":"department","params":{},"confidence":0.7}
+- "أضف هدف زيادة المبيعات لـ أحمد" → {"action":"create","entity":"goal","params":{"title":"زيادة المبيعات","employeeName":"أحمد"},"confidence":0.95}
+- "أرسل تقدير لـ سارة بسبب عملها المميز" → {"action":"send","entity":"recognition","params":{"employeeName":"سارة","message":"عملها المميز"},"confidence":0.9}
+- "انشئ تقييم أداء لـ محمد" → {"action":"create","entity":"review","params":{"employeeName":"محمد"},"confidence":0.95}
+- "احسب رواتب يناير" → {"action":"calculate","entity":"payroll","params":{"month":1},"confidence":0.9}
+- "وافق على الرواتب" → {"action":"approve","entity":"payroll","params":{},"confidence":0.85}
+- "عدل هدف زيادة المبيعات إلى 50%" → {"action":"update","entity":"goal","params":{"title":"زيادة المبيعات","progress":50},"confidence":0.9}
 
 الرد يجب أن يكون JSON فقط، بدون أي شرح أو نص إضافي.`;
 
@@ -110,6 +114,10 @@ export class GeniusIntentService {
         else if (/مكافأة|مكافاة|بونص/.test(m)) entity = 'bonus';
         else if (/خصم/.test(m)) entity = 'deduction';
         else if (/إشعار|اشعار|رسالة|تنبيه/.test(m)) entity = 'notification';
+        else if (/هدف|أهداف/.test(m)) entity = 'goal';
+        else if (/تقييم|أداء/.test(m)) entity = 'review';
+        else if (/تقدير|شكر/.test(m)) entity = 'recognition';
+        else if (/رواتب|مسير/.test(m)) entity = 'payroll';
 
         return {
             action,
@@ -172,6 +180,27 @@ export class GeniusIntentService {
                 "employeeName": "اسم الموظف",
                 "amount": "المبلغ (رقم)",
                 "reason": "السبب"
+            }`,
+            goal: `{
+                "title": "عنوان الهدف",
+                "employeeName": "اسم الموظف",
+                "targetValue": "القيمة المستهدفة (رقم)",
+                "dueDate": "تاريخ الاستحقاق",
+                "progress": "نسبة التقدم (رقم 0-100)",
+                "description": "وصف الهدف"
+            }`,
+            review: `{
+                "employeeName": "اسم الموظف",
+                "cycleName": "اسم الدورة"
+            }`,
+            recognition: `{
+                "employeeName": "اسم الموظف",
+                "message": "نص التقدير",
+                "points": "النقاط (رقم)"
+            }`,
+            payroll: `{
+                "month": "الشهر (رقم 1-12)",
+                "year": "السنة"
             }`
         };
 
