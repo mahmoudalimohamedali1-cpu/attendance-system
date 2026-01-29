@@ -179,7 +179,7 @@ export class LettersService {
     };
   }
 
-  async getLetterRequestById(id: string, userId: string) {
+  async getLetterRequestById(id: string, userId: string, companyId?: string) {
     const letterRequest = await this.prisma.letterRequest.findUnique({
       where: { id },
       include: {
@@ -191,6 +191,7 @@ export class LettersService {
             employeeCode: true,
             jobTitle: true,
             email: true,
+            companyId: true,
             department: { select: { name: true } },
           },
         },
@@ -208,20 +209,32 @@ export class LettersService {
       throw new NotFoundException('طلب الخطاب غير موجود');
     }
 
-    // Check if user has access (owner or manager/admin)
-    if (letterRequest.userId !== userId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true, id: true },
-      });
+    // Owner can always access their own request
+    if (letterRequest.userId === userId) {
+      return letterRequest;
+    }
 
-      if (user?.role !== 'ADMIN' && user?.role !== 'MANAGER') {
-        throw new BadRequestException('غير مصرح لك بالوصول لهذا الطلب');
-      }
+    // For non-owners, verify they have permission to access this employee's letters
+    const targetCompanyId = companyId || (letterRequest.user as any)?.companyId;
+
+    if (!targetCompanyId) {
+      throw new ForbiddenException('غير مصرح لك بالوصول لهذا الطلب');
+    }
+
+    // Check if user has LETTERS_VIEW or LETTERS_APPROVE_MANAGER or LETTERS_APPROVE_HR permission for this employee
+    const [canViewLetter, canApproveManager, canApproveHR] = await Promise.all([
+      this.permissionsService.canAccessEmployee(userId, targetCompanyId, 'LETTERS_VIEW', letterRequest.userId),
+      this.permissionsService.canAccessEmployee(userId, targetCompanyId, 'LETTERS_APPROVE_MANAGER', letterRequest.userId),
+      this.permissionsService.canAccessEmployee(userId, targetCompanyId, 'LETTERS_APPROVE_HR', letterRequest.userId),
+    ]);
+
+    if (!canViewLetter && !canApproveManager && !canApproveHR) {
+      throw new ForbiddenException('غير مصرح لك بالوصول لهذا الطلب');
     }
 
     return letterRequest;
   }
+
 
   async approveLetterRequest(id: string, approverId: string, notes?: string, attachments?: any[]) {
     const letterRequest = await this.prisma.letterRequest.findUnique({

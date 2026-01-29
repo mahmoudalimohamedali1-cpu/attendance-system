@@ -89,8 +89,9 @@ export class LettersController {
   async getLetterRequestById(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
   ) {
-    return this.lettersService.getLetterRequestById(id, userId);
+    return this.lettersService.getLetterRequestById(id, userId, companyId);
   }
 
   @Delete(':id')
