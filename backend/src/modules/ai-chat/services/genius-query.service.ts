@@ -780,8 +780,8 @@ export class GeniusQueryService {
      * 💰 Handle employee salary query - REAL DATA FROM DATABASE
      */
     private async handleEmployeeSalary(question: string, companyId: string): Promise<QueryResult> {
-        // Extract employee name from question
-        const nameMatch = question.match(/راتب\s+([أ-ي\w]+(?:\s+[أ-ي\w]+)?)|معاش\s+([أ-ي\w]+(?:\s+[أ-ي\w]+)?)/);
+        // Extract employee name from question - IMPROVED Arabic character range
+        const nameMatch = question.match(/راتب\s+([\u0600-\u06FF\w]+(?:\s+[\u0600-\u06FF\w]+)?)|معاش\s+([\u0600-\u06FF\w]+(?:\s+[\u0600-\u06FF\w]+)?)/);
         const searchTerm = nameMatch?.[1] || nameMatch?.[2] || '';
 
         if (!searchTerm || searchTerm.length < 2) {
@@ -875,7 +875,7 @@ export class GeniusQueryService {
 💎 **إجمالي الراتب:** ${totalSalary > 0 ? totalSalary.toLocaleString('ar-SA') + ' ريال' : 'غير محدد'}
 
 ${assignment?.structure?.name ? `📋 **هيكل الراتب:** ${assignment.structure.name}` : ''}`,
-                visualization: 'number'
+                visualization: 'list'  // Changed from 'number' - data is object, not simple value
             };
         }
 

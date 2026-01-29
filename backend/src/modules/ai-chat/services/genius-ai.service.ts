@@ -237,28 +237,55 @@ export class GeniusAiService {
             const dynamicResult = await this.dynamicQueryEngine.processQuestion(message, context.companyId);
 
             if (dynamicResult.success) {
+                this.logger.log(`[GENIUS] DynamicQueryEngine succeeded in ${dynamicResult.executionTimeMs}ms`);
+
+                // Determine visualization based on data type
+                let visualization: 'text' | 'table' | 'chart' | 'card' | 'list' = 'text';
+                if (Array.isArray(dynamicResult.data)) {
+                    visualization = 'table';
+                } else if (typeof dynamicResult.data === 'number') {
+                    visualization = 'card';
+                } else if (typeof dynamicResult.data === 'object') {
+                    visualization = 'list';  // Object data should be 'list', not 'card'
+                }
+
                 return {
                     message: dynamicResult.explanation,
                     data: dynamicResult.data,
-                    visualization: Array.isArray(dynamicResult.data) ? 'table' : 'card',
+                    visualization,
                     suggestions: dynamicResult.suggestions,
                     processingTime: dynamicResult.executionTimeMs
                 };
             }
+
+            this.logger.log(`[GENIUS] DynamicQueryEngine failed, falling back to GeniusQueryService`);
         }
 
         // 2. Fallback to old query service (for backward compatibility)
+        this.logger.log(`[GENIUS] Using GeniusQueryService for: "${message}"`);
         const result = await this.queryService.processQuery(message, context.companyId);
 
         if (!result.success || result.explanation === 'NOT_A_STRUCTURED_QUERY') {
-            this.logger.log(`[GENIUS] Pivot to General LLM for: "${message}"`);
+            this.logger.log(`[GENIUS] GeniusQueryService returned no match, pivoting to General LLM`);
             return this.handleGeneral(message, context, systemContext);
+        }
+
+        this.logger.log(`[GENIUS] GeniusQueryService succeeded with visualization: ${result.visualization}`);
+
+        // Unify visualization mapping
+        let visualization: 'text' | 'table' | 'chart' | 'card' | 'list' | undefined;
+        if (result.visualization === 'number') {
+            visualization = 'card';
+        } else if (result.visualization === 'list') {
+            visualization = 'list';
+        } else {
+            visualization = result.visualization || undefined;
         }
 
         return {
             message: result.explanation,
             data: result.data,
-            visualization: result.visualization === 'number' ? 'card' : (result.visualization || undefined),
+            visualization,
             chartType: result.chartType,
             suggestions: this.getQueryFollowups(result.explanation)
         };
