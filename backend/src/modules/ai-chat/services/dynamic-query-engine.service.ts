@@ -186,6 +186,45 @@ export class DynamicQueryEngineService {
             }
         }
 
+        // 🔍 البحث بالاسم (راتب محمد طارق، بيانات أحمد، الموظف محمد)
+        const namePatterns = [
+            /(?:راتب|بيانات|معلومات|الموظف|موظف)\s+([^\s,،]+)(?:\s+([^\s,،]+))?/,
+            /([^\s,،]+)\s+([^\s,،]+)?\s*(?:راتبه|بياناته|حضوره)/
+        ];
+
+        for (const pattern of namePatterns) {
+            const nameMatch = question.match(pattern);
+            if (nameMatch && model === 'user') {
+                const name1 = nameMatch[1]?.trim();
+                const name2 = nameMatch[2]?.trim();
+
+                if (name1 && name1.length > 1) {
+                    const nameConditions: any[] = [
+                        { firstName: { contains: name1, mode: 'insensitive' } },
+                        { lastName: { contains: name1, mode: 'insensitive' } }
+                    ];
+
+                    if (name2 && name2.length > 1) {
+                        nameConditions.push(
+                            { firstName: { contains: name2, mode: 'insensitive' } },
+                            { lastName: { contains: name2, mode: 'insensitive' } }
+                        );
+                        // البحث بالترتيب الصحيح
+                        nameConditions.push({
+                            AND: [
+                                { firstName: { contains: name1, mode: 'insensitive' } },
+                                { lastName: { contains: name2, mode: 'insensitive' } }
+                            ]
+                        });
+                    }
+
+                    where.OR = nameConditions;
+                    this.logger.log(`[DQE] Name search: ${name1} ${name2 || ''}`);
+                }
+                break;
+            }
+        }
+
         // فلترة بالحالة
         if (/نشط|active/.test(q) && model === 'user') {
             where.status = 'ACTIVE';
@@ -532,5 +571,180 @@ ${schemaContext}
         const hasTableKeyword = Object.keys(ARABIC_SCHEMA_MAP).some(k => q.includes(k));
 
         return hasQueryKeyword || hasTableKeyword;
+    }
+
+    /**
+     * 🔍 @ Autocomplete - اقتراحات تلقائية
+     * 
+     * عند كتابة "الموظف @" أو "قسم @" يُرجع قائمة بالخيارات المتاحة
+     */
+    async getAutocomplete(
+        context: string,
+        searchTerm: string,
+        companyId: string,
+        limit: number = 10
+    ): Promise<{ type: string; items: any[] }> {
+        const ctx = context.toLowerCase().trim();
+
+        this.logger.log(`[DQE] Autocomplete: context="${ctx}", search="${searchTerm}"`);
+
+        try {
+            // 🧑‍💼 الموظفين
+            if (/موظف|الموظف|موظفين|employee/.test(ctx)) {
+                const employees = await this.prisma.user.findMany({
+                    where: {
+                        companyId,
+                        status: 'ACTIVE',
+                        OR: searchTerm ? [
+                            { firstName: { contains: searchTerm, mode: 'insensitive' } },
+                            { lastName: { contains: searchTerm, mode: 'insensitive' } },
+                            { email: { contains: searchTerm, mode: 'insensitive' } }
+                        ] : undefined
+                    },
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        jobTitle: true,
+                        department: { select: { name: true } }
+                    },
+                    take: limit,
+                    orderBy: { firstName: 'asc' }
+                });
+
+                return {
+                    type: 'employee',
+                    items: employees.map(e => ({
+                        id: e.id,
+                        label: `${e.firstName} ${e.lastName}`,
+                        sublabel: e.jobTitle || e.department?.name || '',
+                        value: `${e.firstName} ${e.lastName}`
+                    }))
+                };
+            }
+
+            // 🏢 الأقسام
+            if (/قسم|القسم|اقسام|department/.test(ctx)) {
+                const departments = await this.prisma.department.findMany({
+                    where: {
+                        companyId,
+                        name: searchTerm ? { contains: searchTerm, mode: 'insensitive' } : undefined
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        _count: { select: { users: true } }
+                    },
+                    take: limit,
+                    orderBy: { name: 'asc' }
+                });
+
+                return {
+                    type: 'department',
+                    items: departments.map(d => ({
+                        id: d.id,
+                        label: d.name,
+                        sublabel: `${d._count.users} موظف`,
+                        value: d.name
+                    }))
+                };
+            }
+
+            // 🏪 الفروع
+            if (/فرع|الفرع|فروع|branch/.test(ctx)) {
+                const branches = await this.prisma.branch.findMany({
+                    where: {
+                        companyId,
+                        name: searchTerm ? { contains: searchTerm, mode: 'insensitive' } : undefined
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true
+                    },
+                    take: limit,
+                    orderBy: { name: 'asc' }
+                });
+
+                return {
+                    type: 'branch',
+                    items: branches.map(b => ({
+                        id: b.id,
+                        label: b.name,
+                        sublabel: b.address || '',
+                        value: b.name
+                    }))
+                };
+            }
+
+            // ✅ المهام
+            if (/مهمة|المهمة|مهام|task/.test(ctx)) {
+                const tasks = await this.prisma.task.findMany({
+                    where: {
+                        companyId,
+                        title: searchTerm ? { contains: searchTerm, mode: 'insensitive' } : undefined
+                    },
+                    select: {
+                        id: true,
+                        title: true,
+                        status: true,
+                        priority: true
+                    },
+                    take: limit,
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                return {
+                    type: 'task',
+                    items: tasks.map(t => ({
+                        id: t.id,
+                        label: t.title,
+                        sublabel: `${t.status} | ${t.priority}`,
+                        value: t.title
+                    }))
+                };
+            }
+
+            // 🎯 الأهداف
+            if (/هدف|الهدف|اهداف|goal/.test(ctx)) {
+                const goals = await this.prisma.goal.findMany({
+                    where: {
+                        companyId,
+                        title: searchTerm ? { contains: searchTerm, mode: 'insensitive' } : undefined
+                    },
+                    select: {
+                        id: true,
+                        title: true,
+                        status: true,
+                        progress: true
+                    },
+                    take: limit,
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                return {
+                    type: 'goal',
+                    items: goals.map(g => ({
+                        id: g.id,
+                        label: g.title,
+                        sublabel: `${g.status} | ${g.progress}%`,
+                        value: g.title
+                    }))
+                };
+            }
+
+            // ❓ لم يتم التعرف على السياق
+            return {
+                type: 'unknown',
+                items: []
+            };
+
+        } catch (error) {
+            this.logger.error(`[DQE] Autocomplete error: ${error.message}`);
+            return {
+                type: 'error',
+                items: []
+            };
+        }
     }
 }

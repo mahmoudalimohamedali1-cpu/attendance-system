@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GeniusAiService } from './services/genius-ai.service';
 import { GeniusContextService } from './services/genius-context.service';
+import { DynamicQueryEngineService } from './services/dynamic-query-engine.service';
 
 /**
  * 🧠 GENIUS AI Chat Controller
@@ -32,8 +33,9 @@ export class GeniusAiController {
 
     constructor(
         private readonly geniusAiService: GeniusAiService,
-        private readonly contextService: GeniusContextService
-    ) {}
+        private readonly contextService: GeniusContextService,
+        private readonly dynamicQueryEngine: DynamicQueryEngineService
+    ) { }
 
     /**
      * 💬 Send message to Genius AI
@@ -61,7 +63,7 @@ export class GeniusAiController {
     async getContext(@Request() req: any) {
         const companyId = req.user.companyId;
         const context = await this.contextService.getFullContext(companyId);
-        
+
         return {
             success: true,
             context: {
@@ -155,7 +157,7 @@ export class GeniusAiController {
     @ApiOperation({ summary: 'اقتراحات ذكية' })
     async getSuggestions(@Request() req: any) {
         const userRole = req.user.role;
-        
+
         const baseSuggestions = [
             { text: 'ملخص اليوم', icon: 'today', category: 'overview' },
             { text: 'تقرير الحضور', icon: 'schedule', category: 'attendance' },
@@ -177,7 +179,7 @@ export class GeniusAiController {
         ];
 
         const suggestions = [...baseSuggestions];
-        
+
         if (['ADMIN', 'HR', 'SUPER_ADMIN'].includes(userRole)) {
             suggestions.push(...adminSuggestions);
         } else {
@@ -226,7 +228,7 @@ export class GeniusAiController {
     @ApiOperation({ summary: 'تنفيذ إجراء سريع' })
     async quickAction(@Request() req: any, @Body() body: { action: string; params?: any }) {
         const userId = req.user.sub || req.user.id;
-        
+
         // Map quick actions to chat commands
         const actionMap: Record<string, string> = {
             'today_summary': 'ملخص اليوم',
@@ -295,6 +297,40 @@ export class GeniusAiController {
                 description: a.description,
                 time: a.timestamp
             }))
+        };
+    }
+
+    /**
+     * 🔍 @ Autocomplete - اقتراحات تلقائية عند كتابة @
+     * 
+     * Supported contexts:
+     * - الموظف @ → list employees
+     * - القسم @ → list departments
+     * - الفرع @ → list branches
+     * - المهمة @ → list tasks
+     * - الهدف @ → list goals
+     */
+    @Post('autocomplete')
+    @ApiOperation({ summary: 'اقتراحات تلقائية للـ @ mentions' })
+    @ApiResponse({ status: 200, description: 'قائمة الاقتراحات' })
+    async autocomplete(
+        @Request() req: any,
+        @Body() body: { context: string; searchTerm?: string; limit?: number }
+    ) {
+        const companyId = req.user.companyId;
+
+        this.logger.log(`[GENIUS] Autocomplete: context="${body.context}", search="${body.searchTerm || ''}"`);
+
+        const result = await this.dynamicQueryEngine.getAutocomplete(
+            body.context,
+            body.searchTerm || '',
+            companyId,
+            body.limit || 10
+        );
+
+        return {
+            success: true,
+            ...result
         };
     }
 }
