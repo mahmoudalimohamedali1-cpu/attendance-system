@@ -38,18 +38,18 @@ export interface DynamicQueryResult {
 const ARABIC_SCHEMA_MAP: Record<string, { model: string; arabicName: string; fields: Record<string, string> }> = {
     'موظف': { model: 'user', arabicName: 'الموظفين', fields: { 'اسم': 'firstName', 'راتب': 'salary', 'قسم': 'department', 'فرع': 'branch', 'مسمى': 'jobTitle', 'حالة': 'status', 'تعيين': 'hireDate' } },
     'موظفين': { model: 'user', arabicName: 'الموظفين', fields: { 'اسم': 'firstName', 'راتب': 'salary', 'قسم': 'department', 'فرع': 'branch', 'مسمى': 'jobTitle', 'حالة': 'status' } },
-    'حضور': { model: 'attendance', arabicName: 'الحضور', fields: { 'تاريخ': 'date', 'دخول': 'checkIn', 'خروج': 'checkOut', 'تأخير': 'lateMinutes', 'حالة': 'status' } },
+    'حضور': { model: 'attendance', arabicName: 'الحضور', fields: { 'تاريخ': 'date', 'دخول': 'checkInTime', 'خروج': 'checkOutTime', 'تأخير': 'lateMinutes', 'حالة': 'status' } },
     'اجازة': { model: 'leaveRequest', arabicName: 'الإجازات', fields: { 'نوع': 'type', 'حالة': 'status', 'بداية': 'startDate', 'نهاية': 'endDate' } },
     'اجازات': { model: 'leaveRequest', arabicName: 'الإجازات', fields: { 'نوع': 'type', 'حالة': 'status' } },
-    'قسم': { model: 'department', arabicName: 'الأقسام', fields: { 'اسم': 'name', 'كود': 'code' } },
+    'قسم': { model: 'department', arabicName: 'الأقسام', fields: { 'اسم': 'name' } },
     'اقسام': { model: 'department', arabicName: 'الأقسام', fields: { 'اسم': 'name' } },
-    'فرع': { model: 'branch', arabicName: 'الفروع', fields: { 'اسم': 'name', 'موقع': 'location' } },
+    'فرع': { model: 'branch', arabicName: 'الفروع', fields: { 'اسم': 'name', 'عنوان': 'address' } },
     'فروع': { model: 'branch', arabicName: 'الفروع', fields: { 'اسم': 'name' } },
     'مهمة': { model: 'task', arabicName: 'المهام', fields: { 'عنوان': 'title', 'حالة': 'status', 'أولوية': 'priority' } },
     'مهام': { model: 'task', arabicName: 'المهام', fields: { 'عنوان': 'title', 'حالة': 'status' } },
     'هدف': { model: 'goal', arabicName: 'الأهداف', fields: { 'عنوان': 'title', 'حالة': 'status', 'تقدم': 'progress' } },
     'اهداف': { model: 'goal', arabicName: 'الأهداف', fields: { 'عنوان': 'title', 'حالة': 'status' } },
-    'تقييم': { model: 'performanceReview', arabicName: 'التقييمات', fields: { 'حالة': 'status', 'تقييم': 'rating' } },
+    'تقييم': { model: 'performanceReview', arabicName: 'التقييمات', fields: { 'حالة': 'status', 'تقييم': 'finalRating' } },
     'تقييمات': { model: 'performanceReview', arabicName: 'التقييمات', fields: { 'حالة': 'status' } },
     'عهدة': { model: 'custodyAssignment', arabicName: 'العهد', fields: { 'حالة': 'status' } },
     'عهد': { model: 'custodyAssignment', arabicName: 'العهد', fields: { 'حالة': 'status' } },
@@ -287,14 +287,9 @@ export class DynamicQueryEngineService {
     private addCompanyScope(where: Record<string, any>, model: string, companyId: string): Record<string, any> {
         const secureWhere = { ...where };
 
-        // الجداول التي لها companyId مباشرة
-        if (['user', 'department', 'branch', 'goal', 'task', 'custodyAssignment', 'performanceReview'].includes(model)) {
-            secureWhere.companyId = companyId;
-        }
-        // الجداول التي لها relation مع user
-        else if (['attendance', 'leaveRequest'].includes(model)) {
-            secureWhere.user = { ...secureWhere.user, companyId };
-        }
+        // جميع الجداول في النظام لها companyId مباشرة
+        // User, Department, Branch, Goal, Task, CustodyAssignment, PerformanceReview, Attendance, LeaveRequest
+        secureWhere.companyId = companyId;
 
         return secureWhere;
     }
@@ -305,10 +300,10 @@ export class DynamicQueryEngineService {
     private getDefaultSelect(model: string): Record<string, boolean | object> {
         const selectMaps: Record<string, Record<string, boolean | object>> = {
             user: { id: true, firstName: true, lastName: true, jobTitle: true, salary: true, status: true, department: { select: { name: true } } },
-            attendance: { id: true, date: true, checkIn: true, checkOut: true, status: true, lateMinutes: true, user: { select: { firstName: true, lastName: true } } },
+            attendance: { id: true, date: true, checkInTime: true, checkOutTime: true, status: true, lateMinutes: true, user: { select: { firstName: true, lastName: true } } },
             leaveRequest: { id: true, type: true, status: true, startDate: true, endDate: true, user: { select: { firstName: true, lastName: true } } },
-            department: { id: true, name: true, code: true, _count: { select: { employees: true } } },
-            branch: { id: true, name: true, location: true },
+            department: { id: true, name: true, _count: { select: { users: true } } },
+            branch: { id: true, name: true, address: true },
             goal: { id: true, title: true, status: true, progress: true, dueDate: true },
             task: { id: true, title: true, status: true, priority: true, dueDate: true },
             performanceReview: { id: true, status: true, finalRating: true, createdAt: true, employee: { select: { firstName: true, lastName: true } } },
@@ -324,7 +319,7 @@ export class DynamicQueryEngineService {
     private getNumericFields(model: string): Record<string, boolean> | undefined {
         const numericMaps: Record<string, Record<string, boolean>> = {
             user: { salary: true },
-            attendance: { lateMinutes: true, overtimeHours: true },
+            attendance: { lateMinutes: true, overtimeMinutes: true },
             goal: { progress: true }
         };
 
@@ -383,15 +378,15 @@ export class DynamicQueryEngineService {
                 return `${index}. **${item.firstName} ${item.lastName}** - ${item.jobTitle || 'غير محدد'} | ${item.department?.name || '-'} | ${item.salary ? item.salary.toLocaleString('ar-SA') + ' ريال' : '-'}\n`;
 
             case 'attendance':
-                const checkIn = item.checkIn ? new Date(item.checkIn).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '-';
-                const checkOut = item.checkOut ? new Date(item.checkOut).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const checkIn = item.checkInTime ? new Date(item.checkInTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '-';
+                const checkOut = item.checkOutTime ? new Date(item.checkOutTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '-';
                 return `${index}. **${item.user?.firstName} ${item.user?.lastName}** - ${checkIn} → ${checkOut} | ${item.lateMinutes > 0 ? `⏰ متأخر ${item.lateMinutes} دقيقة` : '✅'}\n`;
 
             case 'leaveRequest':
                 return `${index}. **${item.user?.firstName} ${item.user?.lastName}** - ${item.type} | ${item.status}\n`;
 
             case 'department':
-                return `${index}. **${item.name}** (${item.code || '-'}) - ${item._count?.employees || 0} موظف\n`;
+                return `${index}. **${item.name}** - ${item._count?.users || 0} موظف\n`;
 
             case 'goal':
                 return `${index}. **${item.title}** - ${item.status} | التقدم: ${item.progress}%\n`;
