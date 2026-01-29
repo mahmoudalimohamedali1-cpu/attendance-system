@@ -68,6 +68,15 @@ export class GeniusActionsService {
                 case 'assign_deduction': return this.addDeductionAI(intent, context);
                 case 'create_notification':
                 case 'assign_notification': return this.sendNotificationAI(intent, context);
+                // ============ NEW ACTIONS ============
+                case 'create_goal': return this.createGoalAI(intent, context);
+                case 'update_goal': return this.updateGoalAI(intent, context);
+                case 'create_review':
+                case 'create_performance_review': return this.createPerformanceReviewAI(intent, context);
+                case 'send_recognition':
+                case 'create_recognition': return this.sendRecognitionAI(intent, context);
+                case 'calculate_payroll': return this.calculatePayrollAI(intent, context);
+                case 'approve_payroll': return this.approvePayrollAI(intent, context);
                 default:
                     // Try legacy method
                     return this.executeLegacy(message, context);
@@ -125,6 +134,14 @@ export class GeniusActionsService {
         if (/^(أضف|انشئ)\s*(قسم|إدارة)/.test(m)) return 'create_department';
         if (/^(أضف|انشئ)\s*(فرع)/.test(m)) return 'create_branch';
         if (/^(ارسل|أرسل)\s*(إشعار|اشعار|رسالة)/.test(m)) return 'send_notification';
+
+        // New action patterns
+        if (/^(أضف|انشئ|حدد)\s*(هدف)/.test(m) || /هدف.*ل[ـ]?\s/.test(m)) return 'create_goal';
+        if (/^(عدل|حدث|غير)\s*(هدف)/.test(m) || /هدف.*إلى/.test(m)) return 'update_goal';
+        if (/^(انشئ|أضف)\s*(تقييم|تقييم أداء)/.test(m) || /تقييم أداء/.test(m)) return 'create_review';
+        if (/^(ارسل|أرسل)\s*(تقدير|شكر)/.test(m) || /تقدير.*ل/.test(m)) return 'send_recognition';
+        if (/^(احسب|حساب)\s*(رواتب|الرواتب)/.test(m)) return 'calculate_payroll';
+        if (/^(وافق)\s*(على)?\s*(رواتب|الرواتب|مسير)/.test(m)) return 'approve_payroll';
 
         return 'unknown';
     }
@@ -1347,7 +1364,309 @@ export class GeniusActionsService {
             'أضف موظف اسمه [الاسم] في قسم [القسم]',
             'عدل راتب [اسم] إلى [مبلغ]',
             'وافق على إجازة [اسم]',
-            'أضف مكافأة [مبلغ] لـ [اسم]'
+            'أضف مكافأة [مبلغ] لـ [اسم]',
+            'أضف هدف لـ [اسم] بعنوان [العنوان]',
+            'أرسل تقدير لـ [اسم] بسبب [السبب]'
         ];
+    }
+
+    // ============ NEW ACTIONS: GOALS ============
+
+    private async createGoalAI(intent: ParsedIntent, context: ActionContext): Promise<ActionResult> {
+        const { title, employeeName, targetValue, dueDate, description } = intent.params;
+
+        if (!title) {
+            return { success: false, message: '❌ يرجى تحديد عنوان الهدف', suggestions: ['أضف هدف "زيادة المبيعات" لـ أحمد'] };
+        }
+
+        try {
+            let ownerId = context.userId;
+            let ownerName = 'أنت';
+
+            if (employeeName) {
+                const emp = await this.findEmployeeByName(employeeName, context.companyId);
+                if (emp) {
+                    ownerId = emp.id;
+                    ownerName = `${emp.firstName} ${emp.lastName}`;
+                } else {
+                    return { success: false, message: `❌ الموظف "${employeeName}" غير موجود` };
+                }
+            }
+
+            const goal = await (this.prisma.goal as any).create({
+                data: {
+                    title,
+                    description: description || '',
+                    companyId: context.companyId,
+                    ownerId,
+                    status: 'DRAFT',
+                    progress: 0,
+                    targetValue: targetValue ? parseFloat(targetValue) : null,
+                    dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+                }
+            });
+
+            return {
+                success: true,
+                message: `✅ تم إنشاء الهدف!\n\n🎯 **${goal.title}**\n👤 المالك: ${ownerName}\n📅 تاريخ الاستحقاق: ${new Date(goal.dueDate).toLocaleDateString('ar-SA')}`,
+                data: goal,
+                suggestions: ['اعرض الأهداف', 'أضف هدف آخر']
+            };
+        } catch (e: any) {
+            return { success: false, message: `❌ فشل إنشاء الهدف: ${e.message}` };
+        }
+    }
+
+    private async updateGoalAI(intent: ParsedIntent, context: ActionContext): Promise<ActionResult> {
+        const { title, progress, status } = intent.params;
+
+        if (!title) {
+            return { success: false, message: '❌ يرجى تحديد اسم الهدف', suggestions: ['عدل هدف "زيادة المبيعات" إلى 50%'] };
+        }
+
+        try {
+            const goal = await (this.prisma.goal as any).findFirst({
+                where: { companyId: context.companyId, title: { contains: title, mode: 'insensitive' } }
+            });
+
+            if (!goal) {
+                return { success: false, message: `❌ الهدف "${title}" غير موجود` };
+            }
+
+            const updateData: any = {};
+            const changes: string[] = [];
+
+            if (progress !== undefined) {
+                const progressNum = parseInt(progress);
+                if (!isNaN(progressNum)) {
+                    updateData.progress = Math.min(100, Math.max(0, progressNum));
+                    changes.push(`📈 التقدم → ${updateData.progress}%`);
+                    if (updateData.progress === 100) {
+                        updateData.status = 'COMPLETED';
+                        updateData.completedAt = new Date();
+                        changes.push('✅ الحالة → مكتمل');
+                    }
+                }
+            }
+
+            if (status) {
+                const statusMap: any = { 'مكتمل': 'COMPLETED', 'جاري': 'IN_PROGRESS', 'مسودة': 'DRAFT', 'ملغي': 'CANCELLED' };
+                updateData.status = statusMap[status] || status.toUpperCase();
+                changes.push(`📋 الحالة → ${status}`);
+            }
+
+            if (changes.length === 0) {
+                return { success: false, message: '❌ لم يتم تحديد أي تغييرات' };
+            }
+
+            await (this.prisma.goal as any).update({ where: { id: goal.id }, data: updateData });
+
+            return {
+                success: true,
+                message: `✅ تم تحديث الهدف!\n\n🎯 **${goal.title}**\n\n${changes.join('\n')}`,
+                suggestions: ['اعرض الأهداف']
+            };
+        } catch (e: any) {
+            return { success: false, message: `❌ فشل تحديث الهدف: ${e.message}` };
+        }
+    }
+
+    // ============ NEW ACTIONS: PERFORMANCE REVIEWS ============
+
+    private async createPerformanceReviewAI(intent: ParsedIntent, context: ActionContext): Promise<ActionResult> {
+        const { employeeName, cycleName } = intent.params;
+
+        if (!employeeName) {
+            return { success: false, message: '❌ يرجى تحديد اسم الموظف', suggestions: ['أنشئ تقييم أداء لـ أحمد'] };
+        }
+
+        try {
+            const employee = await this.findEmployeeByName(employeeName, context.companyId);
+            if (!employee) {
+                return { success: false, message: `❌ الموظف "${employeeName}" غير موجود` };
+            }
+
+            // Find active cycle or create one
+            let cycle = await (this.prisma.performanceReviewCycle as any).findFirst({
+                where: { companyId: context.companyId, status: 'ACTIVE' }
+            });
+
+            if (!cycle) {
+                return {
+                    success: false,
+                    message: '❌ لا توجد دورة تقييم نشطة. يرجى إنشاء دورة أولاً.',
+                    suggestions: ['أنشئ دورة تقييم سنوية']
+                };
+            }
+
+            // Check if review already exists
+            const existingReview = await (this.prisma.performanceReview as any).findFirst({
+                where: { cycleId: cycle.id, employeeId: employee.id }
+            });
+
+            if (existingReview) {
+                return {
+                    success: false,
+                    message: `⚠️ تقييم الموظف "${employee.firstName} ${employee.lastName}" موجود بالفعل في هذه الدورة`,
+                    suggestions: ['اعرض تقييمات الأداء']
+                };
+            }
+
+            const review = await (this.prisma.performanceReview as any).create({
+                data: {
+                    companyId: context.companyId,
+                    cycleId: cycle.id,
+                    employeeId: employee.id,
+                    managerId: employee.managerId || context.userId,
+                    status: 'PENDING',
+                }
+            });
+
+            return {
+                success: true,
+                message: `✅ تم إنشاء تقييم الأداء!\n\n👤 الموظف: **${employee.firstName} ${employee.lastName}**\n📅 الدورة: ${cycle.name}\n📋 الحالة: قيد الانتظار`,
+                data: review,
+                suggestions: ['اعرض تقييمات الأداء', 'أنشئ تقييم آخر']
+            };
+        } catch (e: any) {
+            return { success: false, message: `❌ فشل إنشاء التقييم: ${e.message}` };
+        }
+    }
+
+    // ============ NEW ACTIONS: RECOGNITION ============
+
+    private async sendRecognitionAI(intent: ParsedIntent, context: ActionContext): Promise<ActionResult> {
+        const { employeeName, message, points } = intent.params;
+
+        if (!employeeName) {
+            return { success: false, message: '❌ يرجى تحديد اسم الموظف', suggestions: ['أرسل تقدير لـ أحمد بسبب عمله المميز'] };
+        }
+
+        try {
+            const receiver = await this.findEmployeeByName(employeeName, context.companyId);
+            if (!receiver) {
+                return { success: false, message: `❌ الموظف "${employeeName}" غير موجود` };
+            }
+
+            const recognition = await (this.prisma.recognition as any).create({
+                data: {
+                    companyId: context.companyId,
+                    senderId: context.userId,
+                    receiverId: receiver.id,
+                    type: 'PEER_TO_PEER',
+                    message: message || 'شكراً على عملك المميز! 🌟',
+                    points: points ? parseInt(points) : 10,
+                }
+            });
+
+            return {
+                success: true,
+                message: `✅ تم إرسال التقدير!\n\n🌟 **تقدير لـ ${receiver.firstName} ${receiver.lastName}**\n💬 ${recognition.message}\n🏆 النقاط: ${recognition.points}`,
+                data: recognition,
+                suggestions: ['أرسل تقدير آخر']
+            };
+        } catch (e: any) {
+            return { success: false, message: `❌ فشل إرسال التقدير: ${e.message}` };
+        }
+    }
+
+    // ============ NEW ACTIONS: PAYROLL ============
+
+    private async calculatePayrollAI(intent: ParsedIntent, context: ActionContext): Promise<ActionResult> {
+        const { month, year } = intent.params;
+
+        try {
+            const targetMonth = month ? parseInt(month) : new Date().getMonth() + 1;
+            const targetYear = year ? parseInt(year) : new Date().getFullYear();
+
+            // Find or create period
+            let period = await (this.prisma.payrollPeriod as any).findFirst({
+                where: { companyId: context.companyId, month: targetMonth, year: targetYear }
+            });
+
+            if (!period) {
+                const startDate = new Date(targetYear, targetMonth - 1, 1);
+                const endDate = new Date(targetYear, targetMonth, 0);
+
+                period = await (this.prisma.payrollPeriod as any).create({
+                    data: {
+                        companyId: context.companyId,
+                        month: targetMonth,
+                        year: targetYear,
+                        startDate,
+                        endDate,
+                        status: 'DRAFT'
+                    }
+                });
+            }
+
+            // Get employee count
+            const employeeCount = await this.prisma.user.count({
+                where: { companyId: context.companyId, status: 'ACTIVE', role: 'EMPLOYEE' }
+            });
+
+            return {
+                success: true,
+                message: `💰 **حساب رواتب ${targetMonth}/${targetYear}**\n\n👥 عدد الموظفين: ${employeeCount}\n📋 الحالة: ${period.status}\n\n⚠️ لتنفيذ الحساب الفعلي، استخدم صفحة الرواتب`,
+                data: { period, employeeCount },
+                suggestions: ['اعرض مسيرات الرواتب', 'وافق على الرواتب']
+            };
+        } catch (e: any) {
+            return { success: false, message: `❌ فشل حساب الرواتب: ${e.message}` };
+        }
+    }
+
+    private async approvePayrollAI(intent: ParsedIntent, context: ActionContext): Promise<ActionResult> {
+        const { month, year } = intent.params;
+
+        try {
+            const targetMonth = month ? parseInt(month) : new Date().getMonth() + 1;
+            const targetYear = year ? parseInt(year) : new Date().getFullYear();
+
+            const run = await (this.prisma.payrollRun as any).findFirst({
+                where: {
+                    companyId: context.companyId,
+                    period: { month: targetMonth, year: targetYear }
+                },
+                include: { period: true, _count: { select: { payslips: true } } }
+            });
+
+            if (!run) {
+                return { success: false, message: `❌ لا يوجد مسير رواتب لشهر ${targetMonth}/${targetYear}` };
+            }
+
+            if (run.status === 'PAID') {
+                return { success: false, message: '✅ هذا المسير تم صرفه بالفعل' };
+            }
+
+            // Update to next status
+            const statusFlow: any = {
+                'DRAFT': 'CALCULATED',
+                'CALCULATED': 'HR_REVIEWED',
+                'HR_REVIEWED': 'FINANCE_APPROVED',
+                'FINANCE_APPROVED': 'LOCKED'
+            };
+
+            const newStatus = statusFlow[run.status] || 'HR_REVIEWED';
+            await (this.prisma.payrollRun as any).update({
+                where: { id: run.id },
+                data: { status: newStatus }
+            });
+
+            const statusNames: any = {
+                'CALCULATED': 'تم الحساب',
+                'HR_REVIEWED': 'تمت مراجعة HR',
+                'FINANCE_APPROVED': 'تمت موافقة المالية',
+                'LOCKED': 'مقفل'
+            };
+
+            return {
+                success: true,
+                message: `✅ تم تحديث حالة المسير!\n\n📅 الفترة: ${targetMonth}/${targetYear}\n📋 الحالة الجديدة: ${statusNames[newStatus] || newStatus}\n👥 عدد الموظفين: ${run._count?.payslips || 0}`,
+                suggestions: ['اعرض مسيرات الرواتب']
+            };
+        } catch (e: any) {
+            return { success: false, message: `❌ فشل الموافقة على الرواتب: ${e.message}` };
+        }
     }
 }

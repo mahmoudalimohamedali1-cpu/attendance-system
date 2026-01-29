@@ -14,6 +14,9 @@ export interface SystemContext {
     attendance: AttendanceSummary;
     leaves: LeavesSummary;
     payroll: PayrollSummary;
+    goals: GoalsSummary;
+    tasks: TasksSummary;
+    recognition: RecognitionSummary;
     alerts: AlertsContext;
     recentActivity: RecentActivity[];
 }
@@ -84,18 +87,37 @@ interface RecentActivity {
     timestamp: Date;
 }
 
+interface GoalsSummary {
+    total: number;
+    completed: number;
+    inProgress: number;
+    overdue: number;
+}
+
+interface TasksSummary {
+    total: number;
+    completed: number;
+    inProgress: number;
+    overdue: number;
+}
+
+interface RecognitionSummary {
+    totalThisMonth: number;
+    topReceivers: { name: string; count: number }[];
+}
+
 @Injectable()
 export class GeniusContextService {
     private readonly logger = new Logger(GeniusContextService.name);
     private contextCache: Map<string, { data: SystemContext; timestamp: number }> = new Map();
     private readonly CACHE_TTL = 60000;
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly prisma: PrismaService) { }
 
     async getFullContext(companyId: string, forceRefresh = false): Promise<SystemContext> {
         const cacheKey = companyId;
         const cached = this.contextCache.get(cacheKey);
-        
+
         if (!forceRefresh && cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
             return cached.data;
         }
@@ -108,6 +130,9 @@ export class GeniusContextService {
             attendance: await this.getAttendanceSummary(companyId),
             leaves: await this.getLeavesSummary(companyId),
             payroll: await this.getPayrollSummary(companyId),
+            goals: await this.getGoalsSummary(companyId),
+            tasks: await this.getTasksSummary(companyId),
+            recognition: await this.getRecognitionSummary(companyId),
             alerts: await this.getAlerts(companyId),
             recentActivity: await this.getRecentActivity(companyId)
         };
@@ -422,7 +447,101 @@ export class GeniusContextService {
 
 💰 **الرواتب**: متوسط ${context.payroll.avgSalary.toLocaleString('ar-SA')} ريال
 
+🎯 **الأهداف**: ${context.goals.completed}/${context.goals.total} مكتمل | ${context.goals.inProgress} جاري | ${context.goals.overdue} متأخر
+
+📋 **المهام**: ${context.tasks.completed}/${context.tasks.total} مكتمل | ${context.tasks.inProgress} جاري | ${context.tasks.overdue} متأخر
+
+🌟 **التقدير**: ${context.recognition.totalThisMonth} تقدير هذا الشهر
+
 🚨 **تنبيهات**: ${context.alerts.critical.length} حرجة | ${context.alerts.warnings.length} تحذيرات
         `.trim();
+    }
+
+    // ============ NEW CONTEXT METHODS ============
+
+    private async getGoalsSummary(companyId: string): Promise<GoalsSummary> {
+        try {
+            const today = new Date();
+
+            const [total, completed, inProgress, overdue] = await Promise.all([
+                (this.prisma.goal as any).count({ where: { companyId } }),
+                (this.prisma.goal as any).count({ where: { companyId, status: 'COMPLETED' } }),
+                (this.prisma.goal as any).count({ where: { companyId, status: 'IN_PROGRESS' } }),
+                (this.prisma.goal as any).count({
+                    where: {
+                        companyId,
+                        status: { not: 'COMPLETED' },
+                        dueDate: { lt: today }
+                    }
+                })
+            ]);
+
+            return { total, completed, inProgress, overdue };
+        } catch (e) {
+            this.logger.error(`getGoalsSummary error: ${e.message}`);
+            return { total: 0, completed: 0, inProgress: 0, overdue: 0 };
+        }
+    }
+
+    private async getTasksSummary(companyId: string): Promise<TasksSummary> {
+        try {
+            const today = new Date();
+
+            const [total, completed, inProgress, overdue] = await Promise.all([
+                (this.prisma.task as any).count({ where: { companyId } }),
+                (this.prisma.task as any).count({ where: { companyId, status: 'COMPLETED' } }),
+                (this.prisma.task as any).count({ where: { companyId, status: 'IN_PROGRESS' } }),
+                (this.prisma.task as any).count({
+                    where: {
+                        companyId,
+                        status: { notIn: ['COMPLETED', 'CANCELLED'] },
+                        dueDate: { lt: today }
+                    }
+                })
+            ]);
+
+            return { total, completed, inProgress, overdue };
+        } catch (e) {
+            this.logger.error(`getTasksSummary error: ${e.message}`);
+            return { total: 0, completed: 0, inProgress: 0, overdue: 0 };
+        }
+    }
+
+    private async getRecognitionSummary(companyId: string): Promise<RecognitionSummary> {
+        try {
+            const monthStart = new Date();
+            monthStart.setDate(1);
+            monthStart.setHours(0, 0, 0, 0);
+
+            const totalThisMonth = await (this.prisma.recognition as any).count({
+                where: { companyId, createdAt: { gte: monthStart } }
+            });
+
+            const topReceiversData = await (this.prisma.recognition as any).groupBy({
+                by: ['receiverId'],
+                where: { companyId, createdAt: { gte: monthStart } },
+                _count: true,
+                orderBy: { _count: { receiverId: 'desc' } },
+                take: 5
+            });
+
+            const topReceivers = await Promise.all(
+                topReceiversData.map(async (r: any) => {
+                    const user = await this.prisma.user.findUnique({
+                        where: { id: r.receiverId },
+                        select: { firstName: true, lastName: true }
+                    });
+                    return {
+                        name: user ? `${user.firstName} ${user.lastName}` : 'غير معروف',
+                        count: r._count
+                    };
+                })
+            );
+
+            return { totalThisMonth, topReceivers };
+        } catch (e) {
+            this.logger.error(`getRecognitionSummary error: ${e.message}`);
+            return { totalThisMonth: 0, topReceivers: [] };
+        }
     }
 }
