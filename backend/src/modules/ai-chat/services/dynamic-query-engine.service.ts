@@ -426,36 +426,57 @@ export class DynamicQueryEngineService {
      * 📝 تنسيق عنصر واحد
      */
     private formatItem(item: any, model: string, index: number): string {
+        if (!item) return `${index}. بيانات غير متوفرة\n`;
+
         switch (model) {
             case 'user':
-                return `${index}. **${item.firstName} ${item.lastName}** - ${item.jobTitle || 'غير محدد'} | ${item.department?.name || '-'} | ${item.salary ? item.salary.toLocaleString('ar-SA') + ' ريال' : '-'}\n`;
+                const userName = `${item.firstName || ''} ${item.lastName || ''}`.trim() || 'غير محدد';
+                const userJob = item.jobTitle || item.department?.name || 'غير محدد';
+                const userSalary = item.salary ? Number(item.salary).toLocaleString('ar-SA') + ' ريال' : '-';
+                return `${index}. **${userName}** - ${userJob} | ${userSalary}\n`;
 
             case 'attendance':
                 const checkIn = item.checkInTime ? new Date(item.checkInTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '-';
                 const checkOut = item.checkOutTime ? new Date(item.checkOutTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '-';
-                return `${index}. **${item.user?.firstName} ${item.user?.lastName}** - ${checkIn} → ${checkOut} | ${item.lateMinutes > 0 ? `⏰ متأخر ${item.lateMinutes} دقيقة` : '✅'}\n`;
+                const attendeeName = `${item.user?.firstName || ''} ${item.user?.lastName || ''}`.trim() || 'موظف';
+                const lateStatus = (item.lateMinutes && item.lateMinutes > 0) ? `⏰ متأخر ${item.lateMinutes} دقيقة` : '✅';
+                return `${index}. **${attendeeName}** - ${checkIn} → ${checkOut} | ${lateStatus}\n`;
 
             case 'leaveRequest':
-                return `${index}. **${item.user?.firstName} ${item.user?.lastName}** - ${item.type} | ${item.status}\n`;
+                const requesterName = `${item.user?.firstName || ''} ${item.user?.lastName || ''}`.trim() || 'موظف';
+                return `${index}. **${requesterName}** - ${item.type || '-'} | ${item.status || '-'}\n`;
 
             case 'department':
-                return `${index}. **${item.name}** - ${item._count?.users || 0} موظف\n`;
+                const deptName = item.name || 'قسم غير محدد';
+                const empCount = item._count?.users ?? 0;
+                return `${index}. **${deptName}** - ${empCount} موظف\n`;
+
+            case 'branch':
+                return `${index}. **${item.name || 'فرع غير محدد'}** - ${item.address || '-'}\n`;
 
             case 'goal':
-                return `${index}. **${item.title}** - ${item.status} | التقدم: ${item.progress}%\n`;
+                const goalProgress = item.progress != null ? `${item.progress}%` : '-';
+                return `${index}. **${item.title || 'هدف غير محدد'}** - ${item.status || '-'} | التقدم: ${goalProgress}\n`;
 
             case 'task':
-                return `${index}. **${item.title}** - ${item.status} | الأولوية: ${item.priority}\n`;
+                return `${index}. **${item.title || 'مهمة غير محددة'}** - ${item.status || '-'} | الأولوية: ${item.priority || '-'}\n`;
 
             case 'performanceReview':
+                const revieweeName = `${item.employee?.firstName || ''} ${item.employee?.lastName || ''}`.trim() || 'موظف';
                 const rating = item.finalRating ? Number(item.finalRating).toFixed(1) : '-';
-                return `${index}. **${item.employee?.firstName} ${item.employee?.lastName}** - ${item.status} | التقييم: ${rating}\n`;
+                return `${index}. **${revieweeName}** - ${item.status || '-'} | التقييم: ${rating}\n`;
 
             case 'custodyAssignment':
-                return `${index}. الموظف: ${item.employee?.firstName || '-'} | الحالة: ${item.status}\n`;
+                const custodyEmployee = `${item.employee?.firstName || ''} ${item.employee?.lastName || ''}`.trim() || '-';
+                const custodyItem = item.custodyItem?.name || '-';
+                return `${index}. الموظف: ${custodyEmployee} | العهدة: ${custodyItem} | الحالة: ${item.status || '-'}\n`;
 
             default:
-                return `${index}. ${JSON.stringify(item)}\n`;
+                try {
+                    return `${index}. ${JSON.stringify(item)}\n`;
+                } catch {
+                    return `${index}. بيانات غير قابلة للعرض\n`;
+                }
         }
     }
 
