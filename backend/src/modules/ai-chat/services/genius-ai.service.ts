@@ -341,8 +341,47 @@ export class GeniusAiService {
 
         // Performance analysis
         if (/أداء|اداء/.test(message.toLowerCase())) {
+            // Get real performance data
+            const [reviewStats, goalStats] = await Promise.all([
+                this.prisma.performanceReview.groupBy({
+                    by: ['status'],
+                    where: { employee: { companyId: context.companyId } },
+                    _count: true
+                }),
+                this.prisma.goal.groupBy({
+                    by: ['status'],
+                    where: { user: { companyId: context.companyId } },
+                    _count: true
+                })
+            ]);
+
+            const totalReviews = reviewStats.reduce((sum, r) => sum + r._count, 0);
+            const completedReviews = reviewStats.find(r => r.status === 'COMPLETED')?._count || 0;
+            const pendingReviews = reviewStats.find(r => r.status === 'PENDING')?._count || 0;
+
+            const totalGoals = goalStats.reduce((sum, g) => sum + g._count, 0);
+            const completedGoals = goalStats.find(g => g.status === 'COMPLETED')?._count || 0;
+            const inProgressGoals = goalStats.find(g => g.status === 'IN_PROGRESS')?._count || 0;
+
             analyses.push(`📊 **تحليل الأداء**`);
-            analyses.push(`- بيانات الأداء: جاري التحميل...`);
+            analyses.push(`\n📋 **التقييمات:**`);
+            analyses.push(`  • إجمالي التقييمات: ${totalReviews}`);
+            analyses.push(`  • مكتملة: ${completedReviews}`);
+            analyses.push(`  • معلقة: ${pendingReviews}`);
+            analyses.push(`\n🎯 **الأهداف:**`);
+            analyses.push(`  • إجمالي الأهداف: ${totalGoals}`);
+            analyses.push(`  • مكتملة: ${completedGoals}`);
+            analyses.push(`  • جارية: ${inProgressGoals}`);
+
+            if (totalReviews > 0) {
+                const completionRate = Math.round((completedReviews / totalReviews) * 100);
+                analyses.push(`\n📈 **نسبة إكمال التقييمات:** ${completionRate}%`);
+            }
+
+            if (totalGoals > 0) {
+                const goalCompletionRate = Math.round((completedGoals / totalGoals) * 100);
+                analyses.push(`📈 **نسبة تحقيق الأهداف:** ${goalCompletionRate}%`);
+            }
         }
 
         return {
