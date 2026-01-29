@@ -140,9 +140,25 @@ export class SettingsService {
 
   /**
    * إنشاء عطلة جديدة مع التعيينات
+   * يتحقق أولاً إذا كانت عطلة بنفس الاسم والتاريخ موجودة
    */
   async createHoliday(data: CreateHolidayData, companyId: string) {
     const { assignments, ...holidayData } = data;
+
+    // التحقق من وجود عطلة بنفس الاسم والتاريخ
+    const existingHoliday = await this.prisma.holiday.findFirst({
+      where: {
+        companyId,
+        name: data.name,
+        date: new Date(data.date),
+      },
+      include: { assignments: true },
+    });
+
+    // إذا كانت موجودة، نرجعها بدلاً من إنشاء تكرار
+    if (existingHoliday) {
+      return existingHoliday;
+    }
 
     return this.prisma.$transaction(async (tx) => {
       // إنشاء العطلة
@@ -242,6 +258,48 @@ export class SettingsService {
     return this.prisma.holiday.delete({
       where: { id, companyId },
     });
+  }
+
+  /**
+   * حذف العطلات المكررة (نفس الاسم والتاريخ)
+   * يبقي على أقدم عطلة ويحذف التكرارات
+   */
+  async removeDuplicateHolidays(companyId: string): Promise<{ removed: number; message: string }> {
+    // جلب جميع العطلات مرتبة حسب تاريخ الإنشاء
+    const allHolidays = await this.prisma.holiday.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const seen = new Map<string, string>(); // key: name+date, value: first id
+    const toDelete: string[] = [];
+
+    for (const holiday of allHolidays) {
+      const dateStr = new Date(holiday.date).toISOString().split('T')[0];
+      const key = `${holiday.name}|${dateStr}`;
+
+      if (seen.has(key)) {
+        // هذه عطلة مكررة، أضفها للحذف
+        toDelete.push(holiday.id);
+      } else {
+        // هذه أول ظهور لهذه العطلة
+        seen.set(key, holiday.id);
+      }
+    }
+
+    // حذف العطلات المكررة
+    if (toDelete.length > 0) {
+      await this.prisma.holiday.deleteMany({
+        where: { id: { in: toDelete } },
+      });
+    }
+
+    return {
+      removed: toDelete.length,
+      message: toDelete.length > 0
+        ? `تم حذف ${toDelete.length} عطلة مكررة`
+        : 'لا توجد عطلات مكررة',
+    };
   }
 
   /**
