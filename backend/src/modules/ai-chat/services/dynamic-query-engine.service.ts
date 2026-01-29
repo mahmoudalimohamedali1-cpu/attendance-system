@@ -288,11 +288,11 @@ export class DynamicQueryEngineService {
         const secureWhere = { ...where };
 
         // الجداول التي لها companyId مباشرة
-        if (['user', 'department', 'branch', 'goal', 'task', 'custodyAssignment'].includes(model)) {
+        if (['user', 'department', 'branch', 'goal', 'task', 'custodyAssignment', 'performanceReview'].includes(model)) {
             secureWhere.companyId = companyId;
         }
         // الجداول التي لها relation مع user
-        else if (['attendance', 'leaveRequest', 'performanceReview'].includes(model)) {
+        else if (['attendance', 'leaveRequest'].includes(model)) {
             secureWhere.user = { ...secureWhere.user, companyId };
         }
 
@@ -311,7 +311,8 @@ export class DynamicQueryEngineService {
             branch: { id: true, name: true, location: true },
             goal: { id: true, title: true, status: true, progress: true, dueDate: true },
             task: { id: true, title: true, status: true, priority: true, dueDate: true },
-            performanceReview: { id: true, status: true, rating: true, createdAt: true }
+            performanceReview: { id: true, status: true, finalRating: true, createdAt: true, employee: { select: { firstName: true, lastName: true } } },
+            custodyAssignment: { id: true, status: true, assignedAt: true, employee: { select: { firstName: true, lastName: true } }, custodyItem: { select: { name: true } } }
         };
 
         return selectMaps[model] || { id: true };
@@ -397,6 +398,13 @@ export class DynamicQueryEngineService {
 
             case 'task':
                 return `${index}. **${item.title}** - ${item.status} | الأولوية: ${item.priority}\n`;
+
+            case 'performanceReview':
+                const rating = item.finalRating ? Number(item.finalRating).toFixed(1) : '-';
+                return `${index}. **${item.employee?.firstName} ${item.employee?.lastName}** - ${item.status} | التقييم: ${rating}\n`;
+
+            case 'custodyAssignment':
+                return `${index}. الموظف: ${item.employee?.firstName || '-'} | الحالة: ${item.status}\n`;
 
             default:
                 return `${index}. ${JSON.stringify(item)}\n`;
