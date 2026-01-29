@@ -610,18 +610,19 @@ ${schemaContext}
         this.logger.log(`[DQE] Autocomplete: context="${ctx}", search="${searchTerm}"`);
 
         try {
-            // 🧑‍💼 الموظفين
+            // 🧑‍💼 الموظفين - عرض كل الموظفين بدون فلتر الشركة
             if (/موظف|الموظف|موظفين|employee/.test(ctx)) {
                 const employees = await this.prisma.user.findMany({
                     where: {
-                        companyId,
-                        // استثناء الـ Super Admin فقط باستخدام الـ boolean field
+                        // نعرض كل الموظفين بدون فلتر companyId
                         isSuperAdmin: false,
-                        OR: searchTerm ? [
-                            { firstName: { contains: searchTerm, mode: 'insensitive' } },
-                            { lastName: { contains: searchTerm, mode: 'insensitive' } },
-                            { email: { contains: searchTerm, mode: 'insensitive' } }
-                        ] : undefined
+                        ...(searchTerm ? {
+                            OR: [
+                                { firstName: { contains: searchTerm, mode: 'insensitive' } },
+                                { lastName: { contains: searchTerm, mode: 'insensitive' } },
+                                { email: { contains: searchTerm, mode: 'insensitive' } }
+                            ]
+                        } : {})
                     },
                     select: {
                         id: true,
@@ -629,20 +630,21 @@ ${schemaContext}
                         lastName: true,
                         jobTitle: true,
                         status: true,
+                        company: { select: { name: true } },
                         department: { select: { name: true } }
                     },
                     take: limit,
                     orderBy: { firstName: 'asc' }
                 });
 
-                this.logger.log(`[DQE] Found ${employees.length} employees for autocomplete`);
+                this.logger.log(`[DQE] Found ${employees.length} employees for autocomplete (all companies)`);
 
                 return {
                     type: 'employee',
                     items: employees.map(e => ({
                         id: e.id,
                         label: `${e.firstName} ${e.lastName}`,
-                        sublabel: e.jobTitle || e.department?.name || e.status || '',
+                        sublabel: e.jobTitle || e.department?.name || e.company?.name || e.status || '',
                         value: `${e.firstName} ${e.lastName}`
                     }))
                 };
