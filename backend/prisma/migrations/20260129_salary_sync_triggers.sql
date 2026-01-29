@@ -33,7 +33,39 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. Create triggers
+-- 3. NEW: Auto-create salary assignment when new user is created with salary
+CREATE OR REPLACE FUNCTION auto_create_salary_assignment()
+RETURNS TRIGGER AS $$
+DECLARE
+    default_structure_id UUID;
+BEGIN
+    -- Only if user has a salary
+    IF NEW.salary IS NOT NULL AND NEW.salary > 0 THEN
+        -- Find a default salary structure (company's first structure, or any first)
+        SELECT id INTO default_structure_id 
+        FROM salary_structures 
+        WHERE company_id = NEW.company_id OR company_id IS NULL
+        LIMIT 1;
+        
+        -- If we have a structure, create the assignment
+        IF default_structure_id IS NOT NULL THEN
+            INSERT INTO employee_salary_assignments (
+                employee_id, structure_id, base_salary, effective_date, is_active
+            ) VALUES (
+                NEW.id, 
+                default_structure_id, 
+                NEW.salary, 
+                COALESCE(NEW.hire_date, CURRENT_DATE), 
+                true
+            )
+            ON CONFLICT DO NOTHING;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 4. Create triggers
 DROP TRIGGER IF EXISTS trg_salary_assignment_sync ON employee_salary_assignments;
 CREATE TRIGGER trg_salary_assignment_sync
     AFTER INSERT OR UPDATE ON employee_salary_assignments
@@ -46,7 +78,13 @@ CREATE TRIGGER trg_user_salary_sync
     FOR EACH ROW
     EXECUTE FUNCTION sync_salary_to_assignment();
 
--- 4. Initial sync: Update users.salary from active assignments
+DROP TRIGGER IF EXISTS trg_user_create_salary_assignment ON users;
+CREATE TRIGGER trg_user_create_salary_assignment
+    AFTER INSERT ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION auto_create_salary_assignment();
+
+-- 5. Initial sync: Update users.salary from active assignments
 UPDATE users u
 SET salary = sa.base_salary,
     updated_at = NOW()
@@ -55,8 +93,8 @@ WHERE u.id = sa.employee_id
   AND sa.is_active = true
   AND (u.salary IS NULL OR u.salary != sa.base_salary);
 
--- 5. Report
-SELECT 'Salary Sync System installed successfully!' AS status;
+-- 6. Report
+SELECT '✅ Salary Sync System installed with AUTO-CREATE!' AS status;
 SELECT 
     u.first_name || ' ' || u.last_name AS employee,
     u.salary AS synced_salary
