@@ -5,6 +5,7 @@ import { GeniusContextService, SystemContext } from './genius-context.service';
 import { GeniusQueryService } from './genius-query.service';
 import { GeniusActionsService, ActionResult } from './genius-actions.service';
 import { LocalAiEngineService } from './local-ai-engine.service';
+import { DynamicQueryEngineService } from './dynamic-query-engine.service';
 
 /**
  * 🧠 GENIUS AI Chat Service
@@ -75,9 +76,10 @@ export class GeniusAiService {
         private readonly contextService: GeniusContextService,
         private readonly queryService: GeniusQueryService,
         private readonly actionsService: GeniusActionsService,
-        private readonly localAiEngine: LocalAiEngineService
+        private readonly localAiEngine: LocalAiEngineService,
+        private readonly dynamicQueryEngine: DynamicQueryEngineService
     ) {
-        this.logger.log('🧠 Genius AI Service initialized with Local AI Engine!');
+        this.logger.log('🧠 Genius AI Service initialized with Dynamic Query Engine!');
     }
 
     /**
@@ -225,12 +227,29 @@ export class GeniusAiService {
     }
 
     /**
-     * 📊 Handle query requests
+     * 📊 Handle query requests - NOW USES DYNAMIC QUERY ENGINE!
      */
     private async handleQuery(message: string, context: ConversationContext, systemContext: SystemContext | null): Promise<ChatResponse> {
+        // 1. Try Dynamic Query Engine first (Schema-Aware!)
+        if (this.dynamicQueryEngine.canHandle(message)) {
+            this.logger.log(`[GENIUS] Using Dynamic Query Engine for: "${message}"`);
+
+            const dynamicResult = await this.dynamicQueryEngine.processQuestion(message, context.companyId);
+
+            if (dynamicResult.success) {
+                return {
+                    message: dynamicResult.explanation,
+                    data: dynamicResult.data,
+                    visualization: Array.isArray(dynamicResult.data) ? 'table' : 'card',
+                    suggestions: dynamicResult.suggestions,
+                    processingTime: dynamicResult.executionTimeMs
+                };
+            }
+        }
+
+        // 2. Fallback to old query service (for backward compatibility)
         const result = await this.queryService.processQuery(message, context.companyId);
 
-        // If no structured query match, fallback to natural language LLM response
         if (!result.success || result.explanation === 'NOT_A_STRUCTURED_QUERY') {
             this.logger.log(`[GENIUS] Pivot to General LLM for: "${message}"`);
             return this.handleGeneral(message, context, systemContext);

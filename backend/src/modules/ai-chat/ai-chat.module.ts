@@ -79,6 +79,10 @@ import { GeniusQueryService } from './services/genius-query.service';
 import { GeniusActionsService } from './services/genius-actions.service';
 import { GeniusIntentService } from './services/genius-intent.service';
 import { LocalAiEngineService } from './services/local-ai-engine.service';
+import { DynamicQueryEngineService } from './services/dynamic-query-engine.service';
+
+// Schema Discovery from Smart Policies
+import { SchemaDiscoveryService } from '../smart-policies/schema-discovery.service';
 
 /**
  * 🤖 AI Chat Module (V10 - Complete 200 Ideas)
@@ -181,6 +185,10 @@ import { LocalAiEngineService } from './services/local-ai-engine.service';
 
         // 🧠 Local AI Engine (Self-Hosted - No External API)
         LocalAiEngineService,
+
+        // 🧠 Dynamic Query Engine (Schema-Aware AI)
+        DynamicQueryEngineService,
+        SchemaDiscoveryService,
     ],
     exports: [
         // Export secure service for other modules
@@ -243,6 +251,8 @@ import { LocalAiEngineService } from './services/local-ai-engine.service';
         GeniusActionsService,
         GeniusIntentService,
         LocalAiEngineService,
+        DynamicQueryEngineService,
+        SchemaDiscoveryService,
     ],
 })
 export class AiChatModule { }
