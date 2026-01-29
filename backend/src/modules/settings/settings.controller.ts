@@ -142,20 +142,20 @@ export class SettingsController {
     return this.settingsService.updateHoliday(id, companyId, updateData);
   }
 
-  @Delete('holidays/:id')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'حذف عطلة' })
-  @ApiResponse({ status: 200, description: 'تم الحذف' })
-  async deleteHoliday(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
-    return this.settingsService.deleteHoliday(id, companyId);
-  }
-
   @Delete('holidays/cleanup/duplicates')
   @Roles('ADMIN')
   @ApiOperation({ summary: 'حذف العطلات المكررة' })
   @ApiResponse({ status: 200, description: 'تم حذف العطلات المكررة' })
   async removeDuplicateHolidays(@CurrentUser('companyId') companyId: string) {
     return this.settingsService.removeDuplicateHolidays(companyId);
+  }
+
+  @Delete('holidays/:id')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'حذف عطلة' })
+  @ApiResponse({ status: 200, description: 'تم الحذف' })
+  async deleteHoliday(@Param('id') id: string, @CurrentUser('companyId') companyId: string) {
+    return this.settingsService.deleteHoliday(id, companyId);
   }
 
   // ============ Dynamic Key Routes (MUST come AFTER specific routes) ============
