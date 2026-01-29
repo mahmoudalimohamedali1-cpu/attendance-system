@@ -196,9 +196,23 @@ export class DynamicQueryEngineService {
         if (/غائب|absent/.test(q) && model === 'attendance') {
             where.status = 'ABSENT';
         }
+
+        // فلترة "معلق/pending" - تختلف حسب النموذج
         if (/معلق|pending/.test(q)) {
-            where.status = 'PENDING';
+            if (model === 'leaveRequest') {
+                where.status = 'PENDING';
+            } else if (model === 'task') {
+                where.status = 'TODO'; // TaskStatus لا يوجد PENDING
+            } else if (model === 'goal') {
+                where.status = 'PENDING_APPROVAL'; // GoalStatus
+            } else if (model === 'custodyAssignment') {
+                where.status = 'PENDING';
+            } else {
+                where.status = 'PENDING';
+            }
         }
+
+        // فلترة "مكتمل/completed"
         if (/مكتمل|completed/.test(q)) {
             where.status = 'COMPLETED';
         }
