@@ -13,6 +13,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GeniusAiService } from './services/genius-ai.service';
 import { GeniusContextService } from './services/genius-context.service';
 import { DynamicQueryEngineService } from './services/dynamic-query-engine.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 
 /**
  * 🧠 GENIUS AI Chat Controller
@@ -34,7 +35,8 @@ export class GeniusAiController {
     constructor(
         private readonly geniusAiService: GeniusAiService,
         private readonly contextService: GeniusContextService,
-        private readonly dynamicQueryEngine: DynamicQueryEngineService
+        private readonly dynamicQueryEngine: DynamicQueryEngineService,
+        private readonly prisma: PrismaService
     ) { }
 
     /**
@@ -317,9 +319,28 @@ export class GeniusAiController {
         @Request() req: any,
         @Body() body: { context: string; searchTerm?: string; limit?: number }
     ) {
-        const companyId = req.user.companyId;
+        let companyId = req.user.companyId;
 
-        this.logger.log(`[GENIUS] Autocomplete: context="${body.context}", search="${body.searchTerm || ''}"`);
+        // 🔧 Debug logging
+        this.logger.log(`[GENIUS] Autocomplete: user=${req.user.id}, companyId=${companyId}, context="${body.context}", search="${body.searchTerm || ''}"`);
+
+        // 🛡️ إذا لم يكن هناك companyId (مثل Super Admin)، نجلب أول شركة
+        if (!companyId) {
+            const firstCompany = await this.prisma.company.findFirst({
+                select: { id: true }
+            });
+            companyId = firstCompany?.id;
+            this.logger.log(`[GENIUS] Using fallback companyId: ${companyId}`);
+        }
+
+        if (!companyId) {
+            return {
+                success: false,
+                type: 'error',
+                items: [],
+                message: 'لا يوجد companyId'
+            };
+        }
 
         const result = await this.dynamicQueryEngine.getAutocomplete(
             body.context,
