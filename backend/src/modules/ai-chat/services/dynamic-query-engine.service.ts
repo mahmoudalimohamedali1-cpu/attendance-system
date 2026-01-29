@@ -615,8 +615,8 @@ ${schemaContext}
                 const employees = await this.prisma.user.findMany({
                     where: {
                         companyId,
-                        // لا نفلتر بالـ status ليظهر كل الموظفين
-                        role: { not: 'SUPER_ADMIN' }, // استثناء الـ Super Admin فقط
+                        // استثناء الـ Super Admin فقط باستخدام الـ boolean field
+                        isSuperAdmin: false,
                         OR: searchTerm ? [
                             { firstName: { contains: searchTerm, mode: 'insensitive' } },
                             { lastName: { contains: searchTerm, mode: 'insensitive' } },
