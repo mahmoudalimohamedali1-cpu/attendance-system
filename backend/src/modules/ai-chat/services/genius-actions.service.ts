@@ -1270,19 +1270,62 @@ export class GeniusActionsService {
     // ========== NOTIFICATION ACTIONS ==========
 
     private async sendNotification(message: string, context: ActionContext): Promise<ActionResult> {
-        const match = message.match(/(?:إشعار|رسالة)\s+[""]?([^""]+)[""]?\s+(?:ل[ـ]?\s*)([^\s]+)/);
+        // Support multiple formats:
+        // 1. أرسل إشعار "رسالة" لـ موظف
+        // 2. ارسل اشعار للموظف محمد طارق "رسالة"
+        // 3. إشعار لـ أحمد "الرسالة"
 
-        if (!match) {
+        let notificationText: string | null = null;
+        let employeeName: string | null = null;
+
+        // Pattern 1: إشعار "رسالة" لـ موظف
+        let match = message.match(/(?:إشعار|اشعار|رسالة)\s+[""【]([^""】]+)[""】]\s+(?:ل[ـ]?\s*|الى?\s*|إلى?\s*)([^\s]+(?:\s+[^\s]+)?)/i);
+        if (match) {
+            notificationText = match[1];
+            employeeName = match[2];
+        }
+
+        // Pattern 2: ارسل اشعار للموظف X "رسالة"
+        if (!notificationText) {
+            match = message.match(/(?:ارسل|أرسل)\s+(?:إشعار|اشعار)\s+(?:ل[ـ]?|لل?)(?:موظف)?\s*([^\s""]+(?:\s+[^\s""]+)?)\s+[""【]([^""】]+)[""】]/i);
+            if (match) {
+                employeeName = match[1];
+                notificationText = match[2];
+            }
+        }
+
+        // Pattern 3: إشعار لـ موظف "رسالة"
+        if (!notificationText) {
+            match = message.match(/(?:إشعار|اشعار)\s+(?:ل[ـ]?\s*|الى?\s*|إلى?\s*)([^\s""]+(?:\s+[^\s""]+)?)\s+[""【]([^""】]+)[""】]/i);
+            if (match) {
+                employeeName = match[1];
+                notificationText = match[2];
+            }
+        }
+
+        // Pattern 4: ارسل اشعار للموظف X بدون علامات تنصيص (الرسالة بعد الاسم)
+        if (!notificationText) {
+            match = message.match(/(?:ارسل|أرسل)\s+(?:إشعار|اشعار)\s+(?:ل[ـ]?|لل?)(?:موظف\s+)?([^\s]+(?:\s+[^\s]+)?)\s+(.+)/i);
+            if (match) {
+                employeeName = match[1].replace(/[""【].*$/, '').trim();
+                notificationText = match[2].replace(/^[""【]|[""】]$/g, '').trim();
+            }
+        }
+
+        if (!notificationText || !employeeName) {
             return {
                 success: false,
                 message: '❌ يرجى تحديد الرسالة والموظف',
-                suggestions: ['أرسل إشعار "نص الرسالة" لـ أحمد']
+                suggestions: [
+                    'أرسل إشعار "نص الرسالة" لـ أحمد',
+                    'ارسل اشعار للموظف محمد "الرسالة"'
+                ]
             };
         }
 
-        const employee = await this.findEmployeeByName(match[2], context.companyId);
+        const employee = await this.findEmployeeByName(employeeName, context.companyId);
         if (!employee) {
-            return { success: false, message: `❌ الموظف غير موجود` };
+            return { success: false, message: `❌ الموظف "${employeeName}" غير موجود` };
         }
 
         try {
@@ -1290,7 +1333,7 @@ export class GeniusActionsService {
                 data: {
                     userId: employee.id,
                     title: 'إشعار جديد',
-                    body: match[1],
+                    body: notificationText,
                     type: 'GENERAL',
                     companyId: context.companyId
                 }
@@ -1301,7 +1344,7 @@ export class GeniusActionsService {
 
         return {
             success: true,
-            message: `✅ تم إرسال الإشعار إلى ${employee.firstName} ${employee.lastName}`
+            message: `✅ تم إرسال الإشعار إلى ${employee.firstName} ${employee.lastName}\n\n📩 "${notificationText}"`
         };
     }
 
