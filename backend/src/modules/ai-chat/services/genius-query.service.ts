@@ -796,35 +796,64 @@ export class GeniusQueryService {
         this.logger.log(`[SALARY QUERY] Searching for employee: "${searchTerm}"`);
 
         // Search for employee with salary data
-        const employees = await this.prisma.user.findMany({
-            where: {
-                companyId,
-                OR: [
-                    { firstName: { contains: searchTerm.split(' ')[0] } },
-                    { lastName: { contains: searchTerm.split(' ')[1] || searchTerm.split(' ')[0] } },
-                    { firstName: { contains: searchTerm } }
-                ]
-            },
-            select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                salary: true,
-                jobTitle: true,
-                department: { select: { name: true } },
-                salaryAssignments: {
-                    where: { isActive: true },
-                    select: {
-                        baseSalary: true,
-                        effectiveDate: true,
-                        structure: { select: { name: true } }
-                    },
-                    orderBy: { effectiveDate: 'desc' },
-                    take: 1
-                }
-            },
-            take: 5
-        });
+        // NOTE: salaryAssignments may not exist if migration not applied
+        let employees: any[] = [];
+
+        try {
+            employees = await this.prisma.user.findMany({
+                where: {
+                    companyId,
+                    OR: [
+                        { firstName: { contains: searchTerm.split(' ')[0] } },
+                        { lastName: { contains: searchTerm.split(' ')[1] || searchTerm.split(' ')[0] } },
+                        { firstName: { contains: searchTerm } }
+                    ]
+                },
+                select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    salary: true,
+                    jobTitle: true,
+                    department: { select: { name: true } },
+                    salaryAssignments: {
+                        where: { isActive: true },
+                        select: {
+                            baseSalary: true,
+                            effectiveDate: true,
+                            structure: { select: { name: true } }
+                        },
+                        orderBy: { effectiveDate: 'desc' },
+                        take: 1
+                    }
+                },
+                take: 5
+            });
+        } catch (error) {
+            // Fallback: salaryAssignments table might not exist
+            this.logger.warn(`[SALARY QUERY] salaryAssignments not available, using users.salary only`);
+            employees = await this.prisma.user.findMany({
+                where: {
+                    companyId,
+                    OR: [
+                        { firstName: { contains: searchTerm.split(' ')[0] } },
+                        { lastName: { contains: searchTerm.split(' ')[1] || searchTerm.split(' ')[0] } },
+                        { firstName: { contains: searchTerm } }
+                    ]
+                },
+                select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    salary: true,
+                    jobTitle: true,
+                    department: { select: { name: true } }
+                },
+                take: 5
+            });
+            // Add empty salaryAssignments array for compatibility
+            employees = employees.map(e => ({ ...e, salaryAssignments: [] }));
+        }
 
         if (employees.length === 0) {
             return {
@@ -835,19 +864,20 @@ export class GeniusQueryService {
             };
         }
 
-        // Format salary data
+        // Format salary data - prioritize salaryAssignments if available
         const data = employees.map((e, i) => {
-            const totalSalary = e.salary ? Number(e.salary) : 0;
-            const assignment = e.salaryAssignments[0];
+            const assignment = e.salaryAssignments?.[0];
+            // Priority: salaryAssignments.baseSalary > user.salary
             const baseSalary = assignment?.baseSalary ? Number(assignment.baseSalary) : 0;
-            const allowances = totalSalary - baseSalary;
+            const totalSalary = e.salary ? Number(e.salary) : baseSalary;
+            const allowances = baseSalary > 0 ? totalSalary - baseSalary : 0;
 
             return {
                 '#': i + 1,
                 'الاسم': `${e.firstName} ${e.lastName}`,
                 'المسمى': e.jobTitle || '-',
                 'القسم': e.department?.name || '-',
-                'الراتب الأساسي': baseSalary > 0 ? `${baseSalary.toLocaleString('ar-SA')} ريال` : '-',
+                'الراتب الأساسي': baseSalary > 0 ? `${baseSalary.toLocaleString('ar-SA')} ريال` : (totalSalary > 0 ? `${totalSalary.toLocaleString('ar-SA')} ريال` : '-'),
                 'البدلات': allowances > 0 ? `${allowances.toLocaleString('ar-SA')} ريال` : '-',
                 'إجمالي الراتب': totalSalary > 0 ? `${totalSalary.toLocaleString('ar-SA')} ريال` : '-'
             };
@@ -856,10 +886,10 @@ export class GeniusQueryService {
         // If single result, show detailed card
         if (employees.length === 1) {
             const e = employees[0];
-            const totalSalary = e.salary ? Number(e.salary) : 0;
-            const assignment = e.salaryAssignments[0];
+            const assignment = e.salaryAssignments?.[0];
             const baseSalary = assignment?.baseSalary ? Number(assignment.baseSalary) : 0;
-            const allowances = totalSalary - baseSalary;
+            const totalSalary = e.salary ? Number(e.salary) : baseSalary;
+            const allowances = baseSalary > 0 ? totalSalary - baseSalary : 0;
 
             return {
                 success: true,
@@ -870,7 +900,7 @@ export class GeniusQueryService {
 👤 **المسمى الوظيفي:** ${e.jobTitle || 'غير محدد'}
 🏢 **القسم:** ${e.department?.name || 'غير محدد'}
 
-💵 **الراتب الأساسي:** ${baseSalary > 0 ? baseSalary.toLocaleString('ar-SA') + ' ريال' : 'غير محدد'}
+💵 **الراتب الأساسي:** ${baseSalary > 0 ? baseSalary.toLocaleString('ar-SA') + ' ريال' : (totalSalary > 0 ? totalSalary.toLocaleString('ar-SA') + ' ريال' : 'غير محدد')}
 🎁 **البدلات:** ${allowances > 0 ? allowances.toLocaleString('ar-SA') + ' ريال' : 'غير محددة'}
 💎 **إجمالي الراتب:** ${totalSalary > 0 ? totalSalary.toLocaleString('ar-SA') + ' ريال' : 'غير محدد'}
 
