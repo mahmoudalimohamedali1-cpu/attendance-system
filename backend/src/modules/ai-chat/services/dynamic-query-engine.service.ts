@@ -610,38 +610,41 @@ ${schemaContext}
         this.logger.log(`[DQE] Autocomplete: context="${ctx}", search="${searchTerm}"`);
 
         try {
-            // 🧑‍💼 الموظفين - عرض كل الموظفين بدون فلتر الشركة
+            // 🧑‍💼 الموظفين - عرض كل الموظفين بدون أي فلاتر
             if (/موظف|الموظف|موظفين|employee/.test(ctx)) {
+                // نستخدم limit أعلى لعرض كل الموظفين
+                const actualLimit = Math.max(limit, 50);
+
                 const employees = await this.prisma.user.findMany({
-                    where: {
-                        // نعرض كل الموظفين بدون فلتر companyId
-                        isSuperAdmin: false,
-                        ...(searchTerm ? {
-                            OR: [
-                                { firstName: { contains: searchTerm, mode: 'insensitive' } },
-                                { lastName: { contains: searchTerm, mode: 'insensitive' } },
-                                { email: { contains: searchTerm, mode: 'insensitive' } }
-                            ]
-                        } : {})
-                    },
+                    where: searchTerm ? {
+                        OR: [
+                            { firstName: { contains: searchTerm, mode: 'insensitive' } },
+                            { lastName: { contains: searchTerm, mode: 'insensitive' } },
+                            { email: { contains: searchTerm, mode: 'insensitive' } }
+                        ]
+                    } : {},
                     select: {
                         id: true,
                         firstName: true,
                         lastName: true,
                         jobTitle: true,
                         status: true,
+                        isSuperAdmin: true,
                         company: { select: { name: true } },
                         department: { select: { name: true } }
                     },
-                    take: limit,
+                    take: actualLimit,
                     orderBy: { firstName: 'asc' }
                 });
 
-                this.logger.log(`[DQE] Found ${employees.length} employees for autocomplete (all companies)`);
+                this.logger.log(`[DQE] Found ${employees.length} users for autocomplete (NO FILTERS)`);
+
+                // نستثني فقط الـ super admins من النتائج
+                const filteredEmployees = employees.filter(e => !e.isSuperAdmin);
 
                 return {
                     type: 'employee',
-                    items: employees.map(e => ({
+                    items: filteredEmployees.map(e => ({
                         id: e.id,
                         label: `${e.firstName} ${e.lastName}`,
                         sublabel: e.jobTitle || e.department?.name || e.company?.name || e.status || '',
