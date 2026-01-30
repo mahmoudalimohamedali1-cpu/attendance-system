@@ -1403,16 +1403,19 @@ export class PayrollAdjustmentsService {
             } as any
         });
 
-        return deductions.map(d => ({
-            id: d.id,
-            employeeId: d.employeeId,
-            employeeName: `${(d as any).employee.firstName} ${(d as any).employee.lastName}`,
-            employeeCode: (d as any).employee.employeeCode,
-            amount: Number(d.approvedAmount || d.originalAmount),
-            reason: d.reason,
-            status: d.status,
-            referenceId: d.referenceId,
-        }));
+        // Filter out deductions where employee is null (deleted employee)
+        return deductions
+            .filter(d => (d as any).employee !== null)
+            .map(d => ({
+                id: d.id,
+                employeeId: d.employeeId,
+                employeeName: `${(d as any).employee?.firstName || ''} ${(d as any).employee?.lastName || ''}`.trim() || 'موظف محذوف',
+                employeeCode: (d as any).employee?.employeeCode || 'N/A',
+                amount: Number(d.approvedAmount || d.originalAmount || 0),
+                reason: d.reason,
+                status: d.status,
+                referenceId: d.referenceId,
+            }));
     }
 
     /**
@@ -1440,16 +1443,19 @@ export class PayrollAdjustmentsService {
             } as any
         });
 
-        return deductions.map(d => ({
-            id: d.id,
-            employeeId: d.employeeId,
-            employeeName: `${(d as any).employee.firstName} ${(d as any).employee.lastName}`,
-            employeeCode: (d as any).employee.employeeCode,
-            amount: Number(d.approvedAmount || d.originalAmount),
-            reason: d.reason,
-            status: d.status,
-            referenceId: d.referenceId,
-        }));
+        // Filter out deductions where employee is null (deleted employee)
+        return deductions
+            .filter(d => (d as any).employee !== null)
+            .map(d => ({
+                id: d.id,
+                employeeId: d.employeeId,
+                employeeName: `${(d as any).employee?.firstName || ''} ${(d as any).employee?.lastName || ''}`.trim() || 'موظف محذوف',
+                employeeCode: (d as any).employee?.employeeCode || 'N/A',
+                amount: Number(d.approvedAmount || d.originalAmount || 0),
+                reason: d.reason,
+                status: d.status,
+                referenceId: d.referenceId,
+            }));
     }
 }
 
