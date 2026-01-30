@@ -884,7 +884,7 @@ export class PayrollAdjustmentsService {
                         firstName: true,
                         lastName: true,
                         employeeCode: true,
-                        baseSalary: true,
+                        salary: true,
                     },
                 },
             },
@@ -898,7 +898,7 @@ export class PayrollAdjustmentsService {
             const user = leave.user;
             if (!user) continue;
 
-            const baseSalary = Number(user.baseSalary || 0);
+            const baseSalary = Number(user.salary || 0);
             const dailyRate = baseSalary / 30;
 
             const sickUnpaid = Number((leave as any).unpaidDays || 0);
@@ -1011,8 +1011,7 @@ export class PayrollAdjustmentsService {
                 firstName: true,
                 lastName: true,
                 employeeCode: true,
-                baseSalary: true,
-                housingAllowance: true,
+                salary: true,
             },
         });
 
@@ -1021,9 +1020,9 @@ export class PayrollAdjustmentsService {
         let totalEmployerShare = 0;
 
         for (const emp of employees) {
-            const baseSalary = Number(emp.baseSalary || 0);
-            const housingAllowance = Number(emp.housingAllowance || 0);
-            const gosiBase = Math.min(baseSalary + housingAllowance, 45000); // الحد الأقصى 45,000
+            const baseSalary = Number(emp.salary || 0);
+            // Note: housingAllowance is in EmploymentContract, using salary only for now
+            const gosiBase = Math.min(baseSalary, 45000); // الحد الأقصى 45,000
 
             const employeeShare = gosiBase * employeeRate;
             const employerShare = gosiBase * employerRate;
