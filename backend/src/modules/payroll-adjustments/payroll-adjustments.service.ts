@@ -903,7 +903,10 @@ export class PayrollAdjustmentsService {
 
             const sickUnpaid = Number((leave as any).unpaidDays || 0);
             const sickPartial = Number((leave as any).partialPayDays || 0);
-            const totalDays = Number((leave as any).totalDays || leave.days || 0);
+            // حساب أيام الإجازة من تاريخ البداية والنهاية
+            const startDate = new Date(leave.startDate);
+            const leaveEndDate = new Date(leave.endDate);
+            const totalDays = Math.ceil((leaveEndDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
             let deductionAmount = 0;
             let deductionType = '';
