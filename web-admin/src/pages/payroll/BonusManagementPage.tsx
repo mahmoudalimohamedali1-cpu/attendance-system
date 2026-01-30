@@ -57,6 +57,8 @@ import {
   AccessTime as AttendanceIcon,
   CreditCard as AdvanceIcon,
   Gavel as DisciplinaryIcon,
+  LocalHospital as SickIcon,
+  Security as SecurityIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api.service';
@@ -312,6 +314,18 @@ export default function BonusManagementPage() {
     queryFn: () => api.get('/payroll-adjustments/advance-deductions-preview'),
   });
 
+  // جلب معاينة خصومات الإجازات (مرضى + بدون راتب)
+  const { data: leaveDeductions, isLoading: loadingLeaveDeductions } = useQuery({
+    queryKey: ['leave-deductions-preview'],
+    queryFn: () => api.get('/payroll-adjustments/leave-deductions-preview'),
+  });
+
+  // جلب معاينة التأمينات الاجتماعية (GOSI)
+  const { data: gosiData, isLoading: loadingGosi } = useQuery({
+    queryKey: ['gosi-preview'],
+    queryFn: () => api.get('/payroll-adjustments/gosi-preview'),
+  });
+
 
   const handleCreateInstantAdjustment = () => {
     if (!instantForm.employeeId || !instantForm.amount || !instantForm.reason) {
@@ -388,7 +402,7 @@ export default function BonusManagementPage() {
             color="warning"
             startIcon={<BoltIcon />}
             onClick={() => {
-              setTabValue(3); // الانتقال لتاب الخصومات الفورية
+              setTabValue(7); // الانتقال لتاب الخصومات الفورية
               setOpenInstantDialog(true);
             }}
             sx={{ mr: 1 }}
@@ -494,6 +508,18 @@ export default function BonusManagementPage() {
             label={`الجزاءات والعهد (${(pendingAdjustments as any[])?.filter((a: any) =>
               a.adjustmentType === 'DEDUCTION' || a.disciplinaryCaseId || a.reason?.includes('جزاء') || a.reason?.includes('عهدة')
             )?.length || 0})`}
+          />
+          <Tab
+            icon={<SickIcon />}
+            iconPosition="start"
+            label={`خصومات الإجازات (${(leaveDeductions as any)?.leaveDeductions?.length || 0})`}
+            sx={{ color: 'info.main' }}
+          />
+          <Tab
+            icon={<SecurityIcon />}
+            iconPosition="start"
+            label={`التأمينات - GOSI (${(gosiData as any)?.gosiDeductions?.length || 0})`}
+            sx={{ color: 'success.main' }}
           />
           <Tab
             icon={<BonusIcon />}
@@ -908,8 +934,235 @@ export default function BonusManagementPage() {
         )}
       </TabPanel>
 
-      {/* تاب 3: برامج المكافآت */}
+      {/* تاب 3: خصومات الإجازات */}
       <TabPanel value={tabValue} index={3}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">
+            🏥 خصومات الإجازات للفترة الحالية
+          </Typography>
+          <Typography variant="body2">
+            خصومات الإجازات المرضية (بدون أجر / جزئي) والإجازات بدون راتب. محسوبة تلقائياً حسب نظام العمل السعودي.
+          </Typography>
+        </Alert>
+
+        {loadingLeaveDeductions ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'info.light', color: 'info.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">خصومات الإجازة المرضية</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((leaveDeductions as any)?.totals?.totalSickDeduction || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">خصومات إجازة بدون راتب</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((leaveDeductions as any)?.totals?.totalUnpaidDeduction || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'error.light', color: 'error.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">إجمالي خصومات الإجازات</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((leaveDeductions as any)?.totals?.totalAmount || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableCell>الموظف</TableCell>
+                    <TableCell>نوع الإجازة</TableCell>
+                    <TableCell>الفترة</TableCell>
+                    <TableCell>الأيام</TableCell>
+                    <TableCell align="center">الخصم</TableCell>
+                    <TableCell>التفاصيل</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(leaveDeductions as any)?.leaveDeductions?.map((leave: any) => (
+                    <TableRow key={leave.leaveId} hover>
+                      <TableCell>
+                        <Box>
+                          <Typography fontWeight="medium">{leave.employeeName}</Typography>
+                          <Typography variant="body2" color="text.secondary">{leave.employeeCode}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={leave.leaveType === 'SICK' ? 'إجازة مرضية' : 'بدون راتب'}
+                          color={leave.leaveType === 'SICK' ? 'info' : 'warning'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {new Date(leave.startDate).toLocaleDateString('ar-SA')} - {new Date(leave.endDate).toLocaleDateString('ar-SA')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{leave.totalDays} يوم</TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={formatCurrency(leave.deductionAmount)}
+                          color="error"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">{leave.deductionDetails}</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!leaveDeductions || (leaveDeductions as any)?.leaveDeductions?.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        <Box sx={{ py: 4 }}>
+                          <SickIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+                          <Typography color="text.secondary">
+                            لا توجد خصومات إجازات للفترة الحالية
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )}
+      </TabPanel>
+
+      {/* تاب 4: التأمينات الاجتماعية GOSI */}
+      <TabPanel value={tabValue} index={4}>
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">
+            🏛️ التأمينات الاجتماعية (GOSI) - للمعلومات فقط
+          </Typography>
+          <Typography variant="body2">
+            هذه البيانات تُحسب تلقائياً ولا يمكن تعديلها. تُخصم من راتب الموظف تلقائياً حسب النسب المحددة.
+          </Typography>
+        </Alert>
+
+        {loadingGosi ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">حصة الموظف ({(gosiData as any)?.gosiConfig?.employeeRate || 9.75}%)</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((gosiData as any)?.totals?.totalEmployeeShare || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">حصة الشركة ({(gosiData as any)?.gosiConfig?.employerRate || 11.75}%)</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((gosiData as any)?.totals?.totalEmployerShare || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">إجمالي التأمينات</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((gosiData as any)?.totals?.totalGosi || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableCell>الموظف</TableCell>
+                    <TableCell align="center">أساس الاحتساب</TableCell>
+                    <TableCell align="center">حصة الموظف</TableCell>
+                    <TableCell align="center">حصة الشركة</TableCell>
+                    <TableCell>الحالة</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(gosiData as any)?.gosiDeductions?.map((gosi: any) => (
+                    <TableRow key={gosi.employeeId} hover>
+                      <TableCell>
+                        <Box>
+                          <Typography fontWeight="medium">{gosi.employeeName}</Typography>
+                          <Typography variant="body2" color="text.secondary">{gosi.employeeCode}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography fontWeight="bold">{formatCurrency(gosi.gosiBase)}</Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={formatCurrency(gosi.employeeShare)}
+                          color="primary"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={formatCurrency(gosi.employerShare)}
+                          color="secondary"
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip label="محسوب تلقائياً" color="success" size="small" variant="outlined" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!gosiData || (gosiData as any)?.gosiDeductions?.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        <Box sx={{ py: 4 }}>
+                          <SecurityIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+                          <Typography color="text.secondary">
+                            لا توجد بيانات تأمينات للفترة الحالية
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )}
+      </TabPanel>
+
+      {/* تاب 5: برامج المكافآت */}
+      <TabPanel value={tabValue} index={5}>
         {loadingPrograms ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -1000,8 +1253,8 @@ export default function BonusManagementPage() {
         )}
       </TabPanel>
 
-      {/* الموافقات المعلقة - تاب 4 */}
-      <TabPanel value={tabValue} index={4}>
+      {/* الموافقات المعلقة - تاب 6 */}
+      <TabPanel value={tabValue} index={6}>
         {loadingPending ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -1169,8 +1422,8 @@ export default function BonusManagementPage() {
         </Alert>
       </TabPanel>
 
-      {/* ⚡ الخصومات والمكافآت الفورية - تاب 5 */}
-      <TabPanel value={tabValue} index={5}>
+      {/* ⚡ الخصومات والمكافآت الفورية - تاب 7 */}
+      <TabPanel value={tabValue} index={7}>
         <Box sx={{ mb: 3 }}>
           <Button
             variant="contained"

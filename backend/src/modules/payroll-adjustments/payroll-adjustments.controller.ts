@@ -88,6 +88,32 @@ export class PayrollAdjustmentsController {
         return this.service.getAdvanceDeductionsPreview(companyId, periodId);
     }
 
+    /**
+     * 🏥 معاينة خصومات الإجازات للفترة الحالية
+     * GET /payroll-adjustments/leave-deductions-preview
+     */
+    @Get('leave-deductions-preview')
+    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
+    async getLeaveDeductionsPreview(
+        @Query('periodId') periodId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.getLeaveDeductionsPreview(companyId, periodId);
+    }
+
+    /**
+     * 🏛️ معاينة التأمينات الاجتماعية (GOSI) للفترة الحالية
+     * GET /payroll-adjustments/gosi-preview
+     */
+    @Get('gosi-preview')
+    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
+    async getGosiPreview(
+        @Query('periodId') periodId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.getGosiPreview(companyId, periodId);
+    }
+
 
     /**
      * إنشاء تسوية جديدة
