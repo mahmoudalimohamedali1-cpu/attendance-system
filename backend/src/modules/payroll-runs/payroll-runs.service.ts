@@ -338,29 +338,34 @@ export class PayrollRunsService {
 
                 const empDiscDeds = disciplinaryDeductionsMap.get(employee.id) || [];
                 for (const d of empDiscDeds) {
-                    payslipLines.push({
-                        componentId: adjDedId,
-                        amount: new Decimal(d.amount.toFixed(2)),
-                        sourceType: PayslipLineSource.ADJUSTMENT,
-                        sign: 'DEDUCTION',
-                        descriptionAr: d.reason || 'جزاء تأديبي',
-                        sourceRef: `DED-APP:${d.id}`,
-                        costCenterId: primaryCostCenterId,
-                    });
-                    // Mark as applied in payroll? (Currently no status field in DB for applied to payroll specifically beyond status)
+                    const discAmount = Number(d.amount || 0);
+                    if (discAmount > 0) {
+                        payslipLines.push({
+                            componentId: adjDedId,
+                            amount: new Decimal(discAmount.toFixed(2)),
+                            sourceType: PayslipLineSource.ADJUSTMENT,
+                            sign: 'DEDUCTION',
+                            descriptionAr: d.reason || 'جزاء تأديبي',
+                            sourceRef: `DED-APP:${d.id}`,
+                            costCenterId: primaryCostCenterId,
+                        });
+                    }
                 }
 
                 const empCustDeds = custodyDeductionsMap.get(employee.id) || [];
                 for (const d of empCustDeds) {
-                    payslipLines.push({
-                        componentId: adjDedId,
-                        amount: new Decimal(d.amount.toFixed(2)),
-                        sourceType: PayslipLineSource.ADJUSTMENT,
-                        sign: 'DEDUCTION',
-                        descriptionAr: d.reason || 'خصم عهدة',
-                        sourceRef: `DED-APP:${d.id}`,
-                        costCenterId: primaryCostCenterId,
-                    });
+                    const custAmount = Number(d.amount || 0);
+                    if (custAmount > 0) {
+                        payslipLines.push({
+                            componentId: adjDedId,
+                            amount: new Decimal(custAmount.toFixed(2)),
+                            sourceType: PayslipLineSource.ADJUSTMENT,
+                            sign: 'DEDUCTION',
+                            descriptionAr: d.reason || 'خصم عهدة',
+                            sourceRef: `DED-APP:${d.id}`,
+                            costCenterId: primaryCostCenterId,
+                        });
+                    }
                 }
 
                 // ✅ إضافة التعديلات اليدوية (مكافآت/خصومات) من الـ Wizard فقط (التي لم تحفظ في الـ DB بعد)
@@ -941,17 +946,23 @@ export class PayrollRunsService {
             const discDeds = disciplinaryMap.get(employee.id) || [];
             let totalDisc = ZERO;
             for (const d of discDeds) {
-                const amt = toDecimal(d.amount);
-                totalDisc = add(totalDisc, amt);
-                deductionItems.push({ name: d.reason || 'جزاء تأديبي', code: 'DISC_DED', amount: d.amount });
+                const discAmt = Number(d.amount || 0);
+                if (discAmt > 0) {
+                    const amt = toDecimal(discAmt);
+                    totalDisc = add(totalDisc, amt);
+                    deductionItems.push({ name: d.reason || 'جزاء تأديبي', code: 'DISC_DED', amount: discAmt });
+                }
             }
 
             const custDeds = custodyMap.get(employee.id) || [];
             let totalCust = ZERO;
             for (const d of custDeds) {
-                const amt = toDecimal(d.amount);
-                totalCust = add(totalCust, amt);
-                deductionItems.push({ name: d.reason || 'خصم عهدة', code: 'CUST_DED', amount: d.amount });
+                const custAmt = Number(d.amount || 0);
+                if (custAmt > 0) {
+                    const amt = toDecimal(custAmt);
+                    totalCust = add(totalCust, amt);
+                    deductionItems.push({ name: d.reason || 'خصم عهدة', code: 'CUST_DED', amount: custAmt });
+                }
             }
 
             // ✅ إضافة التعديلات اليدوية المكتوبة في الـ Wizard فقط (dto.adjustments)

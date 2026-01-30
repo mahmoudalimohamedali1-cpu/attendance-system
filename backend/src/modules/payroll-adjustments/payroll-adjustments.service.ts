@@ -606,21 +606,32 @@ export class PayrollAdjustmentsService {
             };
         }
 
-        // 🔧 FIX: Fetch company payroll settings for consistent calculations
-        const settings = await (this.prisma as any).payrollSettings?.findUnique?.({
-            where: { companyId },
-        }) || {
-            gracePeriodMinutes: 15,
-            lateDeductionMethod: 'PER_MINUTE',
-            enableAttendancePenalty: true,
-            enableEarlyDeparturePenalty: true,
-        };
+        // 🔧 FIX: Fetch PayrollSettings like PayrollCalculationService does (line 280-282)
+        let gracePeriodMinutes = 15; // Default fallback
+        let lateDeductionMethod = 'PER_MINUTE'; // Default fallback
+        let enableAttendancePenalty = true;
 
-        const gracePeriodMinutes = settings.gracePeriodMinutes || 15;
-        const lateDeductionMethod = settings.lateDeductionMethod || 'PER_MINUTE';
-        this.logger.log(`📋 Using settings: gracePeriod=${gracePeriodMinutes}, method=${lateDeductionMethod}`);
+        try {
+            const companySettings = await (this.prisma as any).payrollSettings.findUnique({
+                where: { companyId },
+            });
+
+            if (companySettings) {
+                gracePeriodMinutes = companySettings.gracePeriodMinutes ?? 15;
+                lateDeductionMethod = companySettings.lateDeductionMethod ?? 'PER_MINUTE';
+                enableAttendancePenalty = companySettings.enableAttendancePenalty ?? true;
+                this.logger.log(`📋 Loaded PayrollSettings: gracePeriod=${gracePeriodMinutes}, method=${lateDeductionMethod}, enabled=${enableAttendancePenalty}`);
+            } else {
+                this.logger.warn(`⚠️ No PayrollSettings found for company ${companyId}, using defaults`);
+            }
+        } catch (e) {
+            this.logger.warn(`⚠️ Error fetching PayrollSettings: ${e.message}, using defaults`);
+        }
+
+
 
         // جلب بيانات الموظفين
+
         const employees = await this.prisma.user.findMany({
             where: {
                 companyId,
@@ -729,22 +740,24 @@ export class PayrollAdjustmentsService {
             const dailyRate = Number(emp.salary || 0) / 30;
             const hourlyRate = dailyRate / 8;
 
-            // 🔧 FIX: Apply grace period like PayrollCalculationService
+            // 🔧 FIX: Apply grace period like PayrollCalculationService (line 800)
             const effectiveLateMinutes = Math.max(0, lateMinutes - gracePeriodMinutes);
 
-            // 🔧 FIX: Use lateDeductionMethod setting
+            // 🔧 FIX: Use lateDeductionMethod from PayrollSettings (like line 803-829)
             let lateDeduction = 0;
-            if (effectiveLateMinutes > 0) {
+            if (enableAttendancePenalty && effectiveLateMinutes > 0) {
                 switch (lateDeductionMethod) {
                     case 'PER_MINUTE':
+                        // Convert minutes to hours, multiply by hourly rate
                         lateDeduction = Math.round((effectiveLateMinutes / 60) * hourlyRate * 100) / 100;
                         break;
                     case 'PER_HOUR':
+                        // Round up to full hours
                         const lateHours = Math.ceil(effectiveLateMinutes / 60);
                         lateDeduction = Math.round(lateHours * hourlyRate * 100) / 100;
                         break;
                     case 'DAILY_RATE':
-                        // Count days where late > threshold (using 30 min as default threshold)
+                        // Count days where late > 30min threshold
                         const lateDays = attendances.filter((a: any) => (a.lateMinutes || 0) > 30).length;
                         lateDeduction = Math.round(lateDays * dailyRate * 100) / 100;
                         break;
@@ -756,6 +769,7 @@ export class PayrollAdjustmentsService {
             const absenceDeduction = Math.round(realAbsentDays * dailyRate * 100) / 100;
             const earlyDeduction = Math.round((earlyMinutes / 60) * hourlyRate * 100) / 100;
             const totalDeduction = lateDeduction + absenceDeduction + earlyDeduction;
+
 
 
             if (totalDeduction > 0) {
