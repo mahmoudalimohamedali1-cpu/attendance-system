@@ -255,10 +255,7 @@ export class LeavesService {
     const { type, startDate, endDate, reason, notes, attachments } = createLeaveDto;
     const leaveNotes = reason || notes || '';
 
-    // Debug: log attachments
-    console.log('📎 Received attachments:', JSON.stringify(attachments));
-    console.log('📎 Attachments type:', typeof attachments);
-    console.log('📎 Is Array:', Array.isArray(attachments));
+    // Attachments are already parsed by the time they arrive here
 
     // Validate dates
     const start = new Date(startDate);
@@ -991,9 +988,18 @@ export class LeavesService {
       throw new NotFoundException('طلب الإجازة غير موجود');
     }
 
-    // Verify this manager is the assigned approver
+    // Verify this manager has permission (either assigned approver OR general permission)
     if (request.managerApproverId !== managerId) {
-      throw new ForbiddenException('ليس لديك صلاحية للموافقة على هذا الطلب');
+      // Check if they have general LEAVES_APPROVE_MANAGER permission
+      const canApprove = await this.permissionsService.canAccessEmployee(
+        managerId,
+        companyId,
+        'LEAVES_APPROVE_MANAGER',
+        request.userId
+      );
+      if (!canApprove.hasAccess) {
+        throw new ForbiddenException('ليس لديك صلاحية للموافقة على هذا الطلب');
+      }
     }
 
     // Verify request is in correct step
@@ -1026,7 +1032,7 @@ export class LeavesService {
       for (const hrUser of hrUsers) {
         await this.notificationsService.sendNotification(
           hrUser.id,
-          'GENERAL', // Use GENERAL as LEAVE_PENDING_HR is not in NotificationType enum
+          NotificationType.GENERAL, // Use NotificationType enum
           'طلب إجازة يحتاج موافقتك',
           `${request.user.firstName} ${request.user.lastName} - طلب ${this.getLeaveTypeName(request.type)} يحتاج موافقة HR`,
           { leaveRequestId: requestId, employeeId: request.userId },
@@ -1170,7 +1176,7 @@ export class LeavesService {
 
       await this.notificationsService.sendNotification(
         request.userId,
-        'GENERAL',
+        NotificationType.GENERAL,
         'تم تأجيل طلب الإجازة',
         `تم تأجيل طلب إجازتك${notes ? ': ' + notes : ''}`,
         { leaveRequestId: requestId },
