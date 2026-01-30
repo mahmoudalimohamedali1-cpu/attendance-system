@@ -17,16 +17,15 @@ import {
     CreateAdjustmentDto,
     ApproveAdjustmentDto,
     InstantAdjustmentDto,
+    WaiveDeductionDto,
+    ModifyDeductionDto,
+    ConvertToLeaveDto,
 } from './payroll-adjustments.service';
-import { DeductionApprovalService } from './deduction-approval.service';
 
 @Controller('payroll-adjustments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PayrollAdjustmentsController {
-    constructor(
-        private readonly service: PayrollAdjustmentsService,
-        private readonly approvalService: DeductionApprovalService,
-    ) { }
+    constructor(private readonly service: PayrollAdjustmentsService) { }
 
     /**
      * ⚡ إنشاء خصم/مكافأة فورية
@@ -197,95 +196,48 @@ export class PayrollAdjustmentsController {
         return this.service.delete(id, companyId);
     }
 
-    // ==================== نظام اعتماد الخصومات ====================
+    // ==================== إجراءات اعتماد الخصومات ====================
 
     /**
-     * 📋 جلب الخصومات المعلقة للاعتماد
-     * GET /payroll-adjustments/deductions/pending
+     * ❌ إلغاء خصم (رفض كامل)
+     * POST /payroll-adjustments/attendance-deductions/waive
      */
-    @Get('deductions/pending')
-    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
-    async getPendingDeductions(
-        @Query('periodId') periodId: string,
-        @CurrentUser('companyId') companyId: string,
-    ) {
-        return this.approvalService.getPendingDeductions(companyId, periodId);
-    }
-
-    /**
-     * ✅ اعتماد خصم
-     * POST /payroll-adjustments/deductions/:id/approve
-     */
-    @Post('deductions/:id/approve')
+    @Post('attendance-deductions/waive')
     @Roles('ADMIN', 'MANAGER', 'HR')
-    async approveDeduction(
-        @Param('id') id: string,
-        @Body('notes') notes: string,
+    async waiveDeduction(
+        @Body() dto: WaiveDeductionDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('companyId') companyId: string,
     ) {
-        return this.approvalService.approveDeduction(id, companyId, userId, notes);
-    }
-
-    /**
-     * ❌ رفض خصم
-     * POST /payroll-adjustments/deductions/:id/reject
-     */
-    @Post('deductions/:id/reject')
-    @Roles('ADMIN', 'MANAGER', 'HR')
-    async rejectDeduction(
-        @Param('id') id: string,
-        @Body('reason') reason: string,
-        @CurrentUser('id') userId: string,
-        @CurrentUser('companyId') companyId: string,
-    ) {
-        return this.approvalService.rejectDeduction(id, companyId, userId, reason);
+        return this.service.waiveDeduction(dto, userId, companyId);
     }
 
     /**
      * ✏️ تعديل مبلغ الخصم
-     * POST /payroll-adjustments/deductions/:id/modify
+     * POST /payroll-adjustments/attendance-deductions/modify
      */
-    @Post('deductions/:id/modify')
+    @Post('attendance-deductions/modify')
     @Roles('ADMIN', 'MANAGER', 'HR')
     async modifyDeduction(
-        @Param('id') id: string,
-        @Body('amount') amount: number,
-        @Body('notes') notes: string,
+        @Body() dto: ModifyDeductionDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('companyId') companyId: string,
     ) {
-        return this.approvalService.modifyDeduction(id, companyId, userId, amount, notes);
+        return this.service.modifyDeduction(dto, userId, companyId);
     }
 
     /**
      * 🔄 تحويل الخصم لإجازة
-     * POST /payroll-adjustments/deductions/:id/convert-to-leave
+     * POST /payroll-adjustments/attendance-deductions/convert-to-leave
      */
-    @Post('deductions/:id/convert-to-leave')
+    @Post('attendance-deductions/convert-to-leave')
     @Roles('ADMIN', 'MANAGER', 'HR')
     async convertToLeave(
-        @Param('id') id: string,
-        @Body('leaveType') leaveType: string,
-        @Body('days') days: number,
-        @Body('notes') notes: string,
+        @Body() dto: ConvertToLeaveDto,
         @CurrentUser('id') userId: string,
         @CurrentUser('companyId') companyId: string,
     ) {
-        return this.approvalService.convertToLeave(id, companyId, userId, leaveType, days, notes);
-    }
-
-    /**
-     * 📊 جلب سجل التدقيق للخصم
-     * GET /payroll-adjustments/deductions/:id/audit-log
-     */
-    @Get('deductions/:id/audit-log')
-    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
-    async getDeductionAuditLog(
-        @Param('id') id: string,
-        @CurrentUser('companyId') companyId: string,
-    ) {
-        return this.approvalService.getDeductionAuditLog(id, companyId);
+        return this.service.convertDeductionToLeave(dto, userId, companyId);
     }
 }
 

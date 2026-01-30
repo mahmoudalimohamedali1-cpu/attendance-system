@@ -763,237 +763,495 @@ export class PayrollAdjustmentsService {
                 count: advanceDeductions.length,
             },
         };
-        }
+    }
 
     /**
      * 🏥 جلب معاينة خصومات الإجازات للفترة الحالية
      * يشمل: إجازة مرضية (بدون أجر / جزئي) + إجازة بدون راتب
      */
     async getLeaveDeductionsPreview(companyId: string, periodId?: string) {
-            this.logger.log(`🏥 Getting leave deductions preview for company: ${companyId}`);
+        this.logger.log(`🏥 Getting leave deductions preview for company: ${companyId}`);
 
-            // جلب الفترة الحالية
-            let period: any;
-            if (periodId) {
-                period = await this.prisma.payrollPeriod.findFirst({
-                    where: { id: periodId, companyId },
-                });
-            } else {
-                period = await this.prisma.payrollPeriod.findFirst({
-                    where: { companyId, status: 'OPEN' },
-                    orderBy: { startDate: 'desc' },
-                });
-            }
-
-            if (!period) {
-                return {
-                    period: null,
-                    leaveDeductions: [],
-                    totals: { totalSickDeduction: 0, totalUnpaidDeduction: 0, totalAmount: 0, count: 0 },
-                };
-            }
-
-            const startDate = new Date(period.startDate);
-            const endDate = new Date(period.endDate);
-
-            // جلب الإجازات المعتمدة في هذه الفترة
-            const leaves = await this.prisma.leaveRequest.findMany({
-                where: {
-                    companyId,
-                    status: 'APPROVED',
-                    type: { in: ['SICK', 'UNPAID'] },
-                    startDate: { lte: endDate },
-                    endDate: { gte: startDate },
-                },
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            firstName: true,
-                            lastName: true,
-                            employeeCode: true,
-                            baseSalary: true,
-                        },
-                    },
-                },
+        // جلب الفترة الحالية
+        let period: any;
+        if (periodId) {
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { id: periodId, companyId },
             });
+        } else {
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { companyId, status: 'OPEN' },
+                orderBy: { startDate: 'desc' },
+            });
+        }
 
-            const leaveDeductions = [];
-            let totalSickDeduction = 0;
-            let totalUnpaidDeduction = 0;
-
-            for (const leave of leaves) {
-                const user = leave.user;
-                if (!user) continue;
-
-                const baseSalary = Number(user.baseSalary || 0);
-                const dailyRate = baseSalary / 30;
-
-                const sickUnpaid = Number((leave as any).unpaidDays || 0);
-                const sickPartial = Number((leave as any).partialPayDays || 0);
-                const totalDays = Number((leave as any).totalDays || leave.days || 0);
-
-                let deductionAmount = 0;
-                let deductionType = '';
-                let deductionDetails = '';
-
-                if (leave.type === 'SICK') {
-                    // خصم الإجازة المرضية
-                    if (sickUnpaid > 0) {
-                        deductionAmount += sickUnpaid * dailyRate;
-                        deductionDetails += `${sickUnpaid} يوم بدون أجر`;
-                    }
-                    if (sickPartial > 0) {
-                        deductionAmount += (sickPartial * dailyRate * 0.25); // خصم 25% (أجر 75%)
-                        deductionDetails += deductionDetails ? ` + ${sickPartial} يوم (75% أجر)` : `${sickPartial} يوم (75% أجر)`;
-                    }
-                    deductionType = 'SICK_LEAVE';
-                    totalSickDeduction += deductionAmount;
-                } else if (leave.type === 'UNPAID') {
-                    // خصم الإجازة بدون راتب
-                    deductionAmount = totalDays * dailyRate;
-                    deductionType = 'UNPAID_LEAVE';
-                    deductionDetails = `${totalDays} يوم بدون راتب`;
-                    totalUnpaidDeduction += deductionAmount;
-                }
-
-                if (deductionAmount > 0) {
-                    leaveDeductions.push({
-                        employeeId: user.id,
-                        employeeName: `${user.firstName} ${user.lastName}`,
-                        employeeCode: user.employeeCode,
-                        leaveId: leave.id,
-                        leaveType: leave.type,
-                        deductionType,
-                        startDate: leave.startDate,
-                        endDate: leave.endDate,
-                        totalDays,
-                        deductionAmount: Math.round(deductionAmount * 100) / 100,
-                        deductionDetails,
-                        status: 'CALCULATED',
-                    });
-                }
-            }
-
+        if (!period) {
             return {
-                period: period ? {
-                    id: period.id,
-                    month: period.month,
-                    year: period.year,
-                } : null,
-                leaveDeductions,
-                totals: {
-                    totalSickDeduction: Math.round(totalSickDeduction * 100) / 100,
-                    totalUnpaidDeduction: Math.round(totalUnpaidDeduction * 100) / 100,
-                    totalAmount: Math.round((totalSickDeduction + totalUnpaidDeduction) * 100) / 100,
-                    count: leaveDeductions.length,
-                },
+                period: null,
+                leaveDeductions: [],
+                totals: { totalSickDeduction: 0, totalUnpaidDeduction: 0, totalAmount: 0, count: 0 },
             };
         }
+
+        const startDate = new Date(period.startDate);
+        const endDate = new Date(period.endDate);
+
+        // جلب الإجازات المعتمدة في هذه الفترة
+        const leaves = await this.prisma.leaveRequest.findMany({
+            where: {
+                companyId,
+                status: 'APPROVED',
+                type: { in: ['SICK', 'UNPAID'] },
+                startDate: { lte: endDate },
+                endDate: { gte: startDate },
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                        baseSalary: true,
+                    },
+                },
+            },
+        });
+
+        const leaveDeductions = [];
+        let totalSickDeduction = 0;
+        let totalUnpaidDeduction = 0;
+
+        for (const leave of leaves) {
+            const user = leave.user;
+            if (!user) continue;
+
+            const baseSalary = Number(user.baseSalary || 0);
+            const dailyRate = baseSalary / 30;
+
+            const sickUnpaid = Number((leave as any).unpaidDays || 0);
+            const sickPartial = Number((leave as any).partialPayDays || 0);
+            const totalDays = Number((leave as any).totalDays || leave.days || 0);
+
+            let deductionAmount = 0;
+            let deductionType = '';
+            let deductionDetails = '';
+
+            if (leave.type === 'SICK') {
+                // خصم الإجازة المرضية
+                if (sickUnpaid > 0) {
+                    deductionAmount += sickUnpaid * dailyRate;
+                    deductionDetails += `${sickUnpaid} يوم بدون أجر`;
+                }
+                if (sickPartial > 0) {
+                    deductionAmount += (sickPartial * dailyRate * 0.25); // خصم 25% (أجر 75%)
+                    deductionDetails += deductionDetails ? ` + ${sickPartial} يوم (75% أجر)` : `${sickPartial} يوم (75% أجر)`;
+                }
+                deductionType = 'SICK_LEAVE';
+                totalSickDeduction += deductionAmount;
+            } else if (leave.type === 'UNPAID') {
+                // خصم الإجازة بدون راتب
+                deductionAmount = totalDays * dailyRate;
+                deductionType = 'UNPAID_LEAVE';
+                deductionDetails = `${totalDays} يوم بدون راتب`;
+                totalUnpaidDeduction += deductionAmount;
+            }
+
+            if (deductionAmount > 0) {
+                leaveDeductions.push({
+                    employeeId: user.id,
+                    employeeName: `${user.firstName} ${user.lastName}`,
+                    employeeCode: user.employeeCode,
+                    leaveId: leave.id,
+                    leaveType: leave.type,
+                    deductionType,
+                    startDate: leave.startDate,
+                    endDate: leave.endDate,
+                    totalDays,
+                    deductionAmount: Math.round(deductionAmount * 100) / 100,
+                    deductionDetails,
+                    status: 'CALCULATED',
+                });
+            }
+        }
+
+        return {
+            period: period ? {
+                id: period.id,
+                month: period.month,
+                year: period.year,
+            } : null,
+            leaveDeductions,
+            totals: {
+                totalSickDeduction: Math.round(totalSickDeduction * 100) / 100,
+                totalUnpaidDeduction: Math.round(totalUnpaidDeduction * 100) / 100,
+                totalAmount: Math.round((totalSickDeduction + totalUnpaidDeduction) * 100) / 100,
+                count: leaveDeductions.length,
+            },
+        };
+    }
 
     /**
      * 🏛️ جلب معاينة التأمينات الاجتماعية (GOSI) للفترة الحالية
      * للمعلومات فقط - غير قابل للتعديل
      */
     async getGosiPreview(companyId: string, periodId?: string) {
-            this.logger.log(`🏛️ Getting GOSI preview for company: ${companyId}`);
+        this.logger.log(`🏛️ Getting GOSI preview for company: ${companyId}`);
 
-            // جلب الفترة الحالية
-            let period: any;
-            if (periodId) {
-                period = await this.prisma.payrollPeriod.findFirst({
-                    where: { id: periodId, companyId },
-                });
-            } else {
-                period = await this.prisma.payrollPeriod.findFirst({
-                    where: { companyId, status: 'OPEN' },
-                    orderBy: { startDate: 'desc' },
-                });
-            }
-
-            if (!period) {
-                return {
-                    period: null,
-                    gosiDeductions: [],
-                    totals: { totalEmployeeShare: 0, totalEmployerShare: 0, totalGosi: 0, count: 0 },
-                };
-            }
-
-            // جلب إعدادات GOSI للشركة
-            const gosiConfig = await (this.prisma as any).gosiConfig?.findFirst?.({
-                where: { companyId, isActive: true },
+        // جلب الفترة الحالية
+        let period: any;
+        if (periodId) {
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { id: periodId, companyId },
             });
-
-            const employeeRate = Number(gosiConfig?.employeeRate || 9.75) / 100;
-            const employerRate = Number(gosiConfig?.employerRate || 11.75) / 100;
-
-            // جلب الموظفين النشطين
-            const employees = await this.prisma.user.findMany({
-                where: {
-                    companyId,
-                    status: 'ACTIVE',
-                    role: { not: 'ADMIN' },
-                },
-                select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    employeeCode: true,
-                    baseSalary: true,
-                    housingAllowance: true,
-                },
+        } else {
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { companyId, status: 'OPEN' },
+                orderBy: { startDate: 'desc' },
             });
+        }
 
-            const gosiDeductions = [];
-            let totalEmployeeShare = 0;
-            let totalEmployerShare = 0;
-
-            for (const emp of employees) {
-                const baseSalary = Number(emp.baseSalary || 0);
-                const housingAllowance = Number(emp.housingAllowance || 0);
-                const gosiBase = Math.min(baseSalary + housingAllowance, 45000); // الحد الأقصى 45,000
-
-                const employeeShare = gosiBase * employeeRate;
-                const employerShare = gosiBase * employerRate;
-
-                if (employeeShare > 0) {
-                    gosiDeductions.push({
-                        employeeId: emp.id,
-                        employeeName: `${emp.firstName} ${emp.lastName}`,
-                        employeeCode: emp.employeeCode,
-                        gosiBase: Math.round(gosiBase * 100) / 100,
-                        employeeShare: Math.round(employeeShare * 100) / 100,
-                        employerShare: Math.round(employerShare * 100) / 100,
-                        employeeRate: employeeRate * 100,
-                        employerRate: employerRate * 100,
-                        status: 'CALCULATED',
-                    });
-
-                    totalEmployeeShare += employeeShare;
-                    totalEmployerShare += employerShare;
-                }
-            }
-
+        if (!period) {
             return {
-                period: period ? {
-                    id: period.id,
-                    month: period.month,
-                    year: period.year,
-                } : null,
-                gosiDeductions,
-                gosiConfig: gosiConfig ? {
-                    employeeRate: employeeRate * 100,
-                    employerRate: employerRate * 100,
-                } : null,
-                totals: {
-                    totalEmployeeShare: Math.round(totalEmployeeShare * 100) / 100,
-                    totalEmployerShare: Math.round(totalEmployerShare * 100) / 100,
-                    totalGosi: Math.round((totalEmployeeShare + totalEmployerShare) * 100) / 100,
-                    count: gosiDeductions.length,
-                },
+                period: null,
+                gosiDeductions: [],
+                totals: { totalEmployeeShare: 0, totalEmployerShare: 0, totalGosi: 0, count: 0 },
             };
         }
+
+        // جلب إعدادات GOSI للشركة
+        const gosiConfig = await (this.prisma as any).gosiConfig?.findFirst?.({
+            where: { companyId, isActive: true },
+        });
+
+        const employeeRate = Number(gosiConfig?.employeeRate || 9.75) / 100;
+        const employerRate = Number(gosiConfig?.employerRate || 11.75) / 100;
+
+        // جلب الموظفين النشطين
+        const employees = await this.prisma.user.findMany({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                role: { not: 'ADMIN' },
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                employeeCode: true,
+                baseSalary: true,
+                housingAllowance: true,
+            },
+        });
+
+        const gosiDeductions = [];
+        let totalEmployeeShare = 0;
+        let totalEmployerShare = 0;
+
+        for (const emp of employees) {
+            const baseSalary = Number(emp.baseSalary || 0);
+            const housingAllowance = Number(emp.housingAllowance || 0);
+            const gosiBase = Math.min(baseSalary + housingAllowance, 45000); // الحد الأقصى 45,000
+
+            const employeeShare = gosiBase * employeeRate;
+            const employerShare = gosiBase * employerRate;
+
+            if (employeeShare > 0) {
+                gosiDeductions.push({
+                    employeeId: emp.id,
+                    employeeName: `${emp.firstName} ${emp.lastName}`,
+                    employeeCode: emp.employeeCode,
+                    gosiBase: Math.round(gosiBase * 100) / 100,
+                    employeeShare: Math.round(employeeShare * 100) / 100,
+                    employerShare: Math.round(employerShare * 100) / 100,
+                    employeeRate: employeeRate * 100,
+                    employerRate: employerRate * 100,
+                    status: 'CALCULATED',
+                });
+
+                totalEmployeeShare += employeeShare;
+                totalEmployerShare += employerShare;
+            }
+        }
+
+        return {
+            period: period ? {
+                id: period.id,
+                month: period.month,
+                year: period.year,
+            } : null,
+            gosiDeductions,
+            gosiConfig: gosiConfig ? {
+                employeeRate: employeeRate * 100,
+                employerRate: employerRate * 100,
+            } : null,
+            totals: {
+                totalEmployeeShare: Math.round(totalEmployeeShare * 100) / 100,
+                totalEmployerShare: Math.round(totalEmployerShare * 100) / 100,
+                totalGosi: Math.round((totalEmployeeShare + totalEmployerShare) * 100) / 100,
+                count: gosiDeductions.length,
+            },
+        };
     }
+
+    // ==================== إجراءات اعتماد الخصومات ====================
+
+    /**
+     * ❌ إلغاء خصم حضور (رفض الخصم كلياً)
+     * ينشئ PayrollAdjustment من نوع WAIVE_DEDUCTION
+     */
+    async waiveDeduction(dto: WaiveDeductionDto, userId: string, companyId: string) {
+        this.logger.log(`❌ Waiving ${dto.deductionType} deduction for employee: ${dto.employeeId}`);
+
+        // التحقق من الموظف
+        const employee = await this.prisma.user.findFirst({
+            where: { id: dto.employeeId, companyId },
+            select: { id: true, firstName: true, lastName: true, employeeCode: true },
+        });
+
+        if (!employee) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // جلب أو إنشاء الفترة الحالية
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+
+        let period = dto.periodId
+            ? await this.prisma.payrollPeriod.findFirst({ where: { id: dto.periodId, companyId } })
+            : await this.prisma.payrollPeriod.findFirst({
+                where: { companyId, month: currentMonth, year: currentYear },
+            });
+
+        if (!period) {
+            period = await this.prisma.payrollPeriod.create({
+                data: {
+                    companyId,
+                    month: currentMonth,
+                    year: currentYear,
+                    startDate: new Date(currentYear, currentMonth - 1, 1),
+                    endDate: new Date(currentYear, currentMonth, 0),
+                    status: 'DRAFT',
+                },
+            });
+        }
+
+        // إنشاء التسوية (إلغاء كامل للخصم)
+        const adjustment = await this.prisma.payrollAdjustment.create({
+            data: {
+                adjustmentType: 'WAIVE_DEDUCTION',
+                originalDeductionType: dto.deductionType === 'LATE' ? 'LATE_DEDUCTION' :
+                    dto.deductionType === 'ABSENCE' ? 'ABSENCE_DEDUCTION' : 'EARLY_DEPARTURE',
+                originalAmount: dto.originalAmount,
+                adjustedAmount: 0, // تم إلغاء الخصم بالكامل
+                leaveDaysDeducted: 0,
+                value: dto.originalAmount, // مبلغ الإلغاء
+                reason: dto.reason,
+                notes: `إلغاء خصم ${dto.deductionType} بمبلغ ${dto.originalAmount} ر.س`,
+                status: 'POSTED', // معتمد تلقائياً
+                approvedAt: now,
+                payrollPeriod: { connect: { id: period.id } },
+                employee: { connect: { id: dto.employeeId } },
+                company: { connect: { id: companyId } },
+                createdBy: { connect: { id: userId } },
+                approvedBy: { connect: { id: userId } },
+            },
+        });
+
+        this.logger.log(`✅ Created waive adjustment: ${adjustment.id}`);
+
+        return {
+            success: true,
+            message: `تم إلغاء خصم ${dto.deductionType} بنجاح`,
+            adjustment,
+            employee: `${employee.firstName} ${employee.lastName}`,
+            waivedAmount: dto.originalAmount,
+        };
+    }
+
+    /**
+     * ✏️ تعديل مبلغ الخصم (تخفيض جزئي)
+     * ينشئ PayrollAdjustment من نوع WAIVE_DEDUCTION بالفرق
+     */
+    async modifyDeduction(dto: ModifyDeductionDto, userId: string, companyId: string) {
+        this.logger.log(`✏️ Modifying ${dto.deductionType} deduction for employee: ${dto.employeeId}`);
+
+        if (dto.newAmount >= dto.originalAmount) {
+            throw new BadRequestException('المبلغ الجديد يجب أن يكون أقل من المبلغ الأصلي');
+        }
+
+        if (dto.newAmount < 0) {
+            throw new BadRequestException('المبلغ يجب أن يكون أكبر من أو يساوي صفر');
+        }
+
+        const employee = await this.prisma.user.findFirst({
+            where: { id: dto.employeeId, companyId },
+            select: { id: true, firstName: true, lastName: true },
+        });
+
+        if (!employee) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+
+        let period = dto.periodId
+            ? await this.prisma.payrollPeriod.findFirst({ where: { id: dto.periodId, companyId } })
+            : await this.prisma.payrollPeriod.findFirst({
+                where: { companyId, month: currentMonth, year: currentYear },
+            });
+
+        if (!period) {
+            period = await this.prisma.payrollPeriod.create({
+                data: {
+                    companyId,
+                    month: currentMonth,
+                    year: currentYear,
+                    startDate: new Date(currentYear, currentMonth - 1, 1),
+                    endDate: new Date(currentYear, currentMonth, 0),
+                    status: 'DRAFT',
+                },
+            });
+        }
+
+        const reduction = dto.originalAmount - dto.newAmount;
+
+        const adjustment = await this.prisma.payrollAdjustment.create({
+            data: {
+                adjustmentType: 'WAIVE_DEDUCTION',
+                originalDeductionType: dto.deductionType === 'LATE' ? 'LATE_DEDUCTION' :
+                    dto.deductionType === 'ABSENCE' ? 'ABSENCE_DEDUCTION' : 'EARLY_DEPARTURE',
+                originalAmount: dto.originalAmount,
+                adjustedAmount: dto.newAmount, // المبلغ بعد التخفيض
+                leaveDaysDeducted: 0,
+                value: reduction, // مبلغ التخفيض
+                reason: dto.reason,
+                notes: `تخفيض خصم ${dto.deductionType} من ${dto.originalAmount} إلى ${dto.newAmount} ر.س`,
+                status: 'POSTED',
+                approvedAt: now,
+                payrollPeriod: { connect: { id: period.id } },
+                employee: { connect: { id: dto.employeeId } },
+                company: { connect: { id: companyId } },
+                createdBy: { connect: { id: userId } },
+                approvedBy: { connect: { id: userId } },
+            },
+        });
+
+        this.logger.log(`✅ Created modify adjustment: ${adjustment.id}`);
+
+        return {
+            success: true,
+            message: `تم تعديل مبلغ الخصم من ${dto.originalAmount} إلى ${dto.newAmount} ر.س`,
+            adjustment,
+            employee: `${employee.firstName} ${employee.lastName}`,
+            originalAmount: dto.originalAmount,
+            newAmount: dto.newAmount,
+            reduction,
+        };
+    }
+
+    /**
+     * 🔄 تحويل الخصم لإجازة
+     * ينشئ PayrollAdjustment من نوع CONVERT_TO_LEAVE + يخصم من رصيد الإجازات
+     */
+    async convertDeductionToLeave(dto: ConvertToLeaveDto, userId: string, companyId: string) {
+        this.logger.log(`🔄 Converting ${dto.deductionType} deduction to leave for employee: ${dto.employeeId}`);
+
+        if (dto.leaveDays <= 0) {
+            throw new BadRequestException('عدد أيام الإجازة يجب أن يكون أكبر من صفر');
+        }
+
+        const employee = await this.prisma.user.findFirst({
+            where: { id: dto.employeeId, companyId },
+            select: { id: true, firstName: true, lastName: true, remainingLeaveDays: true },
+        });
+
+        if (!employee) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        // التحقق من رصيد الإجازات
+        if (employee.remainingLeaveDays < dto.leaveDays) {
+            throw new BadRequestException(
+                `رصيد الإجازات غير كافي. الرصيد: ${employee.remainingLeaveDays} يوم، المطلوب: ${dto.leaveDays} يوم`
+            );
+        }
+
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+
+        let period = dto.periodId
+            ? await this.prisma.payrollPeriod.findFirst({ where: { id: dto.periodId, companyId } })
+            : await this.prisma.payrollPeriod.findFirst({
+                where: { companyId, month: currentMonth, year: currentYear },
+            });
+
+        if (!period) {
+            period = await this.prisma.payrollPeriod.create({
+                data: {
+                    companyId,
+                    month: currentMonth,
+                    year: currentYear,
+                    startDate: new Date(currentYear, currentMonth - 1, 1),
+                    endDate: new Date(currentYear, currentMonth, 0),
+                    status: 'DRAFT',
+                },
+            });
+        }
+
+        // Transaction: إنشاء التسوية + خصم الإجازات
+        const result = await this.prisma.$transaction(async (tx) => {
+            // إنشاء التسوية
+            const adjustment = await tx.payrollAdjustment.create({
+                data: {
+                    adjustmentType: 'CONVERT_TO_LEAVE',
+                    originalDeductionType: dto.deductionType === 'LATE' ? 'LATE_DEDUCTION' :
+                        dto.deductionType === 'ABSENCE' ? 'ABSENCE_DEDUCTION' : 'EARLY_DEPARTURE',
+                    originalAmount: dto.originalAmount,
+                    adjustedAmount: 0, // لا يوجد خصم نقدي
+                    leaveDaysDeducted: dto.leaveDays,
+                    value: dto.originalAmount,
+                    reason: dto.reason,
+                    notes: `تحويل خصم ${dto.deductionType} بمبلغ ${dto.originalAmount} ر.س إلى ${dto.leaveDays} يوم إجازة ${dto.leaveType}`,
+                    status: 'POSTED',
+                    approvedAt: now,
+                    payrollPeriod: { connect: { id: period!.id } },
+                    employee: { connect: { id: dto.employeeId } },
+                    company: { connect: { id: companyId } },
+                    createdBy: { connect: { id: userId } },
+                    approvedBy: { connect: { id: userId } },
+                },
+            });
+
+            // خصم أيام الإجازة من رصيد الموظف
+            await tx.user.update({
+                where: { id: dto.employeeId },
+                data: {
+                    usedLeaveDays: { increment: dto.leaveDays },
+                    remainingLeaveDays: { decrement: dto.leaveDays },
+                },
+            });
+
+            return adjustment;
+        });
+
+        this.logger.log(`✅ Created convert-to-leave adjustment: ${result.id}`);
+
+        return {
+            success: true,
+            message: `تم تحويل الخصم إلى ${dto.leaveDays} يوم إجازة بنجاح`,
+            adjustment: result,
+            employee: `${employee.firstName} ${employee.lastName}`,
+            leaveDaysDeducted: dto.leaveDays,
+            leaveType: dto.leaveType,
+            remainingLeaveBalance: employee.remainingLeaveDays - dto.leaveDays,
+        };
+    }
+}
 
 /**
  * DTO للخصم/المكافأة الفورية
@@ -1007,3 +1265,38 @@ export interface InstantAdjustmentDto {
     autoApprove?: boolean; // إذا كان المدير نفسه يعتمد تلقائياً
 }
 
+/**
+ * DTO لإلغاء خصم الحضور
+ */
+export interface WaiveDeductionDto {
+    employeeId: string;
+    deductionType: 'LATE' | 'ABSENCE' | 'EARLY_DEPARTURE';
+    originalAmount: number;
+    reason: string;
+    periodId?: string;
+}
+
+/**
+ * DTO لتعديل مبلغ الخصم
+ */
+export interface ModifyDeductionDto {
+    employeeId: string;
+    deductionType: 'LATE' | 'ABSENCE' | 'EARLY_DEPARTURE';
+    originalAmount: number;
+    newAmount: number;
+    reason: string;
+    periodId?: string;
+}
+
+/**
+ * DTO لتحويل الخصم لإجازة
+ */
+export interface ConvertToLeaveDto {
+    employeeId: string;
+    deductionType: 'LATE' | 'ABSENCE' | 'EARLY_DEPARTURE';
+    originalAmount: number;
+    leaveDays: number;
+    leaveType: string;
+    reason: string;
+    periodId?: string;
+}
