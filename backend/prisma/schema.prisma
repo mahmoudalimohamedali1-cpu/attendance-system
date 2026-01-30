@@ -613,9 +613,11 @@ model User {
   muqeemTransactionsCreated MuqeemTransaction[] @relation("MuqeemCreatedTransactions")
 
   // نهاية الخدمة (EoS)
-  employeeTerminations EmployeeTermination[] @relation("EmployeeTerminations")
-  terminationsCreated  EmployeeTermination[] @relation("TerminationCreator")
-  terminationsApproved EmployeeTermination[] @relation("TerminationApprover")
+  employeeTerminations   EmployeeTermination[] @relation("EmployeeTerminations")
+  terminationsCreated    EmployeeTermination[] @relation("TerminationCreator")
+  terminationsApproved   EmployeeTermination[] @relation("TerminationApprover")
+  terminationsHRApproved EmployeeTermination[] @relation("TerminationHRApprover")
+  terminationsGMApproved EmployeeTermination[] @relation("TerminationGMApprover")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -7481,7 +7483,8 @@ enum TerminationReason {
 
 enum TerminationStatus {
   PENDING // في انتظار التأكيد
-  APPROVED // تم التأكيد
+  HR_APPROVED // تم اعتماد HR
+  APPROVED // تم التأكيد النهائي
   PAID // تم الصرف
   CANCELLED // ملغي
 }
@@ -7512,17 +7515,29 @@ model EmployeeTermination {
   notes           String?
   calculationJson Json?   @map("calculation_json")
 
-  createdById  String    @map("created_by_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // HR Approval
+  hrApprovedById String?   @map("hr_approved_by_id")
+  hrApprovedAt   DateTime? @map("hr_approved_at")
+
+  // GM/Final Approval
+  gmApprovedById String?   @map("gm_approved_by_id")
+  gmApprovedAt   DateTime? @map("gm_approved_at")
+
+  // Legacy fields (for backward compatibility)
   approvedById String?   @map("approved_by_id")
   approvedAt   DateTime? @map("approved_at")
   paidAt       DateTime? @map("paid_at")
 
-  employee   User     @relation("EmployeeTerminations", fields: [employeeId], references: [id])
-  company    Company  @relation(fields: [companyId], references: [id])
-  createdBy  User     @relation("TerminationCreator", fields: [createdById], references: [id])
-  approvedBy User?    @relation("TerminationApprover", fields: [approvedById], references: [id])
-  payslip    Payslip? @relation(fields: [payslipId], references: [id])
+  employee     User     @relation("EmployeeTerminations", fields: [employeeId], references: [id])
+  company      Company  @relation(fields: [companyId], references: [id])
+  createdBy    User     @relation("TerminationCreator", fields: [createdById], references: [id])
+  hrApprovedBy User?    @relation("TerminationHRApprover", fields: [hrApprovedById], references: [id])
+  gmApprovedBy User?    @relation("TerminationGMApprover", fields: [gmApprovedById], references: [id])
+  approvedBy   User?    @relation("TerminationApprover", fields: [approvedById], references: [id])
+  payslip      Payslip? @relation(fields: [payslipId], references: [id])
 
   @@index([companyId])
   @@index([employeeId])
