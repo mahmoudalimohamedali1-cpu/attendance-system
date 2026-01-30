@@ -1089,10 +1089,11 @@ export class AttendanceService {
       updateData.workingMinutes = Math.floor(workingMs / 60000);
     }
 
-    // Add correction metadata
-    updateData.correctedAt = new Date();
-    updateData.correctedBy = adminId;
-    updateData.correctionReason = correctionReason;
+    // Add correction note (using existing notes field instead of non-existent correction fields)
+    const correctionNote = `✏️ تصحيح إداري: ${correctionReason} (بواسطة المسؤول في ${new Date().toLocaleString('ar-SA')})`;
+    updateData.notes = attendance.notes
+      ? `${attendance.notes}\n${correctionNote}`
+      : correctionNote;
 
     // Update the attendance record
     const updatedAttendance = await this.prisma.attendance.update({
