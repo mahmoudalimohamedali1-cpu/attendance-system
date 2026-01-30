@@ -1325,6 +1325,80 @@ export class PayrollAdjustmentsService {
             remainingLeaveBalance: employee.remainingLeaveDays - dto.leaveDays,
         };
     }
+
+    /**
+     * ⚖️ جلب معاينة خصومات الجزاءات التأديبية
+     */
+    async getDisciplinaryDeductionsPreview(companyId: string, periodId: string) {
+        this.logger.log(`⚖️ Getting disciplinary deductions preview for company: ${companyId}, period: ${periodId}`);
+
+        const deductions = await this.prisma.deductionApproval.findMany({
+            where: {
+                companyId,
+                periodId,
+                deductionType: 'DISCIPLINARY',
+                status: { in: ['APPROVED', 'MODIFIED'] as any }
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                    }
+                }
+            } as any
+        });
+
+        return deductions.map(d => ({
+            id: d.id,
+            employeeId: d.employeeId,
+            employeeName: `${(d as any).employee.firstName} ${(d as any).employee.lastName}`,
+            employeeCode: (d as any).employee.employeeCode,
+            amount: Number(d.approvedAmount || d.originalAmount),
+            reason: d.reason,
+            status: d.status,
+            referenceId: d.referenceId,
+        }));
+    }
+
+    /**
+     * 📦 جلب معاينة خصومات العهد
+     */
+    async getCustodyDeductionsPreview(companyId: string, periodId: string) {
+        this.logger.log(`📦 Getting custody deductions preview for company: ${companyId}, period: ${periodId}`);
+
+        const deductions = await this.prisma.deductionApproval.findMany({
+            where: {
+                companyId,
+                periodId,
+                deductionType: 'CUSTODY',
+                status: { in: ['APPROVED', 'MODIFIED'] as any }
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                    }
+                }
+            } as any
+        });
+
+        return deductions.map(d => ({
+            id: d.id,
+            employeeId: d.employeeId,
+            employeeName: `${(d as any).employee.firstName} ${(d as any).employee.lastName}`,
+            employeeCode: (d as any).employee.employeeCode,
+            amount: Number(d.approvedAmount || d.originalAmount),
+            reason: d.reason,
+            status: d.status,
+            referenceId: d.referenceId,
+        }));
+    }
 }
 
 /**

@@ -493,6 +493,24 @@ export class DisciplinaryService {
                         createdById: actorId,
                     }
                 });
+
+                // Create DeductionApproval for unified payroll integration
+                // We set it to APPROVED because finalizeCase is the final step after employee notification/objection
+                await tx.deductionApproval.create({
+                    data: {
+                        companyId,
+                        employeeId: disciplinaryCase.employeeId,
+                        periodId: disciplinaryCase.payrollPeriodId,
+                        deductionType: 'DISCIPLINARY',
+                        referenceId: disciplinaryCase.id,
+                        originalAmount: disciplinaryCase.penaltyValue as any, // This is days/hours usually, but stored as originalAmount
+                        approvedAmount: disciplinaryCase.penaltyValue as any,
+                        status: 'APPROVED',
+                        reason: `جزاء إداري: ${disciplinaryCase.caseCode} - ${disciplinaryCase.decisionReason || ''}`,
+                        approvedById: actorId,
+                        approvedAt: new Date(),
+                    }
+                });
             }
 
             await this.logEvent(caseId, actorId, CaseEventType.FINALIZED, 'تم اعتماد القضية نهائياً', tx);

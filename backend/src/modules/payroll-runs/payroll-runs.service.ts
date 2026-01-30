@@ -162,9 +162,11 @@ export class PayrollRunsService {
 
         if (filteredEmployees.length === 0) throw new BadRequestException('لا يوجد موظفين نشطين لديهم تعيينات رواتب للفلتر المختار');
 
-        // ✅ جلب خصومات الحضور والإجازات من صفحة الخصومات
+        // ✅ جلب خصومات الحضور والإجازات والجزاءات والعهد من صفحة الخصومات
         const attendanceDeductionsPreview = await this.adjustmentsService.getAttendanceDeductionsPreview(companyId, dto.periodId);
         const leaveDeductionsPreview = await this.adjustmentsService.getLeaveDeductionsPreview(companyId, dto.periodId);
+        const disciplinaryDeductionsPreview = await this.adjustmentsService.getDisciplinaryDeductionsPreview(companyId, dto.periodId);
+        const custodyDeductionsPreview = await this.adjustmentsService.getCustodyDeductionsPreview(companyId, dto.periodId);
 
         // بناء خرائط الخصومات لكل موظف للوصول السريع
         const attendanceDeductionsMap = new Map<string, { totalDeduction: number; details: any }>();
@@ -183,7 +185,21 @@ export class PayrollRunsService {
             leaveDeductionsMap.set(ded.employeeId, current);
         }
 
-        this.logger.log(`📊 Loaded ${attendanceDeductionsMap.size} attendance deductions and ${leaveDeductionsMap.size} leave deductions for payroll run`);
+        const disciplinaryDeductionsMap = new Map<string, any[]>();
+        for (const ded of disciplinaryDeductionsPreview) {
+            const current = disciplinaryDeductionsMap.get(ded.employeeId) || [];
+            current.push(ded);
+            disciplinaryDeductionsMap.set(ded.employeeId, current);
+        }
+
+        const custodyDeductionsMap = new Map<string, any[]>();
+        for (const ded of custodyDeductionsPreview) {
+            const current = custodyDeductionsMap.get(ded.employeeId) || [];
+            current.push(ded);
+            custodyDeductionsMap.set(ded.employeeId, current);
+        }
+
+        this.logger.log(`📊 Loaded ${attendanceDeductionsMap.size} attendance, ${leaveDeductionsMap.size} leave, ${disciplinaryDeductionsMap.size} disciplinary, and ${custodyDeductionsMap.size} custody deductions for payroll run`);
 
         const result = await this.prisma.$transaction(async (tx) => {
             const run = await tx.payrollRun.create({
@@ -293,6 +309,58 @@ export class PayrollRunsService {
                             });
                         }
                     }
+                }
+
+                // ✅ إضافة الخصومات الموحدة (حضور، إجازات، جزاءات، عهد)
+                const empAttDed = attendanceDeductionsMap.get(employee.id);
+                if (empAttDed && empAttDed.totalDeduction > 0) {
+                    payslipLines.push({
+                        componentId: adjDedId,
+                        amount: new Decimal(empAttDed.totalDeduction.toFixed(2)),
+                        sourceType: PayslipLineSource.ADJUSTMENT,
+                        sign: 'DEDUCTION',
+                        descriptionAr: 'خصم حضور وانصراف (معتمد)',
+                        costCenterId: primaryCostCenterId,
+                    });
+                }
+
+                const empLeaveDed = leaveDeductionsMap.get(employee.id);
+                if (empLeaveDed && empLeaveDed.totalDeduction > 0) {
+                    payslipLines.push({
+                        componentId: adjDedId,
+                        amount: new Decimal(empLeaveDed.totalDeduction.toFixed(2)),
+                        sourceType: PayslipLineSource.ADJUSTMENT,
+                        sign: 'DEDUCTION',
+                        descriptionAr: 'خصم إجازات (معتمد)',
+                        costCenterId: primaryCostCenterId,
+                    });
+                }
+
+                const empDiscDeds = disciplinaryDeductionsMap.get(employee.id) || [];
+                for (const d of empDiscDeds) {
+                    payslipLines.push({
+                        componentId: adjDedId,
+                        amount: new Decimal(d.amount.toFixed(2)),
+                        sourceType: PayslipLineSource.ADJUSTMENT,
+                        sign: 'DEDUCTION',
+                        descriptionAr: d.reason || 'جزاء تأديبي',
+                        sourceRef: `DED-APP:${d.id}`,
+                        costCenterId: primaryCostCenterId,
+                    });
+                    // Mark as applied in payroll? (Currently no status field in DB for applied to payroll specifically beyond status)
+                }
+
+                const empCustDeds = custodyDeductionsMap.get(employee.id) || [];
+                for (const d of empCustDeds) {
+                    payslipLines.push({
+                        componentId: adjDedId,
+                        amount: new Decimal(d.amount.toFixed(2)),
+                        sourceType: PayslipLineSource.ADJUSTMENT,
+                        sign: 'DEDUCTION',
+                        descriptionAr: d.reason || 'خصم عهدة',
+                        sourceRef: `DED-APP:${d.id}`,
+                        costCenterId: primaryCostCenterId,
+                    });
                 }
 
                 // ✅ إضافة التعديلات اليدوية (مكافآت/خصومات) من الـ Wizard فقط (التي لم تحفظ في الـ DB بعد)
@@ -754,6 +822,33 @@ export class PayrollRunsService {
         // تطبيق فلتر الموظفين المستثنين
         const filteredEmployees = employees.filter(emp => !excludedIds.has(emp.id));
 
+        // ✅ Fetch all unified deductions from PayrollAdjustmentsService
+        const attendanceDedsPreview = await this.adjustmentsService.getAttendanceDeductionsPreview(companyId, dto.periodId);
+        const leaveDedsPreview = await this.adjustmentsService.getLeaveDeductionsPreview(companyId, dto.periodId);
+        const disciplinaryDedsPreview = await this.adjustmentsService.getDisciplinaryDeductionsPreview(companyId, dto.periodId);
+        const custodyDedsPreview = await this.adjustmentsService.getCustodyDeductionsPreview(companyId, dto.periodId);
+
+        // Build helper maps for efficient lookup
+        const attendanceMap = new Map<string, number>();
+        (attendanceDedsPreview.employees || []).forEach((d: any) => attendanceMap.set(d.employeeId, (attendanceMap.get(d.employeeId) || 0) + (d.totalDeduction || 0)));
+
+        const leaveMap = new Map<string, number>();
+        (leaveDedsPreview.leaveDeductions || []).forEach((d: any) => leaveMap.set(d.employeeId, (leaveMap.get(d.employeeId) || 0) + (d.deductionAmount || 0)));
+
+        const disciplinaryMap = new Map<string, any[]>();
+        disciplinaryDedsPreview.forEach((d: any) => {
+            const list = disciplinaryMap.get(d.employeeId) || [];
+            list.push(d);
+            disciplinaryMap.set(d.employeeId, list);
+        });
+
+        const custodyMap = new Map<string, any[]>();
+        custodyDedsPreview.forEach((d: any) => {
+            const list = custodyMap.get(d.employeeId) || [];
+            list.push(d);
+            custodyMap.set(d.employeeId, list);
+        });
+
         if (filteredEmployees.length === 0) {
             return {
                 period: {
@@ -831,11 +926,39 @@ export class PayrollRunsService {
             const gosiAmount = toDecimal(gosiLine?.amount || 0);
             totalGosi = add(totalGosi, gosiAmount);
 
+            // ✅ Add Attendance & Leave deductions (not in calculationService yet)
+            const attendanceAmt = toDecimal(attendanceMap.get(employee.id) || 0);
+            if (isPositive(attendanceAmt)) {
+                deductionItems.push({ name: 'خصم حضور وانصراف (معتمد)', code: 'ATT_DED', amount: toNumber(attendanceAmt) });
+            }
+
+            const leaveAmt = toDecimal(leaveMap.get(employee.id) || 0);
+            if (isPositive(leaveAmt)) {
+                deductionItems.push({ name: 'خصم إجازات (معتمد)', code: 'LEAVE_DED', amount: toNumber(leaveAmt) });
+            }
+
+            // ✅ Add Disciplinary & Custody deductions
+            const discDeds = disciplinaryMap.get(employee.id) || [];
+            let totalDisc = ZERO;
+            for (const d of discDeds) {
+                const amt = toDecimal(d.amount);
+                totalDisc = add(totalDisc, amt);
+                deductionItems.push({ name: d.reason || 'جزاء تأديبي', code: 'DISC_DED', amount: d.amount });
+            }
+
+            const custDeds = custodyMap.get(employee.id) || [];
+            let totalCust = ZERO;
+            for (const d of custDeds) {
+                const amt = toDecimal(d.amount);
+                totalCust = add(totalCust, amt);
+                deductionItems.push({ name: d.reason || 'خصم عهدة', code: 'CUST_DED', amount: d.amount });
+            }
+
             // ✅ إضافة التعديلات اليدوية المكتوبة في الـ Wizard فقط (dto.adjustments)
             // ملاحظة: العمولات والمكافآت والتسويات المسجلة في الـ DB تم جلبها بالفعل في calculation.policyLines
             let wizardBonus: Decimal = ZERO;
             let wizardDeduction: Decimal = ZERO;
-            const wizardEmployeeAdjustments = (dto.adjustments || []).find(a => a.employeeId === employee.id)?.items || [];
+            const wizardEmployeeAdjustments = (dto.adjustments || []).find(a => (a as any).employeeId === employee.id)?.items || [];
 
             for (const adj of wizardEmployeeAdjustments) {
                 const adjAmount = toDecimal(adj.amount);
@@ -860,8 +983,8 @@ export class PayrollRunsService {
             // الراتب الإجمالي النهائي = إجمالي المحرك + إضافات الـ Wizard
             const finalGross = add(toDecimal(calculation.grossSalary), wizardBonus);
 
-            // إجمالي الخصومات النهائي = خصومات المحرك + خصم الـ Wizard
-            const finalDeductions = add(toDecimal(calculation.totalDeductions), wizardDeduction);
+            // إجمالي الخصومات النهائي = خصومات المحرك + الخصومات الموحدة + خصم الـ Wizard
+            const finalDeductions = add(add(add(add(toDecimal(calculation.totalDeductions), wizardDeduction), attendanceAmt), leaveAmt), add(totalDisc, totalCust));
 
             // ✅ حساب صافي الراتب باستخدام الأداة لضمان عدم وجود رصيد سالب وتطبيق الحد الأقصى
             const netResult = calculateNetSalary(finalGross, finalDeductions);

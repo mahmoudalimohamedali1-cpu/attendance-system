@@ -194,4 +194,32 @@ export class TimezoneService {
       'America/New_York', // US Eastern UTC-5/-4
     ];
   }
+
+  /**
+     * تحويل تاريخ من UTC إلى منطقة زمنية معينة
+     */
+  convertToTimezone(date: Date, timezone: string): Date {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+
+    const year = parseInt(getPart('year'));
+    const month = parseInt(getPart('month')) - 1;
+    const day = parseInt(getPart('day'));
+    const hour = parseInt(getPart('hour'));
+    const minute = parseInt(getPart('minute'));
+    const second = parseInt(getPart('second'));
+
+    return new Date(year, month, day, hour, minute, second);
+  }
 }

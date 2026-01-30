@@ -1203,6 +1203,58 @@ export class AttendanceService {
         'status=', updatedAttendance.status,
         'workingMinutes=', updatedAttendance.workingMinutes);
 
+      // ✅ Re-trigger smart policies for corrected attendance
+      try {
+        const userId = updatedAttendance.userId;
+        const companyId = updatedAttendance.companyId as string;
+
+        // 1. Delete old pending executions for this attendance to prevent duplicates/stale values
+        // We look for executions for this employee where triggerData contains this attendanceId
+        const pendingExecs = await this.prisma.smartPolicyExecution.findMany({
+          where: {
+            employeeId: userId,
+            payrollPeriod: null, // Only pending ones
+            triggerEvent: SmartPolicyTrigger.ATTENDANCE,
+          }
+        });
+
+        const execsToDelete = pendingExecs.filter(exec => {
+          const data = exec.triggerData as any;
+          return data?.attendanceId === attendanceId;
+        });
+
+        if (execsToDelete.length > 0) {
+          console.log(`🧹 Deleting ${execsToDelete.length} stale smart policy executions for attendance ${attendanceId}`);
+          await this.prisma.smartPolicyExecution.deleteMany({
+            where: {
+              id: { in: execsToDelete.map(e => e.id) }
+            }
+          });
+        }
+
+        // 2. Re-trigger policies with NEW lateMinutes
+        const dayOfWeek = new Date(updatedAttendance.date).toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
+        await this.smartPolicyTrigger.triggerEvent({
+          employeeId: userId,
+          employeeName: `${updatedAttendance.user?.firstName || ''} ${updatedAttendance.user?.lastName || ''}`.trim() || 'Admin-Corrected',
+          companyId,
+          event: SmartPolicyTrigger.ATTENDANCE,
+          subEvent: "CHECK_IN",
+          eventData: {
+            attendanceId: updatedAttendance.id,
+            date: updatedAttendance.date.toISOString(),
+            dayOfWeek,
+            lateMinutes: updatedAttendance.lateMinutes,
+            isLate: (updatedAttendance.lateMinutes || 0) > 0,
+            isCorrection: true,
+            correctionReason,
+          },
+        });
+        console.log('🔔 Smart policies re-triggered successfully for corrected attendance');
+      } catch (triggerError) {
+        console.error('⚠️ Error re-triggering smart policies after correction:', triggerError);
+      }
+
       return {
         message: 'تم تحديث سجل الحضور بنجاح',
         attendance: updatedAttendance,

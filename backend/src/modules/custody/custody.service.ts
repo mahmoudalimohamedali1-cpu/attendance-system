@@ -624,7 +624,7 @@ export class CustodyService {
         const isApproved = dto.decision === 'APPROVED';
 
         if (isApproved) {
-            await this.prisma.$transaction([
+            const operations = [
                 this.prisma.custodyReturn.update({
                     where: { id: dto.returnId },
                     data: {
@@ -652,7 +652,27 @@ export class CustodyService {
                         condition: returnRequest.conditionOnReturn,
                     },
                 }),
-            ]);
+            ];
+
+            // Create deduction approval if employee is charged
+            if (dto.chargeEmployee && Number(dto.estimatedCost) > 0) {
+                operations.push(
+                    this.prisma.deductionApproval.create({
+                        data: {
+                            companyId,
+                            employeeId: returnRequest.returnedById,
+                            deductionType: 'CUSTODY' as any,
+                            referenceId: dto.returnId,
+                            originalAmount: Number(dto.estimatedCost),
+                            status: 'PENDING' as any,
+                            reason: `خصم عهده تالفه: ${returnRequest.custodyItem.name} (${returnRequest.custodyItem.code})`,
+                            notes: dto.reviewNotes,
+                        }
+                    }) as any
+                );
+            }
+
+            await this.prisma.$transaction(operations);
         } else {
             await this.prisma.custodyReturn.update({
                 where: { id: dto.returnId },

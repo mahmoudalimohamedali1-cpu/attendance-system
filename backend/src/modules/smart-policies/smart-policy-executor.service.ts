@@ -34,6 +34,8 @@ export interface SmartPolicyExecutionResult {
 
 export interface SmartPolicyExecutionContext {
     employee: any;
+    userId?: string;
+    companyId: string;
     baseSalary: number;
     workingDays: number;
     absentDays: number;
@@ -44,6 +46,7 @@ export interface SmartPolicyExecutionContext {
     presentDays?: number;
     attendancePercentage?: number;
     yearsOfService?: number;
+    skipPersistence?: boolean; // 🔧 Added to handle previews
 }
 
 @Injectable()
@@ -212,14 +215,19 @@ export class SmartPolicyExecutorService {
                         },
                     });
 
-                    // Mark as applied
-                    await this.prisma.smartPolicyExecution.update({
-                        where: { id: adj.id },
-                        data: {
-                            payrollPeriod,
-                            actionResult: { applied: true, appliedAt: new Date().toISOString() },
-                        },
-                    });
+                    // Mark as applied (only if not a preview)
+                    if (!context.skipPersistence) {
+                        await this.prisma.smartPolicyExecution.update({
+                            where: { id: adj.id },
+                            data: {
+                                payrollPeriod,
+                                actionResult: { applied: true, appliedAt: new Date().toISOString() },
+                            },
+                        });
+                        this.logger.log(`✅ Adjustment ${adj.id} marked as applied to payroll period ${payrollPeriod}`);
+                    } else {
+                        this.logger.log(`ℹ️ [PREVIEW] Skipping persistence for adjustment ${adj.id}`);
+                    }
                 }
             }
         } catch (error) {

@@ -545,6 +545,7 @@ export class PayrollCalculationService {
         endDate: Date,
         year?: number,
         month?: number,
+        payrollRunId?: string, // 🔧 Added to handle previews vs real runs
     ): Promise<EmployeePayrollCalculation> {
         console.error(`🚀 START PAYROLL CALCULATION: employeeId=${employeeId}, period=${startDate.toISOString()} to ${endDate.toISOString()}`);
         const trace: CalculationTraceItem[] = [];
@@ -1819,6 +1820,7 @@ export class PayrollCalculationService {
             // ✅ Convert Decimal values to numbers for smart policy executor
             const smartResults = await this.smartPolicyExecutor.executeSmartPolicies(companyId, {
                 employee: employee,
+                companyId: companyId, // 🔧 Added missing required field
                 baseSalary: toNumber(baseSalary),
                 workingDays: daysInPeriodGeneral,
                 absentDays: absentDays,
@@ -1826,6 +1828,7 @@ export class PayrollCalculationService {
                 overtimeHours: toNumber(overtimeHours),
                 month: effectiveMonth,
                 year: effectiveYear,
+                skipPersistence: !payrollRunId, // 🔧 Added skipPersistence flag
             });
 
             for (const result of smartResults) {
