@@ -1089,6 +1089,12 @@ export class AttendanceService {
     }
 
     // ✅ Recalculate lateMinutes and status if checkInTime changed
+    console.log('🔍 DEBUG CONDITION:', {
+      hasUpdateCheckInTime: !!updateData.checkInTime,
+      hasFinalCheckInTime: !!finalCheckInTime,
+      updateDataCheckInTime: updateData.checkInTime,
+      finalCheckInTime: finalCheckInTime
+    });
     if (updateData.checkInTime && finalCheckInTime) {
       const timezone = branch.timezone || 'Asia/Riyadh';
 
