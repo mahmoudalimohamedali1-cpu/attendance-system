@@ -503,8 +503,9 @@ export class PayrollRunsService {
                 const finalGross = round(add(toDecimal(calculation.grossSalary), wizardBonus));
                 let finalDeductions = round(add(toDecimal(calculation.totalDeductions), wizardDeduction));
 
-                // ✅ تطبيق سقف الخصومات 50% من الراتب الإجمالي (المادة 91 من نظام العمل السعودي)
-                const grossCapResult = applyDeductionCap(finalGross, finalDeductions, 50);
+                // ✅ تطبيق سقف الخصومات 50% من الراتب الأساسي (المادة 91 من نظام العمل السعودي)
+                // السقف يُحسب على راتب العقد (الأساسي) وليس الإجمالي
+                const grossCapResult = applyDeductionCap(toDecimal(baseSalary), finalDeductions, 50);
                 const cappedDeductions = grossCapResult.cappedDeductions;
                 const deferredAmount = grossCapResult.excessAmount; // للترحيل للشهور التالية
 
@@ -1002,8 +1003,10 @@ export class PayrollRunsService {
             // إجمالي الخصومات النهائي = خصومات المحرك + الخصومات الموحدة + خصم الـ Wizard
             const finalDeductions = add(add(add(add(toDecimal(calculation.totalDeductions), wizardDeduction), attendanceAmt), leaveAmt), add(totalDisc, totalCust));
 
-            // ✅ تطبيق سقف الخصومات 50% من الراتب الإجمالي (المادة 91 من نظام العمل السعودي)
-            const capResult = applyDeductionCap(finalGross, finalDeductions, 50);
+            // ✅ تطبيق سقف الخصومات 50% من الراتب الأساسي (المادة 91 من نظام العمل السعودي)
+            // السقف يُحسب على راتب العقد (الأساسي) وليس الإجمالي
+            const baseSalaryDecimal = toDecimal(assignment.baseSalary);
+            const capResult = applyDeductionCap(baseSalaryDecimal, finalDeductions, 50);
             const cappedDeductions = capResult.cappedDeductions;
             const deferredAmount = capResult.excessAmount; // الخصومات المرحلة للشهور التالية
 
