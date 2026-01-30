@@ -1,10 +1,14 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, Min, Max, IsUUID } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, Min, Max, IsUUID, IsDateString } from 'class-validator';
 import { DecisionType, AdjustmentUnit } from '@prisma/client';
 
 export class IssueDecisionDto {
     @IsEnum(DecisionType)
     @IsNotEmpty()
     decisionType: DecisionType;
+
+    @IsUUID()
+    @IsNotEmpty()
+    employeeId: string;
 
     @IsString()
     @IsNotEmpty()
@@ -19,11 +23,11 @@ export class IssueDecisionDto {
     @Min(0)
     penaltyValue?: number;
 
-    @IsOptional()
     @IsUUID()
+    @IsOptional()
     payrollPeriodId?: string;
 
     @IsOptional()
-    @IsString()
+    @IsDateString()
     penaltyEffectiveDate?: string;
 }

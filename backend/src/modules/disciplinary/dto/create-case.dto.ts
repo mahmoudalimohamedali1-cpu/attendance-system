@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsDateString, IsOptional, MaxLength, IsArray, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsDateString, IsOptional, MaxLength, IsArray, IsEnum, IsUUID } from 'class-validator';
 
 // أنواع المخالفات
 export enum ViolationType {
@@ -14,7 +14,7 @@ export enum ViolationType {
 }
 
 export class CreateCaseDto {
-    @IsString()
+    @IsUUID()
     @IsNotEmpty()
     employeeId: string;
 

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
-import { SmartPolicyTrigger } from "@prisma/client";
+import { SmartPolicyTrigger, Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export interface TriggerContext {
@@ -16,13 +16,14 @@ export interface TriggerContext {
 export class SmartPolicyTriggerService {
     private readonly logger = new Logger(SmartPolicyTriggerService.name);
 
-    constructor(private prisma: PrismaService) {}
+    constructor(private prisma: PrismaService) { }
 
-    async triggerEvent(context: TriggerContext): Promise<void> {
+    async triggerEvent(context: TriggerContext, tx?: Prisma.TransactionClient): Promise<void> {
+        const client = tx || this.prisma;
         this.logger.log(`Triggering smart policies for event: ${context.event}.${context.subEvent || "*"} for employee ${context.employeeId}`);
 
         try {
-            const policies = await this.prisma.smartPolicy.findMany({
+            const policies = await client.smartPolicy.findMany({
                 where: {
                     companyId: context.companyId,
                     isActive: true,
@@ -34,14 +35,15 @@ export class SmartPolicyTriggerService {
             this.logger.log(`Found ${policies.length} policies matching trigger ${context.event}.${context.subEvent}`);
 
             for (const policy of policies) {
-                await this.evaluateAndExecute(policy, context);
+                await this.evaluateAndExecute(policy, context, tx);
             }
         } catch (error) {
             this.logger.error(`Error triggering smart policies: ${error.message}`);
         }
     }
 
-    private async evaluateAndExecute(policy: any, context: TriggerContext): Promise<void> {
+    private async evaluateAndExecute(policy: any, context: TriggerContext, tx?: Prisma.TransactionClient): Promise<void> {
+        const client = tx || this.prisma;
         const parsed = policy.parsedRule;
         if (!parsed || !parsed.understood) {
             return;
@@ -66,38 +68,40 @@ export class SmartPolicyTriggerService {
             return;
         }
 
-        const action = actions[0];
-        const actionType = action.type;
-        let actionValue = parseFloat(action.value) || 0;
+        // Logic Fix: Iterate and execute ALL actions, not just the first one
+        for (const action of actions) {
+            const actionType = action.type;
+            let actionValue = parseFloat(action.value) || 0;
 
-        if (action.valueType === "PERCENTAGE") {
-            const activeContract = await this.prisma.contract.findFirst({
-                where: { userId: context.employeeId, status: "ACTIVE" },
-                select: { basicSalary: true },
-            });
-            if (activeContract?.basicSalary) {
-                actionValue = (Number(activeContract.basicSalary) * actionValue) / 100;
+            if (action.valueType === "PERCENTAGE") {
+                const activeContract = await client.contract.findFirst({
+                    where: { userId: context.employeeId, status: "ACTIVE" },
+                    select: { basicSalary: true },
+                });
+                if (activeContract?.basicSalary) {
+                    actionValue = (Number(activeContract.basicSalary) * actionValue) / 100;
+                }
             }
+
+            await client.smartPolicyExecution.create({
+                data: {
+                    policyId: policy.id,
+                    employeeId: context.employeeId,
+                    employeeName: context.employeeName,
+                    triggerEvent: context.event.toString(),
+                    triggerSubEvent: context.subEvent,
+                    triggerData: context.eventData || {},
+                    conditionsMet: true,
+                    conditionsLog,
+                    actionType,
+                    actionValue: new Decimal(actionValue.toFixed(2)),
+                    actionResult: { applied: false, pendingPayroll: true },
+                    isSuccess: true,
+                },
+            });
+
+            this.logger.log(`Recorded smart policy execution for ${policy.name} [${actionType}]: ${actionValue} SAR for employee ${context.employeeName}`);
         }
-
-        await this.prisma.smartPolicyExecution.create({
-            data: {
-                policyId: policy.id,
-                employeeId: context.employeeId,
-                employeeName: context.employeeName,
-                triggerEvent: context.event.toString(),
-                triggerSubEvent: context.subEvent,
-                triggerData: context.eventData || {},
-                conditionsMet: true,
-                conditionsLog,
-                actionType,
-                actionValue: new Decimal(actionValue.toFixed(2)),
-                actionResult: { applied: false, pendingPayroll: true },
-                isSuccess: true,
-            },
-        });
-
-        this.logger.log(`Recorded smart policy execution for ${policy.name}: ${actionValue} SAR for employee ${context.employeeName}`);
     }
 
     private evaluateConditions(conditions: any[], context: TriggerContext): boolean {
@@ -116,7 +120,7 @@ export class SmartPolicyTriggerService {
                 if (eventDayOfWeek) {
                     const targetDay = value.toString().toUpperCase();
                     const actualDay = eventDayOfWeek.toString().toUpperCase();
-                    
+
                     if (operator === "EQUALS" && actualDay !== targetDay) {
                         this.logger.log(`Condition not met: dayOfWeek ${actualDay} !== ${targetDay}`);
                         return false;

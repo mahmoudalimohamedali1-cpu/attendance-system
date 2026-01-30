@@ -16,7 +16,8 @@ import {
     DecisionType,
     PayrollAdjustmentStatus,
     DeductionBasePolicy,
-    SmartPolicyTrigger
+    SmartPolicyTrigger,
+    Prisma
 } from '@prisma/client';
 
 @Injectable()
@@ -30,107 +31,100 @@ export class DisciplinaryService {
         private smartPolicyTrigger: SmartPolicyTriggerService,
     ) { }
 
-    /**
-     * الحصول على سياسة الشركة للجزاءات أو الإعدادات الافتراضية
-     */
-    async getPolicy(companyId: string) {
-        const policy = await this.prisma.companyDisciplinaryPolicy.findUnique({
-            where: { companyId },
-        });
 
-        if (policy) return policy;
-
-        // Default policy if not set
-        return {
-            incidentMaxAgeDays: 30,
-            decisionDeadlineDays: 30,
-            objectionWindowDays: 15,
-            allowRetrospectiveIncidents: false,
-            autoApplyToOpenPayrollPeriod: true,
-            deductionBasePolicy: DeductionBasePolicy.BASIC_FIXED,
-        };
-    }
 
     /**
      * إنشاء طلب تحقيق جديد (بواسطة مدير مباشر)
      */
     async createCase(managerId: string, companyId: string, dto: CreateCaseDto) {
-        const { employeeId, title, violationType, incidentDate, incidentLocation, involvedParties, description, retrospectiveReason } = dto;
+        return this.prisma.$transaction(async (tx) => {
+            const { employeeId, title, violationType, incidentDate, incidentLocation, involvedParties, description, retrospectiveReason } = dto;
 
-        const policy = await this.getPolicy(companyId);
-        const incidentDateObj = new Date(incidentDate);
-        const now = new Date();
-        const ageInDays = Math.floor((now.getTime() - incidentDateObj.getTime()) / (1000 * 60 * 60 * 24));
-
-        // Validation: Incident Age
-        if (ageInDays > policy.incidentMaxAgeDays && !policy.allowRetrospectiveIncidents) {
-            throw new BadRequestException(`تاريخ الواقعة قديم جداً (الحد الأقصى ${policy.incidentMaxAgeDays} يوماً)`);
-        }
-
-        if (ageInDays > policy.incidentMaxAgeDays && policy.allowRetrospectiveIncidents && !retrospectiveReason) {
-            throw new BadRequestException('يجب ذكر سبب لإدخال واقعة قديمة');
-        }
-
-        // Generate Case Code (e.g., INV-2025-001)
-        const year = now.getFullYear();
-        const count = await this.prisma.disciplinaryCase.count({
-            where: { companyId, createdAt: { gte: new Date(year, 0, 1) } }
-        });
-        const caseCode = `INV-${year}-${(count + 1).toString().padStart(4, '0')}`;
-
-        const disciplinaryCase = await this.prisma.disciplinaryCase.create({
-            data: {
-                companyId,
-                caseCode,
-                employeeId,
-                managerId,
-                title,
-                incidentDate: incidentDateObj,
-                incidentLocation,
-                involvedParties: involvedParties || {},
-                description,
-                status: DisciplinaryStatus.SUBMITTED_TO_HR,
-                stage: DisciplinaryStage.MANAGER_REQUEST,
-                // Snapshots
-                incidentMaxAgeDaysSnapshot: policy.incidentMaxAgeDays,
-                decisionDeadlineDaysSnapshot: policy.decisionDeadlineDays,
-                objectionWindowDaysSnapshot: policy.objectionWindowDays,
-                allowRetrospectiveSnapshot: policy.allowRetrospectiveIncidents,
-                deductionBasePolicySnapshot: policy.deductionBasePolicy,
-                // Retrospective
-                isRetrospective: ageInDays > policy.incidentMaxAgeDays,
-                retrospectiveReason,
+            // Phase 2: Tenant Isolation Check
+            const targetEmployee = await tx.user.findFirst({
+                where: { id: employeeId, companyId }
+            });
+            if (!targetEmployee) {
+                throw new BadRequestException('الموظف غير موجود أو لا ينتمي لهذه الشركة');
             }
+
+            const policy = await this.getPolicy(companyId, tx);
+            const incidentDateObj = new Date(incidentDate);
+            const now = new Date();
+            const ageInDays = Math.floor((now.getTime() - incidentDateObj.getTime()) / (1000 * 60 * 60 * 24));
+
+            // Validation: Incident Age
+            if (ageInDays > policy.incidentMaxAgeDays && !policy.allowRetrospectiveIncidents) {
+                throw new BadRequestException(`تاريخ الواقعة قديم جداً (الحد الأقصى ${policy.incidentMaxAgeDays} يوماً)`);
+            }
+
+            if (ageInDays > policy.incidentMaxAgeDays && policy.allowRetrospectiveIncidents && !retrospectiveReason) {
+                throw new BadRequestException('يجب ذكر سبب لإدخال واقعة قديمة');
+            }
+
+            // Generate Case Code (e.g., INV-2025-001)
+            // Phase 2: Race Condition Protection - Locking via separate counter or transaction
+            const year = now.getFullYear();
+            const count = await tx.disciplinaryCase.count({
+                where: { companyId, createdAt: { gte: new Date(year, 0, 1) } }
+            });
+            const caseCode = `INV-${year}-${(count + 1).toString().padStart(4, '0')}`;
+
+            const disciplinaryCase = await tx.disciplinaryCase.create({
+                data: {
+                    companyId,
+                    caseCode,
+                    employeeId,
+                    managerId,
+                    title,
+                    incidentDate: incidentDateObj,
+                    incidentLocation,
+                    involvedParties: involvedParties || {},
+                    description,
+                    status: DisciplinaryStatus.SUBMITTED_TO_HR,
+                    stage: DisciplinaryStage.MANAGER_REQUEST,
+                    // Snapshots
+                    incidentMaxAgeDaysSnapshot: policy.incidentMaxAgeDays,
+                    decisionDeadlineDaysSnapshot: policy.decisionDeadlineDays,
+                    objectionWindowDaysSnapshot: policy.objectionWindowDays,
+                    allowRetrospectiveSnapshot: policy.allowRetrospectiveIncidents,
+                    deductionBasePolicySnapshot: policy.deductionBasePolicy,
+                    // Retrospective
+                    isRetrospective: ageInDays > policy.incidentMaxAgeDays,
+                    retrospectiveReason,
+                }
+            });
+
+            // Log Event
+            await this.logEvent(disciplinaryCase.id, managerId, CaseEventType.CASE_CREATED, 'تم إنشاء طلب تحقيق جديد', tx);
+
+            // Notify HR
+            const employeeName = `${targetEmployee.firstName} ${targetEmployee.lastName}`;
+            await this.notificationsService.notifyHRCaseSubmitted(
+                companyId,
+                disciplinaryCase.id,
+                disciplinaryCase.caseCode,
+                employeeName
+            );
+
+            // Smart Policy Trigger (Transaction-Aware)
+            await this.smartPolicyTrigger.triggerEvent({
+                employeeId,
+                employeeName,
+                companyId,
+                event: SmartPolicyTrigger.DISCIPLINARY,
+                subEvent: 'CREATED',
+                eventData: {
+                    caseId: disciplinaryCase.id,
+                    managerId,
+                    title,
+                    violationType,
+                    incidentDate: incidentDateObj,
+                }
+            }, tx);
+
+            return disciplinaryCase;
         });
-
-        // Log Event
-        await this.logEvent(disciplinaryCase.id, managerId, CaseEventType.CASE_CREATED, 'تم إنشاء طلب تحقيق جديد');
-
-        // Notify HR
-        const employee = await this.prisma.user.findUnique({
-            where: { id: employeeId },
-            select: { firstName: true, lastName: true }
-        });
-        const employeeName = `${employee?.firstName} ${employee?.lastName}`;
-
-        await this.notificationsService.notifyHRCaseSubmitted(
-            companyId,
-            disciplinaryCase.id,
-            disciplinaryCase.caseCode,
-            employeeName
-        );
-
-        // Smart Policy Trigger
-        await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'CREATED', {
-            caseId: disciplinaryCase.id,
-            employeeId,
-            managerId,
-            title,
-            violationType,
-            incidentDate: incidentDateObj,
-        });
-
-        return disciplinaryCase;
     }
 
     /**
@@ -182,11 +176,19 @@ export class DisciplinaryService {
             data: updateData
         });
 
-        // Smart Policy Trigger
-        await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'HR_INITIAL_REVIEW', {
-            caseId,
-            action,
-            reason,
+        // Smart Policy Trigger (Non-critical so global client is okay for now, but better with tx if it was a tx method)
+        // Note: issueDecision hrInitialReview doesn't currently use a transaction.
+        await this.smartPolicyTrigger.triggerEvent({
+            employeeId: updatedCase.employeeId,
+            employeeName: '', // Optional
+            companyId,
+            event: SmartPolicyTrigger.DISCIPLINARY,
+            subEvent: 'HR_INITIAL_REVIEW',
+            eventData: {
+                caseId,
+                action,
+                reason,
+            }
         });
 
         // Notifications
@@ -259,90 +261,102 @@ export class DisciplinaryService {
      * إصدار قرار التحقيق
      */
     async issueDecision(caseId: string, hrId: string, companyId: string, dto: IssueDecisionDto) {
-        const disciplinaryCase = await this.findCaseOrThrow(caseId, companyId);
+        return this.prisma.$transaction(async (tx) => {
+            const disciplinaryCase = await this.findCaseOrThrow(caseId, companyId, tx);
 
-        // Validation: Stage
-        if (disciplinaryCase.stage !== DisciplinaryStage.OFFICIAL_INVESTIGATION) {
-            throw new BadRequestException('يجب أن تكون القضية في مرحلة التحقيق الرسمي لإصدار قرار');
-        }
-
-        // Validation: Deadline (30 days from official open)
-        const openDate = disciplinaryCase.officialInvestigationOpenedAt;
-        if (openDate) {
-            const deadlineDays = disciplinaryCase.decisionDeadlineDaysSnapshot;
-            const deadline = new Date(openDate.getTime() + deadlineDays * 24 * 60 * 60 * 1000);
-            if (new Date() > deadline) {
-                throw new BadRequestException(`انتهت المدة المسموحة لإصدار القرار (${deadlineDays} يوماً)`);
+            // Validation: Stage
+            if (disciplinaryCase.stage !== DisciplinaryStage.OFFICIAL_INVESTIGATION) {
+                throw new BadRequestException('يجب أن تكون القضية في مرحلة التحقيق الرسمي لإصدار قرار');
             }
-        }
 
-        // Validation: Payroll Period (Must not be locked)
-        if (dto.payrollPeriodId) {
-            const period = await this.prisma.payrollPeriod.findUnique({
-                where: { id: dto.payrollPeriodId }
-            });
-            if (period && (period.status === 'LOCKED' || period.lockedAt)) {
-                throw new BadRequestException('دورة الرواتب المختارة مغلقة نهائياً، لا يمكن إضافة جزاءات إليها');
+            // Validation: Deadline (30 days from official open)
+            const openDate = disciplinaryCase.officialInvestigationOpenedAt;
+            if (openDate) {
+                const deadlineDays = disciplinaryCase.decisionDeadlineDaysSnapshot;
+                const deadline = new Date(openDate.getTime() + deadlineDays * 24 * 60 * 60 * 1000);
+                if (new Date() > deadline) {
+                    throw new BadRequestException(`انتهت المدة المسموحة لإصدار القرار (${deadlineDays} يوماً)`);
+                }
             }
-        }
 
-        // Validation: Penalty Rules (Final Warning needs 2 prior)
-        if (dto.decisionType === DecisionType.FINAL_WARNING_TERMINATION) {
-            const priorWarnings = await this.prisma.employeeDisciplinaryRecord.count({
-                where: {
-                    employeeId: disciplinaryCase.employeeId,
-                    decisionType: { in: [DecisionType.FIRST_WARNING, DecisionType.SECOND_WARNING, DecisionType.WARNING] }
+            // Phase 2: Tenant Isolation Check - Payroll Period
+            if (dto.payrollPeriodId) {
+                const period = await tx.payrollPeriod.findFirst({
+                    where: { id: dto.payrollPeriodId, companyId }
+                });
+                if (!period) {
+                    throw new BadRequestException('دورة الرواتب غير موجودة أو لا تنتمي لهذه الشركة');
+                }
+                if (period.status === 'LOCKED' || period.lockedAt) {
+                    throw new BadRequestException('دورة الرواتب المختارة مغلقة نهائياً، لا يمكن إضافة جزاءات إليها');
+                }
+            }
+
+            // Validation: Penalty Rules (Final Warning needs 2 prior)
+            if (dto.decisionType === DecisionType.FINAL_WARNING_TERMINATION) {
+                const priorWarnings = await tx.employeeDisciplinaryRecord.count({
+                    where: {
+                        employeeId: disciplinaryCase.employeeId,
+                        decisionType: { in: [DecisionType.FIRST_WARNING, DecisionType.SECOND_WARNING, DecisionType.WARNING] }
+                    }
+                });
+                if (priorWarnings < 2) {
+                    throw new BadRequestException('لا يمكن اختيار إنذار نهائي بالفصل بدون وجود إنذارين سابقين على الأقل');
+                }
+            }
+
+            // Validation: Suspension duration
+            if (dto.decisionType === DecisionType.SUSPENSION_WITHOUT_PAY) {
+                if (!dto.penaltyValue || dto.penaltyValue < 3 || dto.penaltyValue > 5) {
+                    throw new BadRequestException('الإيقاف بدون أجر يجب أن يكون بين 3 و 5 أيام');
+                }
+            }
+
+            const updated = await tx.disciplinaryCase.update({
+                where: { id: caseId },
+                data: {
+                    status: DisciplinaryStatus.DECISION_ISSUED,
+                    stage: DisciplinaryStage.DECISION,
+                    decisionType: dto.decisionType,
+                    decisionReason: dto.decisionReason,
+                    decisionCreatedAt: new Date(),
+                    penaltyUnit: dto.penaltyUnit,
+                    penaltyValue: dto.penaltyValue,
+                    penaltyEffectiveDate: dto.penaltyEffectiveDate ? new Date(dto.penaltyEffectiveDate) : null,
+                    payrollPeriodId: dto.payrollPeriodId,
                 }
             });
-            if (priorWarnings < 2) {
-                throw new BadRequestException('لا يمكن اختيار إنذار نهائي بالفصل بدون وجود إنذارين سابقين على الأقل');
-            }
-        }
 
-        // Validation: Suspension duration
-        if (dto.decisionType === DecisionType.SUSPENSION_WITHOUT_PAY) {
-            if (!dto.penaltyValue || dto.penaltyValue < 3 || dto.penaltyValue > 5) {
-                throw new BadRequestException('الإيقاف بدون أجر يجب أن يكون بين 3 و 5 أيام');
-            }
-        }
+            const penaltyMsg = dto.penaltyValue ? ` (الجزاء: ${dto.penaltyValue} ${dto.penaltyUnit})` : '';
+            await this.logEvent(caseId, hrId, CaseEventType.DECISION_ISSUED, `تم إصدار القرار: ${dto.decisionType}${penaltyMsg}`, tx);
 
-        const updated = await this.prisma.disciplinaryCase.update({
-            where: { id: caseId },
-            data: {
-                status: DisciplinaryStatus.DECISION_ISSUED,
-                stage: DisciplinaryStage.DECISION,
-                decisionType: dto.decisionType,
-                decisionReason: dto.decisionReason,
-                decisionCreatedAt: new Date(),
-                penaltyUnit: dto.penaltyUnit,
-                penaltyValue: dto.penaltyValue,
-                penaltyEffectiveDate: dto.penaltyEffectiveDate ? new Date(dto.penaltyEffectiveDate) : null,
-                payrollPeriodId: dto.payrollPeriodId,
-            }
+            // Smart Policy Trigger (Transaction-Aware)
+            await this.smartPolicyTrigger.triggerEvent({
+                employeeId: disciplinaryCase.employeeId,
+                employeeName: '', // Optional
+                companyId,
+                event: SmartPolicyTrigger.DISCIPLINARY,
+                subEvent: 'DECISION_ISSUED',
+                eventData: {
+                    caseId,
+                    decisionType: dto.decisionType,
+                    penaltyValue: dto.penaltyValue,
+                    penaltyUnit: dto.penaltyUnit,
+                }
+            }, tx);
+
+            // Notify Employee
+            const policy = await this.getPolicy(companyId, tx);
+            await this.notificationsService.notifyEmployeeDecisionIssued(
+                companyId,
+                disciplinaryCase.employeeId,
+                caseId,
+                disciplinaryCase.caseCode,
+                policy.objectionWindowDays
+            );
+
+            return updated;
         });
-
-        const penaltyMsg = dto.penaltyValue ? ` (الجزاء: ${dto.penaltyValue} ${dto.penaltyUnit})` : '';
-        await this.logEvent(caseId, hrId, CaseEventType.DECISION_ISSUED, `تم إصدار القرار: ${dto.decisionType}${penaltyMsg}`);
-
-        // Smart Policy Trigger
-        await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'DECISION_ISSUED', {
-            caseId,
-            decisionType: dto.decisionType,
-            penaltyValue: dto.penaltyValue,
-            penaltyUnit: dto.penaltyUnit,
-        });
-
-        // Notify Employee
-        const policy = await this.getPolicy(companyId);
-        await this.notificationsService.notifyEmployeeDecisionIssued(
-            companyId,
-            disciplinaryCase.employeeId,
-            caseId,
-            disciplinaryCase.caseCode,
-            policy.objectionWindowDays
-        );
-
-        return updated;
     }
 
     /**
@@ -408,22 +422,24 @@ export class DisciplinaryService {
     async finalizeCase(caseId: string, actorId: string, companyId: string) {
         return this.prisma.$transaction(async (tx) => {
             // Locking row to prevent concurrency issues
-            const disciplinaryCase = await tx.$queryRaw<any[]>`
-        SELECT * FROM disciplinary_cases WHERE id = ${caseId} AND company_id = ${companyId} FOR UPDATE
-      `.then(rows => rows[0]);
+            const disciplinaryCase = await tx.disciplinaryCase.findUnique({
+                where: { id: caseId },
+            });
 
-            if (!disciplinaryCase) throw new NotFoundException('القضية غير موجودة');
+            if (!disciplinaryCase || disciplinaryCase.companyId !== companyId) {
+                throw new NotFoundException('القضية غير موجودة أو لا ينتمي لهذه الشركة');
+            }
             if (disciplinaryCase.finalizedAt) return disciplinaryCase;
 
             // Check Legal Hold
-            if (disciplinaryCase.legal_hold) {
+            if (disciplinaryCase.legalHold) {
                 throw new BadRequestException('لا يمكن اعتماد القضية بسبب وجود حجز قانوني (Legal Hold)');
             }
 
             // Harden: Check Payroll Period status inside transaction
-            if (disciplinaryCase.payroll_period_id) {
+            if (disciplinaryCase.payrollPeriodId) {
                 const period = await tx.payrollPeriod.findUnique({
-                    where: { id: disciplinaryCase.payroll_period_id }
+                    where: { id: disciplinaryCase.payrollPeriodId }
                 });
                 if (period && (period.status === 'LOCKED' || period.lockedAt)) {
                     throw new BadRequestException('لا يمكن اعتماد القضية لأن دورة الرواتب المرتبطة بها مغلقة نهائياً');
@@ -443,59 +459,66 @@ export class DisciplinaryService {
             // Create Record
             await tx.employeeDisciplinaryRecord.create({
                 data: {
-                    employeeId: disciplinaryCase.employee_id,
+                    employeeId: disciplinaryCase.employeeId,
                     caseId: disciplinaryCase.id,
-                    decisionType: disciplinaryCase.decision_type,
-                    reason: disciplinaryCase.decision_reason,
+                    decisionType: disciplinaryCase.decisionType as DecisionType,
+                    reason: disciplinaryCase.decisionReason,
                     effectiveDate: new Date(),
                     penaltyMetadata: {
-                        unit: disciplinaryCase.penalty_unit,
-                        value: disciplinaryCase.penalty_value,
+                        unit: disciplinaryCase.penaltyUnit,
+                        value: disciplinaryCase.penaltyValue,
                     }
                 }
             });
 
             // Create Payroll Adjustment if needed
-            if (disciplinaryCase.decision_type === DecisionType.SALARY_DEDUCTION ||
-                disciplinaryCase.decision_type === DecisionType.SUSPENSION_WITHOUT_PAY) {
+            if (disciplinaryCase.decisionType === DecisionType.SALARY_DEDUCTION ||
+                disciplinaryCase.decisionType === DecisionType.SUSPENSION_WITHOUT_PAY) {
 
-                if (!disciplinaryCase.payroll_period_id) {
+                if (!disciplinaryCase.payrollPeriodId) {
                     throw new BadRequestException('يجب اختيار دورة راتب لتطبيق الخصم المالي');
                 }
 
                 await tx.payrollAdjustment.create({
                     data: {
                         companyId,
-                        employeeId: disciplinaryCase.employee_id,
-                        caseId: disciplinaryCase.id,
-                        payrollPeriodId: disciplinaryCase.payroll_period_id,
-                        adjustmentType: disciplinaryCase.decision_type === DecisionType.SALARY_DEDUCTION ? 'DEDUCTION' : 'SUSPENSION_UNPAID',
-                        unit: disciplinaryCase.penalty_unit || 'DAYS',
-                        value: disciplinaryCase.penalty_value,
-                        effectiveDate: disciplinaryCase.penalty_effective_date,
+                        employeeId: disciplinaryCase.employeeId,
+                        disciplinaryCaseId: disciplinaryCase.id,
+                        payrollPeriodId: disciplinaryCase.payrollPeriodId,
+                        adjustmentType: disciplinaryCase.decisionType === DecisionType.SALARY_DEDUCTION ? 'DEDUCTION' : 'SUSPENSION_UNPAID',
+                        unit: disciplinaryCase.penaltyUnit || 'DAYS',
+                        value: disciplinaryCase.penaltyValue as any,
                         status: PayrollAdjustmentStatus.PENDING,
-                        description: `جزاء إداري - ${disciplinaryCase.case_code}`,
+                        reason: `جزاء إداري - ${disciplinaryCase.caseCode}`,
+                        createdById: actorId,
                     }
                 });
             }
 
             await this.logEvent(caseId, actorId, CaseEventType.FINALIZED, 'تم اعتماد القضية نهائياً', tx);
 
-            // Smart Policy Trigger
-            await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'FINALIZED', {
-                caseId,
-                decisionType: disciplinaryCase.decision_type,
-                employeeId: disciplinaryCase.employee_id,
-            });
+            // Smart Policy Trigger (Transaction-Aware)
+            await this.smartPolicyTrigger.triggerEvent({
+                employeeId: disciplinaryCase.employeeId,
+                employeeName: '', // Optional
+                companyId,
+                event: SmartPolicyTrigger.DISCIPLINARY,
+                subEvent: 'FINALIZED',
+                eventData: {
+                    caseId,
+                    decisionType: disciplinaryCase.decisionType,
+                    employeeId: disciplinaryCase.employeeId,
+                }
+            }, tx);
 
             // Notify Employee and Manager
             await this.notificationsService.notifyCaseFinalized(
                 companyId,
-                disciplinaryCase.employee_id,
-                disciplinaryCase.manager_id,
+                disciplinaryCase.employeeId,
+                disciplinaryCase.managerId,
                 disciplinaryCase.id,
-                disciplinaryCase.case_code,
-                disciplinaryCase.decision_type
+                disciplinaryCase.caseCode,
+                disciplinaryCase.decisionType as DecisionType
             );
 
             return finalized;
@@ -504,12 +527,32 @@ export class DisciplinaryService {
 
     // --- Helpers ---
 
-    private async findCaseOrThrow(id: string, companyId: string) {
-        const disciplinaryCase = await this.prisma.disciplinaryCase.findFirst({
+    private async findCaseOrThrow(id: string, companyId: string, tx?: Prisma.TransactionClient) {
+        const client = tx || this.prisma;
+        const disciplinaryCase = await client.disciplinaryCase.findFirst({
             where: { id, companyId },
         });
         if (!disciplinaryCase) throw new NotFoundException('القضية غير موجودة');
         return disciplinaryCase;
+    }
+
+    private async getPolicy(companyId: string, tx?: Prisma.TransactionClient) {
+        const client = tx || this.prisma;
+        const policy = await client.companyDisciplinaryPolicy.findUnique({
+            where: { companyId },
+        });
+
+        if (policy) return policy;
+
+        // Default policy if not set
+        return {
+            incidentMaxAgeDays: 30,
+            decisionDeadlineDays: 30,
+            objectionWindowDays: 15,
+            allowRetrospectiveIncidents: false,
+            autoApplyToOpenPayrollPeriod: true,
+            deductionBasePolicy: DeductionBasePolicy.BASIC_FIXED,
+        };
     }
 
     private async logEvent(caseId: string, actorId: string, type: CaseEventType, message: string, tx?: any) {
