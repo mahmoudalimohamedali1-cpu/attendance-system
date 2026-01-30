@@ -55,6 +55,7 @@ import {
   Speed as SpeedIcon,
   Link as LinkIcon,
   Forum as ForumIcon,
+  AccountBalance,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/services/api.service';
@@ -138,7 +139,7 @@ const payrollGroup: MenuGroup = {
     { text: 'إعدادات الرواتب', icon: <Settings />, path: '/payroll-settings', requiredRole: 'ADMIN' },
     { text: 'دورات الرواتب', icon: <MonetizationOn />, path: '/salary', requiredRole: 'ADMIN' },
     { text: 'قسائم الرواتب', icon: <Description />, path: '/payslips', requiredRole: 'ADMIN' },
-    { text: 'إدارة المكافآت', icon: <EmojiEvents />, path: '/bonus-management', requiredRole: 'ADMIN' },
+    { text: 'مركز تعديلات الرواتب', icon: <AccountBalance />, path: '/bonus-management', requiredRole: 'ADMIN' },
     { text: 'إدارة العمولات', icon: <TrendingUp />, path: '/commission-management', requiredRole: 'ADMIN' },
     { text: 'تقارير الرواتب', icon: <Assessment />, path: '/payroll-reports', requiredRole: 'ADMIN' },
     { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises', requiredRole: 'ADMIN' },
