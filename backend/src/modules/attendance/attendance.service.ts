@@ -1111,24 +1111,21 @@ export class AttendanceService {
       const graceMinutes = branch.lateGracePeriod || 15;
       const graceEndMinutes = startMinutes + graceMinutes;
 
-      // 🔧 FIX: The check_in_time is stored as-is from the correction input (local time)
-      // Don't convert from UTC - use the time directly
+      // 🔧 FIX: The database stores check_in_time as UTC (with Z suffix)
+      // We need to convert it to local timezone for comparison with work_start_time
       const checkInDate = new Date(finalCheckInTime);
-
-      // Extract hours/minutes from the stored time directly
-      // The database stores these times as local time, not UTC
-      const checkInHours = checkInDate.getUTCHours(); // Use UTC getters since Date is stored as UTC representation of local time
-      const checkInMins = checkInDate.getUTCMinutes();
+      const checkInInTz = this.timezoneService.convertToTimezone(checkInDate, timezone);
+      const checkInHours = checkInInTz.getHours();
+      const checkInMins = checkInInTz.getMinutes();
       const checkInMinutes = checkInHours * 60 + checkInMins;
 
-      console.log('📊 Recalculating late (FIXED):', {
+      console.log('📊 Recalculating late (FIXED v2):', {
         timezone,
         workStartTime: ramadanSchedule.workStartTime,
         startMinutes,
         graceEndMinutes,
-        checkInTime: finalCheckInTime,
-        checkInHours,
-        checkInMins,
+        checkInTimeUTC: finalCheckInTime,
+        checkInTimeLocal: `${checkInHours}:${String(checkInMins).padStart(2, '0')}`,
         checkInMinutes
       });
 
