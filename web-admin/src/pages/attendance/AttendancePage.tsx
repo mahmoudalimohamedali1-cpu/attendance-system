@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box,
@@ -168,7 +169,7 @@ export const AttendancePage = () => {
             متابعة حضور وانصراف الموظفين
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<FileDownload />}>
+        <Button variant="contained" startIcon={<FileDownload />} onClick={exportToCSV}>
           تصدير التقرير
         </Button>
       </Box>

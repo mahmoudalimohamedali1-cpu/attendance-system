@@ -357,11 +357,6 @@ export default function BonusManagementPage() {
     queryFn: () => api.get('/payroll-adjustments/attendance-deductions-preview'),
   });
 
-  // جلب معاينة أقساط السلف
-  const { data: advanceDeductions, isLoading: loadingAdvanceDeductions } = useQuery({
-    queryKey: ['advance-deductions-preview'],
-    queryFn: () => api.get('/payroll-adjustments/advance-deductions-preview'),
-  });
 
   // جلب معاينة خصومات الإجازات (مرضى + بدون راتب)
   const { data: leaveDeductions, isLoading: loadingLeaveDeductions } = useQuery({
@@ -546,11 +541,7 @@ export default function BonusManagementPage() {
             label="خصومات الحضور"
             sx={{ color: 'error.main' }}
           />
-          <Tab
-            icon={<AdvanceIcon />}
-            iconPosition="start"
-            label="أقساط السلف"
-          />
+
           <Tab
             icon={<DisciplinaryIcon />}
             iconPosition="start"
@@ -744,139 +735,8 @@ export default function BonusManagementPage() {
       </TabPanel>
 
 
-      {/* تاب 1: أقساط السلف */}
+      {/* تاب 1: الجزاءات والعهد */}
       <TabPanel value={tabValue} index={1}>
-        <Alert severity="info" sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" fontWeight="bold">
-            💰 أقساط السلف المستحقة للفترة الحالية
-          </Typography>
-          <Typography variant="body2">
-            هنا يتم عرض أقساط السلف المستحقة للخصم من رواتب الموظفين. يمكنك تأجيل قسط لفترة لاحقة.
-          </Typography>
-        </Alert>
-
-        {loadingAdvanceDeductions ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            {/* ملخص أقساط السلف */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={6}>
-                <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-                  <CardContent>
-                    <Typography variant="body2">إجمالي الأقساط المستحقة</Typography>
-                    <Typography variant="h5" fontWeight="bold">
-                      {formatCurrency((advanceDeductions as any)?.totals?.totalInstallments || 0)}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card sx={{ bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
-                  <CardContent>
-                    <Typography variant="body2">عدد السلف النشطة</Typography>
-                    <Typography variant="h5" fontWeight="bold">
-                      {(advanceDeductions as any)?.totals?.count || 0} سلفة
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: 'grey.100' }}>
-                    <TableCell>الموظف</TableCell>
-                    <TableCell>رقم السلفة</TableCell>
-                    <TableCell align="center">المبلغ الأصلي</TableCell>
-                    <TableCell align="center">المتبقي</TableCell>
-                    <TableCell align="center">القسط الشهري</TableCell>
-                    <TableCell align="center">الحالة</TableCell>
-                    <TableCell align="center">الإجراءات</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {((advanceDeductions as any)?.advances || []).map((adv: any) => (
-                    <TableRow key={adv.advanceId} hover>
-                      <TableCell>
-                        <Box>
-                          <Typography fontWeight="medium">{adv.employeeName}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {adv.employeeCode}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={adv.advanceCode} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell align="center">{formatCurrency(adv.originalAmount)}</TableCell>
-                      <TableCell align="center">
-                        <Typography color="warning.main" fontWeight="bold">
-                          {formatCurrency(adv.remainingAmount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={formatCurrency(adv.monthlyInstallment)}
-                          color="primary"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label="مستحق للخصم"
-                          color="info"
-                          size="small"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="تأجيل للشهر القادم">
-                          <IconButton
-                            color="warning"
-                            size="small"
-                            onClick={() => toast.success('سيتم تفعيل تأجيل الأقساط قريباً')}
-                          >
-                            <ScheduleIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="اعتماد الخصم">
-                          <IconButton
-                            color="success"
-                            size="small"
-                            onClick={() => toast.success('سيتم تفعيل اعتماد الخصم قريباً')}
-                          >
-                            <ApproveIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {(!advanceDeductions || (advanceDeductions as any)?.advances?.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center">
-                        <Box sx={{ py: 4 }}>
-                          <AdvanceIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
-                          <Typography color="text.secondary">
-                            لا توجد أقساط سلف مستحقة للفترة الحالية
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </>
-        )}
-      </TabPanel>
-
-
-      {/* تاب 2: الجزاءات والعهد */}
-      <TabPanel value={tabValue} index={2}>
         <Alert severity="warning" sx={{ mb: 3 }}>
           <Typography variant="subtitle2" fontWeight="bold">
             ⚖️ الخصومات من الجزاءات والعهد
@@ -1005,7 +865,7 @@ export default function BonusManagementPage() {
       </TabPanel>
 
       {/* تاب 3: خصومات الإجازات */}
-      <TabPanel value={tabValue} index={3}>
+      <TabPanel value={tabValue} index={2}>
         <Alert severity="info" sx={{ mb: 3 }}>
           <Typography variant="subtitle2" fontWeight="bold">
             🏥 خصومات الإجازات للفترة الحالية
@@ -1120,7 +980,7 @@ export default function BonusManagementPage() {
       </TabPanel>
 
       {/* تاب 4: التأمينات الاجتماعية GOSI */}
-      <TabPanel value={tabValue} index={4}>
+      <TabPanel value={tabValue} index={3}>
         <Alert severity="success" sx={{ mb: 3 }}>
           <Typography variant="subtitle2" fontWeight="bold">
             🏛️ التأمينات الاجتماعية (GOSI) - للمعلومات فقط
@@ -1232,7 +1092,7 @@ export default function BonusManagementPage() {
       </TabPanel>
 
       {/* تاب 5: برامج المكافآت */}
-      <TabPanel value={tabValue} index={5}>
+      <TabPanel value={tabValue} index={4}>
         {loadingPrograms ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -1324,7 +1184,7 @@ export default function BonusManagementPage() {
       </TabPanel>
 
       {/* الموافقات المعلقة - تاب 6 */}
-      <TabPanel value={tabValue} index={6}>
+      <TabPanel value={tabValue} index={5}>
         {loadingPending ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -1493,7 +1353,7 @@ export default function BonusManagementPage() {
       </TabPanel>
 
       {/* ⚡ الخصومات والمكافآت الفورية - تاب 7 */}
-      <TabPanel value={tabValue} index={7}>
+      <TabPanel value={tabValue} index={6}>
         <Box sx={{ mb: 3 }}>
           <Button
             variant="contained"
