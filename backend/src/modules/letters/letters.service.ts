@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateLetterRequestDto } from './dto/create-letter-request.dto';
 import { LetterQueryDto } from './dto/letter-query.dto';
-import { LetterStatus, LetterType, User } from '@prisma/client';
+import { LetterStatus, LetterType, ApprovalStep, User } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UploadService } from '../../common/upload/upload.service';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -333,21 +333,25 @@ export class LettersService {
       throw new BadRequestException('لا يمكنك إلغاء طلب خطاب شخص آخر');
     }
 
-    if (letterRequest.status !== 'PENDING') {
-      throw new BadRequestException('لا يمكن إلغاء طلب تم البت فيه');
+    // السماح بإلغاء الطلبات المعلقة أو الموافق عليها من المدير فقط
+    const cancellableStatuses = ['PENDING', 'MGR_APPROVED'];
+    if (!cancellableStatuses.includes(letterRequest.status)) {
+      throw new BadRequestException('لا يمكن إلغاء طلب تم البت فيه نهائياً');
     }
 
     return this.prisma.letterRequest.update({
       where: { id },
-      data: { status: LetterStatus.CANCELLED },
+      data: {
+        status: LetterStatus.CANCELLED,
+        currentStep: 'COMPLETED',
+      },
     });
   }
 
   // ==================== Workflow: Manager Inbox ====================
 
-  async getManagerInbox(managerId: string, companyId: string) {
+  async getManagerInbox(managerId: string, companyId: string, page = 1, limit = 20) {
     // استخدام نظام الصلاحيات للحصول على الموظفين المتاحين
-    // يشمل: المرؤوسين المباشرين + أي موظفين ضمن نطاق صلاحية LETTERS_APPROVE_MANAGER
     const accessibleEmployeeIds = await this.permissionsService.getAccessibleEmployeeIds(
       managerId,
       companyId,
@@ -355,27 +359,36 @@ export class LettersService {
     );
 
     if (accessibleEmployeeIds.length === 0) {
-      return [];
+      return { data: [], pagination: { page, limit, total: 0, totalPages: 0 } };
     }
 
-    return this.prisma.letterRequest.findMany({
-      where: {
-        userId: { in: accessibleEmployeeIds },
-        currentStep: 'MANAGER',
-        status: 'PENDING',
-      },
-      include: {
-        user: {
-          select: { id: true, firstName: true, lastName: true, email: true, employeeCode: true },
+    const where = {
+      userId: { in: accessibleEmployeeIds },
+      currentStep: ApprovalStep.MANAGER,
+      status: LetterStatus.PENDING,
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.letterRequest.findMany({
+        where,
+        include: {
+          user: {
+            select: { id: true, firstName: true, lastName: true, email: true, employeeCode: true },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.letterRequest.count({ where }),
+    ]);
+
+    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   // ==================== Workflow: HR Inbox ====================
 
-  async getHRInbox(hrUserId: string, companyId: string) {
+  async getHRInbox(hrUserId: string, companyId: string, page = 1, limit = 20) {
     // جلب الموظفين المتاحين لـ HR بناءً على صلاحياته
     const accessibleIds = await this.permissionsService.getAccessibleEmployeeIds(
       hrUserId,
@@ -385,25 +398,34 @@ export class LettersService {
 
     // 🔒 SECURITY FIX: إذا لم يكن لديه صلاحيات، لا نظهر أي طلبات
     if (accessibleIds.length === 0) {
-      return [];
+      return { data: [], pagination: { page, limit, total: 0, totalPages: 0 } };
     }
 
-    return this.prisma.letterRequest.findMany({
-      where: {
-        currentStep: 'HR',
-        status: 'MGR_APPROVED',
-        userId: { in: accessibleIds },
-      },
-      include: {
-        user: {
-          select: { id: true, firstName: true, lastName: true, email: true, employeeCode: true },
+    const where = {
+      currentStep: ApprovalStep.HR,
+      status: LetterStatus.MGR_APPROVED,
+      userId: { in: accessibleIds },
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.letterRequest.findMany({
+        where,
+        include: {
+          user: {
+            select: { id: true, firstName: true, lastName: true, email: true, employeeCode: true },
+          },
+          managerApprover: {
+            select: { id: true, firstName: true, lastName: true },
+          },
         },
-        managerApprover: {
-          select: { id: true, firstName: true, lastName: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.letterRequest.count({ where }),
+    ]);
+
+    return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   // ==================== Workflow: Manager Decision ====================
