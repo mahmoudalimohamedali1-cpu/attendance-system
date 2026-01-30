@@ -606,12 +606,12 @@ export class PayrollAdjustmentsService {
             };
         }
 
-        // جلب بيانات الحضور للفترة
+        // جلب بيانات الموظفين
         const employees = await this.prisma.user.findMany({
             where: {
                 companyId,
                 status: 'ACTIVE',
-                role: { in: ['EMPLOYEE', 'MANAGER', 'SUPERVISOR'] },
+                role: { in: ['EMPLOYEE', 'MANAGER'] },
             },
             select: {
                 id: true,
