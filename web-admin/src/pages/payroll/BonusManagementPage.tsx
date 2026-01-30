@@ -59,6 +59,8 @@ import {
   Gavel as DisciplinaryIcon,
   LocalHospital as SickIcon,
   Security as SecurityIcon,
+  Edit as EditIcon,
+  SwapHoriz as SwapHorizIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api.service';
@@ -129,6 +131,15 @@ export default function BonusManagementPage() {
     deductionType: 'TASK_FAILURE',
     autoApprove: true,
   });
+
+  // State for deduction approval dialogs
+  const [modifyDialog, setModifyDialog] = useState<{ open: boolean; employee: any | null }>({ open: false, employee: null });
+  const [convertDialog, setConvertDialog] = useState<{ open: boolean; employee: any | null }>({ open: false, employee: null });
+  const [modifyAmount, setModifyAmount] = useState(0);
+  const [modifyReason, setModifyReason] = useState('');
+  const [leaveDays, setLeaveDays] = useState(1);
+  const [leaveType, setLeaveType] = useState('annual');
+
   const queryClient = useQueryClient();
 
   // Form State
@@ -298,6 +309,44 @@ export default function BonusManagementPage() {
       queryClient.invalidateQueries({ queryKey: ['advance-deductions-preview'] });
     },
     onError: () => toast.error('حدث خطأ'),
+  });
+
+  // ========== Mutations لإجراءات الخصومات ==========
+
+  // إلغاء خصم (Waive)
+  const waiveDeductionMutation = useMutation({
+    mutationFn: (dto: any) => api.post('/payroll-adjustments/attendance-deductions/waive', dto),
+    onSuccess: (result: any) => {
+      toast.success(result?.message || 'تم إلغاء الخصم بنجاح');
+      queryClient.invalidateQueries({ queryKey: ['attendance-deductions-preview'] });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'حدث خطأ أثناء إلغاء الخصم'),
+  });
+
+  // تعديل مبلغ الخصم (Modify)
+  const modifyDeductionMutation = useMutation({
+    mutationFn: (dto: any) => api.post('/payroll-adjustments/attendance-deductions/modify', dto),
+    onSuccess: (result: any) => {
+      toast.success(result?.message || 'تم تعديل الخصم بنجاح');
+      setModifyDialog({ open: false, employee: null });
+      setModifyAmount(0);
+      setModifyReason('');
+      queryClient.invalidateQueries({ queryKey: ['attendance-deductions-preview'] });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'حدث خطأ أثناء تعديل الخصم'),
+  });
+
+  // تحويل الخصم لإجازة (Convert to Leave)
+  const convertToLeaveMutation = useMutation({
+    mutationFn: (dto: any) => api.post('/payroll-adjustments/attendance-deductions/convert-to-leave', dto),
+    onSuccess: (result: any) => {
+      toast.success(result?.message || 'تم تحويل الخصم لإجازة بنجاح');
+      setConvertDialog({ open: false, employee: null });
+      setLeaveDays(1);
+      setLeaveType('annual');
+      queryClient.invalidateQueries({ queryKey: ['attendance-deductions-preview'] });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'حدث خطأ أثناء تحويل الخصم لإجازة'),
   });
 
   // ============= معاينة خصومات الحضور والسلف =============
@@ -633,22 +682,43 @@ export default function BonusManagementPage() {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Tooltip title="اعتماد الخصم">
-                          <IconButton
-                            color="success"
-                            size="small"
-                            onClick={() => toast.success('سيتم تفعيل اعتماد الخصومات قريباً')}
-                          >
-                            <ApproveIcon />
-                          </IconButton>
-                        </Tooltip>
+                        {/* إلغاء الخصم بالكامل */}
                         <Tooltip title="إلغاء الخصم">
                           <IconButton
                             color="error"
                             size="small"
-                            onClick={() => toast.success('سيتم تفعيل إلغاء الخصومات قريباً')}
+                            disabled={waiveDeductionMutation.isPending}
+                            onClick={() => waiveDeductionMutation.mutate({
+                              employeeId: emp.employeeId,
+                              deductionType: emp.lateDeduction > emp.absenceDeduction ? 'LATE' : 'ABSENCE',
+                              originalAmount: emp.totalDeduction,
+                              reason: 'إلغاء الخصم من مركز تعديلات الرواتب',
+                            })}
                           >
                             <RejectIcon />
+                          </IconButton>
+                        </Tooltip>
+                        {/* تعديل المبلغ */}
+                        <Tooltip title="تعديل المبلغ">
+                          <IconButton
+                            color="warning"
+                            size="small"
+                            onClick={() => {
+                              setModifyDialog({ open: true, employee: emp });
+                              setModifyAmount(emp.totalDeduction);
+                            }}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        {/* تحويل لإجازة */}
+                        <Tooltip title="تحويل لإجازة">
+                          <IconButton
+                            color="info"
+                            size="small"
+                            onClick={() => setConvertDialog({ open: true, employee: emp })}
+                          >
+                            <SwapHorizIcon />
                           </IconButton>
                         </Tooltip>
                       </TableCell>
@@ -1965,6 +2035,120 @@ export default function BonusManagementPage() {
               : instantForm.type === 'DEDUCTION'
                 ? `خصم ${instantForm.amount} ر.س`
                 : `مكافأة ${instantForm.amount} ر.س`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ========== Dialog تعديل مبلغ الخصم ========== */}
+      <Dialog open={modifyDialog.open} onClose={() => setModifyDialog({ open: false, employee: null })} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+          <EditIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+          تعديل مبلغ الخصم
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            سيتم إنشاء تسوية بالفرق بين المبلغ الأصلي والمبلغ الجديد
+          </Alert>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            <strong>الموظف:</strong> {modifyDialog.employee?.employeeName}
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            <strong>المبلغ الأصلي:</strong> {modifyDialog.employee?.totalDeduction?.toFixed(2)} ر.س
+          </Typography>
+          <TextField
+            label="المبلغ الجديد"
+            type="number"
+            value={modifyAmount}
+            onChange={(e) => setModifyAmount(Number(e.target.value))}
+            fullWidth
+            inputProps={{ min: 0, max: modifyDialog.employee?.totalDeduction }}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="سبب التعديل"
+            value={modifyReason}
+            onChange={(e) => setModifyReason(e.target.value)}
+            fullWidth
+            multiline
+            rows={2}
+            placeholder="اذكر سبب تعديل مبلغ الخصم..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModifyDialog({ open: false, employee: null })}>إلغاء</Button>
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={modifyDeductionMutation.isPending || modifyAmount >= (modifyDialog.employee?.totalDeduction || 0) || !modifyReason}
+            onClick={() => modifyDeductionMutation.mutate({
+              employeeId: modifyDialog.employee?.employeeId,
+              deductionType: 'LATE',
+              originalAmount: modifyDialog.employee?.totalDeduction,
+              newAmount: modifyAmount,
+              reason: modifyReason,
+            })}
+            startIcon={modifyDeductionMutation.isPending ? <CircularProgress size={20} /> : <EditIcon />}
+          >
+            {modifyDeductionMutation.isPending ? 'جاري الحفظ...' : 'تأكيد التعديل'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ========== Dialog تحويل الخصم لإجازة ========== */}
+      <Dialog open={convertDialog.open} onClose={() => setConvertDialog({ open: false, employee: null })} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ bgcolor: 'info.light', color: 'info.contrastText' }}>
+          <SwapHorizIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+          تحويل الخصم لإجازة
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            سيتم إلغاء الخصم النقدي وخصم أيام من رصيد الإجازات بدلاً منه
+          </Alert>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            <strong>الموظف:</strong> {convertDialog.employee?.employeeName}
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            <strong>مبلغ الخصم:</strong> {convertDialog.employee?.totalDeduction?.toFixed(2)} ر.س
+          </Typography>
+          <TextField
+            label="عدد أيام الإجازة"
+            type="number"
+            value={leaveDays}
+            onChange={(e) => setLeaveDays(Number(e.target.value))}
+            fullWidth
+            inputProps={{ min: 0.5, step: 0.5 }}
+            sx={{ mb: 2 }}
+          />
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>نوع الإجازة</InputLabel>
+            <Select
+              value={leaveType}
+              label="نوع الإجازة"
+              onChange={(e) => setLeaveType(e.target.value)}
+            >
+              <MenuItem value="annual">إجازة سنوية</MenuItem>
+              <MenuItem value="unpaid">إجازة بدون راتب</MenuItem>
+              <MenuItem value="sick">إجازة مرضية</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConvertDialog({ open: false, employee: null })}>إلغاء</Button>
+          <Button
+            variant="contained"
+            color="info"
+            disabled={convertToLeaveMutation.isPending || leaveDays <= 0}
+            onClick={() => convertToLeaveMutation.mutate({
+              employeeId: convertDialog.employee?.employeeId,
+              deductionType: 'LATE',
+              originalAmount: convertDialog.employee?.totalDeduction,
+              leaveDays: leaveDays,
+              leaveType: leaveType,
+              reason: `تحويل خصم حضور بمبلغ ${convertDialog.employee?.totalDeduction} ر.س إلى ${leaveDays} يوم إجازة`,
+            })}
+            startIcon={convertToLeaveMutation.isPending ? <CircularProgress size={20} /> : <SwapHorizIcon />}
+          >
+            {convertToLeaveMutation.isPending ? 'جاري الحفظ...' : `تحويل إلى ${leaveDays} يوم إجازة`}
           </Button>
         </DialogActions>
       </Dialog>

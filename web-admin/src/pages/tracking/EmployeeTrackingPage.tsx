@@ -3,7 +3,7 @@
  * تعرض قائمة الموظفين الحاضرين مع موقعهم وخريطة حية
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Box,
     Paper,
@@ -37,6 +37,13 @@ import {
     Divider,
     Tabs,
     Tab,
+    Snackbar,
+    Switch,
+    FormControlLabel,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
 } from '@mui/material';
 import {
     MyLocation as LocationIcon,
@@ -51,6 +58,11 @@ import {
     Map as MapIcon,
     ViewModule as CardsIcon,
     Assessment as ReportIcon,
+    Notifications as NotificationIcon,
+    Send as SendIcon,
+    VolumeUp as VolumeUpIcon,
+    VolumeOff as VolumeOffIcon,
+    Message as MessageIcon,
 } from '@mui/icons-material';
 
 import {
@@ -62,15 +74,25 @@ import LiveMapView, { Branch } from '@/components/tracking/LiveMapView';
 import { api } from '@/services/api.service';
 import TrackingReportsPanel from './TrackingReportsPanel';
 
+// رسائل الإشعارات الجاهزة
+const PRESET_MESSAGES = [
+    { id: 'return', label: 'تنبيه العودة', message: 'يرجى العودة إلى نطاق العمل المحدد فوراً.' },
+    { id: 'warning', label: 'تحذير رسمي', message: 'تم رصد خروجك من نطاق العمل. هذا تحذير رسمي.' },
+    { id: 'check', label: 'استفسار', message: 'تم ملاحظة خروجك من النطاق. هل كل شيء على ما يرام؟' },
+    { id: 'urgent', label: 'عاجل', message: 'يجب العودة فوراً للعمل أو التواصل مع المدير المباشر.' },
+];
+
 // مكون كارت الموظف
 const EmployeeCard = ({
     employee,
     onViewHistory,
     onViewExits,
+    onSendNotification,
 }: {
     employee: ActiveEmployee;
     onViewHistory: (id: string) => void;
     onViewExits: (id: string) => void;
+    onSendNotification: (employee: ActiveEmployee) => void;
 }) => {
     const isOutside = employee.lastLocation && !employee.lastLocation?.isInsideGeofence;
 
@@ -185,6 +207,21 @@ const EmployeeCard = ({
                             <ExitIcon />
                         </IconButton>
                     </Tooltip>
+                    {isOutside && (
+                        <Tooltip title="إرسال إشعار">
+                            <IconButton
+                                size="small"
+                                sx={{
+                                    color: 'white',
+                                    bgcolor: 'rgba(255,255,255,0.2)',
+                                    '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }
+                                }}
+                                onClick={() => onSendNotification(employee)}
+                            >
+                                <NotificationIcon />
+                            </IconButton>
+                        </Tooltip>
+                    )}
                 </Box>
             </CardContent>
         </Card>
@@ -204,10 +241,60 @@ export const EmployeeTrackingPage = () => {
     const [viewMode, setViewMode] = useState<'cards' | 'map' | 'reports'>('cards');
     const [branches, setBranches] = useState<Branch[]>([]);
 
+    // Sound Alert States
+    const [soundEnabled, setSoundEnabled] = useState(() => {
+        const saved = localStorage.getItem('tracking-sound-enabled');
+        return saved ? JSON.parse(saved) : true;
+    });
+    const previousOutsideIdsRef = useRef<Set<string>>(new Set());
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Notification Dialog States
+    const [showNotificationDialog, setShowNotificationDialog] = useState(false);
+    const [notificationTarget, setNotificationTarget] = useState<ActiveEmployee | null>(null);
+    const [notificationMessage, setNotificationMessage] = useState('');
+    const [selectedPreset, setSelectedPreset] = useState('');
+    const [sendingNotification, setSendingNotification] = useState(false);
+    const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
+
+    // Initialize audio element
+    useEffect(() => {
+        audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQCKs9m+mDYfIH+v1siVOS0bXZnApn8xMU1/p7CPTU9HZoydhWRNWm1+jYdxY2ZzeIR6c3N1c3d1end1eXd4eHd4d3d4d3h3d3d3d3d3');
+        audioRef.current.volume = 0.5;
+    }, []);
+
+    // Save sound preference
+    useEffect(() => {
+        localStorage.setItem('tracking-sound-enabled', JSON.stringify(soundEnabled));
+    }, [soundEnabled]);
+
+    // Play alert sound when new employees exit geofence
+    const playAlertSound = useCallback(() => {
+        if (soundEnabled && audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(console.error);
+        }
+    }, [soundEnabled]);
+
     const fetchEmployees = useCallback(async () => {
         try {
             setRefreshing(true);
             const data = await locationTrackingService.getActiveEmployees();
+
+            // Check for new outside employees
+            const currentOutsideIds = new Set<string>(
+                data.filter((emp: ActiveEmployee) => emp.lastLocation && !emp.lastLocation.isInsideGeofence)
+                    .map((emp: ActiveEmployee) => emp.id)
+            );
+
+            // Find new exits (employees who just went outside)
+            currentOutsideIds.forEach((id: string) => {
+                if (!previousOutsideIdsRef.current.has(id)) {
+                    playAlertSound();
+                }
+            });
+
+            previousOutsideIdsRef.current = currentOutsideIds;
             setEmployees(data);
             setError(null);
         } catch (err: any) {
@@ -216,7 +303,7 @@ export const EmployeeTrackingPage = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [playAlertSound]);
 
     // Fetch branches for map
     const fetchBranches = useCallback(async () => {
@@ -258,6 +345,47 @@ export const EmployeeTrackingPage = () => {
         window.open(`/employee-profile/${userId}?tab=location`, '_blank');
     };
 
+    // Handle notification sending
+    const handleOpenNotification = (employee: ActiveEmployee) => {
+        setNotificationTarget(employee);
+        setNotificationMessage('');
+        setSelectedPreset('');
+        setShowNotificationDialog(true);
+    };
+
+    const handlePresetChange = (presetId: string) => {
+        setSelectedPreset(presetId);
+        const preset = PRESET_MESSAGES.find(p => p.id === presetId);
+        if (preset) {
+            setNotificationMessage(preset.message);
+        }
+    };
+
+    const handleSendNotification = async () => {
+        if (!notificationTarget || !notificationMessage.trim()) return;
+
+        setSendingNotification(true);
+        try {
+            await api.post('/notifications/send', {
+                userId: notificationTarget.id,
+                title: 'تنبيه من إدارة الموارد البشرية',
+                message: notificationMessage,
+                type: 'GEOFENCE_ALERT',
+            });
+
+            setSnackbar({ open: true, message: 'تم إرسال الإشعار بنجاح', severity: 'success' });
+            setShowNotificationDialog(false);
+        } catch (err: any) {
+            setSnackbar({
+                open: true,
+                message: err.response?.data?.message || 'حدث خطأ في إرسال الإشعار',
+                severity: 'error'
+            });
+        } finally {
+            setSendingNotification(false);
+        }
+    };
+
     const filteredEmployees = employees.filter(
         (emp) =>
             emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -290,15 +418,34 @@ export const EmployeeTrackingPage = () => {
                         مراقبة مواقع الموظفين الحاضرين في الوقت الفعلي
                     </Typography>
                 </Box>
-                <Tooltip title="تحديث">
-                    <IconButton
-                        onClick={fetchEmployees}
-                        disabled={refreshing}
-                        sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}
-                    >
-                        {refreshing ? <CircularProgress size={24} color="inherit" /> : <RefreshIcon />}
-                    </IconButton>
-                </Tooltip>
+                <Box display="flex" alignItems="center" gap={2}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={soundEnabled}
+                                onChange={(e) => setSoundEnabled(e.target.checked)}
+                                color="primary"
+                            />
+                        }
+                        label={
+                            <Box display="flex" alignItems="center" gap={0.5}>
+                                {soundEnabled ? <VolumeUpIcon /> : <VolumeOffIcon />}
+                                <Typography variant="body2">
+                                    {soundEnabled ? 'التنبيه الصوتي' : 'صامت'}
+                                </Typography>
+                            </Box>
+                        }
+                    />
+                    <Tooltip title="تحديث">
+                        <IconButton
+                            onClick={fetchEmployees}
+                            disabled={refreshing}
+                            sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}
+                        >
+                            {refreshing ? <CircularProgress size={24} color="inherit" /> : <RefreshIcon />}
+                        </IconButton>
+                    </Tooltip>
+                </Box>
             </Box>
 
             {error && (
@@ -456,6 +603,7 @@ export const EmployeeTrackingPage = () => {
                                         employee={employee}
                                         onViewHistory={handleViewHistory}
                                         onViewExits={handleViewExits}
+                                        onSendNotification={handleOpenNotification}
                                     />
                                 </Grid>
                             ))}
@@ -529,6 +677,100 @@ export const EmployeeTrackingPage = () => {
                     <Button onClick={() => setShowExitsDialog(false)}>إغلاق</Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Dialog إرسال إشعار */}
+            <Dialog
+                open={showNotificationDialog}
+                onClose={() => setShowNotificationDialog(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <NotificationIcon color="primary" />
+                    إرسال إشعار للموظف
+                </DialogTitle>
+                <DialogContent dividers>
+                    {notificationTarget && (
+                        <Box mb={3}>
+                            <Box display="flex" alignItems="center" gap={2} mb={2}>
+                                <Avatar sx={{ bgcolor: 'error.main' }}>
+                                    {notificationTarget.firstName.charAt(0)}
+                                </Avatar>
+                                <Box>
+                                    <Typography fontWeight="bold">
+                                        {notificationTarget.firstName} {notificationTarget.lastName}
+                                    </Typography>
+                                    <Chip
+                                        size="small"
+                                        label="خارج النطاق"
+                                        color="error"
+                                        icon={<WarningIcon />}
+                                    />
+                                </Box>
+                            </Box>
+
+                            <FormControl fullWidth sx={{ mb: 2 }}>
+                                <InputLabel>رسالة جاهزة</InputLabel>
+                                <Select
+                                    value={selectedPreset}
+                                    onChange={(e) => handlePresetChange(e.target.value)}
+                                    label="رسالة جاهزة"
+                                >
+                                    <MenuItem value=""><em>اختر رسالة أو اكتب رسالتك</em></MenuItem>
+                                    {PRESET_MESSAGES.map(preset => (
+                                        <MenuItem key={preset.id} value={preset.id}>
+                                            {preset.label}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
+                            <TextField
+                                fullWidth
+                                multiline
+                                rows={3}
+                                label="نص الإشعار"
+                                value={notificationMessage}
+                                onChange={(e) => setNotificationMessage(e.target.value)}
+                                placeholder="اكتب نص الإشعار هنا..."
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1.5 }}>
+                                            <MessageIcon />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowNotificationDialog(false)}>إلغاء</Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleSendNotification}
+                        disabled={!notificationMessage.trim() || sendingNotification}
+                        startIcon={sendingNotification ? <CircularProgress size={20} /> : <SendIcon />}
+                    >
+                        {sendingNotification ? 'جاري الإرسال...' : 'إرسال'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Snackbar للرسائل */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+            >
+                <Alert
+                    severity={snackbar.severity}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };
