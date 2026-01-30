@@ -24,18 +24,22 @@ export class LettersService {
     private permissionsService: PermissionsService,
   ) { }
 
-  async createLetterRequest(userId: string, createLetterDto: CreateLetterRequestDto) {
+  async createLetterRequest(userId: string, companyId: string, createLetterDto: CreateLetterRequestDto) {
     const { type, notes, attachments } = createLetterDto;
 
-    // جلب بيانات المستخدم لمعرفة مديره المباشر
+    // جلب بيانات المستخدم لمعرفة مديره المباشر والشركة
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, managerId: true, firstName: true, lastName: true },
+      select: { id: true, managerId: true, firstName: true, lastName: true, companyId: true },
     });
+
+    // استخدام companyId من المستخدم إذا لم يتم توفيرها
+    const effectiveCompanyId = companyId || user?.companyId;
 
     const letterRequest = await this.prisma.letterRequest.create({
       data: {
         userId,
+        companyId: effectiveCompanyId || undefined,
         type,
         notes: notes || undefined,
         attachments: attachments && attachments.length > 0
@@ -236,7 +240,7 @@ export class LettersService {
   }
 
 
-  async approveLetterRequest(id: string, approverId: string, notes?: string, attachments?: any[]) {
+  async approveLetterRequest(id: string, approverId: string, companyId: string, notes?: string, attachments?: any[]) {
     const letterRequest = await this.prisma.letterRequest.findUnique({
       where: { id },
       include: { user: true },
@@ -248,34 +252,35 @@ export class LettersService {
 
     // Route through workflow based on currentStep
     const currentStep = (letterRequest as any).currentStep || 'MANAGER';
+    const effectiveCompanyId = companyId || letterRequest.companyId || '';
 
     if (currentStep === 'MANAGER') {
       // Check if this user is the assigned manager approver
       if ((letterRequest as any).managerApproverId === approverId) {
-        return this.managerDecision(id, approverId, 'APPROVED', notes, attachments);
+        return this.managerDecision(id, approverId, effectiveCompanyId, 'APPROVED', notes, attachments);
       }
 
       // Or check if they have general LETTERS_APPROVE_MANAGER permission
       const canApprove = await this.permissionsService.canAccessEmployee(
         approverId,
-        letterRequest.companyId || '',
+        effectiveCompanyId,
         'LETTERS_APPROVE_MANAGER',
         letterRequest.userId
       );
       if (canApprove.hasAccess) {
-        return this.managerDecision(id, approverId, 'APPROVED', notes, attachments);
+        return this.managerDecision(id, approverId, effectiveCompanyId, 'APPROVED', notes, attachments);
       }
 
       throw new ForbiddenException('ليس لديك صلاحية الموافقة على طلبات هذا الموظف');
     } else if (currentStep === 'HR') {
       // Route to HR decision
-      return this.hrDecision(id, approverId, 'APPROVED', notes, attachments);
+      return this.hrDecision(id, approverId, effectiveCompanyId, 'APPROVED', notes, attachments);
     } else {
       throw new BadRequestException('هذا الطلب تم البت فيه مسبقاً');
     }
   }
 
-  async rejectLetterRequest(id: string, approverId: string, notes?: string, attachments?: any[]) {
+  async rejectLetterRequest(id: string, approverId: string, companyId: string, notes?: string, attachments?: any[]) {
     const letterRequest = await this.prisma.letterRequest.findUnique({
       where: { id },
       include: { user: true },
@@ -287,28 +292,29 @@ export class LettersService {
 
     // Route through workflow based on currentStep
     const currentStep = (letterRequest as any).currentStep || 'MANAGER';
+    const effectiveCompanyId = companyId || letterRequest.companyId || '';
 
     if (currentStep === 'MANAGER') {
       // Check if this user is the assigned manager approver
       if ((letterRequest as any).managerApproverId === approverId) {
-        return this.managerDecision(id, approverId, 'REJECTED', notes, attachments);
+        return this.managerDecision(id, approverId, effectiveCompanyId, 'REJECTED', notes, attachments);
       }
 
       // Or check if they have general LETTERS_APPROVE_MANAGER permission
       const canApprove = await this.permissionsService.canAccessEmployee(
         approverId,
-        letterRequest.companyId || '',
+        effectiveCompanyId,
         'LETTERS_APPROVE_MANAGER',
         letterRequest.userId
       );
       if (canApprove.hasAccess) {
-        return this.managerDecision(id, approverId, 'REJECTED', notes, attachments);
+        return this.managerDecision(id, approverId, effectiveCompanyId, 'REJECTED', notes, attachments);
       }
 
       throw new ForbiddenException('ليس لديك صلاحية رفض طلبات هذا الموظف');
     } else if (currentStep === 'HR') {
       // Route to HR decision
-      return this.hrDecision(id, approverId, 'REJECTED', notes, attachments);
+      return this.hrDecision(id, approverId, effectiveCompanyId, 'REJECTED', notes, attachments);
     } else {
       throw new BadRequestException('هذا الطلب تم البت فيه مسبقاً');
     }
@@ -377,11 +383,16 @@ export class LettersService {
       'LETTERS_APPROVE_HR'
     );
 
+    // 🔒 SECURITY FIX: إذا لم يكن لديه صلاحيات، لا نظهر أي طلبات
+    if (accessibleIds.length === 0) {
+      return [];
+    }
+
     return this.prisma.letterRequest.findMany({
       where: {
         currentStep: 'HR',
         status: 'MGR_APPROVED',
-        userId: accessibleIds.length > 0 ? { in: accessibleIds } : undefined,
+        userId: { in: accessibleIds },
       },
       include: {
         user: {
@@ -400,6 +411,7 @@ export class LettersService {
   async managerDecision(
     id: string,
     managerId: string,
+    companyId: string,
     decision: 'APPROVED' | 'REJECTED',
     notes?: string,
     attachments?: any[]
@@ -413,8 +425,29 @@ export class LettersService {
       throw new NotFoundException('طلب الخطاب غير موجود');
     }
 
-    // التحقق من أن المدير هو المسؤول عن هذا الطلب
-    if (letterRequest.managerApproverId !== managerId) {
+    // التحقق من أن المدير هو المسؤول عن هذا الطلب أو لديه صلاحية عامة
+    const effectiveCompanyId = companyId || letterRequest.companyId || '';
+    let hasPermission = false;
+
+    // Check 1: Is the assigned manager
+    if (letterRequest.managerApproverId === managerId) {
+      hasPermission = true;
+    }
+
+    // Check 2: Has general LETTERS_APPROVE_MANAGER permission
+    if (!hasPermission) {
+      const canApprove = await this.permissionsService.canAccessEmployee(
+        managerId,
+        effectiveCompanyId,
+        'LETTERS_APPROVE_MANAGER',
+        letterRequest.userId
+      );
+      if (canApprove.hasAccess) {
+        hasPermission = true;
+      }
+    }
+
+    if (!hasPermission) {
       throw new ForbiddenException('ليس لديك صلاحية الموافقة على هذا الطلب');
     }
 
@@ -479,6 +512,7 @@ export class LettersService {
   async hrDecision(
     id: string,
     hrUserId: string,
+    companyId: string,
     decision: 'APPROVED' | 'REJECTED' | 'DELAYED',
     notes?: string,
     attachments?: any[]

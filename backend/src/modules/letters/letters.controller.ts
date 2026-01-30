@@ -39,7 +39,7 @@ export class LettersController {
     private readonly uploadService: UploadService,
   ) { }
 
-  // ============ Employee Endpoints ============
+  // ============ Static Routes FIRST (before :id params) ============
 
   @Post('upload-attachments')
   @ApiOperation({ summary: 'رفع مرفقات طلب الخطاب' })
@@ -63,6 +63,7 @@ export class LettersController {
   @ApiResponse({ status: 201, description: 'تم إنشاء الطلب بنجاح' })
   async createLetterRequest(
     @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
     @Body() createLetterDto: CreateLetterRequestDto,
     @Req() req: Request,
   ) {
@@ -70,7 +71,7 @@ export class LettersController {
     if (rawBody.attachments && Array.isArray(rawBody.attachments)) {
       createLetterDto.attachments = rawBody.attachments;
     }
-    return this.lettersService.createLetterRequest(userId, createLetterDto);
+    return this.lettersService.createLetterRequest(userId, companyId, createLetterDto);
   }
 
   @Get('my')
@@ -82,6 +83,39 @@ export class LettersController {
   ) {
     return this.lettersService.getMyLetterRequests(userId, query);
   }
+
+  @Get('pending/all')
+  @ApiOperation({ summary: 'الطلبات المعلقة (حسب صلاحياتك)' })
+  @ApiResponse({ status: 200, description: 'قائمة الطلبات المعلقة التي لديك صلاحية عليها' })
+  async getPendingRequests(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Query() query: LetterQueryDto,
+  ) {
+    return this.lettersService.getPendingRequests(userId, companyId, query);
+  }
+
+  @Get('inbox/manager')
+  @ApiOperation({ summary: 'طلبات تنتظر موافقة المدير' })
+  @ApiResponse({ status: 200, description: 'قائمة الطلبات التي تنتظر موافقتك كمدير' })
+  async getManagerInbox(
+    @CurrentUser('id') managerId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.lettersService.getManagerInbox(managerId, companyId);
+  }
+
+  @Get('inbox/hr')
+  @ApiOperation({ summary: 'طلبات تنتظر موافقة HR' })
+  @ApiResponse({ status: 200, description: 'قائمة الطلبات التي تنتظر موافقة HR' })
+  async getHRInbox(
+    @CurrentUser('id') hrUserId: string,
+    @CurrentUser('companyId') companyId: string,
+  ) {
+    return this.lettersService.getHRInbox(hrUserId, companyId);
+  }
+
+  // ============ Parameterized Routes LAST (after all static routes) ============
 
   @Get(':id')
   @ApiOperation({ summary: 'تفاصيل طلب خطاب' })
@@ -104,28 +138,16 @@ export class LettersController {
     return this.lettersService.cancelLetterRequest(id, userId);
   }
 
-  // ============ Permission-Based Endpoints (uses PermissionsService) ============
-
-  @Get('pending/all')
-  @ApiOperation({ summary: 'الطلبات المعلقة (حسب صلاحياتك)' })
-  @ApiResponse({ status: 200, description: 'قائمة الطلبات المعلقة التي لديك صلاحية عليها' })
-  async getPendingRequests(
-    @CurrentUser('id') userId: string,
-    @CurrentUser('companyId') companyId: string,
-    @Query() query: LetterQueryDto,
-  ) {
-    return this.lettersService.getPendingRequests(userId, companyId, query);
-  }
-
   @Patch(':id/approve')
   @ApiOperation({ summary: 'الموافقة على طلب خطاب (حسب صلاحياتك)' })
   @ApiResponse({ status: 200, description: 'تمت الموافقة' })
   async approveLetterRequest(
     @Param('id') id: string,
     @CurrentUser('id') approverId: string,
+    @CurrentUser('companyId') companyId: string,
     @Body() body: { notes?: string; attachments?: any[] },
   ) {
-    return this.lettersService.approveLetterRequest(id, approverId, body.notes, body.attachments);
+    return this.lettersService.approveLetterRequest(id, approverId, companyId, body.notes, body.attachments);
   }
 
   @Patch(':id/reject')
@@ -134,31 +156,10 @@ export class LettersController {
   async rejectLetterRequest(
     @Param('id') id: string,
     @CurrentUser('id') approverId: string,
+    @CurrentUser('companyId') companyId: string,
     @Body() body: { notes?: string; attachments?: any[] },
   ) {
-    return this.lettersService.rejectLetterRequest(id, approverId, body.notes, body.attachments);
-  }
-
-  // ==================== Workflow Endpoints (Multi-Step Approval) ====================
-
-  @Get('inbox/manager')
-  @ApiOperation({ summary: 'طلبات تنتظر موافقة المدير' })
-  @ApiResponse({ status: 200, description: 'قائمة الطلبات التي تنتظر موافقتك كمدير' })
-  async getManagerInbox(
-    @CurrentUser('id') managerId: string,
-    @CurrentUser('companyId') companyId: string,
-  ) {
-    return this.lettersService.getManagerInbox(managerId, companyId);
-  }
-
-  @Get('inbox/hr')
-  @ApiOperation({ summary: 'طلبات تنتظر موافقة HR' })
-  @ApiResponse({ status: 200, description: 'قائمة الطلبات التي تنتظر موافقة HR' })
-  async getHRInbox(
-    @CurrentUser('id') hrUserId: string,
-    @CurrentUser('companyId') companyId: string,
-  ) {
-    return this.lettersService.getHRInbox(hrUserId, companyId);
+    return this.lettersService.rejectLetterRequest(id, approverId, companyId, body.notes, body.attachments);
   }
 
   @Post(':id/manager-decision')
@@ -167,9 +168,10 @@ export class LettersController {
   async managerDecision(
     @Param('id') id: string,
     @CurrentUser('id') managerId: string,
+    @CurrentUser('companyId') companyId: string,
     @Body() body: { decision: 'APPROVED' | 'REJECTED'; notes?: string; attachments?: any[] },
   ) {
-    return this.lettersService.managerDecision(id, managerId, body.decision, body.notes, body.attachments);
+    return this.lettersService.managerDecision(id, managerId, companyId, body.decision, body.notes, body.attachments);
   }
 
   @Post(':id/hr-decision')
@@ -178,8 +180,9 @@ export class LettersController {
   async hrDecision(
     @Param('id') id: string,
     @CurrentUser('id') hrUserId: string,
+    @CurrentUser('companyId') companyId: string,
     @Body() body: { decision: 'APPROVED' | 'REJECTED' | 'DELAYED'; notes?: string; attachments?: any[] },
   ) {
-    return this.lettersService.hrDecision(id, hrUserId, body.decision, body.notes, body.attachments);
+    return this.lettersService.hrDecision(id, hrUserId, companyId, body.decision, body.notes, body.attachments);
   }
 }
