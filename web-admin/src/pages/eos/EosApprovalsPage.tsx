@@ -185,9 +185,9 @@ const EosApprovalsPage: React.FC = () => {
                                                     <Visibility />
                                                 </IconButton>
                                             </Tooltip>
-                                            {(!t.isConfirmed && t.status !== 'APPROVED') && (
+                                            {t.status !== 'APPROVED' && t.status !== 'PAID' && t.status !== 'CANCELLED' && (
                                                 <>
-                                                    <Tooltip title="الموافقة">
+                                                    <Tooltip title={t.status === 'HR_APPROVED' ? 'موافقة المدير العام' : 'موافقة HR'}>
                                                         <IconButton
                                                             size="small"
                                                             color="success"
@@ -197,16 +197,18 @@ const EosApprovalsPage: React.FC = () => {
                                                             <Check />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title="إلغاء">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="error"
-                                                            onClick={() => handleCancel(t.id)}
-                                                            disabled={cancelMutation.isPending}
-                                                        >
-                                                            <Close />
-                                                        </IconButton>
-                                                    </Tooltip>
+                                                    {t.status === 'PENDING' && (
+                                                        <Tooltip title="إلغاء">
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => handleCancel(t.id)}
+                                                                disabled={cancelMutation.isPending}
+                                                            >
+                                                                <Close />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
                                                 </>
                                             )}
                                         </Stack>
@@ -271,15 +273,17 @@ const EosApprovalsPage: React.FC = () => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDetailsOpen(false)}>إغلاق</Button>
-                    {selectedTermination && !selectedTermination.isConfirmed && (
+                    {selectedTermination && selectedTermination.status !== 'APPROVED' && selectedTermination.status !== 'PAID' && selectedTermination.status !== 'CANCELLED' && (
                         <>
-                            <Button
-                                color="error"
-                                onClick={() => handleCancel(selectedTermination.id)}
-                                disabled={cancelMutation.isPending}
-                            >
-                                إلغاء الطلب
-                            </Button>
+                            {selectedTermination.status === 'PENDING' && (
+                                <Button
+                                    color="error"
+                                    onClick={() => handleCancel(selectedTermination.id)}
+                                    disabled={cancelMutation.isPending}
+                                >
+                                    إلغاء الطلب
+                                </Button>
+                            )}
                             <Button
                                 variant="contained"
                                 color="success"
@@ -287,7 +291,7 @@ const EosApprovalsPage: React.FC = () => {
                                 disabled={approveMutation.isPending}
                                 startIcon={<Check />}
                             >
-                                الموافقة
+                                {selectedTermination.status === 'HR_APPROVED' ? 'موافقة المدير العام' : 'موافقة HR'}
                             </Button>
                         </>
                     )}

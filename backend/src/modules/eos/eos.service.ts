@@ -458,8 +458,8 @@ export class EosService {
             newStatus = 'HR_APPROVED';
             updateData = {
                 status: newStatus,
-                hr_approved_by_id: approvedById,
-                hr_approved_at: new Date(),
+                hrApprovedById: approvedById,
+                hrApprovedAt: new Date(),
             };
         } else if (currentStatus === 'HR_APPROVED') {
             // Second approval by GM/Admin
@@ -469,8 +469,8 @@ export class EosService {
             newStatus = 'APPROVED';
             updateData = {
                 status: newStatus,
-                gm_approved_by_id: approvedById,
-                gm_approved_at: new Date(),
+                gmApprovedById: approvedById,
+                gmApprovedAt: new Date(),
                 approvedById,
                 approvedAt: new Date(),
             };
@@ -556,6 +556,8 @@ export class EosService {
                     },
                 },
                 createdBy: { select: { firstName: true, lastName: true } },
+                hrApprovedBy: { select: { firstName: true, lastName: true } },
+                gmApprovedBy: { select: { firstName: true, lastName: true } },
                 approvedBy: { select: { firstName: true, lastName: true } },
             },
             orderBy: { createdAt: 'desc' },
@@ -571,6 +573,8 @@ export class EosService {
             include: {
                 employee: true,
                 createdBy: { select: { firstName: true, lastName: true } },
+                hrApprovedBy: { select: { firstName: true, lastName: true } },
+                gmApprovedBy: { select: { firstName: true, lastName: true } },
                 approvedBy: { select: { firstName: true, lastName: true } },
                 payslip: true,
             },
