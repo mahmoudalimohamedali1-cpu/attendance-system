@@ -1016,6 +1016,7 @@ export class AttendanceService {
   /**
    * Admin correction of attendance record with audit logging
    * تصحيح إداري لسجل الحضور مع تسجيل في سجل المراجعة
+   * ✅ Now recalculates lateMinutes, status, and workingMinutes for payroll accuracy
    */
   async adminCorrectAttendance(
     attendanceId: string,
@@ -1032,50 +1033,160 @@ export class AttendanceService {
       throw new BadRequestException('يجب إدخال سبب التعديل (3 أحرف على الأقل)');
     }
 
-    // Find the attendance record
+    // Find the attendance record with branch info for timezone and work times
     const attendance = await this.prisma.attendance.findFirst({
       where: { id: attendanceId, companyId },
-      include: { user: true, branch: true },
+      include: {
+        user: { include: { branch: true, department: true } },
+        branch: true
+      },
     });
 
     if (!attendance) {
       throw new NotFoundException('سجل الحضور غير موجود');
     }
 
+    const branch = attendance.branch;
+    if (!branch) {
+      throw new BadRequestException('لا يوجد فرع مرتبط بالسجل');
+    }
+
     console.log('📋 Found attendance:', attendance.id, attendance.date);
 
-    // Build simple update data
+    // Store old values for audit
+    const oldCheckIn = attendance.checkInTime;
+    const oldCheckOut = attendance.checkOutTime;
+    const oldLateMinutes = attendance.lateMinutes || 0;
+    const oldStatus = attendance.status;
+
+    // Build update data
     const updateData: any = {};
 
-    // Only update times if provided and valid
+    // Get the new times (or keep existing)
+    let finalCheckInTime = attendance.checkInTime;
+    let finalCheckOutTime = attendance.checkOutTime;
+
     if (newCheckInTime) {
       try {
-        updateData.checkInTime = new Date(newCheckInTime);
-        console.log('⏰ New checkInTime:', updateData.checkInTime);
+        finalCheckInTime = new Date(newCheckInTime);
+        updateData.checkInTime = finalCheckInTime;
+        console.log('⏰ New checkInTime:', finalCheckInTime);
       } catch (e) {
         console.error('❌ Invalid checkInTime format:', newCheckInTime);
+        throw new BadRequestException('تنسيق وقت الحضور غير صالح');
       }
     }
 
     if (newCheckOutTime) {
       try {
-        updateData.checkOutTime = new Date(newCheckOutTime);
-        console.log('⏰ New checkOutTime:', updateData.checkOutTime);
+        finalCheckOutTime = new Date(newCheckOutTime);
+        updateData.checkOutTime = finalCheckOutTime;
+        console.log('⏰ New checkOutTime:', finalCheckOutTime);
       } catch (e) {
         console.error('❌ Invalid checkOutTime format:', newCheckOutTime);
+        throw new BadRequestException('تنسيق وقت الانصراف غير صالح');
       }
     }
 
-    // Add correction note
-    const correctionNote = `✏️ تصحيح: ${correctionReason}`;
+    // ✅ Recalculate lateMinutes and status if checkInTime changed
+    if (updateData.checkInTime && finalCheckInTime) {
+      const timezone = branch.timezone || 'Asia/Riyadh';
+
+      // Get work start time from branch (using Ramadan schedule if enabled)
+      const branchConfig = {
+        ramadanModeEnabled: (branch as any).ramadanModeEnabled ?? false,
+        ramadanWorkHours: (branch as any).ramadanWorkHours ?? 6,
+        ramadanWorkStartTime: (branch as any).ramadanWorkStartTime,
+        ramadanWorkEndTime: (branch as any).ramadanWorkEndTime,
+        workStartTime: branch.workStartTime,
+        workEndTime: branch.workEndTime,
+      };
+      const ramadanSchedule = getRamadanWorkSchedule(branchConfig, {
+        workStartTime: attendance.user?.department?.workStartTime,
+        workEndTime: attendance.user?.department?.workEndTime,
+      });
+
+      const workStartTime = this.parseTime(ramadanSchedule.workStartTime);
+      const startMinutes = workStartTime.hours * 60 + workStartTime.minutes;
+      const graceMinutes = branch.lateGracePeriod || 15;
+      const graceEndMinutes = startMinutes + graceMinutes;
+
+      // Convert checkInTime to minutes in branch timezone
+      const checkInDate = new Date(finalCheckInTime);
+      const checkInInTz = this.timezoneService.convertToTimezone(checkInDate, timezone);
+      const checkInMinutes = checkInInTz.getHours() * 60 + checkInInTz.getMinutes();
+
+      console.log('📊 Recalculating late:', { startMinutes, graceEndMinutes, checkInMinutes });
+
+      // Calculate new lateMinutes
+      let newLateMinutes = 0;
+      let newStatus: string = 'PRESENT';
+
+      if (checkInMinutes > graceEndMinutes) {
+        newLateMinutes = checkInMinutes - startMinutes;
+        newStatus = 'LATE';
+      }
+
+      updateData.lateMinutes = newLateMinutes;
+      updateData.status = newStatus;
+
+      console.log('✅ New lateMinutes:', newLateMinutes, 'Status:', newStatus);
+    }
+
+    // ✅ Recalculate workingMinutes if either time changed
+    if ((updateData.checkInTime || updateData.checkOutTime) && finalCheckInTime && finalCheckOutTime) {
+      const checkIn = new Date(finalCheckInTime);
+      const checkOut = new Date(finalCheckOutTime);
+      const workingMs = checkOut.getTime() - checkIn.getTime();
+      const workingMinutes = Math.max(0, Math.floor(workingMs / 60000));
+
+      updateData.workingMinutes = workingMinutes;
+      console.log('✅ New workingMinutes:', workingMinutes);
+
+      // ✅ Recalculate overtime if applicable
+      const workEndTime = this.parseTime(branch.workEndTime);
+      const expectedEndMinutes = workEndTime.hours * 60 + workEndTime.minutes;
+      const workStartParsed = this.parseTime(branch.workStartTime);
+      const expectedWorkMinutes = expectedEndMinutes - (workStartParsed.hours * 60 + workStartParsed.minutes);
+
+      if (workingMinutes > expectedWorkMinutes) {
+        updateData.overtimeMinutes = workingMinutes - expectedWorkMinutes;
+        console.log('✅ New overtimeMinutes:', updateData.overtimeMinutes);
+      } else {
+        updateData.overtimeMinutes = 0;
+      }
+    }
+
+    // Build detailed correction note with audit trail
+    const timestamp = new Date().toISOString();
+    let correctionDetails = `✏️ تصحيح إداري (${timestamp}):\n`;
+    correctionDetails += `السبب: ${correctionReason}\n`;
+
+    if (oldCheckIn?.toISOString() !== finalCheckInTime?.toISOString()) {
+      const oldTimeStr = oldCheckIn ? oldCheckIn.toISOString().slice(11, 16) : 'لا يوجد';
+      const newTimeStr = finalCheckInTime ? new Date(finalCheckInTime).toISOString().slice(11, 16) : 'لا يوجد';
+      correctionDetails += `الحضور: ${oldTimeStr} → ${newTimeStr}\n`;
+    }
+    if (oldCheckOut?.toISOString() !== finalCheckOutTime?.toISOString()) {
+      const oldTimeStr = oldCheckOut ? oldCheckOut.toISOString().slice(11, 16) : 'لا يوجد';
+      const newTimeStr = finalCheckOutTime ? new Date(finalCheckOutTime).toISOString().slice(11, 16) : 'لا يوجد';
+      correctionDetails += `الانصراف: ${oldTimeStr} → ${newTimeStr}\n`;
+    }
+    if (updateData.lateMinutes !== undefined && updateData.lateMinutes !== oldLateMinutes) {
+      correctionDetails += `التأخير: ${oldLateMinutes} → ${updateData.lateMinutes} دقيقة\n`;
+    }
+    if (updateData.status && updateData.status !== oldStatus) {
+      correctionDetails += `الحالة: ${oldStatus} → ${updateData.status}\n`;
+    }
+
     updateData.notes = attendance.notes
-      ? `${attendance.notes}\n${correctionNote}`
-      : correctionNote;
+      ? `${attendance.notes}\n${correctionDetails}`
+      : correctionDetails;
 
     console.log('📝 Update data:', updateData);
 
     // Only proceed if there's something to update
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length <= 1) { // Only notes means no real change
       throw new BadRequestException('لا توجد بيانات للتحديث');
     }
 
@@ -1088,10 +1199,17 @@ export class AttendanceService {
       });
 
       console.log('✅ Attendance updated successfully:', updatedAttendance.id);
+      console.log('📊 Updated values: lateMinutes=', updatedAttendance.lateMinutes,
+        'status=', updatedAttendance.status,
+        'workingMinutes=', updatedAttendance.workingMinutes);
 
       return {
         message: 'تم تحديث سجل الحضور بنجاح',
         attendance: updatedAttendance,
+        changes: {
+          lateMinutes: { old: oldLateMinutes, new: updatedAttendance.lateMinutes },
+          status: { old: oldStatus, new: updatedAttendance.status },
+        }
       };
     } catch (updateError) {
       console.error('❌ Prisma update error:', updateError);

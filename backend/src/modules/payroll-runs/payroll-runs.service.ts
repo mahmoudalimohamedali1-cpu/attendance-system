@@ -162,6 +162,29 @@ export class PayrollRunsService {
 
         if (filteredEmployees.length === 0) throw new BadRequestException('لا يوجد موظفين نشطين لديهم تعيينات رواتب للفلتر المختار');
 
+        // ✅ جلب خصومات الحضور والإجازات من صفحة الخصومات
+        const attendanceDeductionsPreview = await this.adjustmentsService.getAttendanceDeductionsPreview(companyId, dto.periodId);
+        const leaveDeductionsPreview = await this.adjustmentsService.getLeaveDeductionsPreview(companyId, dto.periodId);
+
+        // بناء خرائط الخصومات لكل موظف للوصول السريع
+        const attendanceDeductionsMap = new Map<string, { totalDeduction: number; details: any }>();
+        for (const ded of attendanceDeductionsPreview.employees || []) {
+            const current = attendanceDeductionsMap.get(ded.employeeId) || { totalDeduction: 0, details: [] };
+            current.totalDeduction += ded.totalDeduction || 0;
+            current.details.push(ded);
+            attendanceDeductionsMap.set(ded.employeeId, current);
+        }
+
+        const leaveDeductionsMap = new Map<string, { totalDeduction: number; details: any }>();
+        for (const ded of leaveDeductionsPreview.leaveDeductions || []) {
+            const current = leaveDeductionsMap.get(ded.employeeId) || { totalDeduction: 0, details: [] };
+            current.totalDeduction += ded.deductionAmount || 0;
+            current.details.push(ded);
+            leaveDeductionsMap.set(ded.employeeId, current);
+        }
+
+        this.logger.log(`📊 Loaded ${attendanceDeductionsMap.size} attendance deductions and ${leaveDeductionsMap.size} leave deductions for payroll run`);
+
         const result = await this.prisma.$transaction(async (tx) => {
             const run = await tx.payrollRun.create({
                 data: {
@@ -306,6 +329,66 @@ export class PayrollRunsService {
                         // ✅ إضافة للبيانات المحفوظة
                         deductionsData.push({ name: `خصم يدوي: ${adj.reason}`, code: 'WIZ_DED', amount: adj.amount });
                     }
+                }
+
+                // ✅ إضافة خصومات الحضور من صفحة الخصومات (تأخير، غياب، انصراف مبكر)
+                const empAttendanceDeduction = attendanceDeductionsMap.get(employee.id);
+                if (empAttendanceDeduction && empAttendanceDeduction.totalDeduction > 0) {
+                    const attDedAmount = toDecimal(empAttendanceDeduction.totalDeduction);
+                    wizardDeduction = add(wizardDeduction, attDedAmount);
+
+                    // تفصيل الخصومات
+                    const details = empAttendanceDeduction.details[0] || {};
+                    let descParts: string[] = [];
+                    if (details.lateDeduction > 0) descParts.push(`تأخير: ${details.lateDeduction.toFixed(2)}`);
+                    if (details.absenceDeduction > 0) descParts.push(`غياب ${details.absentDays} يوم: ${details.absenceDeduction.toFixed(2)}`);
+                    if (details.earlyDeduction > 0) descParts.push(`انصراف مبكر: ${details.earlyDeduction.toFixed(2)}`);
+
+                    payslipLines.push({
+                        componentId: adjDedId,
+                        amount: round(attDedAmount),
+                        sourceType: PayslipLineSource.ADJUSTMENT,
+                        sign: 'DEDUCTION',
+                        descriptionAr: `خصم حضور: ${descParts.join(' + ')}`,
+                        sourceRef: 'ATTENDANCE_DEDUCTION',
+                        costCenterId: primaryCostCenterId,
+                    });
+                    deductionsData.push({
+                        name: `خصم حضور: ${descParts.join(' + ')}`,
+                        code: 'ATT_DED',
+                        amount: empAttendanceDeduction.totalDeduction
+                    });
+
+                    this.logger.debug(`📍 Added attendance deduction for ${employee.firstName}: ${toFixed(attDedAmount)} SAR`);
+                }
+
+                // ✅ إضافة خصومات الإجازات من صفحة الخصومات (إجازة بدون راتب، مرضية)
+                const empLeaveDeduction = leaveDeductionsMap.get(employee.id);
+                if (empLeaveDeduction && empLeaveDeduction.totalDeduction > 0) {
+                    const leaveDedAmount = toDecimal(empLeaveDeduction.totalDeduction);
+                    wizardDeduction = add(wizardDeduction, leaveDedAmount);
+
+                    // تفصيل الخصومات
+                    const leaveDetails = empLeaveDeduction.details.map((d: any) =>
+                        `${d.leaveType === 'UNPAID' ? 'إجازة بدون راتب' : 'إجازة مرضية'}: ${d.totalDays} يوم`
+                    ).join(' + ');
+
+                    payslipLines.push({
+                        componentId: adjDedId,
+                        amount: round(leaveDedAmount),
+                        sourceType: PayslipLineSource.ADJUSTMENT,
+                        sign: 'DEDUCTION',
+                        descriptionAr: `خصم إجازات: ${leaveDetails}`,
+                        sourceRef: 'LEAVE_DEDUCTION',
+                        costCenterId: primaryCostCenterId,
+                    });
+                    deductionsData.push({
+                        name: `خصم إجازات: ${leaveDetails}`,
+                        code: 'LEAVE_DED',
+                        amount: empLeaveDeduction.totalDeduction
+                    });
+
+                    this.logger.debug(`🌴 Added leave deduction for ${employee.firstName}: ${toFixed(leaveDedAmount)} SAR`);
                 }
 
                 // ✅ تسجيل دفعات السلف تلقائياً (السطور موجودة بالفعل في policyLines)
