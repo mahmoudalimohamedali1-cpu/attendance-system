@@ -52,7 +52,7 @@ export class DisciplinaryController {
      */
     @Get('cases/:id')
     async getCaseDetail(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
-        return this.disciplinaryService.getCaseDetail(id, req.user.companyId);
+        return this.disciplinaryService.getCaseDetail(id, req.user.companyId, req.user.id, req.user.role);
     }
 
     /**
@@ -163,6 +163,7 @@ export class DisciplinaryController {
      * رفع مرفقات (JSON - URL مباشر)
      */
     @Post('cases/:id/attachments')
+    @RequirePermission('DISC_HR_REVIEW')
     async uploadAttachment(
         @Param('id', ParseUUIDPipe) id: string,
         @Request() req: any,
@@ -175,6 +176,7 @@ export class DisciplinaryController {
      * رفع ملفات مرفقة (Multipart)
      */
     @Post('cases/:id/upload-files')
+    @RequirePermission('DISC_HR_REVIEW')
     @UseInterceptors(FilesInterceptor('files', 10))
     async uploadFiles(
         @Param('id', ParseUUIDPipe) id: string,

@@ -638,7 +638,7 @@ export class DisciplinaryService {
     /**
      * جلب تفاصيل قضية واحدة
      */
-    async getCaseDetail(caseId: string, companyId: string) {
+    async getCaseDetail(caseId: string, companyId: string, userId?: string, userRole?: string) {
         const disciplinaryCase = await this.prisma.disciplinaryCase.findFirst({
             where: { id: caseId, companyId },
             include: {
@@ -654,6 +654,17 @@ export class DisciplinaryService {
         });
 
         if (!disciplinaryCase) throw new NotFoundException('القضية غير موجودة');
+
+        // Authorization check: Only employee, manager, or HR/Admin can view case details
+        if (userId && userRole) {
+            const isEmployee = disciplinaryCase.employeeId === userId;
+            const isManager = disciplinaryCase.managerId === userId;
+            const isHROrAdmin = ['HR', 'ADMIN'].includes(userRole);
+
+            if (!isEmployee && !isManager && !isHROrAdmin) {
+                throw new ForbiddenException('لا يمكنك الوصول لتفاصيل هذه القضية');
+            }
+        }
 
         // Calculate deadlines
         const now = new Date();
