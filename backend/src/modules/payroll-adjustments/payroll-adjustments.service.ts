@@ -1384,8 +1384,8 @@ export class PayrollAdjustmentsService {
     async getDisciplinaryDeductionsPreview(companyId: string, periodId: string) {
         this.logger.log(`⚖️ Getting disciplinary deductions preview for company: ${companyId}, period: ${periodId}`);
 
-        // Use raw query to avoid enum type mismatch
-        const deductions = await this.prisma.$queryRaw<any[]>`
+        // Use $queryRawUnsafe with explicit UUID casting
+        const query = `
             SELECT 
                 da.id,
                 da.employee_id as "employeeId",
@@ -1399,11 +1399,13 @@ export class PayrollAdjustmentsService {
                 u.employee_code as "employeeCode"
             FROM deduction_approvals da
             LEFT JOIN users u ON da.employee_id = u.id
-            WHERE da.company_id = ${companyId}::uuid
-              AND da.period_id = ${periodId}::uuid
+            WHERE da.company_id = '${companyId}'::uuid
+              AND da.period_id = '${periodId}'::uuid
               AND da.deduction_type = 'DISCIPLINARY'
               AND da.status IN ('APPROVED', 'MODIFIED')
         `;
+
+        const deductions = await this.prisma.$queryRawUnsafe<any[]>(query);
 
         return deductions
             .filter(d => d.firstName !== null)
@@ -1425,8 +1427,8 @@ export class PayrollAdjustmentsService {
     async getCustodyDeductionsPreview(companyId: string, periodId: string) {
         this.logger.log(`📦 Getting custody deductions preview for company: ${companyId}, period: ${periodId}`);
 
-        // Use raw query to avoid enum type mismatch
-        const deductions = await this.prisma.$queryRaw<any[]>`
+        // Use $queryRawUnsafe with explicit UUID casting
+        const query = `
             SELECT 
                 da.id,
                 da.employee_id as "employeeId",
@@ -1440,11 +1442,13 @@ export class PayrollAdjustmentsService {
                 u.employee_code as "employeeCode"
             FROM deduction_approvals da
             LEFT JOIN users u ON da.employee_id = u.id
-            WHERE da.company_id = ${companyId}::uuid
-              AND da.period_id = ${periodId}::uuid
+            WHERE da.company_id = '${companyId}'::uuid
+              AND da.period_id = '${periodId}'::uuid
               AND da.deduction_type = 'CUSTODY'
               AND da.status IN ('APPROVED', 'MODIFIED')
         `;
+
+        const deductions = await this.prisma.$queryRawUnsafe<any[]>(query);
 
         return deductions
             .filter(d => d.firstName !== null)
