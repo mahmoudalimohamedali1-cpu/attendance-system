@@ -1399,8 +1399,8 @@ export class PayrollAdjustmentsService {
                 u.employee_code as "employeeCode"
             FROM deduction_approvals da
             LEFT JOIN users u ON da.employee_id = u.id
-            WHERE da.company_id = ${companyId}
-              AND da.period_id = ${periodId}
+            WHERE da.company_id = ${companyId}::uuid
+              AND da.period_id = ${periodId}::uuid
               AND da.deduction_type = 'DISCIPLINARY'
               AND da.status IN ('APPROVED', 'MODIFIED')
         `;
@@ -1440,8 +1440,8 @@ export class PayrollAdjustmentsService {
                 u.employee_code as "employeeCode"
             FROM deduction_approvals da
             LEFT JOIN users u ON da.employee_id = u.id
-            WHERE da.company_id = ${companyId}
-              AND da.period_id = ${periodId}
+            WHERE da.company_id = ${companyId}::uuid
+              AND da.period_id = ${periodId}::uuid
               AND da.deduction_type = 'CUSTODY'
               AND da.status IN ('APPROVED', 'MODIFIED')
         `;
