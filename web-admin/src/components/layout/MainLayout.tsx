@@ -126,6 +126,8 @@ const allMenuItems: MenuItem[] = [
   { text: 'السياسات', icon: <Security />, path: '/policies', requiredRole: 'ADMIN' },
   { text: 'السياسات الذكية', icon: <AutoAwesome />, path: '/smart-policies', requiredRole: 'ADMIN' },
   { text: 'الإعدادات', icon: <Settings />, path: '/settings', requiredRole: 'ADMIN' },
+  // EOS Approvals - visible to HR role for two-level approval workflow
+  { text: 'موافقات إنهاء الخدمة', icon: <Security />, path: '/eos/approvals', requiredPermission: ['EMPLOYEES_VIEW'] },
 ];
 
 // Payroll submenu group
