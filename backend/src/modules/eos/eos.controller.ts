@@ -45,7 +45,7 @@ export class EosController {
     @Get('terminations')
     @Roles('ADMIN', 'HR')
     @ApiOperation({ summary: 'قائمة طلبات إنهاء الخدمات' })
-    @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'APPROVED', 'PAID', 'CANCELLED'] })
+    @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'HR_APPROVED', 'APPROVED', 'PAID', 'CANCELLED'] })
     getTerminations(
         @CurrentUser('companyId') companyId: string,
         @Query('status') status?: string,
@@ -70,7 +70,7 @@ export class EosController {
     // الموافقة على طلب الإنهاء
     // ========================================
     @Patch('terminations/:id/approve')
-    @Roles('ADMIN')
+    @Roles('ADMIN', 'HR')
     @ApiOperation({ summary: 'الموافقة على طلب إنهاء الخدمات وتغيير حالة الموظف' })
     approveTermination(
         @Param('id') id: string,
