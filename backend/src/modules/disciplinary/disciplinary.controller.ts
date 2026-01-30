@@ -44,6 +44,12 @@ export class DisciplinaryController {
         @Request() req: any,
         @Query('role') role: 'manager' | 'hr' | 'employee' = 'hr'
     ) {
+        // Security check: Only HR/Admin can request 'hr' role (which sees all cases)
+        if (role === 'hr' && !['HR', 'ADMIN'].includes(req.user.role)) {
+            // Fallback to employee role or throw error
+            role = 'employee';
+        }
+
         return this.disciplinaryService.getCasesForRole(req.user.id, req.user.companyId, role);
     }
 

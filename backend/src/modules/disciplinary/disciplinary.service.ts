@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -14,7 +15,8 @@ import {
     CaseEventType,
     DecisionType,
     PayrollAdjustmentStatus,
-    DeductionBasePolicy
+    DeductionBasePolicy,
+    SmartPolicyTrigger
 } from '@prisma/client';
 
 @Injectable()
@@ -118,6 +120,16 @@ export class DisciplinaryService {
             employeeName
         );
 
+        // Smart Policy Trigger
+        await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'CREATED', {
+            caseId: disciplinaryCase.id,
+            employeeId,
+            managerId,
+            title,
+            violationType,
+            incidentDate: incidentDateObj,
+        });
+
         return disciplinaryCase;
     }
 
@@ -168,6 +180,13 @@ export class DisciplinaryService {
         const updatedCase = await this.prisma.disciplinaryCase.update({
             where: { id: caseId },
             data: updateData
+        });
+
+        // Smart Policy Trigger
+        await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'HR_INITIAL_REVIEW', {
+            caseId,
+            action,
+            reason,
         });
 
         // Notifications
@@ -305,6 +324,14 @@ export class DisciplinaryService {
         const penaltyMsg = dto.penaltyValue ? ` (الجزاء: ${dto.penaltyValue} ${dto.penaltyUnit})` : '';
         await this.logEvent(caseId, hrId, CaseEventType.DECISION_ISSUED, `تم إصدار القرار: ${dto.decisionType}${penaltyMsg}`);
 
+        // Smart Policy Trigger
+        await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'DECISION_ISSUED', {
+            caseId,
+            decisionType: dto.decisionType,
+            penaltyValue: dto.penaltyValue,
+            penaltyUnit: dto.penaltyUnit,
+        });
+
         // Notify Employee
         const policy = await this.getPolicy(companyId);
         await this.notificationsService.notifyEmployeeDecisionIssued(
@@ -393,6 +420,16 @@ export class DisciplinaryService {
                 throw new BadRequestException('لا يمكن اعتماد القضية بسبب وجود حجز قانوني (Legal Hold)');
             }
 
+            // Harden: Check Payroll Period status inside transaction
+            if (disciplinaryCase.payroll_period_id) {
+                const period = await tx.payrollPeriod.findUnique({
+                    where: { id: disciplinaryCase.payroll_period_id }
+                });
+                if (period && (period.status === 'LOCKED' || period.lockedAt)) {
+                    throw new BadRequestException('لا يمكن اعتماد القضية لأن دورة الرواتب المرتبطة بها مغلقة نهائياً');
+                }
+            }
+
             // Update Case
             const finalized = await tx.disciplinaryCase.update({
                 where: { id: caseId },
@@ -443,6 +480,13 @@ export class DisciplinaryService {
             }
 
             await this.logEvent(caseId, actorId, CaseEventType.FINALIZED, 'تم اعتماد القضية نهائياً', tx);
+
+            // Smart Policy Trigger
+            await this.smartPolicyTrigger.trigger(companyId, SmartPolicyTrigger.DISCIPLINARY, 'FINALIZED', {
+                caseId,
+                decisionType: disciplinaryCase.decision_type,
+                employeeId: disciplinaryCase.employee_id,
+            });
 
             // Notify Employee and Manager
             await this.notificationsService.notifyCaseFinalized(
@@ -726,27 +770,31 @@ export class DisciplinaryService {
         const savedAttachments = [];
 
         for (const file of files) {
-            // حفظ الملف في مجلد uploads
+            // Securely generate filename using UUID to prevent path traversal and collisions
             const fs = require('fs');
             const path = require('path');
-            const uploadsDir = path.join(process.cwd(), 'uploads', 'disciplinary', caseId);
+            const uploadsDir = path.resolve(process.cwd(), 'uploads', 'disciplinary', caseId);
 
             if (!fs.existsSync(uploadsDir)) {
                 fs.mkdirSync(uploadsDir, { recursive: true });
             }
 
-            const fileName = `${Date.now()}-${file.originalname}`;
-            const filePath = path.join(uploadsDir, fileName);
+            // Sanitize original name for DB storage but use UUID for filesystem
+            const sanitizedOriginalName = file.originalname.replace(/[^\w\d.-]/g, '_');
+            const fileExtension = path.extname(file.originalname);
+            const storageFileName = `${crypto.randomUUID()}${fileExtension}`;
+            const filePath = path.join(uploadsDir, storageFileName);
+
             fs.writeFileSync(filePath, file.buffer);
 
-            const fileUrl = `/uploads/disciplinary/${caseId}/${fileName}`;
+            const fileUrl = `/uploads/disciplinary/${caseId}/${storageFileName}`;
 
             const attachment = await this.prisma.caseAttachment.create({
                 data: {
                     caseId,
                     uploaderUserId: userId,
                     fileUrl,
-                    fileName: file.originalname,
+                    fileName: sanitizedOriginalName,
                     fileType: file.mimetype,
                 }
             });
