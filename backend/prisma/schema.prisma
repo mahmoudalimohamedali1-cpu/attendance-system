@@ -138,6 +138,9 @@ model Company {
   employeeTerminations EmployeeTermination[]
   deductionApprovals   DeductionApproval[]
 
+  // التدرج الوظيفي (Career Progression)
+  jobHistories JobHistory[]
+
   @@map("companies")
 }
 
@@ -620,6 +623,10 @@ model User {
   terminationsHRApproved EmployeeTermination[] @relation("TerminationHRApprover")
   terminationsGMApproved EmployeeTermination[] @relation("TerminationGMApprover")
 
+  // التدرج الوظيفي (Career Progression)
+  jobHistory        JobHistory[] @relation("EmployeeJobHistory")
+  jobHistoryCreated JobHistory[] @relation("JobHistoryCreator")
+
   // اعتمادات الخصومات
   deductionApprovalsAsEmployee DeductionApproval[] @relation("DeductionApprovalEmployee")
   deductionApprovalsAsApprover DeductionApproval[] @relation("DeductionApprovalApprover")
@@ -916,6 +923,7 @@ model Branch {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   shiftSchedules ShiftSchedule[]
+  jobHistories   JobHistory[]
 
   @@unique([companyId, name])
   @@map("branches")
@@ -995,6 +1003,7 @@ model Department {
   departmentSaudizations DepartmentSaudization[]
   shiftSchedules         ShiftSchedule[]
   costCenters            CostCenter[]
+  jobHistories           JobHistory[]
 
   @@unique([companyId, name])
   @@map("departments")
@@ -7642,4 +7651,62 @@ model DeductionAuditLog {
   @@index([performedById])
   @@index([performedAt])
   @@map("deduction_audit_logs")
+}
+
+// ==================== التدرج الوظيفي (Career Progression) ====================
+
+enum JobChangeType {
+  HIRE // تعيين جديد
+  PROMOTION // ترقية
+  DEMOTION // تخفيض
+  TRANSFER // نقل (قسم/فرع)
+  TITLE_CHANGE // تغيير مسمى وظيفي
+  SALARY_CHANGE // تغيير راتب
+}
+
+model JobHistory {
+  id        String @id @default(uuid())
+  companyId String @map("company_id")
+  userId    String @map("user_id")
+
+  // المنصب والمسمى الوظيفي
+  jobTitle   String  @map("job_title")
+  jobTitleId String? @map("job_title_id")
+
+  // القسم والفرع
+  departmentId   String? @map("department_id")
+  departmentName String? @map("department_name")
+  branchId       String? @map("branch_id")
+  branchName     String? @map("branch_name")
+
+  // نوع التغيير
+  changeType JobChangeType @map("change_type")
+
+  // التواريخ
+  startDate DateTime  @map("start_date")
+  endDate   DateTime? @map("end_date")
+
+  // الراتب (اختياري)
+  salary Decimal? @db.Decimal(12, 2)
+
+  // ملاحظات وسبب التغيير
+  notes  String?
+  reason String?
+
+  // من أضاف هذا السجل
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // العلاقات
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User        @relation("EmployeeJobHistory", fields: [userId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id])
+  branch     Branch?     @relation(fields: [branchId], references: [id])
+  createdBy  User?       @relation("JobHistoryCreator", fields: [createdById], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([startDate])
+  @@map("job_history")
 }

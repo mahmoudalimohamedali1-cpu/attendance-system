@@ -133,6 +133,99 @@ export class EmployeeProfileController {
         return this.profileService.getDocuments(userIdOrCode, user.companyId);
     }
 
+    // ==================== التدرج الوظيفي (Career Progression) ====================
+
+    /**
+     * GET /employee-profile/:id/job-history
+     * جلب سجل التدرج الوظيفي
+     */
+    @Get(':id/job-history')
+    async getJobHistory(
+        @Param('id') userIdOrCode: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.getJobHistory(userIdOrCode, user.companyId);
+    }
+
+    /**
+     * POST /employee-profile/:id/job-history
+     * إضافة سجل تدرج وظيفي جديد
+     */
+    @Post(':id/job-history')
+    async addJobHistory(
+        @Param('id') userIdOrCode: string,
+        @Body() data: {
+            jobTitle: string;
+            jobTitleId?: string;
+            departmentId?: string;
+            branchId?: string;
+            changeType: string;
+            startDate: string;
+            endDate?: string;
+            salary?: number;
+            notes?: string;
+            reason?: string;
+        },
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.addJobHistory(
+            userIdOrCode,
+            user.companyId,
+            user.id,
+            {
+                ...data,
+                changeType: data.changeType as any,
+                startDate: new Date(data.startDate),
+                endDate: data.endDate ? new Date(data.endDate) : undefined,
+            }
+        );
+    }
+
+    /**
+     * PATCH /employee-profile/:id/job-history/:historyId
+     * تحديث سجل تدرج وظيفي
+     */
+    @Patch(':id/job-history/:historyId')
+    async updateJobHistory(
+        @Param('historyId', ParseUUIDPipe) historyId: string,
+        @Body() data: {
+            jobTitle?: string;
+            jobTitleId?: string;
+            departmentId?: string;
+            branchId?: string;
+            changeType?: string;
+            startDate?: string;
+            endDate?: string;
+            salary?: number;
+            notes?: string;
+            reason?: string;
+        },
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.updateJobHistory(
+            historyId,
+            user.companyId,
+            {
+                ...data,
+                changeType: data.changeType as any,
+                startDate: data.startDate ? new Date(data.startDate) : undefined,
+                endDate: data.endDate ? new Date(data.endDate) : undefined,
+            }
+        );
+    }
+
+    /**
+     * DELETE /employee-profile/:id/job-history/:historyId
+     * حذف سجل تدرج وظيفي
+     */
+    @Delete(':id/job-history/:historyId')
+    async deleteJobHistory(
+        @Param('historyId', ParseUUIDPipe) historyId: string,
+        @CurrentUser() user: any,
+    ) {
+        return this.profileService.deleteJobHistory(historyId, user.companyId);
+    }
+
     /**
      * GET /employee-profile/:id/timeline
      * سجل النشاطات

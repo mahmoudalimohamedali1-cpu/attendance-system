@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { DocumentType, NotificationType, ProficiencyLevel } from '@prisma/client';
+import { DocumentType, NotificationType, ProficiencyLevel, JobChangeType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -41,6 +41,185 @@ export class EmployeeProfileService {
         }
 
         return user.id;
+    }
+
+    // ==================== التدرج الوظيفي (Career Progression) ====================
+
+    /**
+     * جلب سجل التدرج الوظيفي للموظف
+     */
+    async getJobHistory(userIdOrCode: string, companyId: string) {
+        const userId = await this.resolveUserId(userIdOrCode, companyId);
+
+        const jobHistory = await this.prisma.jobHistory.findMany({
+            where: { userId, companyId },
+            orderBy: { startDate: 'desc' },
+            include: {
+                department: { select: { id: true, name: true } },
+                branch: { select: { id: true, name: true } },
+                createdBy: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+
+        return jobHistory;
+    }
+
+    /**
+     * إضافة سجل تدرج وظيفي جديد
+     */
+    async addJobHistory(
+        userIdOrCode: string,
+        companyId: string,
+        createdById: string,
+        data: {
+            jobTitle: string;
+            jobTitleId?: string;
+            departmentId?: string;
+            branchId?: string;
+            changeType: JobChangeType;
+            startDate: Date;
+            endDate?: Date;
+            salary?: number;
+            notes?: string;
+            reason?: string;
+        }
+    ) {
+        const userId = await this.resolveUserId(userIdOrCode, companyId);
+
+        // جلب أسماء القسم والفرع إذا وجدت
+        let departmentName: string | null = null;
+        let branchName: string | null = null;
+
+        if (data.departmentId) {
+            const dept = await this.prisma.department.findUnique({
+                where: { id: data.departmentId },
+                select: { name: true },
+            });
+            departmentName = dept?.name || null;
+        }
+
+        if (data.branchId) {
+            const branch = await this.prisma.branch.findUnique({
+                where: { id: data.branchId },
+                select: { name: true },
+            });
+            branchName = branch?.name || null;
+        }
+
+        // إغلاق السجل السابق إذا كان مفتوحاً
+        await this.prisma.jobHistory.updateMany({
+            where: { userId, companyId, endDate: null },
+            data: { endDate: data.startDate },
+        });
+
+        // إنشاء السجل الجديد
+        const newRecord = await this.prisma.jobHistory.create({
+            data: {
+                companyId,
+                userId,
+                jobTitle: data.jobTitle,
+                jobTitleId: data.jobTitleId,
+                departmentId: data.departmentId,
+                departmentName,
+                branchId: data.branchId,
+                branchName,
+                changeType: data.changeType,
+                startDate: data.startDate,
+                endDate: data.endDate,
+                salary: data.salary,
+                notes: data.notes,
+                reason: data.reason,
+                createdById,
+            },
+            include: {
+                department: { select: { id: true, name: true } },
+                branch: { select: { id: true, name: true } },
+            },
+        });
+
+        return newRecord;
+    }
+
+    /**
+     * تحديث سجل تدرج وظيفي
+     */
+    async updateJobHistory(
+        historyId: string,
+        companyId: string,
+        data: {
+            jobTitle?: string;
+            jobTitleId?: string;
+            departmentId?: string;
+            branchId?: string;
+            changeType?: JobChangeType;
+            startDate?: Date;
+            endDate?: Date;
+            salary?: number;
+            notes?: string;
+            reason?: string;
+        }
+    ) {
+        const record = await this.prisma.jobHistory.findFirst({
+            where: { id: historyId, companyId },
+        });
+
+        if (!record) {
+            throw new NotFoundException('سجل التدرج الوظيفي غير موجود');
+        }
+
+        // تحديث أسماء القسم والفرع إذا تغيرت
+        let departmentName = record.departmentName;
+        let branchName = record.branchName;
+
+        if (data.departmentId && data.departmentId !== record.departmentId) {
+            const dept = await this.prisma.department.findUnique({
+                where: { id: data.departmentId },
+                select: { name: true },
+            });
+            departmentName = dept?.name || null;
+        }
+
+        if (data.branchId && data.branchId !== record.branchId) {
+            const branch = await this.prisma.branch.findUnique({
+                where: { id: data.branchId },
+                select: { name: true },
+            });
+            branchName = branch?.name || null;
+        }
+
+        const updated = await this.prisma.jobHistory.update({
+            where: { id: historyId },
+            data: {
+                ...data,
+                departmentName,
+                branchName,
+            },
+            include: {
+                department: { select: { id: true, name: true } },
+                branch: { select: { id: true, name: true } },
+            },
+        });
+
+        return updated;
+    }
+
+    /**
+     * حذف سجل تدرج وظيفي
+     */
+    async deleteJobHistory(historyId: string, companyId: string) {
+        const record = await this.prisma.jobHistory.findFirst({
+            where: { id: historyId, companyId },
+        });
+
+        if (!record) {
+            throw new NotFoundException('سجل التدرج الوظيفي غير موجود');
+        }
+
+        await this.prisma.jobHistory.delete({
+            where: { id: historyId },
+        });
+
+        return { success: true, message: 'تم حذف السجل بنجاح' };
     }
 
     /**
