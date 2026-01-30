@@ -47,7 +47,7 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { api } from '@/services/api.service';
-import { formatTimeWithTimezone, formatDisplayDateWithTimezone } from '@/utils/date.utils';
+import { formatTimeWithTimezone, formatDisplayDateWithTimezone, dayjs } from '@/utils/date.utils';
 
 interface Attendance {
   id: string;
@@ -293,8 +293,10 @@ export const AttendancePage = () => {
 
   const handleOpenEdit = (record: Attendance) => {
     setEditingRecord(record);
-    setEditCheckIn(record.checkInTime ? format(new Date(record.checkInTime), 'HH:mm') : '');
-    setEditCheckOut(record.checkOutTime ? format(new Date(record.checkOutTime), 'HH:mm') : '');
+    // Use branch timezone to display correct local time (same as shown in table)
+    const tz = record.branch?.timezone || 'Asia/Riyadh';
+    setEditCheckIn(record.checkInTime ? formatTimeWithTimezone(record.checkInTime, tz) : '');
+    setEditCheckOut(record.checkOutTime ? formatTimeWithTimezone(record.checkOutTime, tz) : '');
     setEditReason('');
     setEditDialogOpen(true);
   };
@@ -306,11 +308,27 @@ export const AttendancePage = () => {
     }
 
     const dateStr = editingRecord.date.split('T')[0];
+    const tz = editingRecord.branch?.timezone || 'Asia/Riyadh';
+
+    // Convert local time (in branch timezone) to ISO string for backend
+    // The backend will parse these as dates
+    let checkInISO: string | undefined;
+    let checkOutISO: string | undefined;
+
+    if (editCheckIn) {
+      // Parse the local time string and convert to UTC
+      const localDateTime = dayjs.tz(`${dateStr} ${editCheckIn}`, tz);
+      checkInISO = localDateTime.toISOString();
+    }
+    if (editCheckOut) {
+      const localDateTime = dayjs.tz(`${dateStr} ${editCheckOut}`, tz);
+      checkOutISO = localDateTime.toISOString();
+    }
 
     updateAttendanceMutation.mutate({
       id: editingRecord.id,
-      checkInTime: editCheckIn ? `${dateStr}T${editCheckIn}:00` : undefined,
-      checkOutTime: editCheckOut ? `${dateStr}T${editCheckOut}:00` : undefined,
+      checkInTime: checkInISO,
+      checkOutTime: checkOutISO,
       reason: editReason,
     });
   };
