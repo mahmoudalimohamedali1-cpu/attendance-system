@@ -606,6 +606,20 @@ export class PayrollAdjustmentsService {
             };
         }
 
+        // 🔧 FIX: Fetch company payroll settings for consistent calculations
+        const settings = await (this.prisma as any).payrollSettings?.findUnique?.({
+            where: { companyId },
+        }) || {
+            gracePeriodMinutes: 15,
+            lateDeductionMethod: 'PER_MINUTE',
+            enableAttendancePenalty: true,
+            enableEarlyDeparturePenalty: true,
+        };
+
+        const gracePeriodMinutes = settings.gracePeriodMinutes || 15;
+        const lateDeductionMethod = settings.lateDeductionMethod || 'PER_MINUTE';
+        this.logger.log(`📋 Using settings: gracePeriod=${gracePeriodMinutes}, method=${lateDeductionMethod}`);
+
         // جلب بيانات الموظفين
         const employees = await this.prisma.user.findMany({
             where: {
@@ -711,14 +725,38 @@ export class PayrollAdjustmentsService {
                 if ((att as any).earlyDepartureMinutes) earlyMinutes += (att as any).earlyDepartureMinutes;
             }
 
-            // حساب الخصومات (تقريبي - يعتمد على إعدادات الشركة)
+            // حساب الخصومات مع تطبيق فترة السماح وإعدادات الشركة
             const dailyRate = Number(emp.salary || 0) / 30;
             const hourlyRate = dailyRate / 8;
 
-            const lateDeduction = Math.round((lateMinutes / 60) * hourlyRate * 100) / 100;
+            // 🔧 FIX: Apply grace period like PayrollCalculationService
+            const effectiveLateMinutes = Math.max(0, lateMinutes - gracePeriodMinutes);
+
+            // 🔧 FIX: Use lateDeductionMethod setting
+            let lateDeduction = 0;
+            if (effectiveLateMinutes > 0) {
+                switch (lateDeductionMethod) {
+                    case 'PER_MINUTE':
+                        lateDeduction = Math.round((effectiveLateMinutes / 60) * hourlyRate * 100) / 100;
+                        break;
+                    case 'PER_HOUR':
+                        const lateHours = Math.ceil(effectiveLateMinutes / 60);
+                        lateDeduction = Math.round(lateHours * hourlyRate * 100) / 100;
+                        break;
+                    case 'DAILY_RATE':
+                        // Count days where late > threshold (using 30 min as default threshold)
+                        const lateDays = attendances.filter((a: any) => (a.lateMinutes || 0) > 30).length;
+                        lateDeduction = Math.round(lateDays * dailyRate * 100) / 100;
+                        break;
+                    default:
+                        lateDeduction = Math.round((effectiveLateMinutes / 60) * hourlyRate * 100) / 100;
+                }
+            }
+
             const absenceDeduction = Math.round(realAbsentDays * dailyRate * 100) / 100;
             const earlyDeduction = Math.round((earlyMinutes / 60) * hourlyRate * 100) / 100;
             const totalDeduction = lateDeduction + absenceDeduction + earlyDeduction;
+
 
             if (totalDeduction > 0) {
                 attendanceDeductions.push({

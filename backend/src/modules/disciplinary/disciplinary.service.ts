@@ -479,6 +479,36 @@ export class DisciplinaryService {
                     throw new BadRequestException('يجب اختيار دورة راتب لتطبيق الخصم المالي');
                 }
 
+                // Fetch employee's base salary for monetary calculation
+                const employeeSalary = await tx.employeeSalaryAssignment.findFirst({
+                    where: {
+                        employeeId: disciplinaryCase.employeeId,
+                        isActive: true
+                    },
+                    select: { baseSalary: true }
+                });
+
+                const baseSalary = Number(employeeSalary?.baseSalary || 0);
+                const penaltyDays = Number(disciplinaryCase.penaltyValue || 0);
+                const penaltyUnit = disciplinaryCase.penaltyUnit || 'DAYS';
+
+                // Calculate monetary value based on unit
+                // DAYS: (baseSalary / 30) * days
+                // HOURS: (baseSalary / 30 / 8) * hours
+                // PERCENTAGE: baseSalary * (percentage / 100)
+                // AMOUNT: direct amount
+                let monetaryAmount = 0;
+                const unitStr = String(penaltyUnit);
+                if (unitStr === 'DAYS') {
+                    monetaryAmount = (baseSalary / 30) * penaltyDays;
+                } else if (unitStr === 'HOURS') {
+                    monetaryAmount = (baseSalary / 30 / 8) * penaltyDays;
+                } else if (unitStr === 'PERCENTAGE') {
+                    monetaryAmount = baseSalary * (penaltyDays / 100);
+                } else if (unitStr === 'AMOUNT') {
+                    monetaryAmount = penaltyDays; // Direct amount
+                }
+
                 await tx.payrollAdjustment.create({
                     data: {
                         companyId,
@@ -486,8 +516,8 @@ export class DisciplinaryService {
                         disciplinaryCaseId: disciplinaryCase.id,
                         payrollPeriodId: disciplinaryCase.payrollPeriodId,
                         adjustmentType: disciplinaryCase.decisionType === DecisionType.SALARY_DEDUCTION ? 'DEDUCTION' : 'SUSPENSION_UNPAID',
-                        unit: disciplinaryCase.penaltyUnit || 'DAYS',
-                        value: disciplinaryCase.penaltyValue as any,
+                        unit: penaltyUnit,
+                        value: penaltyDays as any,
                         status: PayrollAdjustmentStatus.PENDING,
                         reason: `جزاء إداري - ${disciplinaryCase.caseCode}`,
                         createdById: actorId,
@@ -495,7 +525,7 @@ export class DisciplinaryService {
                 });
 
                 // Create DeductionApproval for unified payroll integration
-                // We set it to APPROVED because finalizeCase is the final step after employee notification/objection
+                // Store MONETARY value, not days
                 await tx.deductionApproval.create({
                     data: {
                         companyId,
@@ -503,10 +533,10 @@ export class DisciplinaryService {
                         periodId: disciplinaryCase.payrollPeriodId,
                         deductionType: 'DISCIPLINARY',
                         referenceId: disciplinaryCase.id,
-                        originalAmount: disciplinaryCase.penaltyValue as any, // This is days/hours usually, but stored as originalAmount
-                        approvedAmount: disciplinaryCase.penaltyValue as any,
+                        originalAmount: monetaryAmount, // Monetary value in SAR
+                        approvedAmount: monetaryAmount, // Same for now
                         status: 'APPROVED',
-                        reason: `جزاء إداري: ${disciplinaryCase.caseCode} - ${disciplinaryCase.decisionReason || ''}`,
+                        reason: `جزاء إداري: ${disciplinaryCase.caseCode} (${penaltyDays} ${penaltyUnit === 'DAYS' ? 'يوم' : penaltyUnit === 'HOURS' ? 'ساعة' : '%'}) - ${disciplinaryCase.decisionReason || ''}`,
                         approvedById: actorId,
                         approvedAt: new Date(),
                     }

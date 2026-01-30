@@ -656,6 +656,23 @@ export class CustodyService {
 
             // Create deduction approval if employee is charged
             if (dto.chargeEmployee && Number(dto.estimatedCost) > 0) {
+                // Fetch current open payroll period for this company
+                const currentDate = new Date();
+                const currentMonth = currentDate.getMonth() + 1;
+                const currentYear = currentDate.getFullYear();
+
+                const openPeriod = await this.prisma.payrollPeriod.findFirst({
+                    where: {
+                        companyId,
+                        status: { in: ['DRAFT', 'PROCESSING'] },
+                        OR: [
+                            { month: currentMonth, year: currentYear },
+                            { month: currentMonth === 12 ? 1 : currentMonth + 1, year: currentMonth === 12 ? currentYear + 1 : currentYear }
+                        ]
+                    },
+                    orderBy: { createdAt: 'desc' }
+                });
+
                 operations.push(
                     this.prisma.deductionApproval.create({
                         data: {
@@ -663,10 +680,14 @@ export class CustodyService {
                             employeeId: returnRequest.returnedById,
                             deductionType: 'CUSTODY' as any,
                             referenceId: dto.returnId,
+                            periodId: openPeriod?.id || null, // Link to current period if exists
                             originalAmount: Number(dto.estimatedCost),
-                            status: 'PENDING' as any,
+                            approvedAmount: Number(dto.estimatedCost), // Same as original for custody
+                            status: 'APPROVED' as any, // Auto-approve since HR already reviewed the return
                             reason: `خصم عهده تالفه: ${returnRequest.custodyItem.name} (${returnRequest.custodyItem.code})`,
                             notes: dto.reviewNotes,
+                            approvedById: userId, // The reviewer is the approver
+                            approvedAt: new Date(),
                         }
                     }) as any
                 );
