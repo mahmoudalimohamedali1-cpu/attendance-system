@@ -57,7 +57,7 @@ export class EmployeeProfileService {
                 costCenter: {
                     select: {
                         id: true,
-                        nameAr: true,
+                        name: true,
                         code: true,
                     },
                 },
