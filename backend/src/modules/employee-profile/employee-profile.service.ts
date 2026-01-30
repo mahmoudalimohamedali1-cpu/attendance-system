@@ -21,14 +21,35 @@ export class EmployeeProfileService {
     ) { }
 
     /**
-     * جلب البروفايل الكامل للموظف
+     * جلب البروفايل الكامل للموظف (يدعم UUID أو employee_code)
      */
-    async getFullProfile(userId: string, companyId: string, requesterId: string) {
+    async getFullProfile(userIdOrCode: string, companyId: string, requesterId: string) {
+        // فحص إذا كان المدخل UUID أو employee_code
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userIdOrCode);
+
+        // بناء شرط البحث بناءً على نوع المدخل
+        const whereClause = isUUID
+            ? { id: userIdOrCode, companyId }
+            : { employeeCode: userIdOrCode, companyId };
+
+        // جلب المستخدم أولاً للحصول على الـ ID الفعلي
+        const foundUser = await this.prisma.user.findFirst({
+            where: whereClause,
+            select: { id: true },
+        });
+
+        if (!foundUser) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        const userId = foundUser.id;
+
         // التحقق من الصلاحيات
         await this.checkAccess(userId, companyId, requesterId);
 
         const user = await this.prisma.user.findFirst({
             where: { id: userId, companyId },
+
             include: {
                 branch: true,
                 department: true,

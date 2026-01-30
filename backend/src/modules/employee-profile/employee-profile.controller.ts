@@ -38,15 +38,16 @@ export class EmployeeProfileController {
 
     /**
      * GET /employee-profile/:id
-     * جلب البروفايل الكامل للموظف
+     * جلب البروفايل الكامل للموظف (يدعم UUID أو employee_code)
      */
     @Get(':id')
     async getFullProfile(
-        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('id') userIdOrCode: string,
         @CurrentUser() user: any,
     ) {
-        return this.profileService.getFullProfile(userId, user.companyId, user.id);
+        return this.profileService.getFullProfile(userIdOrCode, user.companyId, user.id);
     }
+
 
     /**
      * PATCH /employee-profile/:id
