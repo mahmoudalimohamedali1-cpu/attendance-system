@@ -295,8 +295,21 @@ export const AttendancePage = () => {
     setEditingRecord(record);
     // Use branch timezone to display correct local time (same as shown in table)
     const tz = record.branch?.timezone || 'Asia/Riyadh';
-    setEditCheckIn(record.checkInTime ? formatTimeWithTimezone(record.checkInTime, tz) : '');
-    setEditCheckOut(record.checkOutTime ? formatTimeWithTimezone(record.checkOutTime, tz) : '');
+    const checkInFormatted = record.checkInTime ? formatTimeWithTimezone(record.checkInTime, tz) : '';
+    const checkOutFormatted = record.checkOutTime ? formatTimeWithTimezone(record.checkOutTime, tz) : '';
+
+    // Debug logging
+    console.log('🔧 Edit Dialog Debug:', {
+      branchTimezone: record.branch?.timezone,
+      usedTimezone: tz,
+      rawCheckIn: record.checkInTime,
+      formattedCheckIn: checkInFormatted,
+      rawCheckOut: record.checkOutTime,
+      formattedCheckOut: checkOutFormatted,
+    });
+
+    setEditCheckIn(checkInFormatted);
+    setEditCheckOut(checkOutFormatted);
     setEditReason('');
     setEditDialogOpen(true);
   };
