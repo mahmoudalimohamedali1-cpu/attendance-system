@@ -586,9 +586,14 @@ export class PayrollAdjustmentsService {
                 where: { id: periodId, companyId },
             });
         } else {
-            // جلب آخر فترة مفتوحة
+            // جلب آخر فترة نشطة (غير مغلقة أو ملغية أو مؤرشفة)
             period = await this.prisma.payrollPeriod.findFirst({
-                where: { companyId, status: 'OPEN' },
+                where: {
+                    companyId,
+                    status: {
+                        in: ['DRAFT', 'INPUTS_COLLECTED', 'CALCULATED', 'HR_REVIEWED', 'FINANCE_APPROVED']
+                    }
+                },
                 orderBy: { startDate: 'desc' },
             });
         }
@@ -769,7 +774,7 @@ export class PayrollAdjustmentsService {
             });
         } else {
             period = await this.prisma.payrollPeriod.findFirst({
-                where: { companyId, status: 'OPEN' },
+                where: { companyId, status: { in: ['DRAFT', 'INPUTS_COLLECTED', 'CALCULATED', 'HR_REVIEWED', 'FINANCE_APPROVED'] } },
                 orderBy: { startDate: 'desc' },
             });
         }
@@ -847,7 +852,7 @@ export class PayrollAdjustmentsService {
             });
         } else {
             period = await this.prisma.payrollPeriod.findFirst({
-                where: { companyId, status: 'OPEN' },
+                where: { companyId, status: { in: ['DRAFT', 'INPUTS_COLLECTED', 'CALCULATED', 'HR_REVIEWED', 'FINANCE_APPROVED'] } },
                 orderBy: { startDate: 'desc' },
             });
         }
@@ -973,7 +978,7 @@ export class PayrollAdjustmentsService {
             });
         } else {
             period = await this.prisma.payrollPeriod.findFirst({
-                where: { companyId, status: 'OPEN' },
+                where: { companyId, status: { in: ['DRAFT', 'INPUTS_COLLECTED', 'CALCULATED', 'HR_REVIEWED', 'FINANCE_APPROVED'] } },
                 orderBy: { startDate: 'desc' },
             });
         }
