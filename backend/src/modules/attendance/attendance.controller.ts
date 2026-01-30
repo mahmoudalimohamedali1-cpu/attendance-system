@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Query,
   UseGuards,
@@ -141,5 +142,34 @@ export class AttendanceController {
     @Query('date') date?: string,
   ) {
     return this.attendanceService.getDailyStats(companyId, date ? new Date(date) : undefined);
+  }
+
+  // ============ Admin Correction Endpoint ============
+
+  @Patch(':id')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'MANAGER', 'HR_MANAGER')
+  @ApiOperation({ summary: 'تعديل سجل الحضور (تصحيح إداري)' })
+  @ApiResponse({ status: 200, description: 'تم تحديث السجل بنجاح' })
+  @ApiResponse({ status: 404, description: 'السجل غير موجود' })
+  @ApiResponse({ status: 403, description: 'غير مصرح لك بهذا الإجراء' })
+  async updateAttendance(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @CurrentUser('companyId') companyId: string,
+    @Body() updateDto: {
+      checkInTime?: string;
+      checkOutTime?: string;
+      correctionReason: string;
+    },
+  ) {
+    return this.attendanceService.adminCorrectAttendance(
+      id,
+      companyId,
+      adminId,
+      updateDto.checkInTime,
+      updateDto.checkOutTime,
+      updateDto.correctionReason,
+    );
   }
 }

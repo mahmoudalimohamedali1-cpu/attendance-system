@@ -1013,6 +1013,136 @@ export class AttendanceService {
     }
   }
 
+  /**
+   * Admin correction of attendance record with audit logging
+   * تصحيح إداري لسجل الحضور مع تسجيل في سجل المراجعة
+   */
+  async adminCorrectAttendance(
+    attendanceId: string,
+    companyId: string,
+    adminId: string,
+    newCheckInTime?: string,
+    newCheckOutTime?: string,
+    correctionReason?: string,
+  ) {
+    // Validate inputs
+    if (!correctionReason || correctionReason.trim().length < 5) {
+      throw new BadRequestException('يجب إدخال سبب التعديل (5 أحرف على الأقل)');
+    }
+
+    // Find the attendance record
+    const attendance = await this.prisma.attendance.findFirst({
+      where: { id: attendanceId, companyId },
+      include: { user: { include: { branch: true } } },
+    });
+
+    if (!attendance) {
+      throw new NotFoundException('سجل الحضور غير موجود');
+    }
+
+    // Store original values for audit
+    const originalCheckIn = attendance.checkInTime;
+    const originalCheckOut = attendance.checkOutTime;
+    const originalStatus = attendance.status;
+    const originalLateMinutes = attendance.lateMinutes;
+
+    // Prepare update data
+    const updateData: any = {};
+
+    if (newCheckInTime) {
+      updateData.checkInTime = new Date(newCheckInTime);
+    }
+
+    if (newCheckOutTime) {
+      updateData.checkOutTime = new Date(newCheckOutTime);
+    }
+
+    // Recalculate late minutes if check-in time changed
+    if (updateData.checkInTime && attendance.user?.branch) {
+      const branch = attendance.user.branch;
+      const workStartTime = this.parseTime(branch.workStartTime);
+      const checkInDate = new Date(updateData.checkInTime);
+      const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
+      const startMinutes = workStartTime.hours * 60 + workStartTime.minutes;
+      const graceEndMinutes = startMinutes + branch.lateGracePeriod;
+
+      if (checkInMinutes > graceEndMinutes) {
+        updateData.lateMinutes = checkInMinutes - startMinutes;
+        updateData.status = 'LATE';
+      } else {
+        updateData.lateMinutes = 0;
+        // Check if there's early leave
+        if (attendance.earlyLeaveMinutes && attendance.earlyLeaveMinutes > 0) {
+          updateData.status = 'EARLY_LEAVE';
+        } else {
+          updateData.status = 'PRESENT';
+        }
+      }
+    }
+
+    // Recalculate working minutes if both times are present
+    const effectiveCheckIn = updateData.checkInTime || attendance.checkInTime;
+    const effectiveCheckOut = updateData.checkOutTime || attendance.checkOutTime;
+
+    if (effectiveCheckIn && effectiveCheckOut) {
+      const workingMs = new Date(effectiveCheckOut).getTime() - new Date(effectiveCheckIn).getTime();
+      updateData.workingMinutes = Math.floor(workingMs / 60000);
+    }
+
+    // Add correction metadata
+    updateData.correctedAt = new Date();
+    updateData.correctedBy = adminId;
+    updateData.correctionReason = correctionReason;
+
+    // Update the attendance record
+    const updatedAttendance = await this.prisma.attendance.update({
+      where: { id: attendanceId },
+      data: updateData,
+      include: { user: true, branch: true },
+    });
+
+    // Create audit log entry
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: adminId,
+          companyId,
+          action: 'UPDATE',
+          entity: 'Attendance',
+          entityId: attendanceId,
+          oldValue: {
+            checkInTime: originalCheckIn,
+            checkOutTime: originalCheckOut,
+            status: originalStatus,
+            lateMinutes: originalLateMinutes,
+          },
+          newValue: {
+            checkInTime: updateData.checkInTime || null,
+            checkOutTime: updateData.checkOutTime || null,
+            status: updateData.status || null,
+            lateMinutes: updateData.lateMinutes || null,
+          },
+          description: `تصحيح حضور - ${correctionReason}`,
+          ipAddress: null,
+        },
+      });
+    } catch (auditError) {
+      console.error('Failed to create audit log:', auditError);
+      // Don't fail the operation if audit log fails
+    }
+
+    return {
+      message: 'تم تحديث سجل الحضور بنجاح',
+      attendance: updatedAttendance,
+      changes: {
+        checkInTime: { old: originalCheckIn, new: updatedAttendance.checkInTime },
+        checkOutTime: { old: originalCheckOut, new: updatedAttendance.checkOutTime },
+        status: { old: originalStatus, new: updatedAttendance.status },
+        lateMinutes: { old: originalLateMinutes, new: updatedAttendance.lateMinutes },
+      },
+    };
+  }
+
   // حساب التشابه بين embedding-ين (Cosine Similarity)
   private cosineSimilarity(a: number[], b: number[]): number {
     if (a.length !== b.length || a.length === 0) {

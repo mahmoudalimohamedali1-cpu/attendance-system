@@ -620,6 +620,30 @@ export class PayrollAdjustmentsService {
         const attendanceDeductions: any[] = [];
         let totalLate = 0, totalAbsence = 0, totalEarly = 0;
 
+        // حساب أيام العمل في الفترة (استبعاد الجمعة افتراضياً)
+        const getWorkingDays = (startDate: Date, endDate: Date): Date[] => {
+            const days: Date[] = [];
+            const current = new Date(startDate);
+            const end = new Date(endDate);
+            // التأكد من عدم تجاوز اليوم الحالي
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+            const effectiveEnd = end > today ? today : end;
+
+            while (current <= effectiveEnd) {
+                const dayOfWeek = current.getDay();
+                // استبعاد الجمعة (5) - يمكن تعديلها حسب إعدادات الشركة
+                if (dayOfWeek !== 5) {
+                    days.push(new Date(current));
+                }
+                current.setDate(current.getDate() + 1);
+            }
+            return days;
+        };
+
+        const workingDays = getWorkingDays(period.startDate, period.endDate);
+        this.logger.log(`📅 Working days in period: ${workingDays.length}`);
+
         for (const emp of employees) {
             // جلب سجلات الحضور للفترة
             const attendances = await this.prisma.attendance.findMany({
@@ -633,9 +657,51 @@ export class PayrollAdjustmentsService {
                 },
             });
 
-            let lateMinutes = 0, absentDays = 0, earlyMinutes = 0;
+            // جلب طلبات الإجازة المعتمدة للفترة
+            const approvedLeaves = await this.prisma.leaveRequest.findMany({
+                where: {
+                    userId: emp.id,
+                    status: 'APPROVED',
+                    OR: [
+                        {
+                            startDate: { lte: period.endDate },
+                            endDate: { gte: period.startDate },
+                        },
+                    ],
+                },
+            });
+
+            // تحويل سجلات الحضور لـ Set من التواريخ
+            const attendanceDates = new Set(
+                attendances.map(a => new Date(a.date).toDateString())
+            );
+
+            // تحويل أيام الإجازة لـ Set من التواريخ
+            const leaveDates = new Set<string>();
+            for (const leave of approvedLeaves) {
+                const leaveStart = new Date(leave.startDate);
+                const leaveEnd = new Date(leave.endDate);
+                const current = new Date(leaveStart);
+                while (current <= leaveEnd) {
+                    leaveDates.add(current.toDateString());
+                    current.setDate(current.getDate() + 1);
+                }
+            }
+
+            // حساب الغياب الحقيقي = أيام عمل بدون حضور وبدون إجازة
+            let realAbsentDays = 0;
+            const absentDates: string[] = [];
+            for (const workDay of workingDays) {
+                const dateStr = workDay.toDateString();
+                if (!attendanceDates.has(dateStr) && !leaveDates.has(dateStr)) {
+                    realAbsentDays++;
+                    absentDates.push(dateStr);
+                }
+            }
+
+            // حساب التأخير والخروج المبكر من السجلات الموجودة
+            let lateMinutes = 0, earlyMinutes = 0;
             for (const att of attendances) {
-                if (att.status === 'ABSENT') absentDays++;
                 if (att.lateMinutes) lateMinutes += att.lateMinutes;
                 if ((att as any).earlyDepartureMinutes) earlyMinutes += (att as any).earlyDepartureMinutes;
             }
@@ -645,7 +711,7 @@ export class PayrollAdjustmentsService {
             const hourlyRate = dailyRate / 8;
 
             const lateDeduction = Math.round((lateMinutes / 60) * hourlyRate * 100) / 100;
-            const absenceDeduction = Math.round(absentDays * dailyRate * 100) / 100;
+            const absenceDeduction = Math.round(realAbsentDays * dailyRate * 100) / 100;
             const earlyDeduction = Math.round((earlyMinutes / 60) * hourlyRate * 100) / 100;
             const totalDeduction = lateDeduction + absenceDeduction + earlyDeduction;
 
@@ -656,7 +722,8 @@ export class PayrollAdjustmentsService {
                     employeeCode: emp.employeeCode,
                     lateMinutes,
                     lateDeduction,
-                    absentDays,
+                    absentDays: realAbsentDays,
+                    absentDates, // قائمة تواريخ الغياب للتوضيح
                     absenceDeduction,
                     earlyMinutes,
                     earlyDeduction,
