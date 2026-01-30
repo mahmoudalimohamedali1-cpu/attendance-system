@@ -1025,123 +1025,78 @@ export class AttendanceService {
     newCheckOutTime?: string,
     correctionReason?: string,
   ) {
+    console.log('🔧 adminCorrectAttendance called:', { attendanceId, companyId, adminId, newCheckInTime, newCheckOutTime, correctionReason });
+
     // Validate inputs
-    if (!correctionReason || correctionReason.trim().length < 5) {
-      throw new BadRequestException('يجب إدخال سبب التعديل (5 أحرف على الأقل)');
+    if (!correctionReason || correctionReason.trim().length < 3) {
+      throw new BadRequestException('يجب إدخال سبب التعديل (3 أحرف على الأقل)');
     }
 
     // Find the attendance record
     const attendance = await this.prisma.attendance.findFirst({
       where: { id: attendanceId, companyId },
-      include: { user: { include: { branch: true } } },
+      include: { user: true, branch: true },
     });
 
     if (!attendance) {
       throw new NotFoundException('سجل الحضور غير موجود');
     }
 
-    // Store original values for audit
-    const originalCheckIn = attendance.checkInTime;
-    const originalCheckOut = attendance.checkOutTime;
-    const originalStatus = attendance.status;
-    const originalLateMinutes = attendance.lateMinutes;
+    console.log('📋 Found attendance:', attendance.id, attendance.date);
 
-    // Prepare update data
+    // Build simple update data
     const updateData: any = {};
 
+    // Only update times if provided and valid
     if (newCheckInTime) {
-      updateData.checkInTime = new Date(newCheckInTime);
-    }
-
-    if (newCheckOutTime) {
-      updateData.checkOutTime = new Date(newCheckOutTime);
-    }
-
-    // Recalculate late minutes if check-in time changed
-    if (updateData.checkInTime && attendance.user?.branch) {
-      const branch = attendance.user.branch;
-      const workStartTime = this.parseTime(branch.workStartTime);
-      const checkInDate = new Date(updateData.checkInTime);
-      const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
-      const startMinutes = workStartTime.hours * 60 + workStartTime.minutes;
-      const graceEndMinutes = startMinutes + branch.lateGracePeriod;
-
-      if (checkInMinutes > graceEndMinutes) {
-        updateData.lateMinutes = checkInMinutes - startMinutes;
-        updateData.status = 'LATE';
-      } else {
-        updateData.lateMinutes = 0;
-        // Check if there's early leave
-        if (attendance.earlyLeaveMinutes && attendance.earlyLeaveMinutes > 0) {
-          updateData.status = 'EARLY_LEAVE';
-        } else {
-          updateData.status = 'PRESENT';
-        }
+      try {
+        updateData.checkInTime = new Date(newCheckInTime);
+        console.log('⏰ New checkInTime:', updateData.checkInTime);
+      } catch (e) {
+        console.error('❌ Invalid checkInTime format:', newCheckInTime);
       }
     }
 
-    // Recalculate working minutes if both times are present
-    const effectiveCheckIn = updateData.checkInTime || attendance.checkInTime;
-    const effectiveCheckOut = updateData.checkOutTime || attendance.checkOutTime;
-
-    if (effectiveCheckIn && effectiveCheckOut) {
-      const workingMs = new Date(effectiveCheckOut).getTime() - new Date(effectiveCheckIn).getTime();
-      updateData.workingMinutes = Math.floor(workingMs / 60000);
+    if (newCheckOutTime) {
+      try {
+        updateData.checkOutTime = new Date(newCheckOutTime);
+        console.log('⏰ New checkOutTime:', updateData.checkOutTime);
+      } catch (e) {
+        console.error('❌ Invalid checkOutTime format:', newCheckOutTime);
+      }
     }
 
-    // Add correction note (using existing notes field instead of non-existent correction fields)
-    const correctionNote = `✏️ تصحيح إداري: ${correctionReason} (بواسطة المسؤول في ${new Date().toLocaleString('ar-SA')})`;
+    // Add correction note
+    const correctionNote = `✏️ تصحيح: ${correctionReason}`;
     updateData.notes = attendance.notes
       ? `${attendance.notes}\n${correctionNote}`
       : correctionNote;
 
-    // Update the attendance record
-    const updatedAttendance = await this.prisma.attendance.update({
-      where: { id: attendanceId },
-      data: updateData,
-      include: { user: true, branch: true },
-    });
+    console.log('📝 Update data:', updateData);
 
-    // Create audit log entry
-    try {
-      await this.prisma.auditLog.create({
-        data: {
-          userId: adminId,
-          companyId,
-          action: 'UPDATE',
-          entity: 'Attendance',
-          entityId: attendanceId,
-          oldValue: {
-            checkInTime: originalCheckIn,
-            checkOutTime: originalCheckOut,
-            status: originalStatus,
-            lateMinutes: originalLateMinutes,
-          },
-          newValue: {
-            checkInTime: updateData.checkInTime || null,
-            checkOutTime: updateData.checkOutTime || null,
-            status: updateData.status || null,
-            lateMinutes: updateData.lateMinutes || null,
-          },
-          description: `تصحيح حضور - ${correctionReason}`,
-          ipAddress: null,
-        },
-      });
-    } catch (auditError) {
-      console.error('Failed to create audit log:', auditError);
-      // Don't fail the operation if audit log fails
+    // Only proceed if there's something to update
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('لا توجد بيانات للتحديث');
     }
 
-    return {
-      message: 'تم تحديث سجل الحضور بنجاح',
-      attendance: updatedAttendance,
-      changes: {
-        checkInTime: { old: originalCheckIn, new: updatedAttendance.checkInTime },
-        checkOutTime: { old: originalCheckOut, new: updatedAttendance.checkOutTime },
-        status: { old: originalStatus, new: updatedAttendance.status },
-        lateMinutes: { old: originalLateMinutes, new: updatedAttendance.lateMinutes },
-      },
-    };
+    try {
+      // Update the attendance record
+      const updatedAttendance = await this.prisma.attendance.update({
+        where: { id: attendanceId },
+        data: updateData,
+        include: { user: true, branch: true },
+      });
+
+      console.log('✅ Attendance updated successfully:', updatedAttendance.id);
+
+      return {
+        message: 'تم تحديث سجل الحضور بنجاح',
+        attendance: updatedAttendance,
+      };
+    } catch (updateError) {
+      console.error('❌ Prisma update error:', updateError);
+      throw new BadRequestException('فشل تحديث السجل: ' + (updateError as Error).message);
+    }
   }
 
   // حساب التشابه بين embedding-ين (Cosine Similarity)
