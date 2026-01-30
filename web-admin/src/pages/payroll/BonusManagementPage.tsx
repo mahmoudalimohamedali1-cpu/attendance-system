@@ -53,6 +53,10 @@ import {
   Schedule as ScheduleIcon,
   RemoveCircle as DeductIcon,
   Bolt as BoltIcon,
+  AccountBalance as CenterIcon,
+  AccessTime as AttendanceIcon,
+  CreditCard as AdvanceIcon,
+  Gavel as DisciplinaryIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api.service';
@@ -288,9 +292,26 @@ export default function BonusManagementPage() {
       toast.success('تم اعتماد التسوية');
       queryClient.invalidateQueries({ queryKey: ['pending-adjustments'] });
       queryClient.invalidateQueries({ queryKey: ['adjustment-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-deductions-preview'] });
+      queryClient.invalidateQueries({ queryKey: ['advance-deductions-preview'] });
     },
     onError: () => toast.error('حدث خطأ'),
   });
+
+  // ============= معاينة خصومات الحضور والسلف =============
+
+  // جلب معاينة خصومات الحضور
+  const { data: attendanceDeductions, isLoading: loadingAttendanceDeductions } = useQuery({
+    queryKey: ['attendance-deductions-preview'],
+    queryFn: () => api.get('/payroll-adjustments/attendance-deductions-preview'),
+  });
+
+  // جلب معاينة أقساط السلف
+  const { data: advanceDeductions, isLoading: loadingAdvanceDeductions } = useQuery({
+    queryKey: ['advance-deductions-preview'],
+    queryFn: () => api.get('/payroll-adjustments/advance-deductions-preview'),
+  });
+
 
   const handleCreateInstantAdjustment = () => {
     if (!instantForm.employeeId || !instantForm.amount || !instantForm.reason) {
@@ -354,11 +375,11 @@ export default function BonusManagementPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" fontWeight="bold" color="primary">
-            <BonusIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            إدارة المكافآت
+            <CenterIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            مركز تعديلات الرواتب
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            إدارة برامج المكافآت والموافقات والتقارير
+            اعتماد الخصومات والإضافات قبل تطبيقها على الرواتب (الحضور، الجزاءات، السلف، العهد)
           </Typography>
         </Box>
         <Box>
@@ -450,21 +471,445 @@ export default function BonusManagementPage() {
 
       {/* التبويبات */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
-          <Tab label="برامج المكافآت" />
-          <Tab label={`الموافقات المعلقة (${(pendingBonuses as any[])?.length || 0})`} />
-          <Tab label={`المعتمدة - يمكن إلغاؤها (${(approvedBonuses as any[])?.length || 0})`} sx={{ color: 'success.main' }} />
-          <Tab label="سجل المكافآت" />
+        <Tabs
+          value={tabValue}
+          onChange={(_, v) => setTabValue(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+        >
+          <Tab
+            icon={<AttendanceIcon />}
+            iconPosition="start"
+            label="خصومات الحضور"
+            sx={{ color: 'error.main' }}
+          />
+          <Tab
+            icon={<AdvanceIcon />}
+            iconPosition="start"
+            label="أقساط السلف"
+          />
+          <Tab
+            icon={<DisciplinaryIcon />}
+            iconPosition="start"
+            label={`الجزاءات والعهد (${(pendingAdjustments as any[])?.filter((a: any) =>
+              a.adjustmentType === 'DEDUCTION' || a.disciplinaryCaseId || a.reason?.includes('جزاء') || a.reason?.includes('عهدة')
+            )?.length || 0})`}
+          />
+          <Tab
+            icon={<BonusIcon />}
+            iconPosition="start"
+            label="برامج المكافآت"
+          />
+          <Tab label={`مكافآت معلقة (${(pendingBonuses as any[])?.length || 0})`} />
           <Tab
             icon={<BoltIcon />}
             iconPosition="start"
-            label={`الخصومات الفورية (${(pendingAdjustments as any[])?.length || 0})`}
+            label="خصم/مكافأة فورية"
+            sx={{ color: 'warning.main' }}
           />
         </Tabs>
       </Paper>
 
-      {/* برامج المكافآت */}
+      {/* تاب 0: خصومات الحضور */}
       <TabPanel value={tabValue} index={0}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">
+            🕐 خصومات الحضور للفترة الحالية
+          </Typography>
+          <Typography variant="body2">
+            هنا يتم عرض خصومات التأخير والغياب والخروج المبكر لاعتمادها قبل تطبيقها على الرواتب.
+            الخصومات المعتمدة ستُطبق على الراتب، والمرفوضة سيتم إلغاؤها.
+          </Typography>
+        </Alert>
+
+        {loadingAttendanceDeductions ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'error.light', color: 'error.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">إجمالي خصومات التأخير</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((attendanceDeductions as any)?.totals?.lateDeduction || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">إجمالي خصومات الغياب</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((attendanceDeductions as any)?.totals?.absenceDeduction || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'info.light', color: 'info.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">إجمالي خروج مبكر</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((attendanceDeductions as any)?.totals?.earlyDeduction || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableCell>الموظف</TableCell>
+                    <TableCell align="center">دقائق التأخير</TableCell>
+                    <TableCell align="center">خصم التأخير</TableCell>
+                    <TableCell align="center">أيام الغياب</TableCell>
+                    <TableCell align="center">خصم الغياب</TableCell>
+                    <TableCell align="center">خروج مبكر</TableCell>
+                    <TableCell align="center">الإجمالي</TableCell>
+                    <TableCell align="center">الإجراءات</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {((attendanceDeductions as any)?.employees || []).map((emp: any) => (
+                    <TableRow key={emp.employeeId} hover>
+                      <TableCell>
+                        <Box>
+                          <Typography fontWeight="medium">{emp.employeeName}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {emp.employeeCode}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">{emp.lateMinutes} دقيقة</TableCell>
+                      <TableCell align="center">
+                        <Typography color="error.main" fontWeight="bold">
+                          {formatCurrency(emp.lateDeduction)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">{emp.absentDays} يوم</TableCell>
+                      <TableCell align="center">
+                        <Typography color="warning.dark" fontWeight="bold">
+                          {formatCurrency(emp.absenceDeduction)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">{emp.earlyMinutes} دقيقة / {formatCurrency(emp.earlyDeduction)}</TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={formatCurrency(emp.totalDeduction)}
+                          color="error"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="اعتماد الخصم">
+                          <IconButton
+                            color="success"
+                            size="small"
+                            onClick={() => toast.success('سيتم تفعيل اعتماد الخصومات قريباً')}
+                          >
+                            <ApproveIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="إلغاء الخصم">
+                          <IconButton
+                            color="error"
+                            size="small"
+                            onClick={() => toast.success('سيتم تفعيل إلغاء الخصومات قريباً')}
+                          >
+                            <RejectIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!attendanceDeductions || (attendanceDeductions as any)?.employees?.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        <Box sx={{ py: 4 }}>
+                          <AttendanceIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+                          <Typography color="text.secondary">
+                            لا توجد خصومات حضور للفترة الحالية
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )}
+      </TabPanel>
+
+
+      {/* تاب 1: أقساط السلف */}
+      <TabPanel value={tabValue} index={1}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">
+            💰 أقساط السلف المستحقة للفترة الحالية
+          </Typography>
+          <Typography variant="body2">
+            هنا يتم عرض أقساط السلف المستحقة للخصم من رواتب الموظفين. يمكنك تأجيل قسط لفترة لاحقة.
+          </Typography>
+        </Alert>
+
+        {loadingAdvanceDeductions ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {/* ملخص أقساط السلف */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={6}>
+                <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">إجمالي الأقساط المستحقة</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {formatCurrency((advanceDeductions as any)?.totals?.totalInstallments || 0)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Card sx={{ bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="body2">عدد السلف النشطة</Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      {(advanceDeductions as any)?.totals?.count || 0} سلفة
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableCell>الموظف</TableCell>
+                    <TableCell>رقم السلفة</TableCell>
+                    <TableCell align="center">المبلغ الأصلي</TableCell>
+                    <TableCell align="center">المتبقي</TableCell>
+                    <TableCell align="center">القسط الشهري</TableCell>
+                    <TableCell align="center">الحالة</TableCell>
+                    <TableCell align="center">الإجراءات</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {((advanceDeductions as any)?.advances || []).map((adv: any) => (
+                    <TableRow key={adv.advanceId} hover>
+                      <TableCell>
+                        <Box>
+                          <Typography fontWeight="medium">{adv.employeeName}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {adv.employeeCode}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={adv.advanceCode} size="small" variant="outlined" />
+                      </TableCell>
+                      <TableCell align="center">{formatCurrency(adv.originalAmount)}</TableCell>
+                      <TableCell align="center">
+                        <Typography color="warning.main" fontWeight="bold">
+                          {formatCurrency(adv.remainingAmount)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={formatCurrency(adv.monthlyInstallment)}
+                          color="primary"
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label="مستحق للخصم"
+                          color="info"
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="تأجيل للشهر القادم">
+                          <IconButton
+                            color="warning"
+                            size="small"
+                            onClick={() => toast.success('سيتم تفعيل تأجيل الأقساط قريباً')}
+                          >
+                            <ScheduleIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="اعتماد الخصم">
+                          <IconButton
+                            color="success"
+                            size="small"
+                            onClick={() => toast.success('سيتم تفعيل اعتماد الخصم قريباً')}
+                          >
+                            <ApproveIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!advanceDeductions || (advanceDeductions as any)?.advances?.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        <Box sx={{ py: 4 }}>
+                          <AdvanceIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+                          <Typography color="text.secondary">
+                            لا توجد أقساط سلف مستحقة للفترة الحالية
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )}
+      </TabPanel>
+
+
+      {/* تاب 2: الجزاءات والعهد */}
+      <TabPanel value={tabValue} index={2}>
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight="bold">
+            ⚖️ الخصومات من الجزاءات والعهد
+          </Typography>
+          <Typography variant="body2">
+            خصومات ناتجة عن قضايا جزاءات معتمدة أو تلفيات عهد. هذه الخصومات تحتاج اعتماد HR قبل تطبيقها.
+          </Typography>
+        </Alert>
+
+        {loadingAdjustments ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'grey.100' }}>
+                  <TableCell>الموظف</TableCell>
+                  <TableCell>المصدر</TableCell>
+                  <TableCell align="center">المبلغ</TableCell>
+                  <TableCell>السبب</TableCell>
+                  <TableCell>التاريخ</TableCell>
+                  <TableCell>الحالة</TableCell>
+                  <TableCell align="center">الإجراءات</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(pendingAdjustments as any[])?.filter((a: any) =>
+                  a.adjustmentType === 'DEDUCTION' || a.disciplinaryCaseId || a.reason?.includes('جزاء') || a.reason?.includes('عهدة')
+                )?.map((adj: any) => (
+                  <TableRow key={adj.id} hover>
+                    <TableCell>
+                      <Box>
+                        <Typography fontWeight="medium">
+                          {adj.employee?.firstName} {adj.employee?.lastName}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {adj.employee?.employeeCode}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        icon={adj.disciplinaryCaseId ? <DisciplinaryIcon /> : <DeductIcon />}
+                        label={adj.disciplinaryCaseId ? 'جزاء' : (adj.reason?.includes('عهدة') ? 'عهدة' : 'خصم')}
+                        size="small"
+                        color={adj.disciplinaryCaseId ? 'error' : 'warning'}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography fontWeight="bold" color="error.main">
+                        -{formatCurrency(Number(adj.adjustedAmount || adj.value || adj.amount || 0))}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 200 }}>
+                      <Typography variant="body2" noWrap>
+                        {adj.reason}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(adj.createdAt).toLocaleDateString('ar-SA')}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={
+                          adj.status === 'PENDING' ? 'معلق' :
+                            adj.status === 'APPROVED' ? 'معتمد' :
+                              adj.status === 'REJECTED' ? 'مرفوض' : adj.status
+                        }
+                        size="small"
+                        color={
+                          adj.status === 'PENDING' ? 'warning' :
+                            adj.status === 'APPROVED' ? 'success' : 'error'
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      {adj.status === 'PENDING' && (
+                        <>
+                          <Tooltip title="اعتماد">
+                            <IconButton
+                              color="success"
+                              size="small"
+                              onClick={() => approveAdjustmentMutation.mutate({
+                                adjustmentId: adj.id,
+                                approved: true,
+                              })}
+                            >
+                              <ApproveIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="رفض">
+                            <IconButton
+                              color="error"
+                              size="small"
+                              onClick={() => approveAdjustmentMutation.mutate({
+                                adjustmentId: adj.id,
+                                approved: false,
+                              })}
+                            >
+                              <RejectIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {(!(pendingAdjustments as any[])?.filter((a: any) =>
+                  a.adjustmentType === 'DEDUCTION' || a.disciplinaryCaseId || a.reason?.includes('جزاء') || a.reason?.includes('عهدة')
+                )?.length) && (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        <Typography color="text.secondary" sx={{ py: 4 }}>
+                          لا توجد خصومات جزاءات أو عهد معلقة
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </TabPanel>
+
+      {/* تاب 3: برامج المكافآت */}
+      <TabPanel value={tabValue} index={3}>
         {loadingPrograms ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -555,8 +1000,8 @@ export default function BonusManagementPage() {
         )}
       </TabPanel>
 
-      {/* الموافقات المعلقة */}
-      <TabPanel value={tabValue} index={1}>
+      {/* الموافقات المعلقة - تاب 4 */}
+      <TabPanel value={tabValue} index={4}>
         {loadingPending ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -643,8 +1088,9 @@ export default function BonusManagementPage() {
         )}
       </TabPanel>
 
-      {/* ✅ المكافآت المعتمدة - يمكن إلغاؤها */}
-      <TabPanel value={tabValue} index={2}>
+      {/* ✅ REMOVED - هذا التاب لم يعد موجود في القائمة الجديدة */}
+      {/* المكافآت المعتمدة - مدمج مع الخصومات الفورية */}
+      <TabPanel value={tabValue} index={-1}>
         {loadingApproved ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
@@ -716,15 +1162,15 @@ export default function BonusManagementPage() {
         )}
       </TabPanel>
 
-      {/* سجل المكافآت */}
-      <TabPanel value={tabValue} index={3}>
+      {/* سجل المكافآت - محذوف من القائمة الجديدة */}
+      <TabPanel value={tabValue} index={-2}>
         <Alert severity="info">
           سيتم عرض سجل جميع المكافآت المصروفة هنا
         </Alert>
       </TabPanel>
 
-      {/* ⚡ الخصومات والمكافآت الفورية */}
-      <TabPanel value={tabValue} index={4}>
+      {/* ⚡ الخصومات والمكافآت الفورية - تاب 5 */}
+      <TabPanel value={tabValue} index={5}>
         <Box sx={{ mb: 3 }}>
           <Button
             variant="contained"

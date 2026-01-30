@@ -63,6 +63,33 @@ export class PayrollAdjustmentsController {
     }
 
     /**
+     * 🕐 معاينة خصومات الحضور للفترة الحالية
+     * GET /payroll-adjustments/attendance-deductions-preview
+     */
+    @Get('attendance-deductions-preview')
+    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
+    async getAttendanceDeductionsPreview(
+        @Query('periodId') periodId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.getAttendanceDeductionsPreview(companyId, periodId);
+    }
+
+    /**
+     * 💰 معاينة أقساط السلف للفترة الحالية
+     * GET /payroll-adjustments/advance-deductions-preview
+     */
+    @Get('advance-deductions-preview')
+    @Roles('ADMIN', 'MANAGER', 'HR', 'ACCOUNTANT')
+    async getAdvanceDeductionsPreview(
+        @Query('periodId') periodId: string,
+        @CurrentUser('companyId') companyId: string,
+    ) {
+        return this.service.getAdvanceDeductionsPreview(companyId, periodId);
+    }
+
+
+    /**
      * إنشاء تسوية جديدة
      * POST /payroll-adjustments
      */

@@ -571,6 +571,199 @@ export class PayrollAdjustmentsService {
             totalDeductions,
         };
     }
+
+    /**
+     * 📊 جلب معاينة خصومات الحضور للفترة الحالية
+     * يعرض خصومات التأخير والغياب والخروج المبكر لكل موظف
+     */
+    async getAttendanceDeductionsPreview(companyId: string, periodId?: string) {
+        this.logger.log(`📊 Getting attendance deductions preview for company: ${companyId}`);
+
+        // جلب الفترة الحالية أو المحددة
+        let period: any;
+        if (periodId) {
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { id: periodId, companyId },
+            });
+        } else {
+            // جلب آخر فترة مفتوحة
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { companyId, status: 'OPEN' },
+                orderBy: { startDate: 'desc' },
+            });
+        }
+
+        if (!period) {
+            return {
+                period: null,
+                employees: [],
+                totals: { lateDeduction: 0, absenceDeduction: 0, earlyDeduction: 0, total: 0 },
+            };
+        }
+
+        // جلب بيانات الحضور للفترة
+        const employees = await this.prisma.user.findMany({
+            where: {
+                companyId,
+                status: 'ACTIVE',
+                role: { in: ['EMPLOYEE', 'MANAGER', 'SUPERVISOR'] },
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                employeeCode: true,
+                salary: true,
+            },
+        });
+
+        const attendanceDeductions: any[] = [];
+        let totalLate = 0, totalAbsence = 0, totalEarly = 0;
+
+        for (const emp of employees) {
+            // جلب سجلات الحضور للفترة
+            const attendances = await this.prisma.attendance.findMany({
+                where: {
+                    userId: emp.id,
+                    companyId,
+                    date: {
+                        gte: period.startDate,
+                        lte: period.endDate,
+                    },
+                },
+            });
+
+            let lateMinutes = 0, absentDays = 0, earlyMinutes = 0;
+            for (const att of attendances) {
+                if (att.status === 'ABSENT') absentDays++;
+                if (att.lateMinutes) lateMinutes += att.lateMinutes;
+                if ((att as any).earlyDepartureMinutes) earlyMinutes += (att as any).earlyDepartureMinutes;
+            }
+
+            // حساب الخصومات (تقريبي - يعتمد على إعدادات الشركة)
+            const dailyRate = Number(emp.salary || 0) / 30;
+            const hourlyRate = dailyRate / 8;
+
+            const lateDeduction = Math.round((lateMinutes / 60) * hourlyRate * 100) / 100;
+            const absenceDeduction = Math.round(absentDays * dailyRate * 100) / 100;
+            const earlyDeduction = Math.round((earlyMinutes / 60) * hourlyRate * 100) / 100;
+            const totalDeduction = lateDeduction + absenceDeduction + earlyDeduction;
+
+            if (totalDeduction > 0) {
+                attendanceDeductions.push({
+                    employeeId: emp.id,
+                    employeeName: `${emp.firstName} ${emp.lastName}`,
+                    employeeCode: emp.employeeCode,
+                    lateMinutes,
+                    lateDeduction,
+                    absentDays,
+                    absenceDeduction,
+                    earlyMinutes,
+                    earlyDeduction,
+                    totalDeduction,
+                    status: 'PENDING_APPROVAL',
+                });
+
+                totalLate += lateDeduction;
+                totalAbsence += absenceDeduction;
+                totalEarly += earlyDeduction;
+            }
+        }
+
+        return {
+            period: {
+                id: period.id,
+                month: period.month,
+                year: period.year,
+                startDate: period.startDate,
+                endDate: period.endDate,
+            },
+            employees: attendanceDeductions,
+            totals: {
+                lateDeduction: totalLate,
+                absenceDeduction: totalAbsence,
+                earlyDeduction: totalEarly,
+                total: totalLate + totalAbsence + totalEarly,
+            },
+        };
+    }
+
+    /**
+     * 💰 جلب معاينة أقساط السلف المستحقة للفترة الحالية
+     */
+    async getAdvanceDeductionsPreview(companyId: string, periodId?: string) {
+        this.logger.log(`💰 Getting advance deductions preview for company: ${companyId}`);
+
+        // جلب الفترة الحالية
+        let period: any;
+        if (periodId) {
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { id: periodId, companyId },
+            });
+        } else {
+            period = await this.prisma.payrollPeriod.findFirst({
+                where: { companyId, status: 'OPEN' },
+                orderBy: { startDate: 'desc' },
+            });
+        }
+
+        if (!period) {
+            return {
+                period: null,
+                advances: [],
+                totals: { totalInstallments: 0, count: 0 },
+            };
+        }
+
+        // جلب السلف النشطة التي عليها أقساط مستحقة
+        const advances = await this.prisma.advance.findMany({
+            where: {
+                companyId,
+                status: 'APPROVED',
+                remainingAmount: { gt: 0 },
+            },
+            include: {
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        employeeCode: true,
+                    },
+                },
+            },
+        });
+
+        const advanceDeductions = advances.map((adv: any) => ({
+            employeeId: adv.employee?.id,
+            employeeName: `${adv.employee?.firstName} ${adv.employee?.lastName}`,
+            employeeCode: adv.employee?.employeeCode,
+            advanceId: adv.id,
+            advanceCode: adv.code || `ADV-${adv.id.slice(0, 8)}`,
+            originalAmount: Number(adv.amount),
+            remainingAmount: Number(adv.remainingAmount),
+            monthlyInstallment: Number(adv.monthlyInstallment || adv.installmentAmount || 0),
+            status: 'PENDING_APPROVAL',
+        }));
+
+        const totalInstallments = advanceDeductions.reduce(
+            (sum: number, a: any) => sum + a.monthlyInstallment,
+            0
+        );
+
+        return {
+            period: period ? {
+                id: period.id,
+                month: period.month,
+                year: period.year,
+            } : null,
+            advances: advanceDeductions,
+            totals: {
+                totalInstallments,
+                count: advanceDeductions.length,
+            },
+        };
+    }
 }
 
 /**
