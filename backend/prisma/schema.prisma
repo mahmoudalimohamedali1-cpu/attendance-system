@@ -136,6 +136,7 @@ model Company {
   muqeemTransactions   MuqeemTransaction[]
   muqeemConfig         MuqeemConfig?
   employeeTerminations EmployeeTermination[]
+  deductionApprovals   DeductionApproval[]
 
   @@map("companies")
 }
@@ -618,6 +619,11 @@ model User {
   terminationsApproved   EmployeeTermination[] @relation("TerminationApprover")
   terminationsHRApproved EmployeeTermination[] @relation("TerminationHRApprover")
   terminationsGMApproved EmployeeTermination[] @relation("TerminationGMApprover")
+
+  // اعتمادات الخصومات
+  deductionApprovalsAsEmployee DeductionApproval[] @relation("DeductionApprovalEmployee")
+  deductionApprovalsAsApprover DeductionApproval[] @relation("DeductionApprovalApprover")
+  deductionAuditLogsPerformed  DeductionAuditLog[] @relation("DeductionAuditPerformer")
 
   @@unique([companyId, employeeCode])
   @@index([companyId, status])
@@ -2357,6 +2363,7 @@ model PayrollPeriod {
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")
   employeeDebtLedgers EmployeeDebtLedger[]
+  deductionApprovals  DeductionApproval[]
 
   @@unique([companyId, month, year])
   @@index([companyId, status])
@@ -7543,4 +7550,96 @@ model EmployeeTermination {
   @@index([employeeId])
   @@index([status])
   @@map("employee_terminations")
+}
+
+// ==================== نظام اعتماد الخصومات (Deduction Approval System) ====================
+
+enum DeductionType {
+  ATTENDANCE // خصومات الحضور
+  LEAVE // خصومات الإجازات
+  DISCIPLINARY // الجزاءات
+  CUSTODY // العهد
+}
+
+enum DeductionApprovalStatus {
+  PENDING // في انتظار الاعتماد
+  APPROVED // معتمد
+  REJECTED // مرفوض
+  MODIFIED // معدل
+  CONVERTED // محول لإجازة
+}
+
+model DeductionApproval {
+  id            String        @id @default(uuid())
+  deductionType DeductionType @map("deduction_type")
+  referenceId   String        @map("reference_id") // معرف السجل الأصلي
+  employeeId    String        @map("employee_id")
+  periodId      String?       @map("period_id")
+
+  // المبالغ
+  originalAmount Decimal  @map("original_amount") @db.Decimal(18, 2)
+  approvedAmount Decimal? @map("approved_amount") @db.Decimal(18, 2)
+
+  // الحالة والإجراء
+  status DeductionApprovalStatus @default(PENDING)
+  action String? // REDUCE, CONVERT_TO_LEAVE, WAIVE
+
+  // التفاصيل
+  reason String? // سبب الخصم الأصلي
+  notes  String? // ملاحظات الاعتماد
+
+  // بيانات التحويل لإجازة
+  convertedLeaveType String? @map("converted_leave_type")
+  convertedLeaveDays Int?    @map("converted_leave_days")
+
+  // الاعتماد
+  approvedById String?   @map("approved_by_id")
+  approvedAt   DateTime? @map("approved_at")
+
+  // الشركة والتواريخ
+  companyId String   @map("company_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // العلاقات
+  employee   User                @relation("DeductionApprovalEmployee", fields: [employeeId], references: [id])
+  approvedBy User?               @relation("DeductionApprovalApprover", fields: [approvedById], references: [id])
+  company    Company             @relation(fields: [companyId], references: [id])
+  period     PayrollPeriod?      @relation(fields: [periodId], references: [id])
+  auditLogs  DeductionAuditLog[]
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([periodId])
+  @@index([status])
+  @@index([deductionType])
+  @@map("deduction_approvals")
+}
+
+model DeductionAuditLog {
+  id          String @id @default(uuid())
+  deductionId String @map("deduction_id")
+
+  // الإجراء
+  action String // CREATED, APPROVED, REJECTED, MODIFIED, CONVERTED
+
+  // القيم
+  previousValue Json? @map("previous_value")
+  newValue      Json? @map("new_value")
+
+  // التفاصيل
+  notes String?
+
+  // من قام بالإجراء
+  performedById String   @map("performed_by_id")
+  performedAt   DateTime @default(now()) @map("performed_at")
+
+  // العلاقات
+  deduction   DeductionApproval @relation(fields: [deductionId], references: [id], onDelete: Cascade)
+  performedBy User              @relation("DeductionAuditPerformer", fields: [performedById], references: [id])
+
+  @@index([deductionId])
+  @@index([performedById])
+  @@index([performedAt])
+  @@map("deduction_audit_logs")
 }
