@@ -126,29 +126,29 @@ const allMenuItems: MenuItem[] = [
   { text: 'السياسات', icon: <Security />, path: '/policies', requiredRole: 'ADMIN' },
   { text: 'السياسات الذكية', icon: <AutoAwesome />, path: '/smart-policies', requiredRole: 'ADMIN' },
   { text: 'الإعدادات', icon: <Settings />, path: '/settings', requiredRole: 'ADMIN' },
-  // EOS Approvals - visible to HR role for two-level approval workflow
-  { text: 'موافقات إنهاء الخدمة', icon: <Security />, path: '/eos/approvals', requiredPermission: ['EMPLOYEES_VIEW'] },
 ];
 
 // Payroll submenu group
+// Payroll submenu - visible to HR (for EOS approvals) and ADMIN (for full access)
 const payrollGroup: MenuGroup = {
   text: 'الرواتب والمالية',
   icon: <Payments />,
-  requiredRole: 'ADMIN',
+  // No requiredRole - visibility controlled by individual items + HR permission check
   children: [
-    { text: 'إعدادات الرواتب', icon: <Settings />, path: '/payroll-settings' },
-    { text: 'دورات الرواتب', icon: <MonetizationOn />, path: '/salary' },
-    { text: 'قسائم الرواتب', icon: <Description />, path: '/payslips' },
-    { text: 'إدارة المكافآت', icon: <EmojiEvents />, path: '/bonus-management' },
-    { text: 'إدارة العمولات', icon: <TrendingUp />, path: '/commission-management' },
-    { text: 'تقارير الرواتب', icon: <Assessment />, path: '/payroll-reports' },
-    { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises' },
-    { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay' },
-    { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos' },
-    { text: 'موافقات الإنهاء', icon: <Security />, path: '/eos/approvals' },
-    { text: 'الحسابات البنكية', icon: <MonetizationOn />, path: '/bank-accounts' },
-    { text: 'مراكز التكلفة', icon: <AccountTree />, path: '/cost-centers' },
-    { text: 'مركز الاستثناءات', icon: <Security />, path: '/exceptions' },
+    { text: 'إعدادات الرواتب', icon: <Settings />, path: '/payroll-settings', requiredRole: 'ADMIN' },
+    { text: 'دورات الرواتب', icon: <MonetizationOn />, path: '/salary', requiredRole: 'ADMIN' },
+    { text: 'قسائم الرواتب', icon: <Description />, path: '/payslips', requiredRole: 'ADMIN' },
+    { text: 'إدارة المكافآت', icon: <EmojiEvents />, path: '/bonus-management', requiredRole: 'ADMIN' },
+    { text: 'إدارة العمولات', icon: <TrendingUp />, path: '/commission-management', requiredRole: 'ADMIN' },
+    { text: 'تقارير الرواتب', icon: <Assessment />, path: '/payroll-reports', requiredRole: 'ADMIN' },
+    { text: 'الزيادات', icon: <MonetizationOn />, path: '/raises', requiredRole: 'ADMIN' },
+    { text: 'الفروقات', icon: <MonetizationOn />, path: '/retro-pay', requiredRole: 'ADMIN' },
+    { text: 'نهاية الخدمة', icon: <MonetizationOn />, path: '/eos', requiredRole: 'ADMIN' },
+    // EOS Approvals - visible to HR for two-level approval workflow
+    { text: 'موافقات الإنهاء', icon: <Security />, path: '/eos/approvals', requiredPermission: ['EMPLOYEES_VIEW'] },
+    { text: 'الحسابات البنكية', icon: <MonetizationOn />, path: '/bank-accounts', requiredRole: 'ADMIN' },
+    { text: 'مراكز التكلفة', icon: <AccountTree />, path: '/cost-centers', requiredRole: 'ADMIN' },
+    { text: 'مركز الاستثناءات', icon: <Security />, path: '/exceptions', requiredRole: 'ADMIN' },
   ],
 };
 
@@ -384,7 +384,20 @@ export const MainLayout = () => {
                 </ListItem>
                 <Collapse in={payrollOpen} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
-                    {payrollGroup.children.map((item) => (
+                    {payrollGroup.children.filter((item) => {
+                      // Check role requirement
+                      if (item.requiredRole) {
+                        if (item.requiredRole === 'ADMIN' && user?.role === 'ADMIN') return true;
+                        if (item.requiredRole === 'MANAGER' && (user?.role === 'ADMIN' || user?.role === 'MANAGER')) return true;
+                        if (!item.requiredPermission) return false;
+                      }
+                      // Check permission requirement
+                      if (item.requiredPermission) {
+                        if (user?.role === 'ADMIN') return true;
+                        return item.requiredPermission.some((perm) => userPermissions.includes(perm));
+                      }
+                      return true;
+                    }).map((item) => (
                       <ListItem key={item.path} disablePadding sx={{ px: 1.5, mb: 0.3 }}>
                         <ListItemButton
                           selected={location.pathname === item.path}
