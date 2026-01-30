@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateLetterRequestDto } from './dto/create-letter-request.dto';
 import { LetterQueryDto } from './dto/letter-query.dto';
-import { LetterStatus, LetterType, ApprovalStep, User } from '@prisma/client';
+import { LetterStatus, LetterType, ApprovalStep, NotificationType, User } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UploadService } from '../../common/upload/upload.service';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -73,7 +73,7 @@ export class LettersService {
     if (letterWithUser.user?.managerId) {
       await this.notificationsService.sendNotification(
         letterWithUser.user.managerId,
-        'GENERAL' as any,
+        NotificationType.GENERAL,
         'طلب خطاب جديد',
         `${letterWithUser.user.firstName} ${letterWithUser.user.lastName} طلب خطاب (${this.getLetterTypeName(type)})`,
         { letterRequestId: letterRequest.id },
@@ -518,7 +518,7 @@ export class LettersService {
     // Notify employee
     await this.notificationsService.sendNotification(
       letterRequest.userId,
-      decision === 'APPROVED' ? 'GENERAL' as any : 'GENERAL' as any,
+      NotificationType.GENERAL,
       decision === 'APPROVED' ? 'موافقة المدير على طلب الخطاب' : 'رفض المدير لطلب الخطاب',
       decision === 'APPROVED'
         ? `وافق مديرك على طلب الخطاب (${this.getLetterTypeName(letterRequest.type)}) - في انتظار موافقة HR`
@@ -618,7 +618,7 @@ export class LettersService {
 
     await this.notificationsService.sendNotification(
       letterRequest.userId,
-      'GENERAL' as any,
+      NotificationType.GENERAL,
       decision === 'APPROVED' ? 'الموافقة النهائية على الخطاب' : decision === 'REJECTED' ? 'رفض طلب الخطاب' : 'تأجيل طلب الخطاب',
       message,
       { letterRequestId: id },
