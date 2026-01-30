@@ -85,12 +85,12 @@ export class EmployeeProfileController {
      */
     @Get(':id/attendance')
     async getAttendanceStats(
-        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('id') userIdOrCode: string,
         @Query() query: AttendanceQueryDto,
         @CurrentUser() user: any,
     ) {
         return this.profileService.getAttendanceStats(
-            userId,
+            userIdOrCode,
             user.companyId,
             query.startDate,
             query.endDate,
@@ -103,10 +103,10 @@ export class EmployeeProfileController {
      */
     @Get(':id/leaves')
     async getLeaveHistory(
-        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('id') userIdOrCode: string,
         @CurrentUser() user: any,
     ) {
-        return this.profileService.getLeaveHistory(userId, user.companyId);
+        return this.profileService.getLeaveHistory(userIdOrCode, user.companyId);
     }
 
     /**
@@ -115,10 +115,10 @@ export class EmployeeProfileController {
      */
     @Get(':id/salary')
     async getSalaryInfo(
-        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('id') userIdOrCode: string,
         @CurrentUser() user: any,
     ) {
-        return this.profileService.getSalaryInfo(userId, user.companyId);
+        return this.profileService.getSalaryInfo(userIdOrCode, user.companyId);
     }
 
     /**
@@ -127,10 +127,10 @@ export class EmployeeProfileController {
      */
     @Get(':id/documents')
     async getDocuments(
-        @Param('id', ParseUUIDPipe) userId: string,
+        @Param('id') userIdOrCode: string,
         @CurrentUser() user: any,
     ) {
-        return this.profileService.getDocuments(userId, user.companyId);
+        return this.profileService.getDocuments(userIdOrCode, user.companyId);
     }
 
     /**

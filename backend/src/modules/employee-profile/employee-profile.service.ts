@@ -21,6 +21,29 @@ export class EmployeeProfileService {
     ) { }
 
     /**
+     * Helper: تحويل userIdOrCode (UUID أو employee_code) إلى UUID
+     */
+    private async resolveUserId(userIdOrCode: string, companyId: string): Promise<string> {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userIdOrCode);
+
+        if (isUUID) {
+            return userIdOrCode;
+        }
+
+        // البحث بـ employee_code
+        const user = await this.prisma.user.findFirst({
+            where: { employeeCode: userIdOrCode, companyId },
+            select: { id: true },
+        });
+
+        if (!user) {
+            throw new NotFoundException('الموظف غير موجود');
+        }
+
+        return user.id;
+    }
+
+    /**
      * جلب البروفايل الكامل للموظف (يدعم UUID أو employee_code)
      */
     async getFullProfile(userIdOrCode: string, companyId: string, requesterId: string) {
@@ -184,11 +207,14 @@ export class EmployeeProfileService {
      * إحصائيات الحضور
      */
     async getAttendanceStats(
-        userId: string,
+        userIdOrCode: string,
         companyId: string,
         startDate?: string,
         endDate?: string,
     ): Promise<AttendanceStatsResponse> {
+        // تحويل employee_code إلى UUID إذا لزم الأمر
+        const userId = await this.resolveUserId(userIdOrCode, companyId);
+
         const start = startDate
             ? new Date(startDate)
             : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -242,9 +268,12 @@ export class EmployeeProfileService {
      * سجل الإجازات والأرصدة
      */
     async getLeaveHistory(
-        userId: string,
+        userIdOrCode: string,
         companyId: string,
     ): Promise<LeaveBalanceResponse & { requests: any[] }> {
+        // تحويل employee_code إلى UUID إذا لزم الأمر
+        const userId = await this.resolveUserId(userIdOrCode, companyId);
+
         const user = await this.prisma.user.findFirst({
             where: { id: userId, companyId },
             select: {
@@ -306,9 +335,12 @@ export class EmployeeProfileService {
      * بيانات الراتب
      */
     async getSalaryInfo(
-        userId: string,
+        userIdOrCode: string,
         companyId: string,
     ): Promise<SalaryInfoResponse> {
+        // تحويل employee_code إلى UUID إذا لزم الأمر
+        const userId = await this.resolveUserId(userIdOrCode, companyId);
+
         // جلب بيانات المستخدم الأساسية
         const user = await this.prisma.user.findFirst({
             where: { id: userId, companyId },
@@ -383,7 +415,10 @@ export class EmployeeProfileService {
     /**
      * جلب الوثائق
      */
-    async getDocuments(userId: string, companyId: string, requesterId?: string, type?: DocumentType) {
+    async getDocuments(userIdOrCode: string, companyId: string, requesterId?: string, type?: DocumentType) {
+        // تحويل employee_code إلى UUID إذا لزم الأمر
+        const userId = await this.resolveUserId(userIdOrCode, companyId);
+
         // التحقق من الصلاحيات إذا تم تمرير requesterId
         if (requesterId) {
             await this.checkAccess(userId, companyId, requesterId);
