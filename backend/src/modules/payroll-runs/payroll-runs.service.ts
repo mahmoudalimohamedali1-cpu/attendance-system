@@ -503,8 +503,13 @@ export class PayrollRunsService {
                 const finalGross = round(add(toDecimal(calculation.grossSalary), wizardBonus));
                 let finalDeductions = round(add(toDecimal(calculation.totalDeductions), wizardDeduction));
 
-                // ✅ حساب صافي الراتب باستخدام الأداة لضمان عدم السلبية وتطبيق الحد الأقصى
-                const netSalaryResult = calculateNetSalary(finalGross, finalDeductions);
+                // ✅ تطبيق سقف الخصومات 50% من الراتب الإجمالي (المادة 91 من نظام العمل السعودي)
+                const grossCapResult = applyDeductionCap(finalGross, finalDeductions, 50);
+                const cappedDeductions = grossCapResult.cappedDeductions;
+                const deferredAmount = grossCapResult.excessAmount; // للترحيل للشهور التالية
+
+                // ✅ حساب صافي الراتب بعد تطبيق السقف
+                const netSalaryResult = calculateNetSalary(finalGross, cappedDeductions);
                 let finalNet = netSalaryResult.netSalary;
 
                 // ✅ خصم الديون السابقة من الراتب (إن وجدت)
@@ -997,12 +1002,17 @@ export class PayrollRunsService {
             // إجمالي الخصومات النهائي = خصومات المحرك + الخصومات الموحدة + خصم الـ Wizard
             const finalDeductions = add(add(add(add(toDecimal(calculation.totalDeductions), wizardDeduction), attendanceAmt), leaveAmt), add(totalDisc, totalCust));
 
-            // ✅ حساب صافي الراتب باستخدام الأداة لضمان عدم وجود رصيد سالب وتطبيق الحد الأقصى
-            const netResult = calculateNetSalary(finalGross, finalDeductions);
+            // ✅ تطبيق سقف الخصومات 50% من الراتب الإجمالي (المادة 91 من نظام العمل السعودي)
+            const capResult = applyDeductionCap(finalGross, finalDeductions, 50);
+            const cappedDeductions = capResult.cappedDeductions;
+            const deferredAmount = capResult.excessAmount; // الخصومات المرحلة للشهور التالية
+
+            // ✅ حساب صافي الراتب باستخدام الخصومات المحددة بالسقف
+            const netResult = calculateNetSalary(finalGross, cappedDeductions);
             const finalNet = netResult.netSalary;
 
             totalGross = add(totalGross, finalGross);
-            totalDeductions = add(totalDeductions, finalDeductions);
+            totalDeductions = add(totalDeductions, cappedDeductions); // Use capped deductions for totals
             totalNet = add(totalNet, finalNet);
             totalAdvances = add(totalAdvances, employeeAdvanceAmount);
 
@@ -1031,8 +1041,10 @@ export class PayrollRunsService {
                 isSaudi: employee.isSaudi || false,
                 baseSalary: toNumber(toDecimal(assignment.baseSalary)),
                 gross: toNumber(finalGross),
-                deductions: toNumber(finalDeductions),
-                deferredDeductions: calculation.deferredDeductions || 0, // ✅ الخصومات المرحلة
+                deductions: toNumber(cappedDeductions), // ✅ الخصومات المطبقة (بعد السقف 50%)
+                deferredDeductions: toNumber(deferredAmount), // ✅ الخصومات المرحلة للشهر التالي
+                originalDeductions: toNumber(finalDeductions), // ✅ الخصومات الأصلية قبل السقف
+                wasCapped: capResult.wasCapped, // ✅ هل تم تطبيق السقف؟
                 gosi: toNumber(gosiAmount),
                 advances: toNumber(employeeAdvanceAmount),
                 net: toNumber(finalNet),
