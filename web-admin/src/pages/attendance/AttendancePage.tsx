@@ -40,7 +40,6 @@ import {
   Logout,
   Edit as EditIcon,
   TimerOff as OvertimeIcon,
-  MoneyOff as DeductionIcon,
   Business as BranchIcon,
   Save as SaveIcon,
   Settings as SettingsIcon,
@@ -222,22 +221,6 @@ export const AttendancePage = () => {
     return hours > 0 ? `${hours} س ${mins} د` : `${mins} د`;
   };
 
-  // Calculate expected deduction based on late minutes
-  const calculateExpectedDeduction = (record: Attendance) => {
-    if (!payrollSettings?.enableAttendancePenalty) return 0;
-
-    const gracePeriod = payrollSettings?.gracePeriodMinutes || 15;
-    const effectiveLateMinutes = Math.max(0, (record.lateMinutes || 0) - gracePeriod);
-
-    if (effectiveLateMinutes <= 0) return 0;
-
-    // Estimate hourly rate (basic salary / 30 days / 8 hours)
-    const baseSalary = record.user?.baseSalary || 5000; // Default if not available
-    const dailyHours = payrollSettings?.dailyWorkingHours || 8;
-    const hourlyRate = baseSalary / 30 / dailyHours;
-
-    return Math.round((effectiveLateMinutes / 60) * hourlyRate);
-  };
 
   // Calculate overtime pay
   const calculateOvertimePay = (record: Attendance) => {
@@ -267,7 +250,8 @@ export const AttendancePage = () => {
   const exportToCSV = () => {
     if (!attendance.length) return;
 
-    const headers = ['الموظف', 'التاريخ', 'الحضور', 'الانصراف', 'الحالة', 'التأخير (دقيقة)', 'الوقت الإضافي', 'ساعات العمل', 'الخصم المتوقع', 'الفرع'];
+
+    const headers = ['الموظف', 'التاريخ', 'الحضور', 'الانصراف', 'الحالة', 'التأخير (دقيقة)', 'الوقت الإضافي', 'ساعات العمل', 'الفرع'];
     const rows = attendance.map(a => [
       `${a.user?.firstName || ''} ${a.user?.lastName || ''}`,
       a.date ? format(new Date(a.date), 'yyyy-MM-dd') : '',
@@ -277,7 +261,6 @@ export const AttendancePage = () => {
       a.lateMinutes || 0,
       a.overtimeMinutes || 0,
       Math.round((a.workingMinutes || 0) / 60 * 10) / 10,
-      calculateExpectedDeduction(a),
       a.branch?.name || '',
     ]);
 
@@ -526,10 +509,7 @@ export const AttendancePage = () => {
                         <Tooltip title="الوقت الإضافي"><OvertimeIcon sx={{ fontSize: 18, mr: 0.5 }} /></Tooltip>
                         إضافي
                       </TableCell>
-                      <TableCell sx={{ color: 'error.main' }}>
-                        <Tooltip title="الخصم المتوقع"><DeductionIcon sx={{ fontSize: 18, mr: 0.5 }} /></Tooltip>
-                        الخصم
-                      </TableCell>
+
                       <TableCell>الحالة</TableCell>
                       <TableCell>الفرع</TableCell>
                       <TableCell align="center">إجراءات</TableCell>
@@ -537,7 +517,6 @@ export const AttendancePage = () => {
                   </TableHead>
                   <TableBody>
                     {attendance.map((record) => {
-                      const expectedDeduction = calculateExpectedDeduction(record);
                       const overtimePay = calculateOvertimePay(record);
 
                       return (
@@ -605,18 +584,7 @@ export const AttendancePage = () => {
                               '-'
                             )}
                           </TableCell>
-                          <TableCell>
-                            {expectedDeduction > 0 ? (
-                              <Chip
-                                label={`${expectedDeduction} ر.س`}
-                                size="small"
-                                color="error"
-                                variant="outlined"
-                              />
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
+
                           <TableCell>
                             <Chip
                               label={getStatusLabel(record.status)}
