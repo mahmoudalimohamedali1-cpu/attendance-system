@@ -610,6 +610,7 @@ export class PayrollAdjustmentsService {
         let gracePeriodMinutes = 15; // Default fallback
         let lateDeductionMethod = 'PER_MINUTE'; // Default fallback
         let enableAttendancePenalty = true;
+        let lateThresholdMinutes = 120; // Default threshold for DAILY_RATE method
 
         try {
             const companySettings = await (this.prisma as any).payrollSettings.findUnique({
@@ -620,7 +621,8 @@ export class PayrollAdjustmentsService {
                 gracePeriodMinutes = companySettings.gracePeriodMinutes ?? 15;
                 lateDeductionMethod = companySettings.lateDeductionMethod ?? 'PER_MINUTE';
                 enableAttendancePenalty = companySettings.enableAttendancePenalty ?? true;
-                this.logger.log(`📋 Loaded PayrollSettings: gracePeriod=${gracePeriodMinutes}, method=${lateDeductionMethod}, enabled=${enableAttendancePenalty}`);
+                lateThresholdMinutes = companySettings.lateThresholdMinutes ?? 120;
+                this.logger.log(`📋 Loaded PayrollSettings: gracePeriod=${gracePeriodMinutes}, method=${lateDeductionMethod}, enabled=${enableAttendancePenalty}, threshold=${lateThresholdMinutes}`);
             } else {
                 this.logger.warn(`⚠️ No PayrollSettings found for company ${companyId}, using defaults`);
             }
@@ -757,8 +759,8 @@ export class PayrollAdjustmentsService {
                         lateDeduction = Math.round(lateHours * hourlyRate * 100) / 100;
                         break;
                     case 'DAILY_RATE':
-                        // Count days where late > 30min threshold
-                        const lateDays = attendances.filter((a: any) => (a.lateMinutes || 0) > 30).length;
+                        // Count days where late > threshold from settings
+                        const lateDays = attendances.filter((a: any) => (a.lateMinutes || 0) > lateThresholdMinutes).length;
                         lateDeduction = Math.round(lateDays * dailyRate * 100) / 100;
                         break;
                     default:
