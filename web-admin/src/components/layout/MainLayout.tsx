@@ -427,12 +427,16 @@ export const MainLayout = () => {
                           }}
                           sx={{
                             pl: 4,
-                            borderRadius: 2,
+                            borderRadius: 3,
+                            transition: 'all 0.2s ease',
                             '&.Mui-selected': {
-                              bgcolor: 'primary.main',
-                              color: 'white',
-                              '&:hover': { bgcolor: 'primary.dark' },
-                              '& .MuiListItemIcon-root': { color: 'white' },
+                              bgcolor: MODERN_THEME.peach,
+                              color: MODERN_THEME.orange,
+                              '&:hover': { bgcolor: MODERN_THEME.cream },
+                              '& .MuiListItemIcon-root': { color: MODERN_THEME.orange },
+                            },
+                            '&:hover': {
+                              bgcolor: MODERN_THEME.cream,
                             },
                           }}
                         >

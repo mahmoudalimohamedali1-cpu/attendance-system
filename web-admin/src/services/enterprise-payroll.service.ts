@@ -442,6 +442,58 @@ class EnterprisePayrollService {
     async carryForwardBalances(year: number, options?: any): Promise<any> {
         return api.post(`${this.baseUrl}/year-end/carry-forward`, { year, options });
     }
+
+    // ==================== تعديلات الخصومات ====================
+
+    /**
+     * 🕐 معاينة خصومات الحضور للفترة
+     */
+    async getAttendanceDeductionsPreview(periodId?: string): Promise<any> {
+        const params = periodId ? `?periodId=${periodId}` : '';
+        return api.get(`/payroll-adjustments/attendance-deductions-preview${params}`);
+    }
+
+    /**
+     * ✏️ تعديل مبلغ الخصم
+     */
+    async modifyDeduction(data: {
+        employeeId: string;
+        deductionType: 'LATE' | 'ABSENCE' | 'EARLY';
+        originalAmount: number;
+        newAmount: number;
+        reason: string;
+        periodId?: string;
+    }): Promise<any> {
+        return api.post('/payroll-adjustments/attendance-deductions/modify', data);
+    }
+
+    /**
+     * 🔄 تحويل الخصم لإجازة
+     */
+    async convertDeductionToLeave(data: {
+        employeeId: string;
+        deductionType: 'LATE' | 'ABSENCE' | 'EARLY';
+        originalAmount: number;
+        leaveDays: number;
+        leaveType: string;
+        reason: string;
+        periodId?: string;
+    }): Promise<any> {
+        return api.post('/payroll-adjustments/attendance-deductions/convert-to-leave', data);
+    }
+
+    /**
+     * ❌ إلغاء خصم بالكامل
+     */
+    async waiveDeduction(data: {
+        employeeId: string;
+        deductionType: 'LATE' | 'ABSENCE' | 'EARLY';
+        originalAmount: number;
+        reason: string;
+        periodId?: string;
+    }): Promise<any> {
+        return api.post('/payroll-adjustments/attendance-deductions/waive', data);
+    }
 }
 
 export const enterprisePayrollService = new EnterprisePayrollService();

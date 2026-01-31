@@ -796,11 +796,17 @@ export class PayrollAdjustmentsService {
 
             const absenceDeduction = Math.round(realAbsentDays * dailyRate * 100) / 100;
             const earlyDeduction = Math.round((earlyMinutes / 60) * hourlyRate * 100) / 100;
-            const totalDeduction = lateDeduction + absenceDeduction + earlyDeduction;
+            const grossDeduction = lateDeduction + absenceDeduction + earlyDeduction;
 
+            // ✅ FIX: جلب التعديلات المعتمدة لهذا الموظف
+            const approvedAdjs = await this.getApprovedAdjustmentsTotal(emp.id, period.id);
+            const waivedAmount = approvedAdjs.waivedDeductions || 0;
+            const leaveDaysUsed = approvedAdjs.leaveDaysDeducted || 0;
 
+            // ✅ حساب الخصم الفعلي بعد طرح التعديلات
+            const totalDeduction = Math.max(0, grossDeduction - waivedAmount);
 
-            if (totalDeduction > 0) {
+            if (grossDeduction > 0) { // ✅ نعرض حتى لو الخصم الصافي = 0 بعد التعديل
                 attendanceDeductions.push({
                     employeeId: emp.id,
                     employeeName: `${emp.firstName} ${emp.lastName}`,
@@ -812,12 +818,15 @@ export class PayrollAdjustmentsService {
                     absenceDeduction,
                     earlyMinutes,
                     earlyDeduction,
-                    totalDeduction,
-                    status: 'PENDING_APPROVAL',
+                    grossDeduction, // ✅ إجمالي الخصم قبل التعديل
+                    waivedAmount,   // ✅ المبلغ الملغي
+                    leaveDaysUsed,  // ✅ أيام الإجازة المخصومة
+                    totalDeduction, // ✅ الخصم الصافي بعد التعديل
+                    status: totalDeduction === 0 ? 'ADJUSTED' : 'PENDING_APPROVAL',
                 });
 
-                totalLate += lateDeduction;
-                totalAbsence += absenceDeduction;
+                totalLate += Math.max(0, lateDeduction - (waivedAmount > 0 ? Math.min(waivedAmount, lateDeduction) : 0));
+                totalAbsence += Math.max(0, absenceDeduction - Math.max(0, waivedAmount - lateDeduction));
                 totalEarly += earlyDeduction;
             }
         }
