@@ -632,7 +632,7 @@ export class PayrollAdjustmentsService {
 
 
 
-        // جلب بيانات الموظفين
+        // جلب بيانات الموظفين مع الراتب الأساسي وإعدادات الفرع
 
         const employees = await this.prisma.user.findMany({
             where: {
@@ -646,14 +646,25 @@ export class PayrollAdjustmentsService {
                 lastName: true,
                 employeeCode: true,
                 salary: true,
+                // ✅ FIX: جلب الراتب الأساسي من employee_salary_assignments
+                salaryAssignments: {
+                    where: { isActive: true },
+                    take: 1,
+                    select: { baseSalary: true },
+                },
+                // ✅ FIX: جلب إعدادات أيام العمل من الفرع
+                branch: {
+                    select: { workingDays: true },
+                },
             },
         });
 
         const attendanceDeductions: any[] = [];
         let totalLate = 0, totalAbsence = 0, totalEarly = 0;
 
-        // حساب أيام العمل في الفترة (استبعاد الجمعة افتراضياً)
-        const getWorkingDays = (startDate: Date, endDate: Date): Date[] => {
+        // حساب أيام العمل في الفترة بناءً على إعدادات الفرع
+        // ✅ FIX: استخدام إعدادات أيام العمل من الفرع بدل الجمعة فقط
+        const getWorkingDaysForEmployee = (startDate: Date, endDate: Date, branchWorkingDays: string | null): Date[] => {
             const days: Date[] = [];
             const current = new Date(startDate);
             const end = new Date(endDate);
@@ -662,10 +673,20 @@ export class PayrollAdjustmentsService {
             today.setHours(23, 59, 59, 999);
             const effectiveEnd = end > today ? today : end;
 
+            // ✅ تحليل أيام العمل من الإعدادات (مثال: '0,1,2,3,4' = أحد-خميس)
+            // إذا مش موجود، افتراضي = كل الأيام ما عدا الجمعة (5)
+            let workingDayNumbers: number[];
+            if (branchWorkingDays && branchWorkingDays.includes(',')) {
+                workingDayNumbers = branchWorkingDays.split(',').map(Number);
+            } else {
+                // Default: Saturday-Thursday (0-4, 6) - Friday only off
+                workingDayNumbers = [0, 1, 2, 3, 4, 6];
+            }
+
             while (current <= effectiveEnd) {
                 const dayOfWeek = current.getDay();
-                // استبعاد الجمعة (5) - يمكن تعديلها حسب إعدادات الشركة
-                if (dayOfWeek !== 5) {
+                // التحقق إذا اليوم من أيام العمل
+                if (workingDayNumbers.includes(dayOfWeek)) {
                     days.push(new Date(current));
                 }
                 current.setDate(current.getDate() + 1);
@@ -673,8 +694,7 @@ export class PayrollAdjustmentsService {
             return days;
         };
 
-        const workingDays = getWorkingDays(period.startDate, period.endDate);
-        this.logger.log(`📅 Working days in period: ${workingDays.length}`);
+        // ✅ لن نحسب أيام العمل مرة واحدة للكل، بل لكل موظف حسب فرعه
 
         for (const emp of employees) {
             // جلب سجلات الحضور للفترة
@@ -723,6 +743,10 @@ export class PayrollAdjustmentsService {
             // حساب الغياب الحقيقي = أيام عمل بدون حضور وبدون إجازة
             let realAbsentDays = 0;
             const absentDates: string[] = [];
+            // ✅ FIX: حساب أيام العمل لكل موظف حسب فرعه
+            const branchWorkingDays = (emp as any).branch?.workingDays || null;
+            const workingDays = getWorkingDaysForEmployee(period.startDate, period.endDate, branchWorkingDays);
+            this.logger.debug(`📅 Employee ${emp.id}: workingDays=${workingDays.length}, branchSettings=${branchWorkingDays}`);
             for (const workDay of workingDays) {
                 const dateStr = workDay.toDateString();
                 if (!attendanceDates.has(dateStr) && !leaveDates.has(dateStr)) {
@@ -739,7 +763,9 @@ export class PayrollAdjustmentsService {
             }
 
             // حساب الخصومات مع تطبيق فترة السماح وإعدادات الشركة
-            const dailyRate = Number(emp.salary || 0) / 30;
+            // ✅ FIX: استخدام baseSalary من employee_salary_assignments بدل emp.salary
+            const empBaseSalary = Number((emp as any).salaryAssignments?.[0]?.baseSalary || emp.salary || 0);
+            const dailyRate = empBaseSalary / 30; // ✅ FIXED_30 days per Saudi Labor Law
             const hourlyRate = dailyRate / 8;
 
             // 🔧 FIX: Apply grace period like PayrollCalculationService (line 800)

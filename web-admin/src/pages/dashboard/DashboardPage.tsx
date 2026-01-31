@@ -59,12 +59,21 @@ import {
   Security as SecurityIcon,
   TrendingUp as TrendIcon,
   Refresh as RefreshIcon,
+  Dashboard as DashboardIcon,
+  Analytics,
+  Assessment,
+  Comment,
+  Devices,
+  Logout,
+  Assignment,
 } from '@mui/icons-material';
 import {
   PieChart,
   Pie,
   Cell,
   ResponsiveContainer,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -81,7 +90,25 @@ import { MudadComplianceCard } from '@/components/dashboard/MudadComplianceCard'
 import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
 import { AnnouncementsBanner } from '@/components/dashboard/AnnouncementsBanner';
 import { calendarEventsService, CalendarEvent as ServiceCalendarEvent } from '@/services/calendar-events.service';
-import { ModernDashboardView } from './ModernDashboardView';
+
+// --- MODERN THEME CONSTANTS ---
+const MODERN_THEME = {
+  bg: '#faf8f5',
+  sidebarBg: '#fefcf9',
+  cardBg: '#ffffff',
+  peach: '#ffd4c4',
+  mint: '#c8f0e8',
+  blue: '#c4e4ff',
+  rose: '#ffc4d4',
+  orange: '#ff8c5a',
+  green: '#7dd4a8',
+  textPrimary: '#2d3436',
+  textSecondary: '#636e72',
+  border: '#f0ebe5',
+};
+
+const CHART_COLORS = ['#2ecc71', '#f39c12', '#e74c3c', '#9b59b6'];
+// ------------------------------
 
 interface DashboardStats {
   employees: { total: number; active: number };
@@ -130,6 +157,14 @@ interface EmployeeDashboard {
 }
 
 type DashboardResponse = DashboardStats | EmployeeDashboard;
+
+const navItems = [
+  { id: 'dashboard', label: 'لوحة التحكم', icon: DashboardIcon, path: '/' },
+  { id: 'analytics', label: 'التحليلات', icon: Analytics, path: '/reports' },
+  { id: 'reports', label: 'التقارير', icon: Assessment, path: '/attendance' },
+  { id: 'comments', label: 'التعليقات', icon: Comment, path: '/tasks' },
+  { id: 'channels', label: 'القنوات', icon: Devices, path: '/employees' },
+];
 
 export const DashboardPage = () => {
   const { user } = useAuthStore();
@@ -335,10 +370,7 @@ export const DashboardPage = () => {
     return <EmployeeDashboardView data={stats} />;
   }
 
-  // Admin/Manager Dashboard - Use Modern Design
-  return <ModernDashboardView />;
-
-  // Legacy code below - kept for reference
+  // Admin/Manager Dashboard
   const adminStats = stats as DashboardStats;
   const dashboardStats = adminStats || {
     employees: { total: 0, active: 0 },
@@ -498,539 +530,265 @@ export const DashboardPage = () => {
     : 0;
 
   return (
-    <Box>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        لوحة التحكم
-      </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        مرحباً بك! هذه نظرة عامة على النظام اليوم
-      </Typography>
-
-      {/* Announcements Banner */}
-      <AnnouncementsBanner />
-
-      {/* Quick Actions for MANAGER role */}
-      {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Add color="primary" />
-            الخدمات المتاحة
-          </Typography>
-          <Divider sx={{ my: 2 }} />
-          <Grid container spacing={2}>
-            <Grid item xs={6} sm={4} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="primary"
-                size="large"
-                startIcon={<BeachAccess />}
-                onClick={() => setOpenLeaveDialog(true)}
-                sx={{ py: 2, borderRadius: 2 }}
-              >
-                طلب إجازة
-              </Button>
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="secondary"
-                size="large"
-                startIcon={<Mail />}
-                onClick={() => setOpenLetterDialog(true)}
-                sx={{ py: 2, borderRadius: 2 }}
-              >
-                طلب خطاب
-              </Button>
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="success"
-                size="large"
-                startIcon={<MonetizationOn />}
-                onClick={() => setOpenRaiseDialog(true)}
-                sx={{ py: 2, borderRadius: 2 }}
-              >
-                طلب زيادة
-              </Button>
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="warning"
-                size="large"
-                startIcon={<MonetizationOn />}
-                onClick={() => setOpenAdvanceDialog(true)}
-                sx={{ py: 2, borderRadius: 2, bgcolor: '#ff9800' }}
-              >
-                طلب سلفة
-              </Button>
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                color="info"
-                size="large"
-                startIcon={<PhoneAndroid />}
-                onClick={() => navigate('/data-updates')}
-                sx={{ py: 2, borderRadius: 2 }}
-              >
-                تحديث جهاز
-              </Button>
-            </Grid>
-            <Grid item xs={6} sm={4} md={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                color="warning"
-                size="large"
-                startIcon={<Face />}
-                onClick={() => navigate('/data-updates')}
-                sx={{ py: 2, borderRadius: 2 }}
-              >
-                تحديث الوجه
-              </Button>
-            </Grid>
-          </Grid>
-        </Paper>
-      )}
-
-      {/* Operations Summary */}
-      <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <CheckCircle color="success" /> ملخص العمليات اليوم
-      </Typography>
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {opsCards.map((card, index) => (
-          <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
-            <Card sx={{ height: '100%', position: 'relative', overflow: 'visible', borderRadius: 3, border: `1px solid ${card.color}20` }}>
-              <CardContent>
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: -20,
-                    right: 16,
-                    width: 48,
-                    height: 48,
-                    borderRadius: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: card.color,
-                    color: 'white',
-                    boxShadow: `0 4px 20px 0 ${card.color}40`,
-                  }}
-                >
-                  {card.icon}
-                </Box>
-                <Box sx={{ pt: 3 }}>
-                  <Typography variant="h4" fontWeight="bold" color={card.color}>
-                    {card.value}
-                  </Typography>
-                  <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>
-                    {card.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {card.subtitle}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      {/* Financial Analytics */}
-      {(user?.role === 'ADMIN' || user?.role === 'HR' || user?.role === 'MANAGER' || user?.role === 'FINANCE') && finCards.length > 0 && (
-        <>
-          <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <MonetizationOn color="primary" /> التحليلات المالية (فترة: {adminStats.financials?.periodName})
-          </Typography>
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            {finCards.map((card, index) => (
-              <Grid item xs={12} sm={6} md={3} key={index}>
-                <Card sx={{ height: '100%', position: 'relative', overflow: 'visible', borderRadius: 3, border: `1px solid ${card.color}20`, background: `linear-gradient(135deg, white 0%, ${card.color}08 100%)` }}>
-                  <CardContent>
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        top: -20,
-                        right: 16,
-                        width: 48,
-                        height: 48,
-                        borderRadius: 2,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        bgcolor: card.color,
-                        color: 'white',
-                        boxShadow: `0 4px 20px 0 ${card.color}40`,
-                      }}
-                    >
-                      {card.icon}
-                    </Box>
-                    <Box sx={{ pt: 3 }}>
-                      <Typography variant="h5" fontWeight="bold" color={card.color}>
-                        {Number(card.value).toLocaleString('ar-SA')} {card.isCurrency ? 'ر.س' : ''}
-                      </Typography>
-                      <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>
-                        {card.title}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {card.subtitle}
-                      </Typography>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </>
-      )}
-
-      {/* Requests & Follow-ups */}
-      <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Description color="primary" /> الطلبات والمراجعات المعلقة
-      </Typography>
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {reqCards.map((card, index) => (
-          <Grid item xs={12} sm={6} md={4} lg={2.4} key={index}>
-            <Card sx={{ height: '100%', position: 'relative', overflow: 'visible', borderRadius: 3, border: `1px solid ${card.color}20`, bgcolor: `${card.color}05` }}>
-              <CardContent>
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: -20,
-                    right: 16,
-                    width: 48,
-                    height: 48,
-                    borderRadius: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: card.color,
-                    color: 'white',
-                    boxShadow: `0 4px 20px 0 ${card.color}40`,
-                  }}
-                >
-                  {card.icon}
-                </Box>
-                <Box sx={{ pt: 3 }}>
-                  <Typography variant="h4" fontWeight="bold" color={card.color}>
-                    {card.value}
-                  </Typography>
-                  <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 1 }}>
-                    {card.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {card.subtitle}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      {/* Compliance Snapshot */}
-      {user?.role === 'ADMIN' && (
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ mt: 4, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SecurityIcon color="info" /> الالتزام الحكومي
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  cursor: 'pointer',
-                  border: '2px solid',
-                  borderColor: 'success.light',
-                  '&:hover': { boxShadow: 4 }
-                }}
-                onClick={() => navigate('/gosi')}
-              >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                  <CloudUpload sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">التأمينات GOSI</Typography>
-                  <Chip label="مفعّل ✓" color="success" size="small" sx={{ mt: 1 }} />
-                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                    انقر لإدارة الإعدادات
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  cursor: 'pointer',
-                  border: '2px solid',
-                  borderColor: 'warning.light',
-                  '&:hover': { boxShadow: 4 }
-                }}
-                onClick={() => navigate('/wps-tracking')}
-              >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                  <CloudUpload sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">متابعة WPS</Typography>
-                  <Chip label="تتبع الملفات" color="warning" size="small" sx={{ mt: 1 }} />
-                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                    انقر لعرض الحالة
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <MudadComplianceCard />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card
-                sx={{
-                  borderRadius: 3,
-                  cursor: 'pointer',
-                  border: '2px solid',
-                  borderColor: 'secondary.light',
-                  '&:hover': { boxShadow: 4 }
-                }}
-                onClick={() => navigate('/contracts')}
-              >
-                <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                  <Description sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">قوى - العقود</Typography>
-                  <Chip label="عقود العمل" color="secondary" size="small" sx={{ mt: 1 }} />
-                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                    انقر لإدارة العقود
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      )}
-
-      {/* Security & Compliance Alerts */}
-      {dashboardStats.compliance && (
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SecurityIcon color="error" /> تنبيهات الأمن والالتزام
-          </Typography>
-          <Grid container spacing={2}>
-            {dashboardStats.compliance.missingFace > 0 && (
-              <Grid item xs={12} md={6}>
-                <Alert
-                  severity="warning"
-                  variant="outlined"
-                  icon={<Face />}
-                  action={
-                    <Button color="inherit" size="small" onClick={() => navigate('/users?filter=no-face')}>
-                      تحسين الهوية
-                    </Button>
-                  }
-                  sx={{ borderRadius: 2 }}
-                >
-                  يوجد <strong>{dashboardStats.compliance.missingFace}</strong> موظف لم يسجلوا بصمة الوجه بعد.
-                </Alert>
-              </Grid>
-            )}
-            {dashboardStats.compliance.suspiciousToday > 0 && (
-              <Grid item xs={12} md={6}>
-                <Alert
-                  severity="error"
-                  variant="outlined"
-                  icon={<Warning />}
-                  action={
-                    <Button color="inherit" size="small" onClick={() => navigate('/exceptions')}>
-                      مراجعة الآن
-                    </Button>
-                  }
-                  sx={{ borderRadius: 2 }}
-                >
-                  تم رصد <strong>{dashboardStats.compliance.suspiciousToday}</strong> محاولة مشبوهة اليوم (موقع وهمي أو خارج النطاق).
-                </Alert>
-              </Grid>
-            )}
-          </Grid>
-        </Box>
-      )}
-
-      <Grid container spacing={3}>
-        {/* Attendance Rate */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                نسبة الحضور اليوم
-              </Typography>
-              <Box sx={{ position: 'relative', display: 'inline-flex', width: '100%', justifyContent: 'center', py: 2 }}>
-                <CircularProgress
-                  variant="determinate"
-                  value={attendanceRate}
-                  size={160}
-                  thickness={8}
-                  sx={{ color: attendanceRate >= 80 ? 'success.main' : attendanceRate >= 60 ? 'warning.main' : 'error.main' }}
-                />
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    right: 0,
-                  }}
-                >
-                  <Typography variant="h3" fontWeight="bold">
-                    {attendanceRate}%
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    من الموظفين
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box sx={{ mt: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">الحضور</Typography>
-                  <Typography variant="body2" color="success.main">{dashboardStats.today.present}</Typography>
-                </Box>
-                <LinearProgress variant="determinate" value={attendanceRate} color="success" sx={{ mb: 2, height: 8, borderRadius: 4 }} />
-
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">الغياب</Typography>
-                  <Typography variant="body2" color="error.main">{dashboardStats.today.absent}</Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={dashboardStats.employees.total > 0 ? (dashboardStats.today.absent / dashboardStats.employees.total) * 100 : 0}
-                  color="error"
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Pie Chart */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                توزيع الحضور
-              </Typography>
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-                {pieData.map((item, index) => (
-                  <Chip
-                    key={index}
-                    label={item.name}
-                    size="small"
-                    sx={{ bgcolor: item.color, color: 'white' }}
-                  />
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Recent Activity */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                آخر النشاطات
-              </Typography>
-              <List sx={{ py: 0 }}>
-                {recentAttendance?.data?.slice(0, 4).map((record, i) => (
-                  <ListItem key={record.id || i} sx={{ px: 0 }}>
-                    <ListItemAvatar>
-                      <Avatar sx={{ bgcolor: record.checkOutTime ? 'info.light' : 'success.light' }}>
-                        <AccessTime />
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={`${record.user?.firstName || 'موظف'} ${record.user?.lastName || ''}`}
-                      secondary={
-                        record.checkOutTime
-                          ? `تسجيل انصراف - ${new Date(record.checkOutTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
-                          : record.checkInTime
-                            ? `تسجيل حضور - ${new Date(record.checkInTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
-                            : 'لم يسجل بعد'
-                      }
-                    />
-                  </ListItem>
-                )) || (
-                    <ListItem sx={{ px: 0 }}>
-                      <ListItemText
-                        primary="لا توجد نشاطات حديثة"
-                        secondary="سيتم عرض النشاطات هنا"
-                      />
-                    </ListItem>
-                  )}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Calendar Widget */}
-        <Grid item xs={12} md={6} lg={4}>
-          <CalendarWidget
-            events={calendarEvents}
-            onEventClick={(event) => {
-              navigate(`/calendar?event=${event.id}`);
+    <Box sx={{ display: 'flex', flexDirection: 'row-reverse', minHeight: '100vh', bgcolor: MODERN_THEME.bg, direction: 'rtl' }}>
+      {/* Sidebar - Right Side */}
+      <Box sx={{ width: 280, bgcolor: MODERN_THEME.sidebarBg, borderLeft: `1px solid ${MODERN_THEME.border}`, p: 4, display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', zIndex: 1100 }}>
+        {/* Profile Info */}
+        <Box sx={{ textAlign: 'center', mb: 5 }}>
+          <Avatar
+            src={user?.avatar || undefined}
+            sx={{
+              width: 90,
+              height: 90,
+              mx: 'auto',
+              mb: 2,
+              border: `4px solid ${MODERN_THEME.peach}`,
+              boxShadow: '0 10px 25px rgba(255, 140, 90, 0.15)'
             }}
-            onViewAll={() => navigate('/calendar')}
-          />
+          >
+            {user?.firstName?.charAt(0)}
+          </Avatar>
+          <Typography sx={{ fontSize: 20, fontWeight: 800, color: MODERN_THEME.textPrimary }}>{user?.firstName} {user?.lastName}</Typography>
+          <Typography sx={{ fontSize: 13, color: MODERN_THEME.textSecondary, mt: 0.5, letterSpacing: 0.5 }}>{user?.role === 'ADMIN' ? 'مدير النظام' : 'مدير العمليات'}</Typography>
+        </Box>
+
+        {/* Navigation */}
+        <Box sx={{ flexGrow: 1 }}>
+          <Typography variant="overline" sx={{ color: MODERN_THEME.textSecondary, fontWeight: 700, px: 1.5, mb: 1, display: 'block' }}>القائمة الرئيسية</Typography>
+          {navItems.map(item => (
+            <Box
+              key={item.id}
+              onClick={() => navigate(item.path)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                p: 2,
+                borderRadius: 4,
+                color: item.id === 'dashboard' ? MODERN_THEME.orange : MODERN_THEME.textSecondary,
+                bgcolor: item.id === 'dashboard' ? 'rgba(255, 140, 90, 0.1)' : 'transparent',
+                cursor: 'pointer',
+                mb: 1,
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 140, 90, 0.05)',
+                  color: MODERN_THEME.orange,
+                  transform: 'translateX(-5px)'
+                }
+              }}
+            >
+              <item.icon sx={{ fontSize: 22 }} />
+              <Typography sx={{ fontSize: 15, fontWeight: item.id === 'dashboard' ? 700 : 500 }}>{item.label}</Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Logout */}
+        <Box
+          onClick={() => navigate('/login')}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            p: 2,
+            borderRadius: 4,
+            color: '#e74c3c',
+            cursor: 'pointer',
+            mt: 'auto',
+            transition: 'all 0.2s',
+            '&:hover': { bgcolor: 'rgba(231, 76, 60, 0.05)', transform: 'scale(1.02)' }
+          }}
+        >
+          <Logout sx={{ fontSize: 22 }} />
+          <Typography sx={{ fontSize: 15, fontWeight: 600 }}>تسجيل الخروج</Typography>
+        </Box>
+      </Box>
+
+      {/* Main Content Area */}
+      <Box sx={{ flexGrow: 1, p: 5, maxWidth: 'calc(100% - 280px)', overflowY: 'auto' }}>
+        {/* Header Section */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 5 }}>
+          <Box>
+            <Typography variant="h3" sx={{ fontWeight: 900, color: MODERN_THEME.textPrimary, mb: 1 }}>أهلاً بك 👋</Typography>
+            <Typography variant="body1" sx={{ color: MODERN_THEME.textSecondary }}>لديك <strong>{dashboardStats.pendingLeaves}</strong> طلبات إجازة بانتظار المراجعة اليوم</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ p: 1.5, bgcolor: 'white', borderRadius: 3, border: `1px solid ${MODERN_THEME.border}`, cursor: 'pointer', boxSizing: 'border-box' }}>
+              <RefreshIcon sx={{ color: MODERN_THEME.textSecondary }} />
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: MODERN_THEME.mint, px: 2, py: 1, borderRadius: 3 }}>
+              <SecurityIcon sx={{ color: MODERN_THEME.green, fontSize: 20 }} />
+              <Typography sx={{ color: MODERN_THEME.green, fontWeight: 700, fontSize: 14 }}>النظام آمن</Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Action Pills */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 5, flexWrap: 'wrap' }}>
+          <Box
+            onClick={() => setOpenLeaveDialog(true)}
+            sx={{
+              bgcolor: 'white', px: 3.5, py: 1.8, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 1.5,
+              cursor: 'pointer', transition: '0.3s', border: `1px solid ${MODERN_THEME.border}`,
+              '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 25px rgba(255, 140, 90, 0.12)', borderColor: MODERN_THEME.orange }
+            }}
+          >
+            <BeachAccess sx={{ color: MODERN_THEME.orange }} />
+            <Typography sx={{ fontWeight: 700 }}>تقديم إجازة</Typography>
+          </Box>
+          <Box
+            onClick={() => setOpenLetterDialog(true)}
+            sx={{
+              bgcolor: 'white', px: 3.5, py: 1.8, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 1.5,
+              cursor: 'pointer', transition: '0.3s', border: `1px solid ${MODERN_THEME.border}`,
+              '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 25px rgba(255, 140, 90, 0.12)', borderColor: MODERN_THEME.orange }
+            }}
+          >
+            <Mail sx={{ color: MODERN_THEME.orange }} />
+            <Typography sx={{ fontWeight: 700 }}>طلب خطاب</Typography>
+          </Box>
+          <Box
+            onClick={() => setOpenRaiseDialog(true)}
+            sx={{
+              bgcolor: 'white', px: 3.5, py: 1.8, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 1.5,
+              cursor: 'pointer', transition: '0.3s', border: `1px solid ${MODERN_THEME.border}`,
+              '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 8px 25px rgba(255, 140, 90, 0.12)', borderColor: MODERN_THEME.orange }
+            }}
+          >
+            <Assignment sx={{ color: MODERN_THEME.orange }} />
+            <Typography sx={{ fontWeight: 700 }}>طلب زيادة</Typography>
+          </Box>
+        </Box>
+
+        {/* Stats Grid */}
+        <Grid container spacing={3} sx={{ mb: 5 }}>
+          {[
+            { label: 'إجمالي الموظفين', value: dashboardStats.employees.total, icon: People, color: '#3498db', bg: '#f1f8fe' },
+            { label: 'حضور اليوم', value: dashboardStats.today.present, icon: CheckCircle, color: '#2ecc71', bg: '#ecfdf5' },
+            { label: 'تأخيرات', value: dashboardStats.today.late, icon: Schedule, color: '#f39c12', bg: '#fffbf0' },
+            { label: 'غياب', value: dashboardStats.today.absent, icon: PersonOff, color: '#e74c3c', bg: '#fef2f2' },
+          ].map((stat, i) => (
+            <Grid item xs={12} sm={6} md={3} key={i}>
+              <Box sx={{ p: 3.5, borderRadius: 7, bgcolor: 'white', border: `1px solid ${MODERN_THEME.border}`, transition: '0.3s', '&:hover': { transform: 'translateY(-5px)', borderColor: stat.color } }}>
+                <Box sx={{ bgcolor: stat.bg, width: 50, height: 50, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2.5 }}>
+                  <stat.icon sx={{ color: stat.color, fontSize: 26 }} />
+                </Box>
+                <Typography variant="h3" sx={{ fontWeight: 900, color: MODERN_THEME.textPrimary, mb: 1 }}>{stat.value}</Typography>
+                <Typography variant="body2" sx={{ color: MODERN_THEME.textSecondary, fontWeight: 500 }}>{stat.label}</Typography>
+              </Box>
+            </Grid>
+          ))}
         </Grid>
 
-        {/* Weekly Chart */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                إحصائيات الأسبوع
-              </Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <RechartsTooltip />
-                  <Legend />
-                  <Bar dataKey="present" name="حاضر" fill="#4caf50" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="late" name="متأخر" fill="#ff9800" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="absent" name="غائب" fill="#f44336" radius={[4, 4, 0, 0]} />
-                </BarChart>
+        {/* Promo Card */}
+        <Box sx={{ position: 'relative', overflow: 'hidden', p: 5, borderRadius: 8, mb: 5, background: 'linear-gradient(135deg, #ffe4d6 0%, #ffd4c4 100%)', boxShadow: '0 15px 40px rgba(255, 140, 90, 0.12)' }}>
+          <Box sx={{ position: 'relative', zIndex: 2, maxWidth: '60%' }}>
+            <Typography variant="h4" sx={{ fontWeight: 900, color: MODERN_THEME.textPrimary, mb: 2 }}>طوّر فريق عملك بأدوات ذكية</Typography>
+            <Typography sx={{ color: MODERN_THEME.textSecondary, mb: 4, fontSize: 16 }}>استخدم تحليلاتنا المتقدمة لتتبع أداء الموظفين وتحفيزهم بشكل فعال</Typography>
+            <Button
+              onClick={() => navigate('/employees')}
+              variant="contained"
+              sx={{ bgcolor: MODERN_THEME.textPrimary, color: 'white', borderRadius: 4, px: 6, py: 1.8, fontWeight: 800, '&:hover': { bgcolor: '#000' } }}
+            >
+              ابدأ الآن
+            </Button>
+          </Box>
+          <Box sx={{ position: 'absolute', right: -20, bottom: -40, opacity: 0.15 }}>
+            <People sx={{ fontSize: 300, color: MODERN_THEME.orange }} />
+          </Box>
+        </Box>
+
+        {/* Graphs & Activity */}
+        <Grid container spacing={4} sx={{ mb: 5 }}>
+          <Grid item xs={12} md={8}>
+            <Card sx={{ borderRadius: 8, p: 4, border: 'none', boxShadow: '0 4px 25px rgba(0,0,0,0.02)' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 20 }}>نشاط الحضور الأسبوعي</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {['حاضر', 'غائب'].map((l, i) => (
+                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: i === 0 ? MODERN_THEME.orange : '#eee' }} />
+                      <Typography variant="caption">{l}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+              <ResponsiveContainer width="100%" height={320}>
+                <AreaChart data={weeklyData}>
+                  <defs>
+                    <linearGradient id="colorWave" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={MODERN_THEME.orange} stopOpacity={0.2} />
+                      <stop offset="95%" stopColor={MODERN_THEME.orange} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: MODERN_THEME.textSecondary }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: MODERN_THEME.textSecondary }} />
+                  <RechartsTooltip
+                    contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 15px 45px rgba(0,0,0,0.1)' }}
+                    itemStyle={{ fontWeight: 700 }}
+                  />
+                  <Area type="monotone" dataKey="present" stroke={MODERN_THEME.orange} strokeWidth={4} fillOpacity={1} fill="url(#colorWave)" name="حاضر" />
+                </AreaChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ borderRadius: 8, p: 4, border: 'none', boxShadow: '0 4px 25px rgba(0,0,0,0.02)', height: '100%' }}>
+              <Typography sx={{ fontWeight: 800, fontSize: 20, mb: 4 }}>آخر التفاعلات</Typography>
+              <List>
+                {recentAttendance?.data?.slice(0, 4).map((record, i) => (
+                  <ListItem key={i} sx={{ px: 0, py: 2, borderBottom: i < 3 ? '1px solid #f9fafb' : 'none' }}>
+                    <Avatar sx={{ width: 48, height: 48, mr: 2, border: `2px solid ${MODERN_THEME.mint}`, bgcolor: 'white', color: MODERN_THEME.orange, fontWeight: 800 }}>
+                      {record.user?.firstName?.charAt(0)}
+                    </Avatar>
+                    <ListItemText
+                      primary={<Typography sx={{ fontWeight: 700, fontSize: 15 }}>{record.user?.firstName} {record.user?.lastName}</Typography>}
+                      secondary={<Typography variant="caption" sx={{ color: MODERN_THEME.textSecondary }}>{record.status} • {new Date(record.checkInTime || '').toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</Typography>}
+                    />
+                    <TrendIcon sx={{ color: MODERN_THEME.green, fontSize: 18 }} />
+                  </ListItem>
+                ))}
+              </List>
+              <Button fullWidth variant="outlined" sx={{ mt: 2, borderRadius: 3, py: 1.2, fontWeight: 700, borderColor: MODERN_THEME.border, color: MODERN_THEME.textPrimary }}>مشاهدة الكل</Button>
+            </Card>
+          </Grid>
         </Grid>
-      </Grid>
+
+        {/* Bottom Banner Stats */}
+        <Box sx={{ bgcolor: MODERN_THEME.mint, p: 4, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `2px solid white`, boxShadow: '0 10px 30px rgba(78, 204, 163, 0.1)', flexWrap: 'wrap', gap: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+            <Box sx={{ bgcolor: 'white', p: 2, borderRadius: 4, boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+              <Analytics sx={{ color: '#4ecca3' }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 800, fontSize: 18 }}>إحصائيات القنوات والطلبات</Typography>
+              <Typography variant="body2" sx={{ color: '#636e72' }}>متابعة حالة الطلبات المعلقة لليوم</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 8 }}>
+            {[
+              { label: 'إجازات', value: dashboardStats.pendingLeaves, color: MODERN_THEME.orange },
+              { label: 'خطابات', value: dashboardStats.pendingLetters || 0, color: MODERN_THEME.textPrimary },
+              { label: 'زيادات', value: dashboardStats.pendingRaises || 0, color: MODERN_THEME.textPrimary },
+            ].map((s, i) => (
+              <Box key={i} sx={{ textAlign: 'center' }}>
+                <Typography variant="h4" sx={{ fontWeight: 900, color: s.color }}>{s.value}</Typography>
+                <Typography variant="caption" sx={{ color: MODERN_THEME.textSecondary, fontWeight: 600 }}>{s.label}</Typography>
+              </Box>
+            ))}
+          </Box>
+          <Button
+            onClick={() => navigate('/reports')}
+            variant="contained"
+            sx={{ bgcolor: '#4ecca3', color: 'white', borderRadius: 4, px: 5, py: 1.5, fontWeight: 800, '&:hover': { bgcolor: '#3dbb8f' }, boxShadow: '0 10px 20px rgba(78, 204, 163, 0.2)' }}
+          >
+            التفاصيل الكاملة
+          </Button>
+        </Box>
+      </Box>
+
+      {/* --- ALL ORIGINAL DIALOGS AND SNACKBAR START HERE --- */}
 
       {/* Manager Leave Request Dialog */}
       {(user?.role === 'MANAGER' || user?.role === 'ADMIN') && (

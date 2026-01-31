@@ -62,7 +62,22 @@ import { api } from '@/services/api.service';
 import { useSidebarBadges } from '@/contexts/SidebarBadgesContext';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
-const drawerWidth = 250;
+const drawerWidth = 280;
+
+// Modern Theme Colors
+const MODERN_THEME = {
+  bg: '#faf8f5',
+  sidebarBg: '#ffffff',
+  peach: '#ffe4d6',
+  cream: '#fff8f0',
+  mint: '#e8f5e9',
+  rose: '#ffc4d4',
+  orange: '#ff8c5a',
+  green: '#7dd4a8',
+  textPrimary: '#2d3436',
+  textSecondary: '#636e72',
+  border: '#f0ebe5',
+};
 
 interface MenuItem {
   text: string;
@@ -322,15 +337,15 @@ export const MainLayout = () => {
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box
         sx={{
-          p: 2.5,
-          background: 'linear-gradient(135deg, #1a237e 0%, #0d47a1 100%)',
-          color: 'white',
+          p: 3,
+          background: `linear-gradient(135deg, ${MODERN_THEME.peach} 0%, ${MODERN_THEME.cream} 100%)`,
+          borderBottom: `1px solid ${MODERN_THEME.border}`,
         }}
       >
-        <Typography variant="h6" fontWeight="bold">
+        <Typography variant="h6" sx={{ fontWeight: 900, color: MODERN_THEME.textPrimary, letterSpacing: -0.5 }}>
           نظام الحضور
         </Typography>
-        <Typography variant="caption" sx={{ opacity: 0.8 }}>
+        <Typography variant="caption" sx={{ color: MODERN_THEME.textSecondary, fontWeight: 500 }}>
           {user?.role === 'ADMIN' ? 'لوحة تحكم الإدارة' : 'لوحة التحكم'}
         </Typography>
       </Box>
@@ -352,12 +367,16 @@ export const MainLayout = () => {
                     setMobileOpen(false);
                   }}
                   sx={{
-                    borderRadius: 2,
+                    borderRadius: 3,
+                    transition: 'all 0.2s ease',
                     '&.Mui-selected': {
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'primary.dark' },
-                      '& .MuiListItemIcon-root': { color: 'white' },
+                      bgcolor: MODERN_THEME.peach,
+                      color: MODERN_THEME.orange,
+                      '&:hover': { bgcolor: MODERN_THEME.cream },
+                      '& .MuiListItemIcon-root': { color: MODERN_THEME.orange },
+                    },
+                    '&:hover': {
+                      bgcolor: MODERN_THEME.cream,
                     },
                   }}
                 >
