@@ -696,7 +696,8 @@ export default function BonusManagementPage() {
                             size="small"
                             onClick={() => {
                               setModifyDialog({ open: true, employee: emp });
-                              setModifyAmount(emp.totalDeduction);
+                              // ✅ استخدام المبلغ الأصلي (grossDeduction) أو totalDeduction
+                              setModifyAmount(emp.grossDeduction || emp.totalDeduction || 0);
                             }}
                           >
                             <EditIcon />
@@ -1912,9 +1913,14 @@ export default function BonusManagementPage() {
           <Typography variant="body1" sx={{ mb: 1 }}>
             <strong>الموظف:</strong> {modifyDialog.employee?.employeeName}
           </Typography>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            <strong>المبلغ الأصلي:</strong> {modifyDialog.employee?.totalDeduction?.toFixed(2)} ر.س
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            <strong>الخصم الأصلي:</strong> {(modifyDialog.employee?.grossDeduction || modifyDialog.employee?.totalDeduction || 0).toFixed(2)} ر.س
           </Typography>
+          {modifyDialog.employee?.waivedAmount > 0 && (
+            <Typography variant="body2" color="success.main" sx={{ mb: 2 }}>
+              <strong>تم تعديله سابقاً:</strong> -{modifyDialog.employee?.waivedAmount?.toFixed(2)} ر.س
+            </Typography>
+          )}
           <TextField
             label="المبلغ الجديد"
             type="number"
@@ -1939,11 +1945,11 @@ export default function BonusManagementPage() {
           <Button
             variant="contained"
             color="warning"
-            disabled={modifyDeductionMutation.isPending || modifyAmount >= (modifyDialog.employee?.totalDeduction || 0) || !modifyReason}
+            disabled={modifyDeductionMutation.isPending || modifyAmount >= (modifyDialog.employee?.grossDeduction || modifyDialog.employee?.totalDeduction || 0) || !modifyReason}
             onClick={() => modifyDeductionMutation.mutate({
               employeeId: modifyDialog.employee?.employeeId,
-              deductionType: 'LATE',
-              originalAmount: modifyDialog.employee?.totalDeduction,
+              deductionType: modifyDialog.employee?.lateDeduction > modifyDialog.employee?.absenceDeduction ? 'LATE' : 'ABSENCE',
+              originalAmount: modifyDialog.employee?.grossDeduction || modifyDialog.employee?.totalDeduction || 0,
               newAmount: modifyAmount,
               reason: modifyReason,
             })}
@@ -2000,11 +2006,11 @@ export default function BonusManagementPage() {
             disabled={convertToLeaveMutation.isPending || leaveDays <= 0}
             onClick={() => convertToLeaveMutation.mutate({
               employeeId: convertDialog.employee?.employeeId,
-              deductionType: 'LATE',
-              originalAmount: convertDialog.employee?.totalDeduction,
+              deductionType: convertDialog.employee?.lateDeduction > convertDialog.employee?.absenceDeduction ? 'LATE' : 'ABSENCE',
+              originalAmount: convertDialog.employee?.grossDeduction || convertDialog.employee?.totalDeduction || 0,
               leaveDays: leaveDays,
               leaveType: leaveType,
-              reason: `تحويل خصم حضور بمبلغ ${convertDialog.employee?.totalDeduction} ر.س إلى ${leaveDays} يوم إجازة`,
+              reason: `تحويل خصم حضور بمبلغ ${convertDialog.employee?.grossDeduction || convertDialog.employee?.totalDeduction || 0} ر.س إلى ${leaveDays} يوم إجازة`,
             })}
             startIcon={convertToLeaveMutation.isPending ? <CircularProgress size={20} /> : <SwapHorizIcon />}
           >
