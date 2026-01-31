@@ -769,6 +769,7 @@ export class PayrollCalculationService {
         const daysInPeriodAbsence = this.getDaysInPeriod(startDate, endDate, settings.unpaidLeaveCalcBase as any);
         const dailyRateAbsence = calcDailyRate(deductionBase, daysInPeriodAbsence);
         const hourlyRateLate = calcHourlyRate(deductionBase, daysInPeriodAbsence, dailyWorkingHours);
+        console.log(`🔍 DAYS_DEBUG: employeeId=${employeeId}, unpaidLeaveCalcBase=${settings.unpaidLeaveCalcBase}, daysInPeriodAbsence=${daysInPeriodAbsence}, deductionBase=${toNumber(deductionBase)}, dailyWorkingHours=${dailyWorkingHours}`);
 
         // ✅ حساب خصم الغياب بناءً على طريقة الحساب (absenceDeductionMethod)
         // Using Decimal for all deduction calculations

@@ -1,4 +1,4 @@
-// @ts-nocheck
+// TypeScript type checking enabled - AUDIT FIX 2026-01-31
 import {
     Injectable,
     NotFoundException,
@@ -27,6 +27,19 @@ import {
 } from './dto/task-actions.dto';
 import { TaskStatus, NotificationType, Prisma } from '@prisma/client';
 
+// AUDIT FIX: Whitelist of allowed sort fields to prevent injection
+const ALLOWED_SORT_FIELDS = [
+    'createdAt', 'updatedAt', 'dueDate', 'startDate', 'title', 'priority',
+    'status', 'order', 'completedAt', 'storyPoints', 'estimatedHours', 'progress'
+] as const;
+type AllowedSortField = typeof ALLOWED_SORT_FIELDS[number];
+
+// AUDIT FIX: Valid TaskStatus values for validation
+const VALID_TASK_STATUSES: TaskStatus[] = [
+    'BACKLOG', 'TODO', 'IN_PROGRESS', 'PENDING_REVIEW', 'IN_REVIEW',
+    'APPROVED', 'REJECTED', 'BLOCKED', 'COMPLETED', 'CANCELLED'
+] as unknown as TaskStatus[];
+
 // Type for Task with all relations included
 type TaskWithRelations = Prisma.TaskGetPayload<{
     include: {
@@ -41,9 +54,10 @@ type TaskWithRelations = Prisma.TaskGetPayload<{
         comments: { include: { author: { select: { id: true; firstName: true; lastName: true; avatar: true } } } };
         attachments: { include: { uploadedBy: { select: { id: true; firstName: true; lastName: true } } } };
         timeLogs: { include: { user: { select: { id: true; firstName: true; lastName: true } } } };
-        blockedBy: { include: { blockingTask: { select: { id: true; title: true; status: true } } } };
-        blocks: { include: { blockedTask: { select: { id: true; title: true; status: true } } } };
-        activities: { include: { user: { select: { id: true; firstName: true; lastName: true } } } };
+        // AUDIT FIX: Use correct relation names from Prisma schema
+        blockedTasks: { include: { blockingTask: { select: { id: true; title: true; status: true } } } };
+        blockingTasks: { include: { blockedTask: { select: { id: true; title: true; status: true } } } };
+        // Note: activities are fetched separately via TaskActivityLog
     };
 }>;
 
@@ -215,7 +229,7 @@ export class TasksService {
                         select: { comments: true, attachments: true },
                     },
                 },
-                orderBy: { [sortBy]: sortOrder },
+                orderBy: { [ALLOWED_SORT_FIELDS.includes(sortBy as AllowedSortField) ? sortBy : 'createdAt']: sortOrder },
                 skip: (page - 1) * limit,
                 take: limit,
             }),
@@ -240,7 +254,8 @@ export class TasksService {
         const tasks = await this.prisma.task.findMany({
             where: {
                 companyId,
-                status: { not: 'CANCELLED' },
+                // AUDIT FIX: Exclude both CANCELLED and DELETED
+                status: { notIn: ['CANCELLED', 'DELETED'] as any },
                 OR: [
                     { assigneeId: userId },
                     { createdById: userId },
@@ -313,13 +328,7 @@ export class TasksService {
                         blockedTask: { select: { id: true, title: true, status: true } },
                     },
                 },
-                activities: {
-                    include: {
-                        user: { select: { id: true, firstName: true, lastName: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 20,
-                },
+                // AUDIT FIX: Fetch activities separately via TaskActivityLog
             },
         });
 
@@ -458,15 +467,16 @@ export class TasksService {
 
         // Check permission (only creator or admin can delete)
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        if (task.createdById !== userId && user?.role !== 'ADMIN' && user?.role !== 'HR') {
+        // AUDIT FIX: Only ADMIN can delete others' tasks (removed HR)
+        if (task.createdById !== userId && user?.role !== 'ADMIN') {
             throw new ForbiddenException('ليس لديك صلاحية حذف هذه المهمة');
         }
 
         // Soft delete by default - mark as DELETED status for potential recovery
         if (hardDelete && user?.role === 'ADMIN') {
-            // Only ADMIN can permanently delete
-            await this.prisma.task.delete({ where: { id } });
+            // AUDIT FIX: Log BEFORE delete to preserve activity
             await this.logActivity(id, userId, 'HARD_DELETED', 'status', task.status, 'تم الحذف النهائي');
+            await this.prisma.task.delete({ where: { id } });
             return { message: 'تم حذف المهمة نهائياً' };
         } else {
             // Soft delete - preserve data
@@ -554,7 +564,8 @@ export class TasksService {
     async getKanbanBoard(companyId: string, categoryId?: string, userId?: string) {
         const where: Prisma.TaskWhereInput = {
             companyId,
-            status: { not: 'CANCELLED' },
+            // AUDIT FIX: Exclude both CANCELLED and DELETED from Kanban
+            status: { notIn: ['CANCELLED', 'DELETED'] as any },
             ...(categoryId && { categoryId }),
             ...(userId && {
                 OR: [
@@ -609,6 +620,10 @@ export class TasksService {
         }
 
         const oldStatus = task.status;
+        // AUDIT FIX: Validate status before casting
+        if (dto.status && !VALID_TASK_STATUSES.includes(dto.status as any)) {
+            throw new BadRequestException(`الحالة غير صالحة: ${dto.status}`);
+        }
         const newStatus = dto.status as TaskStatus;
 
         // Update task
@@ -770,7 +785,7 @@ export class TasksService {
         const comment = await this.prisma.taskComment.create({
             data: {
                 taskId,
-                userId,
+                // AUDIT FIX: Use authorId only (userId doesn't exist in schema)
                 authorId: userId,
                 content: dto.content,
                 mentions: dto.mentions || [],
@@ -842,6 +857,10 @@ export class TasksService {
         if (!duration && dto.startTime && dto.endTime) {
             const start = new Date(dto.startTime);
             const end = new Date(dto.endTime);
+            // AUDIT FIX: Validate endTime > startTime to prevent negative duration
+            if (end.getTime() <= start.getTime()) {
+                throw new BadRequestException('وقت الانتهاء يجب أن يكون بعد وقت البداية');
+            }
             duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
         }
 
@@ -1044,11 +1063,26 @@ export class TasksService {
             throw new BadRequestException('لا يمكن أن تكون المهمة معتمدة على نفسها');
         }
 
-        // Check for circular dependency
-        const existingReverse = await this.prisma.taskDependency.findFirst({
-            where: { blockedTaskId: blockingTaskId, blockingTaskId: blockedTaskId },
-        });
-        if (existingReverse) {
+        // AUDIT FIX: Enhanced circular dependency check - includes transitive chains
+        const hasCircularDependency = async (sourceId: string, targetId: string, visited: Set<string> = new Set()): Promise<boolean> => {
+            if (sourceId === targetId) return true;
+            if (visited.has(sourceId)) return false;
+            visited.add(sourceId);
+
+            const dependencies = await this.prisma.taskDependency.findMany({
+                where: { blockedTaskId: sourceId },
+                select: { blockingTaskId: true },
+            });
+
+            for (const dep of dependencies) {
+                if (await hasCircularDependency(dep.blockingTaskId, targetId, visited)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (await hasCircularDependency(blockingTaskId, blockedTaskId)) {
             throw new BadRequestException('سيؤدي هذا إلى اعتماد دائري');
         }
 
@@ -1069,6 +1103,14 @@ export class TasksService {
     }
 
     async removeDependency(blockedTaskId: string, blockingTaskId: string, companyId: string) {
+        // AUDIT FIX: Verify company ownership before deleting
+        const blockedTask = await this.prisma.task.findFirst({
+            where: { id: blockedTaskId, companyId },
+        });
+        if (!blockedTask) {
+            throw new NotFoundException('المهمة غير موجودة أو لا تملك صلاحية');
+        }
+
         await this.prisma.taskDependency.deleteMany({
             where: { blockedTaskId, blockingTaskId },
         });
@@ -1151,6 +1193,18 @@ export class TasksService {
 
         if (!attachment || attachment.task.companyId !== companyId) {
             throw new NotFoundException('المرفق غير موجود');
+        }
+
+        // AUDIT FIX: Attempt to delete file from disk
+        if ((attachment as any).storagePath) {
+            try {
+                const fs = await import('fs/promises');
+                const path = await import('path');
+                const filePath = path.join(process.cwd(), (attachment as any).storagePath);
+                await fs.unlink(filePath).catch(() => { });
+            } catch (e) {
+                console.warn(`Could not delete attachment file from disk: ${(e as Error).message}`);
+            }
         }
 
         await this.prisma.taskAttachment.delete({ where: { id: attachmentId } });
@@ -1788,30 +1842,17 @@ export class TasksService {
                 author: {
                     select: { id: true, firstName: true, lastName: true, avatar: true },
                 },
-                reactions: {
-                    include: {
-                        user: {
-                            select: { id: true, firstName: true, lastName: true },
-                        },
-                    },
-                },
+                // AUDIT FIX: reactions model doesn't exist - storing in JSON customFields
                 replies: {
                     include: {
                         author: {
                             select: { id: true, firstName: true, lastName: true, avatar: true },
                         },
-                        reactions: {
-                            include: {
-                                user: {
-                                    select: { id: true, firstName: true, lastName: true },
-                                },
-                            },
-                        },
                     },
-                    orderBy: { createdAt: 'asc' },
+                    orderBy: { createdAt: 'asc' as const },
                 },
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: 'desc' as const },
         });
 
         return comments;
@@ -1840,7 +1881,7 @@ export class TasksService {
         const reply = await this.prisma.taskComment.create({
             data: {
                 taskId: parentComment.taskId,
-                userId,
+                // AUDIT FIX: Use authorId only (userId doesn't exist in schema)
                 authorId: userId,
                 parentId: commentId,
                 content,
@@ -1894,19 +1935,21 @@ export class TasksService {
             throw new ForbiddenException('غير مصرح بالوصول');
         }
 
-        // Upsert reaction
-        const reaction = await this.prisma.commentReaction.upsert({
-            where: {
-                commentId_userId_emoji: { commentId, userId, emoji },
-            },
-            create: { commentId, userId, emoji },
-            update: {},
-            include: {
-                user: {
-                    select: { id: true, firstName: true, lastName: true },
-                },
-            },
-        });
+        // AUDIT FIX: commentReaction model doesn't exist - using JSON storage in comment
+        const reactionsField = (comment as any).customFields?.reactions || {};
+        const userReactions = reactionsField[userId] || [];
+
+        if (!userReactions.includes(emoji)) {
+            userReactions.push(emoji);
+            reactionsField[userId] = userReactions;
+
+            await this.prisma.taskComment.update({
+                where: { id: commentId },
+                data: {
+                    customFields: { ...((comment as any).customFields || {}), reactions: reactionsField }
+                } as any,
+            });
+        }
 
         // Notify comment author (if not self)
         if (comment.authorId && comment.authorId !== userId) {
@@ -1919,7 +1962,7 @@ export class TasksService {
             );
         }
 
-        return reaction;
+        return { success: true, emoji, userId };
     }
 
     /**
@@ -1936,9 +1979,22 @@ export class TasksService {
             throw new ForbiddenException('غير مصرح بالوصول');
         }
 
-        await this.prisma.commentReaction.deleteMany({
-            where: { commentId, userId, emoji },
-        });
+        // AUDIT FIX: commentReaction model doesn't exist - using JSON storage
+        const reactionsField = (comment as any).customFields?.reactions || {};
+        const userReactions = reactionsField[userId] || [];
+        const idx = userReactions.indexOf(emoji);
+
+        if (idx >= 0) {
+            userReactions.splice(idx, 1);
+            reactionsField[userId] = userReactions;
+
+            await this.prisma.taskComment.update({
+                where: { id: commentId },
+                data: {
+                    customFields: { ...((comment as any).customFields || {}), reactions: reactionsField }
+                } as any,
+            });
+        }
 
         return { success: true };
     }
@@ -2612,7 +2668,8 @@ export class TasksService {
                         where: {
                             assigneeId: user.id,
                             companyId,
-                            status: { notIn: ['COMPLETED', 'CANCELLED'] },
+                            // AUDIT FIX: Exclude DELETED from overdue count
+                            status: { notIn: ['COMPLETED', 'CANCELLED', 'DELETED'] as any },
                             dueDate: { lt: new Date() },
                         },
                     }),
@@ -2650,7 +2707,8 @@ export class TasksService {
                 totalUsers: users.length,
                 overloadedUsers: workloads.filter((w) => w.stats.workloadScore >= 80).length,
                 underutilizedUsers: workloads.filter((w) => w.stats.workloadScore < 30).length,
-                averageWorkload: workloads.reduce((acc, w) => acc + w.stats.workloadScore, 0) / users.length || 0,
+                // AUDIT FIX: Guard against division by zero
+                averageWorkload: users.length > 0 ? workloads.reduce((acc, w) => acc + w.stats.workloadScore, 0) / users.length : 0,
             },
         };
     }
@@ -3527,7 +3585,8 @@ export class TasksService {
             await this.prisma.task.updateMany({
                 where: {
                     categoryId: sprintId,
-                    status: { notIn: ['COMPLETED', 'CANCELLED'] },
+                    // AUDIT FIX: Exclude DELETED from sprint move
+                    status: { notIn: ['COMPLETED', 'CANCELLED', 'DELETED'] as any },
                 },
                 data: { categoryId: moveIncompleteToSprintId },
             });
@@ -3965,7 +4024,8 @@ export class TasksService {
             },
             take: 5,
             include: {
-                blockedBy: {
+                // AUDIT FIX: Use blockedTasks (correct relation name in schema)
+                blockedTasks: {
                     include: { blockingTask: { select: { id: true, title: true, status: true } } },
                 },
             },
@@ -5283,7 +5343,7 @@ export class TasksService {
         return this.prisma.taskComment.create({
             data: {
                 taskId,
-                userId,
+                // AUDIT FIX: Use authorId only (userId doesn't exist in schema)
                 authorId: userId,
                 content: JSON.stringify({
                     type: 'DISCUSSION_THREAD',
@@ -5340,7 +5400,7 @@ export class TasksService {
         const comment = await this.prisma.taskComment.create({
             data: {
                 taskId,
-                userId,
+                // AUDIT FIX: Use authorId only (userId doesn't exist in schema)
                 authorId: userId,
                 content: message,
                 mentions: userIds,
@@ -5475,7 +5535,7 @@ export class TasksService {
         return this.prisma.taskComment.create({
             data: {
                 taskId,
-                userId,
+                // AUDIT FIX: Use authorId only (userId doesn't exist in schema)
                 authorId: userId,
                 content: JSON.stringify({ type: 'POLL', ...pollData }),
             },
@@ -6146,8 +6206,9 @@ export class TasksService {
                     data: { status: 'BLOCKED' },
                 });
             case 'ADD_COMMENT':
+                // AUDIT FIX: Use authorId only (userId doesn't exist in schema)
                 return this.prisma.taskComment.create({
-                    data: { taskId, userId, authorId: userId, content: action.data?.content || '' },
+                    data: { taskId, authorId: userId, content: action.data?.content || '' },
                 });
             case 'CHECK_ITEM':
                 if (action.data?.itemId) {
@@ -6740,9 +6801,10 @@ export class TasksService {
             // Tasks created by this user will remain linked but user data will be anonymized elsewhere
 
             if (options?.deleteComments) {
+                // AUDIT FIX: Don't nullify authorId if it's required, mark as anonymized instead
                 await this.prisma.taskComment.updateMany({
                     where: { authorId: userId, task: { companyId } },
-                    data: { content: '[محتوى محذوف]', authorId: null as any },
+                    data: { content: '[محتوى محذوف - GDPR]' }, // Keep authorId intact
                 });
             }
 
@@ -6810,6 +6872,7 @@ export class TasksService {
 
     /**
      * Apply retention policy (cleanup old data)
+     * AUDIT FIX: Changed from HARD DELETE to ARCHIVE to prevent data loss
      */
     async applyRetentionPolicy(companyId: string) {
         const policyKey = `__RETENTION_POLICY__`;
@@ -6824,27 +6887,43 @@ export class TasksService {
         const policy = JSON.parse(policyRecord.nameEn);
         const now = new Date();
 
-        // Delete old completed tasks
+        // AUDIT FIX: Archive old completed tasks instead of hard delete
         const completedCutoff = new Date(now.getTime() - policy.completedTaskRetentionDays * 24 * 60 * 60 * 1000);
-        const deletedCompleted = await this.prisma.task.deleteMany({
+        const archivedCompleted = await this.prisma.task.updateMany({
             where: {
                 companyId,
                 status: 'COMPLETED',
                 completedAt: { lt: completedCutoff },
             },
+            data: {
+                status: 'ARCHIVED' as any,
+                customFields: {
+                    archivedAt: now.toISOString(),
+                    archivedBy: 'RETENTION_POLICY',
+                    previousStatus: 'COMPLETED',
+                },
+            },
         });
 
-        // Delete old cancelled tasks
+        // AUDIT FIX: Archive old cancelled tasks instead of hard delete
         const cancelledCutoff = new Date(now.getTime() - policy.cancelledTaskRetentionDays * 24 * 60 * 60 * 1000);
-        const deletedCancelled = await this.prisma.task.deleteMany({
+        const archivedCancelled = await this.prisma.task.updateMany({
             where: {
                 companyId,
                 status: 'CANCELLED',
                 updatedAt: { lt: cancelledCutoff },
             },
+            data: {
+                status: 'ARCHIVED' as any,
+                customFields: {
+                    archivedAt: now.toISOString(),
+                    archivedBy: 'RETENTION_POLICY',
+                    previousStatus: 'CANCELLED',
+                },
+            },
         });
 
-        // Delete old activity logs
+        // Delete old activity logs (these are safe to delete - not user data)
         const activityCutoff = new Date(now.getTime() - policy.activityLogRetentionDays * 24 * 60 * 60 * 1000);
         const deletedLogs = await this.prisma.taskActivityLog.deleteMany({
             where: {
@@ -6856,11 +6935,14 @@ export class TasksService {
         return {
             success: true,
             appliedAt: now.toISOString(),
+            archived: {
+                completedTasks: archivedCompleted.count,
+                cancelledTasks: archivedCancelled.count,
+            },
             deleted: {
-                completedTasks: deletedCompleted.count,
-                cancelledTasks: deletedCancelled.count,
                 activityLogs: deletedLogs.count,
             },
+            note: 'تم أرشفة المهام بدلاً من حذفها للحفاظ على البيانات',
         };
     }
 
@@ -7150,7 +7232,8 @@ export class TasksService {
         const tasks = await this.prisma.task.findMany({
             where: {
                 companyId,
-                status: { notIn: ['COMPLETED', 'CANCELLED'] },
+                // AUDIT FIX: Exclude DELETED from smart prioritization
+                status: { notIn: ['COMPLETED', 'CANCELLED', 'DELETED'] as any },
                 ...(userId && { assigneeId: userId }),
             },
             include: {
@@ -7212,7 +7295,8 @@ export class TasksService {
         const tasks = await this.prisma.task.findMany({
             where: {
                 companyId,
-                status: { notIn: ['CANCELLED'] },
+                // AUDIT FIX: Exclude both CANCELLED and DELETED from dependency graph
+                status: { notIn: ['CANCELLED', 'DELETED'] as any },
                 ...(categoryId && { categoryId }),
             },
             include: {
@@ -7317,7 +7401,8 @@ export class TasksService {
             where: { companyId, status: 'ACTIVE' },
             include: {
                 tasksAssigned: {
-                    where: { status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+                    // AUDIT FIX: Exclude DELETED from workload analysis
+                    where: { status: { notIn: ['COMPLETED', 'CANCELLED', 'DELETED'] as any } },
                     select: { id: true, priority: true, dueDate: true, storyPoints: true, estimatedHours: true },
                 },
             },
@@ -7376,9 +7461,10 @@ export class TasksService {
 
         // Generate daily data points
         const data: { date: string; remaining: number; ideal: number; completed: number }[] = [];
-        const totalPoints = tasks.reduce((sum, t) => sum + (t.storyPoints || 1), 0);
+        const totalPoints = tasks.reduce((sum, t) => sum + (Number(t.storyPoints) || 1), 0);
         const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        const idealBurnRate = totalPoints / days;
+        // AUDIT FIX: Guard against division by zero
+        const idealBurnRate = days > 0 ? totalPoints / days : 0;
 
         for (let i = 0; i <= days; i++) {
             const date = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
@@ -7400,8 +7486,9 @@ export class TasksService {
             data,
             summary: {
                 totalPoints,
-                completedPoints: tasks.filter(t => t.status === 'COMPLETED').reduce((sum, t) => sum + (t.storyPoints || 1), 0),
-                remainingPoints: tasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').reduce((sum, t) => sum + (t.storyPoints || 1), 0),
+                completedPoints: tasks.filter(t => t.status === 'COMPLETED').reduce((sum, t) => sum + (Number(t.storyPoints) || 1), 0),
+                // AUDIT FIX: Exclude DELETED from remaining points
+                remainingPoints: tasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && t.status !== 'DELETED').reduce((sum, t) => sum + (Number(t.storyPoints) || 1), 0),
             },
         };
     }
@@ -7653,7 +7740,8 @@ export class TasksService {
             where: { id: taskId, companyId },
             include: {
                 checklists: { include: { items: true } },
-                blockedBy: true,
+                // AUDIT FIX: Use blockedTasks (correct relation name)
+                blockedTasks: true,
             },
         });
 
@@ -8032,7 +8120,8 @@ export class TasksService {
             include: {
                 assignee: { select: { id: true, firstName: true, lastName: true } },
                 category: { select: { id: true, name: true, color: true } },
-                blockedBy: { include: { blockingTask: { select: { id: true, title: true } } } },
+                // AUDIT FIX: Use blockedTasks (correct relation name)
+                blockedTasks: { include: { blockingTask: { select: { id: true, title: true } } } },
             },
             orderBy: { startDate: 'asc' },
         });
@@ -8104,7 +8193,8 @@ export class TasksService {
         const tasks = await this.prisma.task.findMany({
             where,
             include: {
-                blockedBy: { include: { blockingTask: true } },
+                // AUDIT FIX: Use blockedTasks (correct relation name)
+                blockedTasks: { include: { blockingTask: true } },
             },
         }) as any[];
 
@@ -8181,7 +8271,8 @@ export class TasksService {
         const tasks = await this.prisma.task.findMany({
             where,
             include: {
-                blockedBy: true,
+                // AUDIT FIX: Use blockedTasks (correct relation name)
+                blockedTasks: true,
             },
         }) as any[];
 
@@ -8546,12 +8637,13 @@ export class TasksService {
         };
 
         try {
-            const config = await this.prisma.companyConfig.findUnique({
-                where: { companyId },
+            // AUDIT FIX: companyConfig doesn't exist - using TaskCategory storage pattern
+            const configRecord = await this.prisma.taskCategory.findFirst({
+                where: { companyId, name: '__TASK_SLA_CONFIG__' },
             });
-            if (config?.policies) {
-                const policies = typeof config.policies === 'string' ? JSON.parse(config.policies) : config.policies;
-                return policies.taskSLA || defaultSLA;
+            if (configRecord?.nameEn) {
+                const config = JSON.parse(configRecord.nameEn);
+                return config.taskSLA || defaultSLA;
             }
         } catch (e) { /* ignore */ }
 
@@ -8559,15 +8651,29 @@ export class TasksService {
     }
 
     async updateSLAConfig(companyId: string, userId: string, slaConfig: Record<string, { responseHours: number; resolutionHours: number }>) {
-        const config = await this.prisma.companyConfig.findUnique({ where: { companyId } });
-        const policies: any = config?.policies || {};
-        policies.taskSLA = slaConfig;
+        // AUDIT FIX: companyConfig doesn't exist - using TaskCategory storage pattern
+        const configKey = '__TASK_SLA_CONFIG__';
+        const data = { taskSLA: slaConfig, updatedAt: new Date().toISOString(), updatedBy: userId };
 
-        await this.prisma.companyConfig.upsert({
-            where: { companyId },
-            create: { companyId, policies },
-            update: { policies },
+        const existing = await this.prisma.taskCategory.findFirst({
+            where: { companyId, name: configKey },
         });
+
+        if (existing) {
+            await this.prisma.taskCategory.update({
+                where: { id: existing.id },
+                data: { nameEn: JSON.stringify(data) },
+            });
+        } else {
+            await this.prisma.taskCategory.create({
+                data: {
+                    name: configKey,
+                    nameEn: JSON.stringify(data),
+                    companyId,
+                    isActive: false,
+                },
+            });
+        }
 
         return { success: true, slaConfig };
     }
@@ -8579,7 +8685,8 @@ export class TasksService {
         const activeTasks = await this.prisma.task.findMany({
             where: {
                 companyId,
-                status: { notIn: ['COMPLETED', 'CANCELLED'] as any },
+                // AUDIT FIX: Exclude DELETED from SLA checks
+                status: { notIn: ['COMPLETED', 'CANCELLED', 'DELETED'] as any },
             },
             include: {
                 assignee: { select: { id: true, firstName: true, lastName: true } },
@@ -8659,10 +8766,13 @@ export class TasksService {
         ];
 
         try {
-            const config = await this.prisma.companyConfig.findUnique({ where: { companyId } });
-            if (config?.policies) {
-                const policies = typeof config.policies === 'string' ? JSON.parse(config.policies) : config.policies;
-                return policies.escalationRules || defaultRules;
+            // AUDIT FIX: companyConfig doesn't exist - using TaskCategory storage pattern
+            const configRecord = await this.prisma.taskCategory.findFirst({
+                where: { companyId, name: '__ESCALATION_RULES__' },
+            });
+            if (configRecord?.nameEn) {
+                const config = JSON.parse(configRecord.nameEn);
+                return config.escalationRules || defaultRules;
             }
         } catch (e) { /* ignore */ }
 
@@ -8670,15 +8780,29 @@ export class TasksService {
     }
 
     async updateEscalationRules(companyId: string, userId: string, rules: any[]) {
-        const config = await this.prisma.companyConfig.findUnique({ where: { companyId } });
-        const policies: any = config?.policies || {};
-        policies.escalationRules = rules;
+        // AUDIT FIX: companyConfig doesn't exist - using TaskCategory storage pattern
+        const configKey = '__ESCALATION_RULES__';
+        const data = { escalationRules: rules, updatedAt: new Date().toISOString(), updatedBy: userId };
 
-        await this.prisma.companyConfig.upsert({
-            where: { companyId },
-            create: { companyId, policies },
-            update: { policies },
+        const existing = await this.prisma.taskCategory.findFirst({
+            where: { companyId, name: configKey },
         });
+
+        if (existing) {
+            await this.prisma.taskCategory.update({
+                where: { id: existing.id },
+                data: { nameEn: JSON.stringify(data) },
+            });
+        } else {
+            await this.prisma.taskCategory.create({
+                data: {
+                    name: configKey,
+                    nameEn: JSON.stringify(data),
+                    companyId,
+                    isActive: false,
+                },
+            });
+        }
 
         return { success: true, rules };
     }
@@ -8778,7 +8902,8 @@ export class TasksService {
                     const overdueTasks = await this.prisma.task.findMany({
                         where: {
                             companyId,
-                            status: { notIn: ['COMPLETED', 'CANCELLED'] },
+                            // AUDIT FIX: Exclude DELETED from escalation
+                            status: { notIn: ['COMPLETED', 'CANCELLED', 'DELETED'] as any },
                             dueDate: { lt: new Date(now.getTime() - (rule.condition.daysOverdue || 3) * 24 * 60 * 60 * 1000) },
                         },
                     });
@@ -8789,7 +8914,8 @@ export class TasksService {
                     const staleTasks = await this.prisma.task.findMany({
                         where: {
                             companyId,
-                            status: { notIn: ['COMPLETED', 'CANCELLED'] },
+                            // AUDIT FIX: Exclude DELETED from escalation
+                            status: { notIn: ['COMPLETED', 'CANCELLED', 'DELETED'] as any },
                             updatedAt: { lt: new Date(now.getTime() - (rule.condition.daysSinceLastUpdate || 5) * 24 * 60 * 60 * 1000) },
                         },
                     });
@@ -8802,7 +8928,8 @@ export class TasksService {
                     const result = await this.triggerEscalation(companyId, task.taskId, rule.id);
                     escalations.push(result);
                 } catch (e) {
-                    // Skip if escalation fails
+                    // AUDIT FIX: Log escalation errors instead of silent skip
+                    console.error(`Escalation failed for task ${task.taskId}:`, (e as Error).message);
                 }
             }
         }
