@@ -137,7 +137,7 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
       final tasks = await _repository.getMyTasks();
       emit(TasksLoaded(tasks));
     } catch (e) {
-      emit(TasksError('فشل في تحميل المهام: ${e.toString()}'));
+      emit(TasksError('حدث خطأ أثناء تحميل المهام. يرجى المحاولة مرة أخرى.'));
     }
   }
 
@@ -149,7 +149,7 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
       final tasks = await _repository.getMyTasks();
       emit(TasksLoaded(tasks));
     } catch (e) {
-      emit(TasksError('فشل في تحديث المهام: ${e.toString()}'));
+      emit(TasksError('حدث خطأ أثناء تحديث المهام. يرجى المحاولة مرة أخرى.'));
     }
   }
 
@@ -162,7 +162,7 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
       final task = await _repository.getTaskById(event.taskId);
       emit(TaskDetailLoaded(task));
     } catch (e) {
-      emit(TasksError('فشل في تحميل تفاصيل المهمة: ${e.toString()}'));
+      emit(TasksError('حدث خطأ أثناء تحميل تفاصيل المهمة. يرجى المحاولة مرة أخرى.'));
     }
   }
 
@@ -175,7 +175,7 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
       final task = await _repository.updateTaskStatus(event.taskId, event.newStatus);
       emit(TaskUpdated(task, 'تم تحديث حالة المهمة بنجاح'));
     } catch (e) {
-      emit(TasksError('فشل في تحديث المهمة: ${e.toString()}'));
+      emit(TasksError('حدث خطأ أثناء تحديث حالة المهمة. يرجى المحاولة مرة أخرى.'));
     }
   }
 
@@ -189,7 +189,7 @@ class TasksBloc extends Bloc<TasksEvent, TasksState> {
       final task = await _repository.getTaskById(event.taskId);
       emit(TaskDetailLoaded(task));
     } catch (e) {
-      emit(TasksError('فشل في إضافة التعليق: ${e.toString()}'));
+      emit(TasksError('حدث خطأ أثناء إضافة التعليق. يرجى المحاولة مرة أخرى.'));
     }
   }
 }

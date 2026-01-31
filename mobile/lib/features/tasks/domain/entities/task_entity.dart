@@ -37,6 +37,17 @@ class TaskEntity {
   });
 
   factory TaskEntity.fromJson(Map<String, dynamic> json) {
+    // Fix: Backend returns firstName/lastName separately, concatenate them
+    String? getFullName(Map<String, dynamic>? person) {
+      if (person == null) return null;
+      final firstName = person['firstName'] ?? '';
+      final lastName = person['lastName'] ?? '';
+      final name = person['name'];
+      if (name != null && name.toString().isNotEmpty) return name.toString();
+      if (firstName.isEmpty && lastName.isEmpty) return null;
+      return '$firstName $lastName'.trim();
+    }
+
     return TaskEntity(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
@@ -51,9 +62,9 @@ class TaskEntity {
           ? DateTime.parse(json['updatedAt']) 
           : null,
       assigneeId: json['assigneeId'],
-      assigneeName: json['assignee']?['name'],
+      assigneeName: getFullName(json['assignee']),
       createdById: json['createdById'],
-      createdByName: json['createdBy']?['name'],
+      createdByName: getFullName(json['createdBy']),
       tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
       progress: json['progress'] ?? 0,
       categoryId: json['categoryId'],
@@ -82,12 +93,22 @@ class TaskEntity {
         return 'للعمل';
       case 'IN_PROGRESS':
         return 'جاري العمل';
+      case 'PENDING_REVIEW':
+        return 'في انتظار المراجعة';
       case 'IN_REVIEW':
         return 'قيد المراجعة';
+      case 'APPROVED':
+        return 'معتمد';
+      case 'REJECTED':
+        return 'مرفوض';
       case 'BLOCKED':
         return 'محظور';
       case 'COMPLETED':
         return 'مكتمل';
+      case 'CANCELLED':
+        return 'ملغي';
+      case 'DELETED':
+        return 'محذوف';
       default:
         return status;
     }

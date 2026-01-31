@@ -238,14 +238,29 @@ class _StatusChip extends StatelessWidget {
       case 'IN_PROGRESS':
         color = Colors.orange;
         break;
+      case 'PENDING_REVIEW':
+        color = Colors.pink;
+        break;
       case 'IN_REVIEW':
         color = Colors.purple;
+        break;
+      case 'APPROVED':
+        color = Colors.teal;
+        break;
+      case 'REJECTED':
+        color = Colors.red.shade700;
         break;
       case 'BLOCKED':
         color = Colors.red;
         break;
       case 'COMPLETED':
         color = Colors.green;
+        break;
+      case 'CANCELLED':
+        color = Colors.grey.shade600;
+        break;
+      case 'DELETED':
+        color = Colors.grey.shade400;
         break;
       default:
         color = Colors.grey;

@@ -937,11 +937,12 @@ export class PayrollRunsService {
             const gosiAmount = toDecimal(gosiLine?.amount || 0);
             totalGosi = add(totalGosi, gosiAmount);
 
-            // ✅ Add Attendance & Leave deductions (not in calculationService yet)
-            const attendanceAmt = toDecimal(attendanceMap.get(employee.id) || 0);
-            if (isPositive(attendanceAmt)) {
-                deductionItems.push({ name: 'خصم حضور وانصراف (معتمد)', code: 'ATT_DED', amount: toNumber(attendanceAmt) });
-            }
+            // ❌ DISABLED: Attendance deductions now calculated in payroll-calculation.service
+            // This was causing duplicate deductions (خصم تأخير + خصم حضور وانصراف)
+            // const attendanceAmt = toDecimal(attendanceMap.get(employee.id) || 0);
+            // if (isPositive(attendanceAmt)) {
+            //     deductionItems.push({ name: 'خصم حضور وانصراف (معتمد)', code: 'ATT_DED', amount: toNumber(attendanceAmt) });
+            // }
 
             const leaveAmt = toDecimal(leaveMap.get(employee.id) || 0);
             if (isPositive(leaveAmt)) {
