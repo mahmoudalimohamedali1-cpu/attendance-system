@@ -1002,7 +1002,8 @@ export class PayrollRunsService {
             const finalGross = add(toDecimal(calculation.grossSalary), wizardBonus);
 
             // إجمالي الخصومات النهائي = خصومات المحرك + الخصومات الموحدة + خصم الـ Wizard
-            const finalDeductions = add(add(add(add(toDecimal(calculation.totalDeductions), wizardDeduction), attendanceAmt), leaveAmt), add(totalDisc, totalCust));
+            // ❌ attendanceAmt removed - now calculated in payroll-calculation.service
+            const finalDeductions = add(add(add(add(toDecimal(calculation.totalDeductions), wizardDeduction), ZERO), leaveAmt), add(totalDisc, totalCust));
 
             // ✅ تطبيق سقف الخصومات 50% من الراتب الأساسي (المادة 91 من نظام العمل السعودي)
             // السقف يُحسب على راتب العقد (الأساسي) وليس الإجمالي
