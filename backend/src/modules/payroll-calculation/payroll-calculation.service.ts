@@ -518,9 +518,19 @@ export class PayrollCalculationService {
             }
         }
 
+        // ✅ Fix: حساب أيام العمل المتوقعة في الفترة
+        const workingDays = this.getWorkingDaysInPeriod(startDate, endDate, effectiveWorkingDays);
+
+        // ✅ حساب الغياب الحقيقي = أيام العمل - أيام الحضور (مع مراعاة العطلات)
+        // لو الموظف مش عنده سجل حضور في يوم عمل، ده يعتبر غياب
+        const calculatedAbsentDays = Math.max(0, workingDays - presentDays - holidayWorkDays);
+
+        // استخدام الأكبر بين الغياب المحسوب والغياب المسجل
+        const finalAbsentDays = Math.max(absentDays, calculatedAbsentDays);
+
         return {
             presentDays,
-            absentDays,
+            absentDays: finalAbsentDays, // ✅ استخدام الغياب المحسوب
             holidayWorkDays,
             lateMinutes: totalLateMinutes,
             overtimeHours: totalOvertimeMinutes / 60,
