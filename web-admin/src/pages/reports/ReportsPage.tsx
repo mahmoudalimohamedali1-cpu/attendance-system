@@ -1,4 +1,9 @@
-import { useState } from 'react';
+/**
+ * Reports Page - Comprehensive Reports Library
+ * 70 Reports organized by category
+ */
+
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box,
@@ -9,23 +14,35 @@ import {
   Grid,
   CircularProgress,
   Alert,
+  Tab,
+  Tabs,
+  TextField,
+  InputAdornment,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Divider,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Avatar,
-  Tab,
-  Tabs,
 } from '@mui/material';
 import {
+  Search,
+  Close,
   PictureAsPdf,
   TableChart,
-  Person,
-  AccessTime,
-  Warning,
+  FilterList,
+  Download,
+  Refresh,
+  Category,
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -50,558 +67,394 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ar';
 import { useAuthStore } from '@/store/auth.store';
+import {
+  REPORTS,
+  REPORT_CATEGORIES,
+  ReportCategory,
+  ReportDefinition,
+  getReportsByCategory,
+  getReportsByAccessLevel,
+  searchReports,
+} from './reportDefinitions';
+import { ReportCard } from './components/ReportCard';
 
-interface AttendanceRecord {
-  id: string;
-  userId: string;
-  date: string;
-  checkInTime: string | null;
-  checkOutTime: string | null;
-  status: string;
-  lateMinutes: number;
-  workingMinutes: number;
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    employeeCode: string;
-    jobTitle: string;
-    department?: { name: string };
-    branch?: { name: string };
-  };
-}
-
-interface AttendanceReportResponse {
-  data: AttendanceRecord[];
-  stats: {
-    totalDays: number;
-    presentDays: number;
-    lateDays: number;
-    absentDays: number;
-    onLeaveDays: number;
-    totalWorkingMinutes: number;
-    totalLateMinutes: number;
-  };
-}
-
-interface PayrollSummaryRecord {
-  employeeId: string;
-  employeeCode: string;
-  employeeName: string;
-  baseSalary: number;
-  workingDays: number;
-  totalWorkingHours: number;
-  totalLateMinutes: number;
-  totalEarlyLeaveMinutes: number;
-  totalOvertimeMinutes: number;
-  absentDays: number;
-  lateDeduction: number;
-  absentDeduction: number;
-  overtimeBonus: number;
-}
+// Theme colors
+const MODERN_THEME = {
+  bg: '#faf8f5',
+  peach: '#ffe4d6',
+  cream: '#fff8f0',
+  orange: '#ff8c5a',
+  textPrimary: '#2d3436',
+  textSecondary: '#636e72',
+  border: '#f0ebe5',
+};
 
 export const ReportsPage = () => {
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'ADMIN';
-  const [tabValue, setTabValue] = useState(0);
-  const [startDate, setStartDate] = useState<Dayjs | null>(() => {
-    return dayjs().startOf('month');
-  });
-  const [endDate, setEndDate] = useState<Dayjs | null>(() => {
-    return dayjs();
-  });
+  const userRole = user?.role || 'EMPLOYEE';
+  const [selectedCategory, setSelectedCategory] = useState<ReportCategory | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedReport, setSelectedReport] = useState<ReportDefinition | null>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [startDate, setStartDate] = useState<Dayjs | null>(() => dayjs().startOf('month'));
+  const [endDate, setEndDate] = useState<Dayjs | null>(() => dayjs());
 
   const startDateStr = startDate?.format('YYYY-MM-DD') || '';
   const endDateStr = endDate?.format('YYYY-MM-DD') || '';
 
-  const { data: reportData, isLoading, error } = useQuery<AttendanceReportResponse>({
-    queryKey: ['attendance-report', startDateStr, endDateStr],
-    queryFn: () => api.get(`/reports/attendance?startDate=${startDateStr}&endDate=${endDateStr}`),
-    enabled: !!startDateStr && !!endDateStr,
-  });
+  // Filter reports based on user role, category, and search
+  const filteredReports = useMemo(() => {
+    let reports = getReportsByAccessLevel('ALL', userRole);
 
-  const { data: payrollData, isLoading: payrollLoading } = useQuery<PayrollSummaryRecord[]>({
-    queryKey: ['payroll-report', startDateStr, endDateStr],
-    queryFn: () => api.get(`/reports/payroll?startDate=${startDateStr}&endDate=${endDateStr}`),
-    enabled: isAdmin && !!startDateStr && !!endDateStr,
-  });
+    if (selectedCategory !== 'all') {
+      reports = reports.filter(r => r.category === selectedCategory);
+    }
 
-  const handleExportExcel = async () => {
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      reports = reports.filter(r =>
+        r.name.includes(query) ||
+        r.nameEn.toLowerCase().includes(query) ||
+        r.description.includes(query)
+      );
+    }
+
+    return reports;
+  }, [userRole, selectedCategory, searchQuery]);
+
+  // Get report counts by category
+  const categoryCounts = useMemo(() => {
+    const accessibleReports = getReportsByAccessLevel('ALL', userRole);
+    const counts: Record<string, number> = { all: accessibleReports.length };
+    Object.keys(REPORT_CATEGORIES).forEach(cat => {
+      counts[cat] = accessibleReports.filter(r => r.category === cat).length;
+    });
+    return counts;
+  }, [userRole]);
+
+  // Handler for viewing a report
+  const handleViewReport = (report: ReportDefinition) => {
+    setSelectedReport(report);
+    setReportDialogOpen(true);
+  };
+
+  // Handler for exporting PDF
+  const handleExportPdf = async (report: ReportDefinition) => {
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/reports/export/excel/attendance?startDate=${startDateStr}&endDate=${endDateStr}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-      });
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${report.apiEndpoint}/pdf?startDate=${startDateStr}&endDate=${endDateStr}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          },
+        }
+      );
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `attendance-report-${startDateStr}-${endDateStr}.xlsx`;
+      a.download = `${report.id}-${startDateStr}-${endDateStr}.pdf`;
       a.click();
     } catch (err) {
-      console.error('Export failed:', err);
+      console.error('PDF Export failed:', err);
     }
   };
 
-  const handleExportPdf = async () => {
+  // Handler for exporting Excel
+  const handleExportExcel = async (report: ReportDefinition) => {
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/reports/export/pdf/attendance?startDate=${startDateStr}&endDate=${endDateStr}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-      });
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${report.apiEndpoint}/excel?startDate=${startDateStr}&endDate=${endDateStr}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          },
+        }
+      );
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `attendance-report-${startDateStr}-${endDateStr}.pdf`;
+      a.download = `${report.id}-${startDateStr}-${endDateStr}.xlsx`;
       a.click();
     } catch (err) {
-      console.error('Export failed:', err);
-    }
-  };
-
-  const handleExportPayrollExcel = async () => {
-    try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/reports/export/excel/payroll?startDate=${startDateStr}&endDate=${endDateStr}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        },
-      });
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `payroll-report-${startDateStr}-${endDateStr}.xlsx`;
-      a.click();
-    } catch (err) {
-      console.error('Export failed:', err);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" py={4}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert severity="error" sx={{ mb: 2 }}>
-        فشل تحميل البيانات
-      </Alert>
-    );
-  }
-
-  const attendances = reportData?.data || [];
-  const stats = reportData?.stats || {
-    totalDays: 0,
-    presentDays: 0,
-    lateDays: 0,
-    absentDays: 0,
-    onLeaveDays: 0,
-    totalWorkingMinutes: 0,
-    totalLateMinutes: 0,
-  };
-
-  // Group by employee for pie chart
-  const employeeStats: Record<string, { name: string; present: number; late: number; absent: number }> = {};
-  attendances.forEach((att) => {
-    const empId = att.userId;
-    const empName = att.user ? `${att.user.firstName} ${att.user.lastName}` : 'غير معروف';
-    if (!employeeStats[empId]) {
-      employeeStats[empId] = { name: empName, present: 0, late: 0, absent: 0 };
-    }
-    if (att.status === 'PRESENT' || att.checkInTime) employeeStats[empId].present++;
-    if (att.status === 'LATE') employeeStats[empId].late++;
-    if (att.status === 'ABSENT') employeeStats[empId].absent++;
-  });
-
-  const pieData = [
-    { name: 'حاضر', value: stats.presentDays, color: '#4caf50' },
-    { name: 'متأخر', value: stats.lateDays, color: '#ff9800' },
-    { name: 'غائب', value: stats.absentDays, color: '#f44336' },
-    { name: 'إجازة', value: stats.onLeaveDays, color: '#2196f3' },
-  ].filter(item => item.value > 0);
-
-  // Group by date for bar chart
-  const dateStats: Record<string, { date: string; present: number; late: number; absent: number }> = {};
-  attendances.forEach((att) => {
-    const dateStr = att.date.split('T')[0];
-    if (!dateStats[dateStr]) {
-      dateStats[dateStr] = { date: dateStr, present: 0, late: 0, absent: 0 };
-    }
-    if (att.status === 'PRESENT' || att.checkInTime) dateStats[dateStr].present++;
-    if (att.status === 'LATE') dateStats[dateStr].late++;
-    if (att.status === 'ABSENT') dateStats[dateStr].absent++;
-  });
-  const barChartData = Object.values(dateStats).sort((a, b) => a.date.localeCompare(b.date)).slice(-7);
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'PRESENT': return 'حاضر';
-      case 'LATE': return 'متأخر';
-      case 'ABSENT': return 'غائب';
-      case 'ON_LEAVE': return 'إجازة';
-      case 'EARLY_LEAVE': return 'خروج مبكر';
-      default: return status;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PRESENT': return 'success';
-      case 'LATE': return 'warning';
-      case 'ABSENT': return 'error';
-      case 'ON_LEAVE': return 'info';
-      case 'EARLY_LEAVE': return 'secondary';
-      default: return 'default';
+      console.error('Excel Export failed:', err);
     }
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight="bold">
-            التقارير والإحصائيات
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            تقارير الحضور حسب صلاحياتك ({attendances.length} سجل)
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button variant="outlined" startIcon={<TableChart />} onClick={handleExportExcel}>
-            تصدير Excel
-          </Button>
-          <Button variant="contained" startIcon={<PictureAsPdf />} onClick={handleExportPdf}>
-            تصدير PDF
-          </Button>
-        </Box>
+    <Box sx={{ minHeight: '100vh', bgcolor: MODERN_THEME.bg, p: { xs: 2, md: 4 } }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight="900" color={MODERN_THEME.textPrimary} gutterBottom>
+          📊 مكتبة التقارير
+        </Typography>
+        <Typography variant="body1" color={MODERN_THEME.textSecondary}>
+          {filteredReports.length} تقرير متاح • اختر التقرير المطلوب وقم بتصديره
+        </Typography>
       </Box>
 
-      {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ar">
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={4}>
-                <DatePicker
-                  label="من تاريخ"
-                  value={startDate}
-                  onChange={(newValue: any) => setStartDate(newValue)}
-                  slotProps={{
-                    textField: { fullWidth: true },
-                    actionBar: { actions: ['clear', 'today'] }
-                  }}
-                  format="YYYY-MM-DD"
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <DatePicker
-                  label="إلى تاريخ"
-                  value={endDate}
-                  onChange={(newValue: any) => setEndDate(newValue)}
-                  slotProps={{
-                    textField: { fullWidth: true },
-                    actionBar: { actions: ['clear', 'today'] }
-                  }}
-                  format="YYYY-MM-DD"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <Typography variant="body2" color="text.secondary">
-                  يتم عرض التقارير حسب صلاحياتك
-                </Typography>
-              </Grid>
+      {/* Filters Bar */}
+      <Card sx={{ mb: 4, borderRadius: 4, border: `1px solid ${MODERN_THEME.border}` }}>
+        <CardContent sx={{ p: 3 }}>
+          <Grid container spacing={3} alignItems="center">
+            {/* Search */}
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                placeholder="ابحث عن تقرير..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: MODERN_THEME.textSecondary }} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 3,
+                    bgcolor: 'white',
+                  },
+                }}
+              />
             </Grid>
-          </LocalizationProvider>
+
+            {/* Date Range */}
+            <Grid item xs={12} md={8}>
+              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ar">
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <DatePicker
+                    label="من تاريخ"
+                    value={startDate}
+                    onChange={(newValue: any) => setStartDate(newValue)}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        sx: { bgcolor: 'white', borderRadius: 2, width: 180 },
+                      },
+                    }}
+                    format="YYYY-MM-DD"
+                  />
+                  <DatePicker
+                    label="إلى تاريخ"
+                    value={endDate}
+                    onChange={(newValue: any) => setEndDate(newValue)}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        sx: { bgcolor: 'white', borderRadius: 2, width: 180 },
+                      },
+                    }}
+                    format="YYYY-MM-DD"
+                  />
+                  <Chip
+                    label={userRole === 'ADMIN' ? 'صلاحيات كاملة' : userRole === 'MANAGER' ? 'صلاحيات المدير' : 'صلاحيات الموظف'}
+                    color={userRole === 'ADMIN' ? 'error' : userRole === 'MANAGER' ? 'warning' : 'success'}
+                    sx={{ fontWeight: 600 }}
+                  />
+                </Box>
+              </LocalizationProvider>
+            </Grid>
+          </Grid>
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ bgcolor: 'success.light' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Person sx={{ color: 'success.main' }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="success.main">{stats.presentDays}</Typography>
-                  <Typography variant="body2">أيام الحضور</Typography>
-                </Box>
+      {/* Category Tabs */}
+      <Paper
+        sx={{
+          mb: 4,
+          borderRadius: 4,
+          overflow: 'hidden',
+          border: `1px solid ${MODERN_THEME.border}`,
+        }}
+      >
+        <Tabs
+          value={selectedCategory}
+          onChange={(_, val) => setSelectedCategory(val)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            bgcolor: 'white',
+            '& .MuiTab-root': {
+              minHeight: 70,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: 14,
+            },
+            '& .Mui-selected': {
+              color: `${MODERN_THEME.orange} !important`,
+            },
+            '& .MuiTabs-indicator': {
+              bgcolor: MODERN_THEME.orange,
+              height: 3,
+            },
+          }}
+        >
+          <Tab
+            value="all"
+            label={
+              <Box sx={{ textAlign: 'center' }}>
+                <Category sx={{ fontSize: 28, mb: 0.5 }} />
+                <Typography variant="body2" fontWeight="bold">
+                  جميع التقارير
+                </Typography>
+                <Chip label={categoryCounts.all} size="small" sx={{ mt: 0.5, height: 20 }} />
               </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ bgcolor: 'warning.light' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={1}>
-                <AccessTime sx={{ color: 'warning.main' }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="warning.main">{stats.lateDays}</Typography>
-                  <Typography variant="body2">أيام التأخر</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ bgcolor: 'error.light' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Warning sx={{ color: 'error.main' }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="error.main">{stats.absentDays}</Typography>
-                  <Typography variant="body2">أيام الغياب</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card sx={{ bgcolor: 'info.light' }}>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={1}>
-                <AccessTime sx={{ color: 'info.main' }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="info.main">{Math.round(stats.totalWorkingMinutes / 60)}</Typography>
-                  <Typography variant="body2">ساعات العمل</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
-          <Tab label="نظرة عامة" />
-          <Tab label="تفاصيل الحضور" />
-          {isAdmin && <Tab label="كشوفات الرواتب" />}
+            }
+          />
+          {Object.entries(REPORT_CATEGORIES).map(([key, category]) => {
+            const CategoryIcon = category.icon;
+            return (
+              <Tab
+                key={key}
+                value={key}
+                label={
+                  <Box sx={{ textAlign: 'center' }}>
+                    <CategoryIcon sx={{ fontSize: 28, mb: 0.5, color: category.color }} />
+                    <Typography variant="body2" fontWeight="bold">
+                      {category.name}
+                    </Typography>
+                    <Chip
+                      label={categoryCounts[key] || 0}
+                      size="small"
+                      sx={{ mt: 0.5, height: 20, bgcolor: `${category.color}20`, color: category.color }}
+                    />
+                  </Box>
+                }
+              />
+            );
+          })}
         </Tabs>
-      </Box>
+      </Paper>
 
-      {tabValue === 0 && (
+      {/* Reports Grid */}
+      {filteredReports.length > 0 ? (
         <Grid container spacing={3}>
-          {/* Bar Chart */}
-          <Grid item xs={12} lg={8}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  إحصائيات الحضور (آخر 7 أيام)
-                </Typography>
-                {barChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={barChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tickFormatter={(d) => format(new Date(d), 'dd/MM', { locale: ar })} />
-                      <YAxis />
-                      <Tooltip labelFormatter={(d) => format(new Date(d), 'EEEE dd/MM', { locale: ar })} />
-                      <Legend />
-                      <Bar dataKey="present" name="حاضر" fill="#4caf50" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="late" name="متأخر" fill="#ff9800" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="absent" name="غائب" fill="#f44336" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Box display="flex" justifyContent="center" alignItems="center" height={350}>
-                    <Typography color="text.secondary">لا توجد بيانات للعرض</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Pie Chart */}
-          <Grid item xs={12} lg={4}>
-            <Card sx={{ height: '100%' }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  توزيع الحضور
-                </Typography>
-                {pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={5}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Box display="flex" justifyContent="center" alignItems="center" height={300}>
-                    <Typography color="text.secondary">لا توجد بيانات</Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+          {filteredReports.map((report) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={report.id}>
+              <ReportCard
+                report={report}
+                onView={handleViewReport}
+                onExportPdf={handleExportPdf}
+                onExportExcel={handleExportExcel}
+              />
+            </Grid>
+          ))}
         </Grid>
+      ) : (
+        <Box
+          sx={{
+            textAlign: 'center',
+            py: 10,
+            bgcolor: 'white',
+            borderRadius: 4,
+            border: `1px solid ${MODERN_THEME.border}`,
+          }}
+        >
+          <Search sx={{ fontSize: 60, color: MODERN_THEME.textSecondary, mb: 2 }} />
+          <Typography variant="h6" color={MODERN_THEME.textSecondary}>
+            لم يتم العثور على تقارير
+          </Typography>
+          <Typography variant="body2" color={MODERN_THEME.textSecondary}>
+            جرب تغيير كلمة البحث أو التصنيف
+          </Typography>
+        </Box>
       )}
 
-      {tabValue === 1 && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              تفاصيل سجلات الحضور
-            </Typography>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>الموظف</TableCell>
-                    <TableCell>التاريخ</TableCell>
-                    <TableCell>وقت الحضور</TableCell>
-                    <TableCell>وقت الانصراف</TableCell>
-                    <TableCell>الحالة</TableCell>
-                    <TableCell>التأخير</TableCell>
-                    <TableCell>ساعات العمل</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {attendances.slice(0, 50).map((att) => (
-                    <TableRow key={att.id} hover>
-                      <TableCell>
-                        {att.user ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                              {att.user.firstName?.[0]}
-                            </Avatar>
-                            <Box>
-                              <Typography fontWeight="bold" variant="body2">
-                                {att.user.firstName} {att.user.lastName}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {att.user.jobTitle}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        ) : 'غير معروف'}
-                      </TableCell>
-                      <TableCell>{format(new Date(att.date), 'dd/MM/yyyy', { locale: ar })}</TableCell>
-                      <TableCell>
-                        {att.checkInTime ? format(new Date(att.checkInTime), 'HH:mm') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {att.checkOutTime ? format(new Date(att.checkOutTime), 'HH:mm') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getStatusLabel(att.status)}
-                          color={getStatusColor(att.status) as any}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {att.lateMinutes > 0 ? `${att.lateMinutes} دقيقة` : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {att.workingMinutes > 0 ? `${Math.round(att.workingMinutes / 60 * 10) / 10} ساعة` : '-'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {attendances.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center">
-                        <Typography color="text.secondary" py={4}>
-                          لا توجد سجلات حضور في هذه الفترة
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            {attendances.length > 50 && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                يتم عرض أول 50 سجل فقط. استخدم التصدير لرؤية جميع السجلات.
-              </Typography>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {tabValue === 2 && isAdmin && (
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                كشوفات الرواتب
-              </Typography>
-              <Button variant="outlined" startIcon={<TableChart />} onClick={handleExportPayrollExcel}>
-                تصدير Excel
-              </Button>
-            </Box>
-            {payrollLoading ? (
-              <Box display="flex" justifyContent="center" py={4}>
-                <CircularProgress />
+      {/* Report Preview Dialog */}
+      <Dialog
+        open={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        {selectedReport && (
+          <>
+            <DialogTitle>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box
+                    sx={{
+                      width: 50,
+                      height: 50,
+                      borderRadius: 3,
+                      bgcolor: `${selectedReport.color}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <selectedReport.icon sx={{ fontSize: 28, color: selectedReport.color }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" fontWeight="bold">
+                      {selectedReport.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedReport.description}
+                    </Typography>
+                  </Box>
+                </Box>
+                <IconButton onClick={() => setReportDialogOpen(false)}>
+                  <Close />
+                </IconButton>
               </Box>
-            ) : (
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>كود الموظف</TableCell>
-                      <TableCell>اسم الموظف</TableCell>
-                      <TableCell>الراتب الأساسي</TableCell>
-                      <TableCell>أيام العمل</TableCell>
-                      <TableCell>ساعات العمل</TableCell>
-                      <TableCell>دقائق التأخير</TableCell>
-                      <TableCell>أيام الغياب</TableCell>
-                      <TableCell>خصم التأخير</TableCell>
-                      <TableCell>خصم الغياب</TableCell>
-                      <TableCell>إضافي العمل</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {payrollData && payrollData.length > 0 ? (
-                      payrollData.map((record) => (
-                        <TableRow key={record.employeeId} hover>
-                          <TableCell>{record.employeeCode || '-'}</TableCell>
-                          <TableCell>{record.employeeName}</TableCell>
-                          <TableCell>{record.baseSalary?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
-                          <TableCell>{record.workingDays}</TableCell>
-                          <TableCell>{record.totalWorkingHours.toFixed(2)}</TableCell>
-                          <TableCell>{record.totalLateMinutes}</TableCell>
-                          <TableCell>{record.absentDays}</TableCell>
-                          <TableCell>{record.lateDeduction?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
-                          <TableCell>{record.absentDeduction?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
-                          <TableCell>{record.overtimeBonus?.toLocaleString('ar-SA') || 0} ر.س</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={10} align="center">
-                          <Typography color="text.secondary" py={4}>
-                            لا توجد بيانات رواتب في هذه الفترة
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            </DialogTitle>
+            <Divider />
+            <DialogContent sx={{ minHeight: 400, p: 4 }}>
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <CircularProgress size={40} sx={{ color: selectedReport.color, mb: 3 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  جاري تحميل بيانات التقرير...
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  الفترة: {startDateStr} إلى {endDateStr}
+                </Typography>
+                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 2 }}>
+                  API: {selectedReport.apiEndpoint}
+                </Typography>
+              </Box>
+            </DialogContent>
+            <Divider />
+            <DialogActions sx={{ p: 2, gap: 1 }}>
+              {selectedReport.exportFormats.includes('pdf') && (
+                <Button
+                  variant="contained"
+                  startIcon={<PictureAsPdf />}
+                  onClick={() => handleExportPdf(selectedReport)}
+                  sx={{ bgcolor: '#f44336', '&:hover': { bgcolor: '#d32f2f' } }}
+                >
+                  تصدير PDF
+                </Button>
+              )}
+              {selectedReport.exportFormats.includes('excel') && (
+                <Button
+                  variant="contained"
+                  startIcon={<TableChart />}
+                  onClick={() => handleExportExcel(selectedReport)}
+                  sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#388e3c' } }}
+                >
+                  تصدير Excel
+                </Button>
+              )}
+              <Button variant="outlined" onClick={() => setReportDialogOpen(false)}>
+                إغلاق
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* Statistics Footer */}
+      <Box sx={{ mt: 6, textAlign: 'center' }}>
+        <Typography variant="body2" color={MODERN_THEME.textSecondary}>
+          مكتبة التقارير تحتوي على {REPORTS.length} تقرير • تم تنظيمها في {Object.keys(REPORT_CATEGORIES).length} تصنيفات
+        </Typography>
+      </Box>
     </Box>
   );
 };
+
+export default ReportsPage;
