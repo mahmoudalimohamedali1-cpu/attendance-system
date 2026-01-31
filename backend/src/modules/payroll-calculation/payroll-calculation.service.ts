@@ -805,6 +805,7 @@ export class PayrollCalculationService {
                 case 'PER_MINUTE':
                     // خصم بالدقيقة (تحويل الدقائق لساعات ثم ضرب بالمعدل)
                     lateDeduction = mul(div(effectiveLateMinutes, 60), hourlyRateLate);
+                    console.log(`🔍 LATE_DEDUCTION_DEBUG: employeeId=${employeeId}, lateMinutes=${lateMinutes}, gracePeriod=${settings.gracePeriodMinutes}, effectiveLate=${effectiveLateMinutes}, hourlyRate=${toNumber(hourlyRateLate)}, deduction=${toNumber(lateDeduction)}`);
                     break;
                 case 'PER_HOUR':
                     // خصم بالساعة (تقريب لأعلى للساعة الكاملة)
