@@ -86,7 +86,7 @@ import {
 } from '@mui/icons-material';
 
 // Premium color palette
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
     BACKLOG: { label: 'قائمة الانتظار', color: '#6B7280', bgColor: 'rgba(107, 114, 128, 0.1)' },
     TODO: { label: 'للعمل', color: '#3B82F6', bgColor: 'rgba(59, 130, 246, 0.1)' },
     IN_PROGRESS: { label: 'جاري العمل', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.1)' },
@@ -97,6 +97,7 @@ const STATUS_CONFIG = {
     BLOCKED: { label: 'محظور', color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.1)' },
     COMPLETED: { label: 'مكتمل', color: '#10B981', bgColor: 'rgba(16, 185, 129, 0.1)' },
     CANCELLED: { label: 'ملغي', color: '#9CA3AF', bgColor: 'rgba(156, 163, 175, 0.1)' },
+    DELETED: { label: 'محذوف', color: '#6B7280', bgColor: 'rgba(107, 114, 128, 0.1)' },
 };
 
 const PRIORITY_CONFIG = {

@@ -97,9 +97,14 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
     BACKLOG: { label: 'قائمة الانتظار', color: '#6B7280' },
     TODO: { label: 'للعمل', color: '#3B82F6' },
     IN_PROGRESS: { label: 'جاري العمل', color: '#F59E0B' },
+    PENDING_REVIEW: { label: 'في انتظار المراجعة', color: '#EC4899' },
     IN_REVIEW: { label: 'قيد المراجعة', color: '#8B5CF6' },
+    APPROVED: { label: 'معتمد', color: '#059669' },
+    REJECTED: { label: 'مرفوض', color: '#DC2626' },
     BLOCKED: { label: 'محظور', color: '#EF4444' },
     COMPLETED: { label: 'مكتمل', color: '#10B981' },
+    CANCELLED: { label: 'ملغي', color: '#9CA3AF' },
+    DELETED: { label: 'محذوف', color: '#6B7280' },
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
