@@ -605,7 +605,304 @@ export class ExtendedReportsService {
         };
     }
 
+    // ===================== ADDITIONAL PAYROLL REPORTS =====================
+
+    /** تقرير قسائم الرواتب التفصيلي */
+    async getPayslipDetails(companyId: string, query: PayrollReportQueryDto) {
+        const year = query.year || new Date().getFullYear();
+        const month = query.month || new Date().getMonth() + 1;
+
+        const period = await this.prisma.payrollPeriod.findFirst({ where: { companyId, year, month } });
+        if (!period) return { metadata: { reportName: 'قسائم الرواتب', reportNameEn: 'Payslip Details', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const run = await this.prisma.payrollRun.findFirst({
+            where: { companyId, periodId: period.id, isAdjustment: false },
+            include: { payslips: { include: { user: { select: { firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } } }, lines: { include: { component: true } } } } } as any,
+        });
+
+        if (!run) return { metadata: { reportName: 'قسائم الرواتب', reportNameEn: 'Payslip Details', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const data = ((run as any).payslips || []).map((p: any) => ({
+            employeeId: p.userId,
+            employeeName: `${p.user.firstName} ${p.user.lastName}`,
+            employeeCode: p.user.employeeCode,
+            department: p.user.department?.name,
+            basicSalary: Number(p.basicSalary),
+            earnings: p.lines.filter((l: any) => l.isEarning).reduce((s: number, l: any) => s + Number(l.amount), 0),
+            deductions: p.lines.filter((l: any) => !l.isEarning).reduce((s: number, l: any) => s + Number(l.amount), 0),
+            netSalary: Number(p.netSalary),
+            status: p.status,
+            components: p.lines.map((l: any) => ({ name: l.component.name, amount: Number(l.amount), isEarning: l.isEarning })),
+        }));
+
+        return {
+            metadata: { reportName: 'تفاصيل قسائم الرواتب', reportNameEn: 'Payslip Details Report', generatedAt: new Date(), filters: { year, month }, totalCount: data.length },
+            data,
+        };
+    }
+
+    /** تقرير خصومات التأخير */
+    async getLateDeductionsReport(companyId: string, query: PayrollReportQueryDto) {
+        const year = query.year || new Date().getFullYear();
+        const month = query.month || new Date().getMonth() + 1;
+
+        const period = await this.prisma.payrollPeriod.findFirst({ where: { companyId, year, month } });
+        if (!period) return { metadata: { reportName: 'خصومات التأخير', reportNameEn: 'Late Deductions', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const run = await this.prisma.payrollRun.findFirst({
+            where: { companyId, periodId: period.id },
+            include: { payslips: { include: { user: { select: { firstName: true, lastName: true, employeeCode: true } }, lines: { where: { component: { code: 'LATE_DED' } } as any, include: { component: true } } } } } as any,
+        });
+
+        if (!run) return { metadata: { reportName: 'خصومات التأخير', reportNameEn: 'Late Deductions', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const data = ((run as any).payslips || []).filter((p: any) => p.lines.length > 0).map((p: any) => ({
+            employeeId: p.userId,
+            employeeName: `${p.user.firstName} ${p.user.lastName}`,
+            employeeCode: p.user.employeeCode,
+            deductionAmount: p.lines.reduce((s: number, l: any) => s + Number(l.amount), 0),
+        }));
+
+        return {
+            metadata: { reportName: 'خصومات التأخير', reportNameEn: 'Late Deductions Report', generatedAt: new Date(), filters: { year, month }, totalCount: data.length },
+            data,
+            summary: { totalDeductions: data.reduce((s: number, d: any) => s + d.deductionAmount, 0) },
+        };
+    }
+
+    /** تقرير خصومات الغياب */
+    async getAbsenceDeductionsReport(companyId: string, query: PayrollReportQueryDto) {
+        const year = query.year || new Date().getFullYear();
+        const month = query.month || new Date().getMonth() + 1;
+
+        const period = await this.prisma.payrollPeriod.findFirst({ where: { companyId, year, month } });
+        if (!period) return { metadata: { reportName: 'خصومات الغياب', reportNameEn: 'Absence Deductions', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const run = await this.prisma.payrollRun.findFirst({
+            where: { companyId, periodId: period.id },
+            include: { payslips: { include: { user: { select: { firstName: true, lastName: true, employeeCode: true } }, lines: { where: { component: { code: 'ABSENCE_DED' } } as any, include: { component: true } } } } } as any,
+        });
+
+        if (!run) return { metadata: { reportName: 'خصومات الغياب', reportNameEn: 'Absence Deductions', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const data = ((run as any).payslips || []).filter((p: any) => p.lines.length > 0).map((p: any) => ({
+            employeeId: p.userId,
+            employeeName: `${p.user.firstName} ${p.user.lastName}`,
+            employeeCode: p.user.employeeCode,
+            deductionAmount: p.lines.reduce((s: number, l: any) => s + Number(l.amount), 0),
+        }));
+
+        return {
+            metadata: { reportName: 'خصومات الغياب', reportNameEn: 'Absence Deductions Report', generatedAt: new Date(), filters: { year, month }, totalCount: data.length },
+            data,
+            summary: { totalDeductions: data.reduce((s: number, d: any) => s + d.deductionAmount, 0) },
+        };
+    }
+
+    /** تقرير بدلات العمل الإضافي */
+    async getOvertimeAllowancesReport(companyId: string, query: PayrollReportQueryDto) {
+        const year = query.year || new Date().getFullYear();
+        const month = query.month || new Date().getMonth() + 1;
+
+        const period = await this.prisma.payrollPeriod.findFirst({ where: { companyId, year, month } });
+        if (!period) return { metadata: { reportName: 'بدلات الأوفرتايم', reportNameEn: 'Overtime Allowances', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const run = await this.prisma.payrollRun.findFirst({
+            where: { companyId, periodId: period.id },
+            include: { payslips: { include: { user: { select: { firstName: true, lastName: true, employeeCode: true } }, lines: { where: { component: { code: { startsWith: 'OT_' } } } as any, include: { component: true } } } } } as any,
+        });
+
+        if (!run) return { metadata: { reportName: 'بدلات الأوفرتايم', reportNameEn: 'Overtime Allowances', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const data = ((run as any).payslips || []).filter((p: any) => p.lines.length > 0).map((p: any) => ({
+            employeeId: p.userId,
+            employeeName: `${p.user.firstName} ${p.user.lastName}`,
+            employeeCode: p.user.employeeCode,
+            overtimeAmount: p.lines.reduce((s: number, l: any) => s + Number(l.amount), 0),
+        }));
+
+        return {
+            metadata: { reportName: 'بدلات العمل الإضافي', reportNameEn: 'Overtime Allowances Report', generatedAt: new Date(), filters: { year, month }, totalCount: data.length },
+            data,
+            summary: { totalOvertimeAllowances: data.reduce((s: number, d: any) => s + d.overtimeAmount, 0) },
+        };
+    }
+
+    // ===================== ADDITIONAL LEAVE REPORTS =====================
+
+    /** تقرير الإجازات المرضية */
+    async getSickLeavesReport(companyId: string, query: LeaveReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.leaveRequest.findMany({
+                where: { companyId, type: 'SICK', createdAt: { gte: startDate, lte: endDate } },
+                include: { user: { select: { firstName: true, lastName: true, employeeCode: true } } },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.leaveRequest.count({ where: { companyId, type: 'SICK', createdAt: { gte: startDate, lte: endDate } } }),
+        ]);
+
+        return {
+            metadata: { reportName: 'الإجازات المرضية', reportNameEn: 'Sick Leaves Report', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data: data.map(l => ({ ...l, days: this.calculateDays(l.startDate, l.endDate) })),
+            summary: { totalSickDays: data.reduce((s: number, l: any) => s + this.calculateDays(l.startDate, l.endDate), 0) },
+        };
+    }
+
+    private calculateDays(startDate: Date, endDate: Date): number {
+        const msPerDay = 24 * 60 * 60 * 1000;
+        return Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay) + 1;
+    }
+
+    /** تقرير الإجازات حسب النوع */
+    async getLeavesByTypeReport(companyId: string, query: LeaveReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+
+        const requests = await this.prisma.leaveRequest.findMany({
+            where: { companyId, status: 'APPROVED', startDate: { gte: startDate }, endDate: { lte: endDate } },
+            select: { type: true, startDate: true, endDate: true },
+        });
+
+        const byType = requests.reduce((acc, r) => {
+            const days = this.calculateDays(r.startDate, r.endDate);
+            acc[r.type] = (acc[r.type] || 0) + days;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const grandTotal = requests.reduce((s, r) => s + this.calculateDays(r.startDate, r.endDate), 0);
+
+        return {
+            metadata: { reportName: 'الإجازات حسب النوع', reportNameEn: 'Leaves by Type', generatedAt: new Date(), filters: query, totalCount: Object.keys(byType).length },
+            data: Object.entries(byType).map(([type, days]) => ({ type, totalDays: days })),
+            summary: { grandTotal },
+        };
+    }
+
+    // ===================== ADDITIONAL HR REPORTS =====================
+
+    /** تقرير الموظفين الجدد */
+    async getNewHiresReport(companyId: string, query: EmployeeReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const where: any = { companyId, role: 'EMPLOYEE', hireDate: { gte: startDate, lte: endDate } };
+        if (query.branchId) where.branchId = query.branchId;
+        if (query.departmentId) where.departmentId = query.departmentId;
+
+        const [data, total] = await Promise.all([
+            this.prisma.user.findMany({
+                where,
+                select: { id: true, firstName: true, lastName: true, employeeCode: true, hireDate: true, salary: true, department: { select: { name: true } }, branch: { select: { name: true } } },
+                orderBy: { hireDate: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.user.count({ where }),
+        ]);
+
+        return {
+            metadata: { reportName: 'التوظيف الجديد', reportNameEn: 'New Hires Report', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data,
+        };
+    }
+
+    /** تقرير توزيع الموظفين */
+    async getEmployeeDistribution(companyId: string) {
+        const departments = await this.prisma.department.findMany({
+            where: { companyId },
+            include: { _count: { select: { users: { where: { role: 'EMPLOYEE', status: 'ACTIVE' } } } } },
+        });
+
+        const branches = await this.prisma.branch.findMany({
+            where: { companyId },
+            include: { _count: { select: { users: { where: { role: 'EMPLOYEE', status: 'ACTIVE' } } } } },
+        });
+
+        return {
+            metadata: { reportName: 'توزيع الموظفين', reportNameEn: 'Employee Distribution', generatedAt: new Date(), filters: {}, totalCount: departments.length + branches.length },
+            data: {
+                byDepartment: departments.map(d => ({ name: d.name, count: d._count.users })),
+                byBranch: branches.map(b => ({ name: b.name, count: b._count.users })),
+            },
+        };
+    }
+
+    /** تقرير معدل دوران الموظفين */
+    async getTurnoverReport(companyId: string, query: ExtendedReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+
+        const [newHires, terminations, totalActive] = await Promise.all([
+            this.prisma.user.count({ where: { companyId, role: 'EMPLOYEE', hireDate: { gte: startDate, lte: endDate } } }),
+            this.prisma.employeeTermination.count({ where: { companyId, terminationDate: { gte: startDate, lte: endDate } } }),
+            this.prisma.user.count({ where: { companyId, role: 'EMPLOYEE', status: 'ACTIVE' } }),
+        ]);
+
+        const turnoverRate = totalActive > 0 ? Math.round((terminations / totalActive) * 100 * 100) / 100 : 0;
+
+        return {
+            metadata: { reportName: 'معدل دوران الموظفين', reportNameEn: 'Turnover Rate', generatedAt: new Date(), filters: query, totalCount: 1 },
+            data: { newHires, terminations, totalActive, turnoverRate },
+        };
+    }
+
     // ===================== CUSTODY REPORTS =====================
+
+    /** تقرير العهد حسب الموظف */
+    async getCustodyByEmployee(companyId: string, query: CustodyReportQueryDto) {
+        const { page, limit, skip } = this.getPagination(query);
+
+        const employees = await this.prisma.user.findMany({
+            where: { companyId, role: 'EMPLOYEE', status: 'ACTIVE' },
+            include: {
+                custodyAssignments: {
+                    where: { status: 'ASSIGNED' } as any,
+                    include: { item: { select: { name: true, serialNumber: true, purchasePrice: true } } },
+                },
+            },
+            skip,
+            take: limit,
+        });
+
+        const data = employees.filter(e => (e as any).custodyAssignments.length > 0).map(e => ({
+            employeeId: e.id,
+            employeeName: `${e.firstName} ${e.lastName}`,
+            employeeCode: e.employeeCode,
+            itemCount: (e as any).custodyAssignments.length,
+            totalValue: (e as any).custodyAssignments.reduce((s: number, a: any) => s + Number(a.item.purchasePrice || 0), 0),
+            items: (e as any).custodyAssignments.map((a: any) => ({ name: a.item.name, serialNumber: a.item.serialNumber })),
+        }));
+
+        return {
+            metadata: { reportName: 'عهد الموظفين', reportNameEn: 'Custody by Employee', generatedAt: new Date(), filters: query, totalCount: data.length },
+            data,
+        };
+    }
+
+    /** تقرير إرجاع العهد */
+    async getCustodyReturns(companyId: string, query: CustodyReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.custodyAssignment.findMany({
+                where: { companyId, status: 'RETURNED' as any, returnedAt: { gte: startDate, lte: endDate } } as any,
+                include: { employee: { select: { firstName: true, lastName: true } }, item: { select: { name: true, serialNumber: true } } },
+                orderBy: { returnedAt: 'desc' } as any,
+                skip,
+                take: limit,
+            }),
+            this.prisma.custodyAssignment.count({ where: { companyId, status: 'RETURNED' as any, returnedAt: { gte: startDate, lte: endDate } } as any }),
+        ]);
+
+        return {
+            metadata: { reportName: 'إرجاع العهد', reportNameEn: 'Custody Returns', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data,
+        };
+    }
 
     /** 47. جرد العهد */
     async getCustodyInventory(companyId: string, query: CustodyReportQueryDto) {

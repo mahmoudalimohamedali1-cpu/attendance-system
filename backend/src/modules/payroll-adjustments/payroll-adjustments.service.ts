@@ -315,13 +315,17 @@ export class PayrollAdjustmentsService {
             // 🔧 FIX: تحويل Decimal إلى Number لضمان الحساب الصحيح
             const originalAmt = Number(adj.originalAmount) || 0;
             const adjustedAmt = Number(adj.adjustedAmount) || 0;
+            const valueAmt = Number(adj.value) || 0;
             const leaveDays = Number(adj.leaveDaysDeducted) || 0;
 
             switch (adj.adjustmentType) {
                 case 'WAIVE_DEDUCTION':
-                    // إلغاء خصم = إضافة للموظف
-                    waivedDeductions += originalAmt;
-                    totalAdditions += originalAmt;
+                    // 🔧 FIX: التمييز بين الإلغاء الكامل والتعديل الجزئي
+                    // إذا adjustedAmount > 0، معناه تعديل جزئي (الفرق = originalAmount - adjustedAmount)
+                    // إذا adjustedAmount = 0، معناه إلغاء كامل (الفرق = originalAmount)
+                    const waivedAmt = adjustedAmt > 0 ? (originalAmt - adjustedAmt) : originalAmt;
+                    waivedDeductions += waivedAmt;
+                    totalAdditions += waivedAmt;
                     break;
                 case 'CONVERT_TO_LEAVE':
                     // تحويل لإجازة = إلغاء الخصم + خصم أيام إجازة

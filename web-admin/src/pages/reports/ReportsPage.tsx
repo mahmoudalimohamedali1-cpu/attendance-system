@@ -1,6 +1,6 @@
 /**
  * Reports Page - Comprehensive Reports Library
- * 70 Reports organized by category
+ * Connected to actual backend APIs (22 working reports)
  */
 
 import { useState, useMemo } from 'react';
@@ -33,6 +33,7 @@ import {
   TableHead,
   TableRow,
   Avatar,
+  Skeleton,
 } from '@mui/material';
 import {
   Search,
@@ -43,20 +44,9 @@ import {
   Download,
   Refresh,
   Category,
+  CheckCircle,
+  Error as ErrorIcon,
 } from '@mui/icons-material';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { api } from '@/services/api.service';
@@ -72,9 +62,7 @@ import {
   REPORT_CATEGORIES,
   ReportCategory,
   ReportDefinition,
-  getReportsByCategory,
   getReportsByAccessLevel,
-  searchReports,
 } from './reportDefinitions';
 import { ReportCard } from './components/ReportCard';
 
@@ -89,6 +77,27 @@ const MODERN_THEME = {
   border: '#f0ebe5',
 };
 
+// Mapping between report IDs and export types for the backend
+const EXPORT_TYPE_MAPPING: Record<string, string> = {
+  'daily-attendance': 'attendance',
+  'late-detailed': 'late',
+  'absence': 'attendance',
+  'early-leave': 'attendance',
+  'overtime': 'attendance',
+  'wfh': 'attendance',
+  'branch-summary': 'attendance',
+  'department-summary': 'attendance',
+  'compliance': 'attendance',
+  'suspicious': 'attendance',
+  'payroll-summary': 'payroll',
+  'gosi': 'payroll',
+  'advances': 'payroll',
+  'employee-list': 'employee',
+  'leave-balance': 'attendance',
+  'leave-requests': 'attendance',
+  'custody-inventory': 'attendance',
+};
+
 export const ReportsPage = () => {
   const { user } = useAuthStore();
   const userRole = user?.role || 'EMPLOYEE';
@@ -98,6 +107,7 @@ export const ReportsPage = () => {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [startDate, setStartDate] = useState<Dayjs | null>(() => dayjs().startOf('month'));
   const [endDate, setEndDate] = useState<Dayjs | null>(() => dayjs());
+  const [exportLoading, setExportLoading] = useState<string | null>(null);
 
   const startDateStr = startDate?.format('YYYY-MM-DD') || '';
   const endDateStr = endDate?.format('YYYY-MM-DD') || '';
@@ -132,6 +142,25 @@ export const ReportsPage = () => {
     return counts;
   }, [userRole]);
 
+  // Fetch report data when dialog is open
+  const {
+    data: reportData,
+    isLoading: reportLoading,
+    error: reportError,
+    refetch: refetchReport,
+  } = useQuery({
+    queryKey: ['report-data', selectedReport?.id, startDateStr, endDateStr],
+    queryFn: async () => {
+      if (!selectedReport) return null;
+      const response = await api.get(selectedReport.apiEndpoint, {
+        params: { startDate: startDateStr, endDate: endDateStr, limit: 100 },
+      });
+      return response.data;
+    },
+    enabled: !!selectedReport && reportDialogOpen,
+    staleTime: 30000,
+  });
+
   // Handler for viewing a report
   const handleViewReport = (report: ReportDefinition) => {
     setSelectedReport(report);
@@ -140,46 +169,187 @@ export const ReportsPage = () => {
 
   // Handler for exporting PDF
   const handleExportPdf = async (report: ReportDefinition) => {
+    const exportType = EXPORT_TYPE_MAPPING[report.id] || 'attendance';
+    setExportLoading('pdf');
     try {
       const response = await fetch(
-        `${API_CONFIG.BASE_URL}${report.apiEndpoint}/pdf?startDate=${startDateStr}&endDate=${endDateStr}`,
+        `${API_CONFIG.BASE_URL}/reports/export/pdf/${exportType}?startDate=${startDateStr}&endDate=${endDateStr}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           },
         }
       );
+      if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `${report.id}-${startDateStr}-${endDateStr}.pdf`;
       a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('PDF Export failed:', err);
+      alert('فشل تصدير PDF');
+    } finally {
+      setExportLoading(null);
     }
   };
 
   // Handler for exporting Excel
   const handleExportExcel = async (report: ReportDefinition) => {
+    const exportType = EXPORT_TYPE_MAPPING[report.id] || 'attendance';
+    setExportLoading('excel');
     try {
       const response = await fetch(
-        `${API_CONFIG.BASE_URL}${report.apiEndpoint}/excel?startDate=${startDateStr}&endDate=${endDateStr}`,
+        `${API_CONFIG.BASE_URL}/reports/export/excel/${exportType}?startDate=${startDateStr}&endDate=${endDateStr}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           },
         }
       );
+      if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `${report.id}-${startDateStr}-${endDateStr}.xlsx`;
       a.click();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Excel Export failed:', err);
+      alert('فشل تصدير Excel');
+    } finally {
+      setExportLoading(null);
     }
+  };
+
+  // Render report data as table
+  const renderReportData = () => {
+    if (reportLoading) {
+      return (
+        <Box sx={{ p: 4 }}>
+          {[1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} height={50} sx={{ mb: 1 }} />
+          ))}
+        </Box>
+      );
+    }
+
+    if (reportError) {
+      return (
+        <Alert severity="error" sx={{ m: 2 }}>
+          حدث خطأ في جلب البيانات. يرجى المحاولة مرة أخرى.
+        </Alert>
+      );
+    }
+
+    if (!reportData) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 6 }}>
+          <Typography color="text.secondary">لا توجد بيانات</Typography>
+        </Box>
+      );
+    }
+
+    // Extract data array from response (handle different response formats)
+    const dataArray = reportData.data || reportData.attendances || reportData || [];
+    const summary = reportData.summary || reportData.stats || {};
+    const metadata = reportData.metadata || {};
+
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 6 }}>
+          <Typography color="text.secondary">لا توجد بيانات للفترة المحددة</Typography>
+        </Box>
+      );
+    }
+
+    // Get column headers from first item
+    const firstItem = dataArray[0];
+    const columns = Object.keys(firstItem).filter(key =>
+      !['id', 'companyId', 'createdAt', 'updatedAt', 'userId'].includes(key) &&
+      typeof firstItem[key] !== 'object'
+    ).slice(0, 6);
+
+    return (
+      <Box>
+        {/* Summary Section */}
+        {Object.keys(summary).length > 0 && (
+          <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
+            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+              ملخص التقرير
+            </Typography>
+            <Grid container spacing={2}>
+              {Object.entries(summary).slice(0, 6).map(([key, value]) => (
+                <Grid item xs={6} md={4} key={key}>
+                  <Typography variant="caption" color="text.secondary">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {typeof value === 'number' ? value.toLocaleString('ar-SA') : String(value)}
+                  </Typography>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+
+        {/* Data Table */}
+        <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+          <Table stickyHeader size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>#</TableCell>
+                {columns.map(col => (
+                  <TableCell key={col} sx={{ fontWeight: 'bold', bgcolor: '#f5f5f5' }}>
+                    {col.replace(/([A-Z])/g, ' $1').trim()}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {dataArray.slice(0, 50).map((row: any, index: number) => (
+                <TableRow key={row.id || index} hover>
+                  <TableCell>{index + 1}</TableCell>
+                  {columns.map(col => (
+                    <TableCell key={col}>
+                      {formatCellValue(row[col])}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {/* Metadata */}
+        {metadata.totalCount && (
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary">
+              عرض {Math.min(50, dataArray.length)} من أصل {metadata.totalCount} سجل
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
+  // Helper function to format cell values
+  const formatCellValue = (value: any): string => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'boolean') return value ? '✓' : '✗';
+    if (value instanceof Date || (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/))) {
+      try {
+        return format(new Date(value), 'yyyy/MM/dd', { locale: ar });
+      } catch {
+        return String(value);
+      }
+    }
+    if (typeof value === 'number') return value.toLocaleString('ar-SA');
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
   };
 
   return (
@@ -397,33 +567,42 @@ export const ReportsPage = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <IconButton onClick={() => setReportDialogOpen(false)}>
-                  <Close />
-                </IconButton>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <IconButton onClick={() => refetchReport()} size="small" title="تحديث">
+                    <Refresh />
+                  </IconButton>
+                  <IconButton onClick={() => setReportDialogOpen(false)}>
+                    <Close />
+                  </IconButton>
+                </Box>
               </Box>
             </DialogTitle>
             <Divider />
-            <DialogContent sx={{ minHeight: 400, p: 4 }}>
-              <Box sx={{ textAlign: 'center', py: 8 }}>
-                <CircularProgress size={40} sx={{ color: selectedReport.color, mb: 3 }} />
-                <Typography variant="h6" color="text.secondary" gutterBottom>
-                  جاري تحميل بيانات التقرير...
+            <DialogContent sx={{ minHeight: 400, p: 3 }}>
+              {/* Date Range Info */}
+              <Box sx={{ mb: 2, p: 2, bgcolor: '#e3f2fd', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2">
+                  📅 الفترة: {startDateStr} إلى {endDateStr}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  الفترة: {startDateStr} إلى {endDateStr}
-                </Typography>
-                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 2 }}>
-                  API: {selectedReport.apiEndpoint}
-                </Typography>
+                <Chip
+                  label={reportLoading ? 'جاري التحميل...' : reportError ? 'خطأ' : 'جاهز'}
+                  color={reportLoading ? 'default' : reportError ? 'error' : 'success'}
+                  size="small"
+                  icon={reportLoading ? <CircularProgress size={14} /> : reportError ? <ErrorIcon /> : <CheckCircle />}
+                />
               </Box>
+
+              {/* Report Data */}
+              {renderReportData()}
             </DialogContent>
             <Divider />
             <DialogActions sx={{ p: 2, gap: 1 }}>
               {selectedReport.exportFormats.includes('pdf') && (
                 <Button
                   variant="contained"
-                  startIcon={<PictureAsPdf />}
+                  startIcon={exportLoading === 'pdf' ? <CircularProgress size={16} color="inherit" /> : <PictureAsPdf />}
                   onClick={() => handleExportPdf(selectedReport)}
+                  disabled={!!exportLoading}
                   sx={{ bgcolor: '#f44336', '&:hover': { bgcolor: '#d32f2f' } }}
                 >
                   تصدير PDF
@@ -432,8 +611,9 @@ export const ReportsPage = () => {
               {selectedReport.exportFormats.includes('excel') && (
                 <Button
                   variant="contained"
-                  startIcon={<TableChart />}
+                  startIcon={exportLoading === 'excel' ? <CircularProgress size={16} color="inherit" /> : <TableChart />}
                   onClick={() => handleExportExcel(selectedReport)}
+                  disabled={!!exportLoading}
                   sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#388e3c' } }}
                 >
                   تصدير Excel

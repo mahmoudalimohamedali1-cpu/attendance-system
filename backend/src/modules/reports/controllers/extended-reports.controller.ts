@@ -167,6 +167,78 @@ export class ExtendedReportsController {
         return this.service.getLeaveRequestsReport(req.user.companyId, query);
     }
 
+    @Get('leaves/sick')
+    @ApiOperation({ summary: 'الإجازات المرضية' })
+    getSickLeaves(@Request() req: any, @Query() query: LeaveReportQueryDto) {
+        return this.service.getSickLeavesReport(req.user.companyId, query);
+    }
+
+    @Get('leaves/by-type')
+    @ApiOperation({ summary: 'الإجازات حسب النوع' })
+    getLeavesByType(@Request() req: any, @Query() query: LeaveReportQueryDto) {
+        return this.service.getLeavesByTypeReport(req.user.companyId, query);
+    }
+
+    // ===================== ADDITIONAL PAYROLL REPORTS =====================
+
+    @Get('payroll/payslips')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'تفاصيل قسائم الرواتب' })
+    getPayslipDetails(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getPayslipDetails(req.user.companyId, query);
+    }
+
+    @Get('payroll/late-deductions')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'خصومات التأخير' })
+    getLateDeductions(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getLateDeductionsReport(req.user.companyId, query);
+    }
+
+    @Get('payroll/absence-deductions')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'خصومات الغياب' })
+    getAbsenceDeductions(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getAbsenceDeductionsReport(req.user.companyId, query);
+    }
+
+    @Get('payroll/overtime-allowances')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'بدلات العمل الإضافي' })
+    getOvertimeAllowances(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getOvertimeAllowancesReport(req.user.companyId, query);
+    }
+
+    // ===================== ADDITIONAL HR REPORTS =====================
+
+    @Get('hr/new-hires')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'الموظفين الجدد' })
+    getNewHires(@Request() req: any, @Query() query: EmployeeReportQueryDto) {
+        return this.service.getNewHiresReport(req.user.companyId, query);
+    }
+
+    @Get('hr/distribution')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'توزيع الموظفين' })
+    getEmployeeDistribution(@Request() req: any) {
+        return this.service.getEmployeeDistribution(req.user.companyId);
+    }
+
+    @Get('hr/turnover')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'معدل دوران الموظفين' })
+    getTurnover(@Request() req: any, @Query() query: ExtendedReportQueryDto) {
+        return this.service.getTurnoverReport(req.user.companyId, query);
+    }
+
     // ===================== CUSTODY REPORTS =====================
 
     @Get('custody/inventory')
@@ -175,6 +247,22 @@ export class ExtendedReportsController {
     @ApiOperation({ summary: 'جرد العهد' })
     getCustodyInventory(@Request() req: any, @Query() query: CustodyReportQueryDto) {
         return this.service.getCustodyInventory(req.user.companyId, query);
+    }
+
+    @Get('custody/by-employee')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'العهد حسب الموظف' })
+    getCustodyByEmployee(@Request() req: any, @Query() query: CustodyReportQueryDto) {
+        return this.service.getCustodyByEmployee(req.user.companyId, query);
+    }
+
+    @Get('custody/returns')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'إرجاع العهد' })
+    getCustodyReturns(@Request() req: any, @Query() query: CustodyReportQueryDto) {
+        return this.service.getCustodyReturns(req.user.companyId, query);
     }
 
     // ===================== EXECUTIVE REPORTS =====================
