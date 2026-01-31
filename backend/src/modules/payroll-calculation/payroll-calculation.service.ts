@@ -763,9 +763,10 @@ export class PayrollCalculationService {
         let overtimeHours = toDecimal(attendanceData.overtimeHours || 0);
 
         // 2. حساب الخصومات (Absence/Late)
-        // ملاحظة: قد نستخدم baseSalary أو totalSalary حسب الإعدادات (deductAbsenceFromBasic)
+        // ✅ المادة 91 من نظام العمل السعودي: الخصومات تُحسب من الراتب الأساسي الكامل
+        // نستخدم totalSalary (الراتب الكامل من العقد) بدل baseSalary (المتناسب) للخصومات
         // ✅ Using Decimal for deduction calculations
-        const deductionBase = settings.deductAbsenceFromBasic ? baseSalary : totalSalary;
+        const deductionBase = totalSalary; // استخدام الراتب الأساسي الكامل للخصومات حسب نظام العمل السعودي
         const daysInPeriodAbsence = this.getDaysInPeriod(startDate, endDate, settings.unpaidLeaveCalcBase as any);
         const dailyRateAbsence = calcDailyRate(deductionBase, daysInPeriodAbsence);
         const hourlyRateLate = calcHourlyRate(deductionBase, daysInPeriodAbsence, dailyWorkingHours);
