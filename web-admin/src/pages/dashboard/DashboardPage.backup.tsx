@@ -81,7 +81,6 @@ import { MudadComplianceCard } from '@/components/dashboard/MudadComplianceCard'
 import { CalendarWidget } from '@/components/dashboard/CalendarWidget';
 import { AnnouncementsBanner } from '@/components/dashboard/AnnouncementsBanner';
 import { calendarEventsService, CalendarEvent as ServiceCalendarEvent } from '@/services/calendar-events.service';
-import { ModernDashboardView } from './ModernDashboardView';
 
 interface DashboardStats {
   employees: { total: number; active: number };
@@ -335,10 +334,7 @@ export const DashboardPage = () => {
     return <EmployeeDashboardView data={stats} />;
   }
 
-  // Admin/Manager Dashboard - Use Modern Design
-  return <ModernDashboardView />;
-
-  // Legacy code below - kept for reference
+  // Admin/Manager Dashboard
   const adminStats = stats as DashboardStats;
   const dashboardStats = adminStats || {
     employees: { total: 0, active: 0 },

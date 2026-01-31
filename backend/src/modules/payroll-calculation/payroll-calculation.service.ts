@@ -520,6 +520,7 @@ export class PayrollCalculationService {
 
         // ✅ Fix: حساب أيام العمل المتوقعة في الفترة
         const workingDays = this.getWorkingDaysInPeriod(startDate, endDate, effectiveWorkingDays);
+        console.log(`🔍 WORKING_DAYS_DEBUG: workingDays=${workingDays}, effectiveWorkingDays=${effectiveWorkingDays}, presentDays=${presentDays}, absentDays=${absentDays}`);
 
         // ✅ حساب الغياب الحقيقي = أيام العمل - أيام الحضور (مع مراعاة العطلات)
         // لو الموظف مش عنده سجل حضور في يوم عمل، ده يعتبر غياب
