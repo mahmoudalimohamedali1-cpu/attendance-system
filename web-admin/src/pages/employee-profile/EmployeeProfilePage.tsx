@@ -68,6 +68,7 @@ import { DocumentsTab } from './components/tabs/DocumentsTab';
 import { DisciplinaryTab } from './components/tabs/DisciplinaryTab';
 import { CustodyTab } from './components/tabs/CustodyTab';
 import { SkillsTab } from './components/tabs/SkillsTab';
+import { CareerProgressionTab } from './components/tabs/CareerProgressionTab';
 import { RequestOnBehalfModal } from './components/RequestOnBehalfModal';
 import { AddCircleOutline } from '@mui/icons-material';
 
@@ -410,6 +411,7 @@ export const EmployeeProfilePage = () => {
         { label: 'المهارات', icon: <Psychology fontSize="small" /> },
         { label: 'التأديبية', icon: <Gavel fontSize="small" /> },
         { label: 'العهد', icon: <Inventory fontSize="small" /> },
+        { label: 'التدرج الوظيفي', icon: <Hub fontSize="small" /> },
     ];
 
     const formatDate = (date: string | Date | null) => {
@@ -829,6 +831,7 @@ export const EmployeeProfilePage = () => {
                     {activeTab === 7 && <SkillsTab userId={id!} />}
                     {activeTab === 8 && <DisciplinaryTab profile={profile} />}
                     {activeTab === 9 && <CustodyTab profile={profile} />}
+                    {activeTab === 10 && <CareerProgressionTab userId={id!} />}
                 </Box>
             </Box>
 
