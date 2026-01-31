@@ -1947,6 +1947,7 @@ export class PayrollCalculationService {
 
         // ✅ الحد الأقصى للخصومات من الإعدادات (افتراضي 50% حسب نظام العمل السعودي المادة 91)
         // ✅ FIX: السقف يُحسب على راتب العقد الكامل (totalSalary) وليس الراتب الأساسي فقط
+        const originalDeductionsBeforeCap = totalDeductions; // ✅ حفظ الخصومات الأصلية قبل تطبيق السقف
         const deductionCapResult = applyDeductionCap(totalSalary, totalDeductions, settings.maxDeductionPercent || 50);
         let deductionsExceedLimit = deductionCapResult.wasCapped;
         let excessDeductionAmount = deductionCapResult.excessAmount;
@@ -2020,6 +2021,7 @@ export class PayrollCalculationService {
             totalDeductions: toNumber(totalDeductions),
             netSalary: toNumber(netSalary),
             deferredDeductions: toNumber(excessDeductionAmount), // ✅ الخصومات المرحلة للشهر القادم
+            originalDeductionsBeforeCap: toNumber(originalDeductionsBeforeCap), // ✅ الخصومات الأصلية قبل السقف
             calculationTrace: trace,
             policyLines,
         };

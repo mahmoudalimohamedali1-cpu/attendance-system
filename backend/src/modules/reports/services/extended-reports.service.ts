@@ -991,4 +991,605 @@ export class ExtendedReportsService {
             quickStats: { totalEmployees, activeEmployees, presentToday, onLeaveToday, pendingRequests: pendingLeaves + pendingAdvances, upcomingExpiries: expiringIqamas + expiringContracts },
         };
     }
+
+    // ===================== ADDITIONAL PAYROLL REPORTS =====================
+
+    /** تقرير WPS (ملف البنك) */
+    async getWpsReport(companyId: string, query: PayrollReportQueryDto) {
+        const year = query.year || new Date().getFullYear();
+        const month = query.month || new Date().getMonth() + 1;
+
+        const period = await this.prisma.payrollPeriod.findFirst({ where: { companyId, year, month } });
+        if (!period) return { metadata: { reportName: 'تقرير WPS', reportNameEn: 'WPS Report', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const run = await this.prisma.payrollRun.findFirst({
+            where: { companyId, periodId: period.id, isAdjustment: false },
+            include: { payslips: { include: { user: { select: { firstName: true, lastName: true, employeeCode: true, bankName: true, bankAccountNumber: true, iban: true } } } } } as any,
+        });
+
+        if (!run) return { metadata: { reportName: 'تقرير WPS', reportNameEn: 'WPS Report', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const data = ((run as any).payslips || []).map((p: any) => ({
+            employeeName: `${p.user.firstName} ${p.user.lastName}`,
+            employeeCode: p.user.employeeCode,
+            bankName: p.user.bankName,
+            accountNumber: p.user.bankAccountNumber,
+            iban: p.user.iban,
+            netSalary: Number(p.netSalary),
+        }));
+
+        return {
+            metadata: { reportName: 'تقرير WPS', reportNameEn: 'WPS Bank File Report', generatedAt: new Date(), filters: { year, month }, totalCount: data.length },
+            data,
+            summary: { totalAmount: data.reduce((s: number, d: any) => s + d.netSalary, 0) },
+        };
+    }
+
+    /** تقرير الزيادات */
+    async getRaisesReport(companyId: string, query: ExtendedReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.salaryAdjustment.findMany({
+                where: { companyId, effectiveDate: { gte: startDate, lte: endDate }, type: 'INCREASE' as any } as any,
+                include: { user: { select: { firstName: true, lastName: true, employeeCode: true } } },
+                orderBy: { effectiveDate: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.salaryAdjustment.count({ where: { companyId, effectiveDate: { gte: startDate, lte: endDate }, type: 'INCREASE' as any } as any }),
+        ]);
+
+        return {
+            metadata: { reportName: 'تقرير الزيادات', reportNameEn: 'Raises Report', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data,
+            summary: { totalRaises: total },
+        };
+    }
+
+    /** تقرير مقارنة الرواتب */
+    async getPayrollComparison(companyId: string, query: PayrollReportQueryDto) {
+        const currentYear = query.year || new Date().getFullYear();
+        const currentMonth = query.month || new Date().getMonth() + 1;
+        const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+        const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+        const [currentPeriod, prevPeriod] = await Promise.all([
+            this.prisma.payrollPeriod.findFirst({ where: { companyId, year: currentYear, month: currentMonth }, include: { payrollRuns: { include: { payslips: true } } } } as any),
+            this.prisma.payrollPeriod.findFirst({ where: { companyId, year: prevYear, month: prevMonth }, include: { payrollRuns: { include: { payslips: true } } } } as any),
+        ]);
+
+        const currentTotal = (currentPeriod as any)?.payrollRuns?.[0]?.payslips?.reduce((s: number, p: any) => s + Number(p.netSalary), 0) || 0;
+        const prevTotal = (prevPeriod as any)?.payrollRuns?.[0]?.payslips?.reduce((s: number, p: any) => s + Number(p.netSalary), 0) || 0;
+        const difference = currentTotal - prevTotal;
+        const changePercent = prevTotal > 0 ? Math.round((difference / prevTotal) * 100 * 100) / 100 : 0;
+
+        return {
+            metadata: { reportName: 'مقارنة الرواتب', reportNameEn: 'Payroll Comparison', generatedAt: new Date(), filters: query, totalCount: 2 },
+            data: { currentPeriod: { year: currentYear, month: currentMonth, total: currentTotal }, previousPeriod: { year: prevYear, month: prevMonth, total: prevTotal }, difference, changePercent },
+        };
+    }
+
+    /** تقرير تكلفة الموظف */
+    async getEmployeeCostReport(companyId: string, query: PayrollReportQueryDto) {
+        const year = query.year || new Date().getFullYear();
+        const month = query.month || new Date().getMonth() + 1;
+
+        const period = await this.prisma.payrollPeriod.findFirst({ where: { companyId, year, month } });
+        if (!period) return { metadata: { reportName: 'تكلفة الموظف', reportNameEn: 'Employee Cost', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const run = await this.prisma.payrollRun.findFirst({
+            where: { companyId, periodId: period.id },
+            include: { payslips: { include: { user: { select: { firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } } }, lines: { include: { component: true } } } } } as any,
+        });
+
+        if (!run) return { metadata: { reportName: 'تكلفة الموظف', reportNameEn: 'Employee Cost', generatedAt: new Date(), filters: query, totalCount: 0 }, data: [], summary: {} };
+
+        const data = ((run as any).payslips || []).map((p: any) => {
+            const employerCost = p.lines.filter((l: any) => l.component?.code?.startsWith('GOSI_EMPLOYER') || l.component?.isEmployerCost).reduce((s: number, l: any) => s + Number(l.amount), 0);
+            return {
+                employeeName: `${p.user.firstName} ${p.user.lastName}`,
+                employeeCode: p.user.employeeCode,
+                department: p.user.department?.name,
+                grossSalary: Number(p.grossSalary),
+                employerContributions: employerCost,
+                totalCost: Number(p.grossSalary) + employerCost,
+            };
+        });
+
+        return {
+            metadata: { reportName: 'تكلفة الموظف', reportNameEn: 'Employee Cost Report', generatedAt: new Date(), filters: { year, month }, totalCount: data.length },
+            data,
+            summary: { totalGross: data.reduce((s: number, d: any) => s + d.grossSalary, 0), totalCost: data.reduce((s: number, d: any) => s + d.totalCost, 0) },
+        };
+    }
+
+    /** تقرير التسويات بأثر رجعي */
+    async getRetroPayReport(companyId: string, query: PayrollReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const runs = await this.prisma.payrollRun.findMany({
+            where: { companyId, isAdjustment: true, createdAt: { gte: startDate, lte: endDate } },
+            include: { payslips: { include: { user: { select: { firstName: true, lastName: true, employeeCode: true } } } } } as any,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+        });
+
+        const periodIds = runs.map(r => r.periodId);
+        const periods = await this.prisma.payrollPeriod.findMany({ where: { id: { in: periodIds } } });
+        const periodMap = new Map(periods.map(p => [p.id, p]));
+
+        const data = runs.flatMap(r => (r as any).payslips.map((p: any) => {
+            const period = periodMap.get(r.periodId);
+            return {
+                employeeName: `${p.user.firstName} ${p.user.lastName}`,
+                employeeCode: p.user.employeeCode,
+                adjustmentDate: r.createdAt,
+                period: period ? `${period.month}/${period.year}` : 'N/A',
+                amount: Number(p.netSalary),
+            };
+        }));
+
+        return {
+            metadata: { reportName: 'التسويات بأثر رجعي', reportNameEn: 'Retro Payments', generatedAt: new Date(), filters: query, totalCount: data.length, page, limit, totalPages: Math.ceil(data.length / limit) },
+            data,
+            summary: { totalAmount: data.reduce((s: number, d: any) => s + d.amount, 0) },
+        };
+    }
+
+    // ===================== ADDITIONAL LEAVE REPORTS =====================
+
+    /** تقرير استهلاك الإجازات */
+    async getLeaveConsumptionReport(companyId: string, query: LeaveReportQueryDto) {
+        const year = new Date().getFullYear();
+
+        const users = await this.prisma.user.findMany({
+            where: { companyId, role: 'EMPLOYEE', status: 'ACTIVE', ...(query.branchId && { branchId: query.branchId }) },
+            select: { id: true, firstName: true, lastName: true, employeeCode: true, annualLeaveDays: true, usedLeaveDays: true, remainingLeaveDays: true, department: { select: { name: true } } },
+        });
+
+        const data = users.map(u => ({
+            employeeName: `${u.firstName} ${u.lastName}`,
+            employeeCode: u.employeeCode,
+            department: u.department?.name,
+            entitled: u.annualLeaveDays,
+            used: u.usedLeaveDays,
+            remaining: u.remainingLeaveDays,
+            consumptionRate: u.annualLeaveDays > 0 ? Math.round((u.usedLeaveDays / u.annualLeaveDays) * 100) : 0,
+        }));
+
+        return {
+            metadata: { reportName: 'استهلاك الإجازات', reportNameEn: 'Leave Consumption', generatedAt: new Date(), filters: { year }, totalCount: data.length },
+            data,
+            summary: { avgConsumption: Math.round(data.reduce((s, d) => s + d.consumptionRate, 0) / data.length) || 0 },
+        };
+    }
+
+    /** تقرير الغياب غير المبرر */
+    async getUnjustifiedAbsenceReport(companyId: string, query: LeaveReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.attendance.findMany({
+                where: { companyId, date: { gte: startDate, lte: endDate }, status: 'ABSENT' },
+                include: { user: { select: { firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } } } },
+                orderBy: { date: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.attendance.count({ where: { companyId, date: { gte: startDate, lte: endDate }, status: 'ABSENT' } }),
+        ]);
+
+        return {
+            metadata: { reportName: 'الغياب غير المبرر', reportNameEn: 'Unjustified Absence', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data: data.map(d => ({ ...d, employeeName: `${(d as any).user.firstName} ${(d as any).user.lastName}` })),
+            summary: { totalAbsences: total },
+        };
+    }
+
+    /** تقرير الإجازات المتراكمة */
+    async getCarriedForwardReport(companyId: string, query: LeaveReportQueryDto) {
+        const year = new Date().getFullYear();
+
+        const balances = await this.prisma.leaveBalance.findMany({
+            where: { companyId, year, carriedForward: { gt: 0 } } as any,
+            include: { user: { select: { firstName: true, lastName: true, employeeCode: true } } },
+        });
+
+        const data = balances.map(b => ({
+            employeeName: `${(b as any).user.firstName} ${(b as any).user.lastName}`,
+            employeeCode: (b as any).user.employeeCode,
+            leaveType: b.leaveType,
+            carriedForward: (b as any).carriedForward || 0,
+            year: b.year,
+        }));
+
+        return {
+            metadata: { reportName: 'الإجازات المتراكمة', reportNameEn: 'Carried Forward Leaves', generatedAt: new Date(), filters: { year }, totalCount: data.length },
+            data,
+            summary: { totalCarried: data.reduce((s, d) => s + d.carriedForward, 0) },
+        };
+    }
+
+    /** تقرير توقعات الإجازات */
+    async getLeaveForecastReport(companyId: string, query: LeaveReportQueryDto) {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 3);
+
+        const requests = await this.prisma.leaveRequest.findMany({
+            where: { companyId, status: 'APPROVED', startDate: { gte: startDate, lte: endDate } },
+            include: { user: { select: { firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } } } },
+            orderBy: { startDate: 'asc' },
+        });
+
+        const data = requests.map(r => ({
+            employeeName: `${(r as any).user.firstName} ${(r as any).user.lastName}`,
+            employeeCode: (r as any).user.employeeCode,
+            department: (r as any).user.department?.name,
+            startDate: r.startDate,
+            endDate: r.endDate,
+            days: this.calculateDays(r.startDate, r.endDate),
+            type: r.type,
+        }));
+
+        return {
+            metadata: { reportName: 'توقعات الإجازات', reportNameEn: 'Leave Forecast', generatedAt: new Date(), filters: { months: 3 }, totalCount: data.length },
+            data,
+            summary: { totalUpcoming: data.length, totalDays: data.reduce((s, d) => s + d.days, 0) },
+        };
+    }
+
+    // ===================== ADDITIONAL HR REPORTS =====================
+
+    /** تقرير انتهاء الجوازات */
+    async getPassportExpiryReport(companyId: string, query: ContractExpiryQueryDto) {
+        const daysAhead = query.daysBeforeExpiry || 90;
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + daysAhead);
+
+        const data = await this.prisma.user.findMany({
+            where: { companyId, role: 'EMPLOYEE', status: 'ACTIVE', passportExpiryDate: { lte: futureDate, gte: new Date() } },
+            select: { id: true, firstName: true, lastName: true, employeeCode: true, passportNumber: true, passportExpiryDate: true, nationality: true },
+            orderBy: { passportExpiryDate: 'asc' },
+        });
+
+        return {
+            metadata: { reportName: 'انتهاء الجوازات', reportNameEn: 'Passport Expiry Report', generatedAt: new Date(), filters: { daysBeforeExpiry: daysAhead }, totalCount: data.length },
+            data: data.map(u => ({ ...u, employeeName: `${u.firstName} ${u.lastName}`, daysRemaining: u.passportExpiryDate ? Math.ceil((u.passportExpiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null })),
+        };
+    }
+
+    /** تقرير الترقيات */
+    async getPromotionsReport(companyId: string, query: ExtendedReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.promotion.findMany({
+                where: { companyId, effectiveDate: { gte: startDate, lte: endDate } } as any,
+                include: { user: { select: { firstName: true, lastName: true, employeeCode: true } } },
+                orderBy: { effectiveDate: 'desc' } as any,
+                skip,
+                take: limit,
+            }),
+            this.prisma.promotion.count({ where: { companyId, effectiveDate: { gte: startDate, lte: endDate } } as any }),
+        ]);
+
+        return {
+            metadata: { reportName: 'تقرير الترقيات', reportNameEn: 'Promotions Report', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data: data.map(p => ({ ...p, employeeName: `${(p as any).user.firstName} ${(p as any).user.lastName}` })),
+        };
+    }
+
+    /** التحليل الديموغرافي */
+    async getDemographicsReport(companyId: string) {
+        const employees = await this.prisma.user.findMany({
+            where: { companyId, role: 'EMPLOYEE', status: 'ACTIVE' },
+            select: { dateOfBirth: true, hireDate: true, gender: true, maritalStatus: true },
+        });
+
+        const now = new Date();
+        const ageGroups = { '18-25': 0, '26-35': 0, '36-45': 0, '46-55': 0, '55+': 0 };
+        const tenureGroups = { '<1 year': 0, '1-3 years': 0, '3-5 years': 0, '5-10 years': 0, '10+ years': 0 };
+        const genderDist: Record<string, number> = {};
+
+        employees.forEach(e => {
+            if (e.dateOfBirth) {
+                const age = Math.floor((now.getTime() - e.dateOfBirth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                if (age <= 25) ageGroups['18-25']++;
+                else if (age <= 35) ageGroups['26-35']++;
+                else if (age <= 45) ageGroups['36-45']++;
+                else if (age <= 55) ageGroups['46-55']++;
+                else ageGroups['55+']++;
+            }
+            if (e.hireDate) {
+                const years = Math.floor((now.getTime() - e.hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                if (years < 1) tenureGroups['<1 year']++;
+                else if (years < 3) tenureGroups['1-3 years']++;
+                else if (years < 5) tenureGroups['3-5 years']++;
+                else if (years < 10) tenureGroups['5-10 years']++;
+                else tenureGroups['10+ years']++;
+            }
+            const g = e.gender || 'غير محدد';
+            genderDist[g] = (genderDist[g] || 0) + 1;
+        });
+
+        return {
+            metadata: { reportName: 'التحليل الديموغرافي', reportNameEn: 'Demographics Analysis', generatedAt: new Date(), filters: {}, totalCount: employees.length },
+            data: { ageGroups, tenureGroups, genderDistribution: genderDist },
+        };
+    }
+
+    // ===================== CUSTODY REPORTS =====================
+
+    /** تقرير العهد بحاجة للصيانة */
+    async getCustodyMaintenanceReport(companyId: string, query: CustodyReportQueryDto) {
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.custodyItem.findMany({
+                where: { companyId, status: 'NEEDS_MAINTENANCE' as any } as any,
+                include: { category: { select: { name: true } }, assignments: { take: 1, orderBy: { createdAt: 'desc' }, include: { employee: { select: { firstName: true, lastName: true } } } } },
+                orderBy: { updatedAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.custodyItem.count({ where: { companyId, status: 'NEEDS_MAINTENANCE' as any } as any }),
+        ]);
+
+        return {
+            metadata: { reportName: 'العهد بحاجة للصيانة', reportNameEn: 'Custody Maintenance', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data: data.map(d => ({ ...d, currentHolder: (d as any).assignments?.[0]?.employee ? `${(d as any).assignments[0].employee.firstName} ${(d as any).assignments[0].employee.lastName}` : null })),
+        };
+    }
+
+    /** تقرير قيمة الأصول */
+    async getAssetValueReport(companyId: string, query: CustodyReportQueryDto) {
+        const items = await this.prisma.custodyItem.findMany({
+            where: { companyId },
+            include: { category: { select: { name: true } } },
+        });
+
+        const byCategory = items.reduce((acc, i) => {
+            const cat = (i as any).category?.name || 'غير مصنف';
+            if (!acc[cat]) acc[cat] = { count: 0, value: 0 };
+            acc[cat].count++;
+            acc[cat].value += Number((i as any).purchasePrice || 0);
+            return acc;
+        }, {} as Record<string, { count: number; value: number }>);
+
+        const totalValue = items.reduce((s, i) => s + Number((i as any).purchasePrice || 0), 0);
+
+        return {
+            metadata: { reportName: 'قيمة الأصول', reportNameEn: 'Asset Value Report', generatedAt: new Date(), filters: query, totalCount: items.length },
+            data: { byCategory: Object.entries(byCategory).map(([category, data]) => ({ category, ...data })), totalItems: items.length, totalValue },
+        };
+    }
+
+    // ===================== DISCIPLINARY REPORTS =====================
+
+    /** تقرير القضايا التأديبية */
+    async getDisciplinaryCases(companyId: string, query: DisciplinaryReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const where: any = { companyId, createdAt: { gte: startDate, lte: endDate } };
+        if (query.caseStatus) where.status = query.caseStatus;
+
+        const [data, total] = await Promise.all([
+            this.prisma.disciplinaryCase.findMany({
+                where,
+                include: { user: { select: { firstName: true, lastName: true, employeeCode: true } } },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.disciplinaryCase.count({ where }),
+        ]);
+
+        return {
+            metadata: { reportName: 'القضايا التأديبية', reportNameEn: 'Disciplinary Cases', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data: data.map(d => ({ ...d, employeeName: `${(d as any).user.firstName} ${(d as any).user.lastName}` })),
+        };
+    }
+
+    /** تقرير المخالفات حسب النوع */
+    async getViolationsByType(companyId: string, query: DisciplinaryReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+
+        const cases = await this.prisma.disciplinaryCase.findMany({
+            where: { companyId, createdAt: { gte: startDate, lte: endDate } },
+            select: { violationType: true },
+        });
+
+        const byType = cases.reduce((acc, c) => {
+            const t = (c as any).violationType || 'غير محدد';
+            acc[t] = (acc[t] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return {
+            metadata: { reportName: 'المخالفات حسب النوع', reportNameEn: 'Violations by Type', generatedAt: new Date(), filters: query, totalCount: cases.length },
+            data: Object.entries(byType).map(([type, count]) => ({ type, count })),
+        };
+    }
+
+    /** تقرير العقوبات المطبقة */
+    async getPenaltiesReport(companyId: string, query: DisciplinaryReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.disciplinaryAction.findMany({
+                where: { companyId, appliedAt: { gte: startDate, lte: endDate } } as any,
+                include: { user: { select: { firstName: true, lastName: true, employeeCode: true } }, disciplinaryCase: true },
+                orderBy: { appliedAt: 'desc' } as any,
+                skip,
+                take: limit,
+            }),
+            this.prisma.disciplinaryAction.count({ where: { companyId, appliedAt: { gte: startDate, lte: endDate } } as any }),
+        ]);
+
+        return {
+            metadata: { reportName: 'العقوبات المطبقة', reportNameEn: 'Applied Penalties', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data: data.map(d => ({ ...d, employeeName: `${(d as any).user.firstName} ${(d as any).user.lastName}` })),
+        };
+    }
+
+    /** تقرير التحقيقات */
+    async getInvestigationsReport(companyId: string, query: DisciplinaryReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.investigation.findMany({
+                where: { companyId, createdAt: { gte: startDate, lte: endDate } },
+                include: { accusedEmployees: { select: { firstName: true, lastName: true } } },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.investigation.count({ where: { companyId, createdAt: { gte: startDate, lte: endDate } } }),
+        ]);
+
+        return {
+            metadata: { reportName: 'تقرير التحقيقات', reportNameEn: 'Investigations Report', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data,
+        };
+    }
+
+    /** السجل التأديبي للموظف */
+    async getEmployeeDisciplinaryRecord(companyId: string, query: DisciplinaryReportQueryDto) {
+        const { page, limit, skip } = this.getPagination(query);
+
+        const employees = await this.prisma.user.findMany({
+            where: { companyId, role: 'EMPLOYEE' },
+            include: {
+                disciplinaryCases: { orderBy: { createdAt: 'desc' } },
+                disciplinaryActions: { orderBy: { createdAt: 'desc' } } as any,
+            },
+            skip,
+            take: limit,
+        });
+
+        const data = employees.filter(e => (e as any).disciplinaryCases?.length > 0 || (e as any).disciplinaryActions?.length > 0).map(e => ({
+            employeeName: `${e.firstName} ${e.lastName}`,
+            employeeCode: e.employeeCode,
+            totalCases: (e as any).disciplinaryCases?.length || 0,
+            totalActions: (e as any).disciplinaryActions?.length || 0,
+            cases: (e as any).disciplinaryCases,
+            actions: (e as any).disciplinaryActions,
+        }));
+
+        return {
+            metadata: { reportName: 'السجل التأديبي للموظف', reportNameEn: 'Employee Disciplinary Record', generatedAt: new Date(), filters: query, totalCount: data.length },
+            data,
+        };
+    }
+
+    /** تقرير الإنذارات */
+    async getWarningsReport(companyId: string, query: DisciplinaryReportQueryDto) {
+        const { startDate, endDate } = this.getDateRange(query);
+        const { page, limit, skip } = this.getPagination(query);
+
+        const [data, total] = await Promise.all([
+            this.prisma.disciplinaryAction.findMany({
+                where: { companyId, actionType: 'WARNING' as any, createdAt: { gte: startDate, lte: endDate } } as any,
+                include: { user: { select: { firstName: true, lastName: true, employeeCode: true } } },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.disciplinaryAction.count({ where: { companyId, actionType: 'WARNING' as any, createdAt: { gte: startDate, lte: endDate } } as any }),
+        ]);
+
+        return {
+            metadata: { reportName: 'تقرير الإنذارات', reportNameEn: 'Warnings Report', generatedAt: new Date(), filters: query, totalCount: total, page, limit, totalPages: Math.ceil(total / limit) },
+            data: data.map(d => ({ ...d, employeeName: `${(d as any).user.firstName} ${(d as any).user.lastName}` })),
+        };
+    }
+
+    // ===================== ADDITIONAL EXECUTIVE REPORTS =====================
+
+    /** تنبيهات المخاطر */
+    async getRiskAlerts(companyId: string): Promise<{ metadata: any; data: AlertItem[] }> {
+        const alerts: AlertItem[] = [];
+        const now = new Date();
+        const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        const [expiringIqamas, expiringPassports, pendingLeaves, highAbsence] = await Promise.all([
+            this.prisma.user.count({ where: { companyId, isSaudi: false, iqamaExpiryDate: { lte: thirtyDaysLater, gte: now } } }),
+            this.prisma.user.count({ where: { companyId, passportExpiryDate: { lte: thirtyDaysLater, gte: now } } }),
+            this.prisma.leaveRequest.count({ where: { companyId, status: 'PENDING' } }),
+            this.prisma.attendance.count({ where: { companyId, status: 'ABSENT', date: { gte: new Date(now.getFullYear(), now.getMonth(), 1) } } }),
+        ]);
+
+        if (expiringIqamas > 0) alerts.push({ id: '1', type: 'WARNING', title: 'إقامات تنتهي قريباً', titleEn: 'Expiring Iqamas', message: `${expiringIqamas} إقامة تنتهي خلال 30 يوم`, messageEn: `${expiringIqamas} iqamas expiring`, createdAt: now });
+        if (expiringPassports > 0) alerts.push({ id: '2', type: 'WARNING', title: 'جوازات تنتهي قريباً', titleEn: 'Expiring Passports', message: `${expiringPassports} جواز ينتهي قريباً`, messageEn: `${expiringPassports} passports expiring`, createdAt: now });
+        if (pendingLeaves > 5) alerts.push({ id: '3', type: 'INFO', title: 'طلبات معلقة كثيرة', titleEn: 'Many Pending Requests', message: `${pendingLeaves} طلب إجازة بانتظار المراجعة`, messageEn: `${pendingLeaves} leave requests pending`, createdAt: now });
+        if (highAbsence > 10) alerts.push({ id: '4', type: 'DANGER', title: 'معدل غياب مرتفع', titleEn: 'High Absence Rate', message: `${highAbsence} حالة غياب هذا الشهر`, messageEn: `${highAbsence} absences this month`, createdAt: now });
+
+        return {
+            metadata: { reportName: 'تنبيهات المخاطر', reportNameEn: 'Risk Alerts', generatedAt: now, filters: {}, totalCount: alerts.length },
+            data: alerts,
+        };
+    }
+
+    /** مؤشرات الأداء */
+    async getKpisReport(companyId: string): Promise<{ metadata: any; data: KPIData[] }> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+        const [activeEmployees, todayPresent, monthLate, monthAbsent, pendingRequests] = await Promise.all([
+            this.prisma.user.count({ where: { companyId, role: 'EMPLOYEE', status: 'ACTIVE' } }),
+            this.prisma.attendance.count({ where: { companyId, date: today, checkInTime: { not: null } } }),
+            this.prisma.attendance.count({ where: { companyId, date: { gte: monthStart }, status: 'LATE' } }),
+            this.prisma.attendance.count({ where: { companyId, date: { gte: monthStart }, status: 'ABSENT' } }),
+            this.prisma.leaveRequest.count({ where: { companyId, status: 'PENDING' } }),
+        ]);
+
+        const kpis: KPIData[] = [
+            { name: 'نسبة الحضور اليوم', nameEn: 'Today Attendance', value: activeEmployees > 0 ? Math.round((todayPresent / activeEmployees) * 100) : 0, target: 95, unit: '%', trend: 'stable' },
+            { name: 'التأخيرات هذا الشهر', nameEn: 'Monthly Late', value: monthLate, unit: 'مرة', trend: monthLate > 20 ? 'up' : 'down' },
+            { name: 'الغياب هذا الشهر', nameEn: 'Monthly Absence', value: monthAbsent, unit: 'يوم', trend: monthAbsent > 10 ? 'up' : 'stable' },
+            { name: 'الطلبات المعلقة', nameEn: 'Pending Requests', value: pendingRequests, unit: 'طلب', trend: 'stable' },
+        ];
+
+        return {
+            metadata: { reportName: 'مؤشرات الأداء', reportNameEn: 'KPIs', generatedAt: new Date(), filters: {}, totalCount: kpis.length },
+            data: kpis,
+        };
+    }
+
+    /** تقرير الامتثال التنفيذي */
+    async getExecutiveComplianceReport(companyId: string) {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+
+        const [totalEmployees, totalAttendances, onTimeCount, lateCount, absentCount] = await Promise.all([
+            this.prisma.user.count({ where: { companyId, role: 'EMPLOYEE', status: 'ACTIVE' } }),
+            this.prisma.attendance.count({ where: { companyId, date: { gte: monthStart } } }),
+            this.prisma.attendance.count({ where: { companyId, date: { gte: monthStart }, status: 'PRESENT' } }),
+            this.prisma.attendance.count({ where: { companyId, date: { gte: monthStart }, status: 'LATE' } }),
+            this.prisma.attendance.count({ where: { companyId, date: { gte: monthStart }, status: 'ABSENT' } }),
+        ]);
+
+        const complianceScore = totalAttendances > 0 ? Math.round((onTimeCount / totalAttendances) * 100) : 100;
+
+        return {
+            metadata: { reportName: 'تقرير الامتثال', reportNameEn: 'Compliance Score', generatedAt: new Date(), filters: {}, totalCount: 1 },
+            data: {
+                complianceScore,
+                breakdown: { onTime: onTimeCount, late: lateCount, absent: absentCount, total: totalAttendances },
+                grade: complianceScore >= 90 ? 'ممتاز' : complianceScore >= 75 ? 'جيد' : complianceScore >= 60 ? 'مقبول' : 'ضعيف',
+            },
+        };
+    }
 }

@@ -14,6 +14,7 @@ import {
     EmployeeReportQueryDto,
     ContractExpiryQueryDto,
     CustodyReportQueryDto,
+    DisciplinaryReportQueryDto,
 } from '../dto/extended-report.dto';
 
 @ApiTags('executive-reports')
@@ -265,6 +266,166 @@ export class ExtendedReportsController {
         return this.service.getCustodyReturns(req.user.companyId, query);
     }
 
+    @Get('custody/maintenance')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'العهد بحاجة للصيانة' })
+    getCustodyMaintenance(@Request() req: any, @Query() query: CustodyReportQueryDto) {
+        return this.service.getCustodyMaintenanceReport(req.user.companyId, query);
+    }
+
+    @Get('custody/value')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR', 'MANAGER')
+    @ApiOperation({ summary: 'قيمة الأصول' })
+    getAssetValue(@Request() req: any, @Query() query: CustodyReportQueryDto) {
+        return this.service.getAssetValueReport(req.user.companyId, query);
+    }
+
+    // ===================== ADDITIONAL PAYROLL REPORTS =====================
+
+    @Get('payroll/wps')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'تقرير WPS' })
+    getWpsReport(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getWpsReport(req.user.companyId, query);
+    }
+
+    @Get('payroll/raises')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'تقرير الزيادات' })
+    getRaisesReport(@Request() req: any, @Query() query: ExtendedReportQueryDto) {
+        return this.service.getRaisesReport(req.user.companyId, query);
+    }
+
+    @Get('payroll/comparison')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'مقارنة الرواتب' })
+    getPayrollComparison(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getPayrollComparison(req.user.companyId, query);
+    }
+
+    @Get('payroll/employee-cost')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'تكلفة الموظف' })
+    getEmployeeCost(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getEmployeeCostReport(req.user.companyId, query);
+    }
+
+    @Get('payroll/retro')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'FINANCE')
+    @ApiOperation({ summary: 'التسويات بأثر رجعي' })
+    getRetroPay(@Request() req: any, @Query() query: PayrollReportQueryDto) {
+        return this.service.getRetroPayReport(req.user.companyId, query);
+    }
+
+    // ===================== ADDITIONAL LEAVE REPORTS =====================
+
+    @Get('leaves/consumption')
+    @ApiOperation({ summary: 'استهلاك الإجازات' })
+    getLeaveConsumption(@Request() req: any, @Query() query: LeaveReportQueryDto) {
+        return this.service.getLeaveConsumptionReport(req.user.companyId, query);
+    }
+
+    @Get('leaves/unjustified')
+    @ApiOperation({ summary: 'الغياب غير المبرر' })
+    getUnjustifiedAbsence(@Request() req: any, @Query() query: LeaveReportQueryDto) {
+        return this.service.getUnjustifiedAbsenceReport(req.user.companyId, query);
+    }
+
+    @Get('leaves/carried-forward')
+    @ApiOperation({ summary: 'الإجازات المتراكمة' })
+    getCarriedForward(@Request() req: any, @Query() query: LeaveReportQueryDto) {
+        return this.service.getCarriedForwardReport(req.user.companyId, query);
+    }
+
+    @Get('leaves/forecast')
+    @ApiOperation({ summary: 'توقعات الإجازات' })
+    getLeaveForecast(@Request() req: any, @Query() query: LeaveReportQueryDto) {
+        return this.service.getLeaveForecastReport(req.user.companyId, query);
+    }
+
+    // ===================== ADDITIONAL HR REPORTS =====================
+
+    @Get('hr/passport-expiry')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'انتهاء الجوازات' })
+    getPassportExpiry(@Request() req: any, @Query() query: ContractExpiryQueryDto) {
+        return this.service.getPassportExpiryReport(req.user.companyId, query);
+    }
+
+    @Get('hr/promotions')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'تقرير الترقيات' })
+    getPromotions(@Request() req: any, @Query() query: ExtendedReportQueryDto) {
+        return this.service.getPromotionsReport(req.user.companyId, query);
+    }
+
+    @Get('hr/demographics')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'التحليل الديموغرافي' })
+    getDemographics(@Request() req: any) {
+        return this.service.getDemographicsReport(req.user.companyId);
+    }
+
+    // ===================== DISCIPLINARY REPORTS =====================
+
+    @Get('disciplinary/cases')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'القضايا التأديبية' })
+    getDisciplinaryCases(@Request() req: any, @Query() query: DisciplinaryReportQueryDto) {
+        return this.service.getDisciplinaryCases(req.user.companyId, query);
+    }
+
+    @Get('disciplinary/violations')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'المخالفات حسب النوع' })
+    getViolationsByType(@Request() req: any, @Query() query: DisciplinaryReportQueryDto) {
+        return this.service.getViolationsByType(req.user.companyId, query);
+    }
+
+    @Get('disciplinary/penalties')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'العقوبات المطبقة' })
+    getPenalties(@Request() req: any, @Query() query: DisciplinaryReportQueryDto) {
+        return this.service.getPenaltiesReport(req.user.companyId, query);
+    }
+
+    @Get('disciplinary/investigations')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'تقرير التحقيقات' })
+    getInvestigations(@Request() req: any, @Query() query: DisciplinaryReportQueryDto) {
+        return this.service.getInvestigationsReport(req.user.companyId, query);
+    }
+
+    @Get('disciplinary/employee-record')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'السجل التأديبي للموظف' })
+    getEmployeeDisciplinaryRecord(@Request() req: any, @Query() query: DisciplinaryReportQueryDto) {
+        return this.service.getEmployeeDisciplinaryRecord(req.user.companyId, query);
+    }
+
+    @Get('disciplinary/warnings')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN', 'HR')
+    @ApiOperation({ summary: 'تقرير الإنذارات' })
+    getWarnings(@Request() req: any, @Query() query: DisciplinaryReportQueryDto) {
+        return this.service.getWarningsReport(req.user.companyId, query);
+    }
+
     // ===================== EXECUTIVE REPORTS =====================
 
     @Get('executive/dashboard')
@@ -273,5 +434,29 @@ export class ExtendedReportsController {
     @ApiOperation({ summary: 'لوحة التحكم التنفيذية' })
     getExecutiveDashboard(@Request() req: any) {
         return this.service.getExecutiveDashboard(req.user.companyId);
+    }
+
+    @Get('executive/alerts')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'تنبيهات المخاطر' })
+    getRiskAlerts(@Request() req: any) {
+        return this.service.getRiskAlerts(req.user.companyId);
+    }
+
+    @Get('executive/kpis')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'مؤشرات الأداء' })
+    getKpis(@Request() req: any) {
+        return this.service.getKpisReport(req.user.companyId);
+    }
+
+    @Get('executive/compliance')
+    @UseGuards(RolesGuard)
+    @Roles('ADMIN')
+    @ApiOperation({ summary: 'تقرير الامتثال' })
+    getExecutiveCompliance(@Request() req: any) {
+        return this.service.getExecutiveComplianceReport(req.user.companyId);
     }
 }
