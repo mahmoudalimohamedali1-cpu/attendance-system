@@ -759,6 +759,7 @@ export class PayrollCalculationService {
         let presentDays = attendanceData.presentDays || daysInPeriodGeneral;
         let absentDays = attendanceData.absentDays || 0;
         let lateMinutes = attendanceData.lateMinutes || 0;
+        console.log(`🔍 RAW_ATTENDANCE_DATA: employeeId=${employeeId}, presentDays=${presentDays}, absentDays=${absentDays}, lateMinutes=${lateMinutes}, attendanceData.lateMinutes=${attendanceData.lateMinutes}`);
         let overtimeHours = toDecimal(attendanceData.overtimeHours || 0);
 
         // 2. حساب الخصومات (Absence/Late)
